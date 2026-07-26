@@ -28,7 +28,8 @@ import {
   ChevronDown,
   FileSignature,
   Building2,
-  Lock
+  Lock,
+  Trash2
 } from 'lucide-react';
 
 interface ClassAMasterItemDef {
@@ -199,6 +200,16 @@ export const DocumentVaultView: React.FC = () => {
       localStorage.removeItem('bidocs_vault_items');
       setSelectedItemIds([]);
       alert('Class A Eligibility documents have been completely reset! All document slots are ready for re-uploading from scratch.');
+    }
+  };
+
+  const handleClearAllClassAUploads = () => {
+    if (confirm('Are you sure you want to remove ALL uploaded Class A Eligibility documents? All documents (PhilGEPS, DTI/SEC, Permits, Tax Clearance, PCAB, etc.) will be cleared so you can re-upload them from scratch.')) {
+      const remaining = vaultItems.filter(item => item.category !== 'ELIGIBILITY_CLASS_A');
+      setVaultItems(remaining);
+      localStorage.setItem('bidocs_vault_items', JSON.stringify(remaining));
+      setSelectedItemIds([]);
+      alert('All Class A uploaded documents have been removed! All 13 slots are now clean and ready for re-uploading.');
     }
   };
 
@@ -547,7 +558,15 @@ export const DocumentVaultView: React.FC = () => {
                 </p>
               </div>
             </div>
-            <div className="text-right shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleClearAllClassAUploads}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition flex items-center gap-1.5 shadow-sm"
+                title="Remove all uploaded Class A documents to re-upload from scratch"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                <span>Remove All Uploaded Documents</span>
+              </button>
               <span className="text-xs font-mono font-bold bg-slate-900 text-white px-3 py-1.5 rounded-xl border border-slate-800">
                 10 Mandatory • 3 Optional
               </span>
@@ -560,6 +579,14 @@ export const DocumentVaultView: React.FC = () => {
                 <FileCheck className="w-4 h-4 text-blue-400" />
                 Statutory Fixed Master Document List (Class A)
               </h3>
+              <button
+                onClick={handleClearAllClassAUploads}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition flex items-center gap-1.5"
+                title="Clear all Class A documents and start fresh"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                <span>Remove All Class A Uploads (Re-upload from Scratch)</span>
+              </button>
             </div>
 
             <div className="overflow-x-auto">
