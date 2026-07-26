@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { ChecklistRequirement, LegalRegime } from '../../types';
+import { DocumentCoverPage } from '../vault/DocumentCoverPage';
 import { 
   FolderKanban, 
   FileCheck, 
@@ -100,6 +101,7 @@ export const BidPackageBuilderView: React.FC = () => {
   });
   const [activeEnvelope, setActiveEnvelope] = useState<'ENVELOPE_1' | 'ENVELOPE_2'>('ENVELOPE_1');
   const [showFormGeneratorModal, setShowFormGeneratorModal] = useState(false);
+  const [showCoverPageModal, setShowCoverPageModal] = useState(false);
   const [selectedFormCode, setSelectedFormCode] = useState('OMNIBUS_SWORN_STATEMENT');
 
   // Sync to localStorage
@@ -179,6 +181,14 @@ export const BidPackageBuilderView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowCoverPageModal(true)}
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow transition flex items-center gap-2"
+          >
+            <FileText className="w-4 h-4 text-blue-200" />
+            <span>Preview Package Cover Page</span>
+          </button>
+
           <button
             onClick={() => setShowFormGeneratorModal(true)}
             className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow transition flex items-center gap-2"
@@ -354,6 +364,62 @@ export const BidPackageBuilderView: React.FC = () => {
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Export & Attach PDF to Envelope</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PACKAGE FRONT COVER PAGE MODAL */}
+      {showCoverPageModal && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[95vh] flex flex-col">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <FileText className="w-4 h-4 text-blue-400" />
+                <span>Official Bid Package Front Cover Page (Legal 8.5" × 13")</span>
+              </h3>
+              <button onClick={() => setShowCoverPageModal(false)} className="text-slate-400 hover:text-white p-1">
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 bg-slate-950">
+              <div className="max-w-[700px] mx-auto">
+                <DocumentCoverPage
+                  item={{
+                    id: 'bid-pkg-cover',
+                    tenantId: currentTenant?.id || 'tenant-001',
+                    documentName: 'ENVELOPE 1: TECHNICAL & ELIGIBILITY SUBMISSION PACKAGE',
+                    documentNumber: 'PhilGEPS-2026-10928371',
+                    category: 'ELIGIBILITY_CLASS_A',
+                    procurementApplicability: ['Infrastructure'],
+                    legalBasisReference: 'RA 12009 NGPA / RA 9184 Standard',
+                    versionNumber: 1,
+                    fileHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+                    fileSizeBytes: 1048576,
+                    fileName: 'bid_envelope_1_submission_package.pdf',
+                    uploadedByName: currentTenant?.authorizedSignatory?.name || 'Authorized Managing Officer',
+                    isOptional: false,
+                    requiresIssueDate: false,
+                    requiresExpiryDate: false,
+                    status: 'ACTIVE',
+                    previousVersions: []
+                  }}
+                  tenant={currentTenant}
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900/95">
+              <span className="text-xs text-slate-400 font-mono">
+                Formal submission cover page attached to Envelope 1 & 2
+              </span>
+              <button
+                onClick={() => setShowCoverPageModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white"
+              >
+                Close Preview
               </button>
             </div>
           </div>

@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { DocumentVaultItem, Tenant } from '../../types';
-import { DocumentCoverPage } from './DocumentCoverPage';
-import { X, FileText, Printer, Download, Eye, ShieldCheck, CheckCircle2, ChevronDown, ChevronUp, ZoomIn, ZoomOut } from 'lucide-react';
-
+import { X, FileText, Printer, Download, ZoomIn, ZoomOut } from 'lucide-react';
 import { generateAndDownloadThreeLayerPdf } from '../../utils/pdfExportEngine';
 
 interface PdfPreviewModalProps {
@@ -24,10 +22,9 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
     const today = new Date().toISOString().split('T')[0];
     const fileName = `${projRef}_${cleanDocName}_${today}.pdf`;
 
-    const coverElem = document.querySelector('.print-document-sheet') as HTMLElement;
     const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
 
-    await generateAndDownloadThreeLayerPdf(coverElem, templateElem, item.fileDataUrl, fileName);
+    await generateAndDownloadThreeLayerPdf(null, templateElem, item.fileDataUrl, fileName);
   };
 
   return (
@@ -79,7 +76,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
               className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition shadow flex items-center gap-1.5"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Export to PDF</span>
+              <span>Export PDF</span>
             </button>
 
             <button
@@ -87,7 +84,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
               className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print Legal (8.5" × 13") PDF</span>
+              <span>Print Document</span>
             </button>
 
             <button
@@ -99,25 +96,15 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
           </div>
         </div>
 
-        {/* Scrollable Continuous Multi-Page Viewer */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6 text-center">
+        {/* Scrollable Viewer: Uploaded File Only */}
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-950 space-y-4 text-center">
           
-          <div style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }} className="transition-transform duration-200 space-y-8">
+          <div style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }} className="transition-transform duration-200">
             
-            {/* Page 1: Auto-generated Cover Page (Legal 8.5" x 13") */}
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 text-xs text-slate-400 bg-slate-900/90 px-3.5 py-1 rounded-full border border-slate-800 font-mono">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>PAGE 1 OF PACKAGE: Legal Size (8.5" × 13") Cover Page</span>
-              </div>
-              <DocumentCoverPage item={item} tenant={tenant} />
-            </div>
-
-            {/* Page 2+: Uploaded Document Pages Viewer (Legal 8.5" x 13" Portrait Frame & Fit-To-Page) */}
-            <div className="space-y-3 max-w-[650px] mx-auto">
+            <div className="space-y-3 max-w-[850px] mx-auto">
               <div className="inline-flex items-center gap-2 text-xs text-slate-400 bg-slate-900/90 px-3.5 py-1 rounded-full border border-slate-800 font-mono">
                 <FileText className="w-3.5 h-3.5 text-blue-400" />
-                <span>PAGE 2+: UPLOADED DOCUMENT CONTENT (Legal 8.5" × 13" Fit-to-Page)</span>
+                <span>ORIGINAL UPLOADED DOCUMENT CONTENT (Legal 8.5" × 13" Fit-to-Page)</span>
               </div>
 
               {item.fileDataUrl ? (
@@ -132,13 +119,20 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
                 <div className="single-page-paper w-full aspect-[8.5/13] min-h-[950px] border-2 border-dashed border-slate-800 rounded-2xl bg-white text-slate-900 p-8 flex flex-col items-center justify-center space-y-4 shadow-2xl mx-auto">
                   <FileText className="w-16 h-16 text-blue-900 opacity-90 mx-auto" />
                   <div className="space-y-2 text-center">
-                    <h4 className="text-base font-black uppercase text-slate-950">Full PDF Content Active (Legal 8.5" × 13")</h4>
+                    <h4 className="text-base font-black uppercase text-slate-950">{item.documentName}</h4>
                     <p className="text-xs font-mono text-slate-700 leading-relaxed max-w-md mx-auto">
-                      This statutory exhibit is stored in vault registry. Page 1 Front Cover Page flows seamlessly into Page 2+ content without margin cut-offs or grid shifting.
+                      Statutory Vault Document File: <strong className="text-blue-950 font-bold">{item.fileName || 'document.pdf'}</strong>
+                      <br />
+                      Serial Number: <span className="font-bold">{item.documentNumber || 'N/A'}</span>
                     </p>
+                    {item.expiryDate && (
+                      <p className="text-xs font-mono text-emerald-700 font-bold">
+                        Verified Valid • Expiration Date: {item.expiryDate}
+                      </p>
+                    )}
                   </div>
                   <span className="text-[10px] font-mono font-bold bg-blue-100 text-blue-950 px-3 py-1 rounded-full border border-blue-300">
-                    Fit-To-Page Auto-Scaled • Legal Size Standard
+                    Uploaded File Verified • Legal 8.5" × 13" Standard
                   </span>
                 </div>
               )}
@@ -152,7 +146,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
         <div className="p-3 border-t border-slate-800 flex items-center justify-between bg-slate-900/95 text-xs text-slate-400 sticky bottom-0 z-10 shrink-0">
           <div className="flex items-center gap-2 font-mono text-[11px]">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>BiDOCS AES-256 Verified Standard • Legal (8.5" × 13") Paper Standard</span>
+            <span>BiDOCS AES-256 Verified Standard • Uploaded File View</span>
           </div>
 
           <button
