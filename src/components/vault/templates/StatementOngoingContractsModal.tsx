@@ -359,8 +359,8 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
             )}
           </div>
 
-          {/* GPPB LEGAL PAPER CONTAINER (Legal 13" x 8.5" LANDSCAPE Printable Layout — STRICT 1-PAGE FIT) */}
-          <div className="single-page-paper bg-white text-slate-900 font-sans p-6 sm:p-8 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1150px] min-h-[680px] aspect-[13/8.5] mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none print:max-h-[96vh]">
+          {/* GPPB LEGAL PAPER CONTAINER (Legal 13" x 8.5" LANDSCAPE Printable Layout — EXPANDABLE MULTI-ENTRY FIT) */}
+          <div className="single-page-paper bg-white text-slate-900 font-sans p-6 sm:p-8 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1150px] min-h-[680px] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
             
             {/* Outer Legal Frame */}
             <div className="absolute inset-3 border-2 border-slate-900 pointer-events-none rounded-xl" />
@@ -470,8 +470,11 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                                 <div className="text-slate-600">{row.amountCompletion || '₱0.00'}</div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-[10px] font-mono">
-                                <div>{row.duration}</div>
-                                <div className="text-[9px] text-slate-500">{row.dateAwarded} to {row.dateCompletion}</div>
+                                <div className="font-bold text-slate-950">{row.duration || 'N/A'}</div>
+                                <div className="text-[10px] font-bold text-slate-950 mt-0.5 leading-tight">
+                                  <span className="text-slate-700 font-semibold block">Award: {row.dateAwarded || 'N/A'}</span>
+                                  <span className="text-slate-900 block">Comp: {row.dateCompletion || 'N/A'}</span>
+                                </div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[10px]">
                                 <div>Plan: <span className="font-semibold">{row.accomplishmentPlanned}%</span></div>
@@ -577,8 +580,11 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                                 <div className="text-slate-600">{row.amountCompletion || '₱0.00'}</div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-[10px] font-mono">
-                                <div>{row.duration}</div>
-                                <div className="text-[9px] text-slate-500">{row.dateAwarded} to {row.dateCompletion}</div>
+                                <div className="font-bold text-slate-950">{row.duration || 'N/A'}</div>
+                                <div className="text-[10px] font-bold text-slate-950 mt-0.5 leading-tight">
+                                  <span className="text-slate-700 font-semibold block">Award: {row.dateAwarded || 'N/A'}</span>
+                                  <span className="text-slate-900 block">Comp: {row.dateCompletion || 'N/A'}</span>
+                                </div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[10px]">
                                 <div>Plan: <span className="font-semibold">{row.accomplishmentPlanned}%</span></div>
@@ -635,13 +641,16 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                     <p className="text-[11px] text-slate-700 font-semibold">
                       {tenant?.authorizedSignatory?.title || 'President & Managing Director'}
                     </p>
-                    <div className="flex items-center justify-end gap-1 text-[10px] text-slate-600 pt-0.5">
-                      <span>Date:</span>
+                    <div className="flex items-center justify-end gap-1 text-[11px] text-slate-900 pt-1 font-mono">
+                      <span className="font-bold">Date:</span>
+                      <span className="font-black text-slate-950 border-b border-slate-900 px-2 py-0.5 text-xs inline-block">
+                        {dateSubmitted || new Date().toISOString().split('T')[0]}
+                      </span>
                       <input
                         type="date"
                         value={dateSubmitted}
                         onChange={(e) => setDateSubmitted(e.target.value)}
-                        className="bg-slate-100 border border-slate-300 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-950"
+                        className="bg-slate-100 border border-slate-300 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-950 print:hidden no-export ml-1"
                       />
                     </div>
                   </div>
