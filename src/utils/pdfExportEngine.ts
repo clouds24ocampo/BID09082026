@@ -1,10 +1,11 @@
 import { PDFDocument } from 'pdf-lib';
 import html2canvas from 'html2canvas';
+import { debugLog } from './debugLog';
 
 export interface ExportDocumentUnit {
   title: string;
   coverElement?: HTMLElement | null;
-  formElement?: HTMLElement | null;
+  formElement?: HTMLElement | HTMLElement[] | null;
   fileDataUrl?: string | null;
   documentName?: string;
 }
@@ -41,6 +42,21 @@ export async function exportMergedThreeLayerPdf(
       if (unit.coverElement) {
         console.log(`📸 Generating Cover Page for: ${unit.title}`);
         try {
+          const qrImages = unit.coverElement.querySelectorAll('img[alt*="QR"], img[alt*="qr"]');
+          const qrLoadingPlaceholders = unit.coverElement.querySelectorAll(':scope *');
+          let loadingQrCount = 0;
+          qrLoadingPlaceholders.forEach((el) => {
+            if (el.textContent?.includes('Loading QR')) loadingQrCount++;
+          });
+          // #region agent log
+          debugLog('pdfExportEngine.ts:cover', 'Cover page capture starting', {
+            unitTitle: unit.title,
+            qrImageCount: qrImages.length,
+            loadingQrPlaceholders: loadingQrCount,
+            coverWidth: unit.coverElement.offsetWidth,
+            coverHeight: unit.coverElement.offsetHeight
+          }, 'C');
+          // #endregion
           const canvas = await html2canvas(unit.coverElement, {
             scale: 3, // High 300+ DPI render quality
             useCORS: true,
@@ -67,76 +83,80 @@ export async function exportMergedThreeLayerPdf(
             height: legalPortrait[1]
           });
           console.log(`✅ Cover Page Appended for: ${unit.title}`);
+          // #region agent log
+          debugLog('pdfExportEngine.ts:cover', 'Cover page capture succeeded', {
+            unitTitle: unit.title,
+            canvasWidth: canvas.width,
+            canvasHeight: canvas.height
+          }, 'C');
+          // #endregion
         } catch (err) {
           console.error(`❌ Error generating cover page for ${unit.title}:`, err);
         }
       }
 
-      // STEP 2: GENERATE & APPEND FORM TEMPLATE (IF PRESENT)
+      // STEP 2: GENERATE & APPEND FORM TEMPLATE(S) (IF PRESENT)
       if (unit.formElement) {
-        console.log(`📸 Generating Form Template Page for: ${unit.title}`);
-        try {
-          const canvas = await html2canvas(unit.formElement, {
-            scale: 3,
-            useCORS: true,
-            logging: false,
-            backgroundColor: '#ffffff',
-            ignoreElements: (element: Element) => {
-              return (
-                element.classList.contains('print:hidden') ||
-                element.classList.contains('no-export') ||
-                element.classList.contains('proof-column') ||
-                element.classList.contains('actions-column') ||
-                element.tagName === 'BUTTON'
-              );
-            }
-          });
-          const imgData = canvas.toDataURL('image/png');
-          const pngImage = await pdfDoc.embedPng(imgData);
+        const formElements: HTMLElement[] = Array.isArray(unit.formElement)
+          ? unit.formElement
+          : [unit.formElement];
 
-          const isLandscapeForm = canvas.width > canvas.height;
-          const pageSize = isLandscapeForm ? legalLandscape : legalPortrait;
+        for (let elemIdx = 0; elemIdx < formElements.length; elemIdx++) {
+          const elem = formElements[elemIdx];
+          console.log(`📸 Generating Form Template Page ${elemIdx + 1}/${formElements.length} for: ${unit.title}`);
+          try {
+            const canvas = await html2canvas(elem, {
+              scale: 3,
+              useCORS: true,
+              logging: false,
+              backgroundColor: '#ffffff',
+              ignoreElements: (element: Element) => {
+                return (
+                  element.classList.contains('print:hidden') ||
+                  element.classList.contains('no-export') ||
+                  element.classList.contains('proof-column') ||
+                  element.classList.contains('actions-column') ||
+                  element.tagName === 'BUTTON'
+                );
+              }
+            });
+            const imgData = canvas.toDataURL('image/png');
+            const pngImage = await pdfDoc.embedPng(imgData);
 
-          const formPage = pdfDoc.addPage(pageSize);
-          formPage.drawImage(pngImage, {
-            x: 0,
-            y: 0,
-            width: pageSize[0],
-            height: pageSize[1]
-          });
-          console.log(`✅ Form Template Page Appended (${isLandscapeForm ? 'Landscape' : 'Portrait'}) for: ${unit.title}`);
-        } catch (err) {
-          console.error(`❌ Error generating form template for ${unit.title}:`, err);
+            const isLandscapeForm = canvas.width > canvas.height;
+            const pageSize = isLandscapeForm ? legalLandscape : legalPortrait;
+
+            const formPage = pdfDoc.addPage(pageSize);
+            formPage.drawImage(pngImage, {
+              x: 0,
+              y: 0,
+              width: pageSize[0],
+              height: pageSize[1]
+            });
+            console.log(`✅ Form Template Page ${elemIdx + 1} Appended (${isLandscapeForm ? 'Landscape' : 'Portrait'}) for: ${unit.title}`);
+          } catch (err) {
+            console.error(`❌ Error generating form template page ${elemIdx + 1} for ${unit.title}:`, err);
+          }
         }
       }
 
-      // STEP 3: COPY & APPEND ALL PAGES FROM UPLOADED PDF (PURE VECTOR PRESERVATION)
+      // STEP 3: APPEND ATTACHED UPLOADED PDF FILE (IF PRESENT)
       if (unit.fileDataUrl) {
-        console.log(`📁 Loading Uploaded PDF file for: ${unit.title}`);
+        console.log(`📑 Processing Attached Vector PDF File for: ${unit.title}`);
         try {
-          const base64Data = unit.fileDataUrl.split(',')[1] || unit.fileDataUrl;
-          const binaryString = atob(base64Data);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
+          const res = await fetch(unit.fileDataUrl);
+          const pdfArrayBuffer = await res.arrayBuffer();
 
-          const srcDoc = await PDFDocument.load(bytes);
-          const pageIndices = srcDoc.getPageIndices();
-          console.log(`📄 Uploaded PDF Loaded. Total Pages Found: ${pageIndices.length}`);
+          const externalPdfDoc = await PDFDocument.load(pdfArrayBuffer);
+          const pageIndices = externalPdfDoc.getPageIndices();
 
-          const copiedPages = await pdfDoc.copyPages(srcDoc, pageIndices);
+          console.log(`Copying ${pageIndices.length} native vector pages from uploaded PDF...`);
+          const copiedPages = await pdfDoc.copyPages(externalPdfDoc, pageIndices);
 
-          copiedPages.forEach((copiedPage, pIdx) => {
+          copiedPages.forEach((copiedPage) => {
             const width = copiedPage.getWidth();
             const height = copiedPage.getHeight();
-            const isLandscape = width > height;
-
-            console.log(
-              `   ➜ Page ${pIdx + 1}/${pageIndices.length}: ${
-                isLandscape ? 'Landscape ↔️' : 'Portrait ↕️'
-              } (${Math.round(width)}pt x ${Math.round(height)}pt) -> Copied (Vector Quality Preserved)`
-            );
+            console.log(`-> Page size: ${width.toFixed(0)}pt x ${height.toFixed(0)}pt (${width > height ? 'Landscape' : 'Portrait'})`);
 
             pdfDoc.addPage(copiedPage);
           });
@@ -157,18 +177,32 @@ export async function exportMergedThreeLayerPdf(
     const pdfBytes = await pdfDoc.save();
     const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
     
+    const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
+    link.href = blobUrl;
     link.download = outputFileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 
     console.log('=====================================================');
     console.log(`✨ PDF EXPORT COMPLETE: "${outputFileName}" (${(pdfBytes.length / 1024).toFixed(1)} KB)`);
     console.log('=====================================================');
+    // #region agent log
+    debugLog('pdfExportEngine.ts:complete', 'PDF export completed', {
+      outputFileName,
+      byteSize: pdfBytes.length,
+      unitCount: units.length
+    }, 'C');
+    // #endregion
   } catch (globalErr) {
     console.error('💥 FATAL ERROR IN PDF EXPORT ENGINE:', globalErr);
+    // #region agent log
+    debugLog('pdfExportEngine.ts:fatal', 'PDF export fatal error', {
+      error: String(globalErr)
+    }, 'C');
+    // #endregion
     window.print();
   }
 }
@@ -176,7 +210,7 @@ export async function exportMergedThreeLayerPdf(
 // Backward compatibility helper wrapper
 export async function generateAndDownloadThreeLayerPdf(
   coverElement: HTMLElement | null,
-  templateElement: HTMLElement | null,
+  templateElement: HTMLElement | HTMLElement[] | null,
   uploadedPdfDataUrl?: string,
   outputFileName: string = 'document.pdf'
 ): Promise<void> {

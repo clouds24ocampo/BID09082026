@@ -6,6 +6,9 @@ import { MergedPdfViewerModal } from './MergedPdfViewerModal';
 import { StatementOngoingContractsModal } from './templates/StatementOngoingContractsModal';
 import { StatementSlccModal } from './templates/StatementSlccModal';
 import { TechnicalExhibitTemplateModal } from './templates/TechnicalExhibitTemplateModal';
+import { SectionViScheduleOfRequirements } from './templates/SectionViScheduleOfRequirements';
+import { FrameworkAgreementList } from './templates/FrameworkAgreementList';
+import { TechnicalSpecifications } from './templates/TechnicalSpecifications';
 import {
   saveVaultItems,
   loadVaultItems,
@@ -13,8 +16,10 @@ import {
   loadPdfData as loadPdfDataFromDB,
   clearAllPdfData,
   clearAllVaultData,
+  clearVaultDataForTenant,
   migrateFromLocalStorage
 } from '../../utils/vaultIndexedDB';
+import { debugLog } from '../../utils/debugLog';
 import {
   FileCheck,
   Upload,
@@ -39,7 +44,8 @@ import {
   Building2,
   Lock,
   Trash2,
-  Edit3
+  Edit3,
+  Filter
 } from 'lucide-react';
 
 interface ClassAMasterItemDef {
@@ -92,6 +98,27 @@ const TECHNICAL_CHECKLIST_MASTER: TechnicalChecklistItem[] = [
     name: 'Statement of Bidder\'s Single Largest Completed Contract (SLCC) similar to the contract to be bid',
     notes: 'Legal template to follow',
     templateCode: 'STATEMENT_SLCC'
+  },
+  {
+    id: 'tech-sec-vi',
+    code: 'SEC-VI',
+    name: 'Section VI. Schedule of Requirements',
+    notes: 'Legal template to follow',
+    templateCode: 'SCHEDULE_OF_REQUIREMENTS'
+  },
+  {
+    id: 'tech-sec-vii',
+    code: 'SEC-VII',
+    name: 'Section VII. Technical Specifications',
+    notes: 'Legal template to follow',
+    templateCode: 'TECHNICAL_SPECIFICATIONS'
+  },
+  {
+    id: 'tech-fal',
+    code: 'FAL-01',
+    name: 'Framework Agreement List',
+    notes: 'Legal template to follow',
+    templateCode: 'FRAMEWORK_AGREEMENT_LIST'
   },
   {
     id: 'tech-d',
@@ -172,9 +199,10 @@ export const DocumentVaultView: React.FC = () => {
     return pdfDataCache.current[itemId];
   };
 
+  const activeTenantId = currentTenant?.id || '';
   const [vaultItems, setVaultItems] = useState<DocumentVaultItem[]>([]);
 
-  // ─── Load vault data from IndexedDB on mount (migrates from localStorage if needed) ───
+  // ─── Load vault data from IndexedDB on mount & tenant switch ───
   React.useEffect(() => {
     let cancelled = false;
 
@@ -183,35 +211,58 @@ export const DocumentVaultView: React.FC = () => {
         // One-time migration from old localStorage → IndexedDB
         const migrated = await migrateFromLocalStorage();
 
-        // Load vault items from IndexedDB
-        let items = await loadVaultItems();
+        // Load vault items from IndexedDB for the active tenant
+        let items = await loadVaultItems(activeTenantId);
 
-        // If migration produced items but loadVaultItems is empty, use migrated
+        // If migration produced items but loadVaultItems for this tenant is empty, use migrated if tenant matches
         if (items.length === 0 && migrated.length > 0) {
-          items = migrated;
+          items = migrated.filter((i: any) => i.tenantId === activeTenantId);
         }
 
         if (!cancelled) {
           setVaultItems(items);
 
-          // Pre-load all PDF blobs from IndexedDB into in-memory cache
+          // Pre-load PDF blobs from IndexedDB into in-memory cache
+          let pdfLoadedCount = 0;
           for (const item of items) {
             try {
               const pdfData = await loadPdfDataFromDB(item.id);
               if (pdfData) {
                 pdfDataCache.current[item.id] = pdfData;
+                pdfLoadedCount++;
               }
             } catch (_) { /* skip items without PDF data */ }
           }
+
+          // #region agent log
+          debugLog('DocumentVaultView.tsx:loadFromDB', 'Vault load complete', {
+            activeTenantId,
+            itemCount: items.length,
+            migratedCount: migrated.length,
+            pdfLoadedCount,
+            dbReady: true
+          }, 'B');
+          // #endregion
 
           setDbReady(true);
         }
       } catch (e) {
         console.error('[VaultDB] Failed to load from IndexedDB, falling back to localStorage:', e);
+        // #region agent log
+        debugLog('DocumentVaultView.tsx:loadFromDB', 'Vault load failed, using localStorage fallback', {
+          activeTenantId,
+          error: String(e)
+        }, 'B');
+        // #endregion
         if (!cancelled) {
           try {
-            const saved = localStorage.getItem('bidocs_vault_items');
-            setVaultItems(saved ? JSON.parse(saved) : []);
+            const saved = localStorage.getItem(`bidocs_vault_items_${activeTenantId}`);
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              setVaultItems(Array.isArray(parsed) ? parsed.filter((item: any) => item.tenantId === activeTenantId) : []);
+            } else {
+              setVaultItems([]);
+            }
           } catch (_) {
             setVaultItems([]);
           }
@@ -220,17 +271,30 @@ export const DocumentVaultView: React.FC = () => {
       }
     };
 
+    setDbReady(false);
     loadFromDB();
-    return () => { cancelled = true; };
-  }, []);
 
-  // ─── Persist vault item metadata to IndexedDB on every change (200MB+ capacity) ───
+    // Sync tech completed IDs for active tenant (clean slate [] for new tenants)
+    const savedTech = localStorage.getItem(`bidocs_tech_completed_ids_${activeTenantId}`);
+    setTechCompletedIds(savedTech ? JSON.parse(savedTech) : []);
+
+    return () => { cancelled = true; };
+  }, [activeTenantId]);
+
+  // ─── Persist vault item metadata to IndexedDB on every change (scoped by activeTenantId) ───
   React.useEffect(() => {
     if (!dbReady) return; // Don't write until initial load completes
-    saveVaultItems(vaultItems).catch(e =>
+    // #region agent log
+    debugLog('DocumentVaultView.tsx:persist', 'Persisting vault items to IndexedDB', {
+      activeTenantId,
+      itemCount: vaultItems.length,
+      dbReady
+    }, 'B');
+    // #endregion
+    saveVaultItems(vaultItems, activeTenantId).catch(e =>
       console.error('[VaultDB] Failed to persist vault items:', e)
     );
-  }, [vaultItems, dbReady]);
+  }, [vaultItems, dbReady, activeTenantId]);
 
   const [selectedCategory, setSelectedCategory] = useState<string>('ELIGIBILITY_CLASS_A');
   const [searchQuery, setSearchQuery] = useState('');
@@ -242,11 +306,9 @@ export const DocumentVaultView: React.FC = () => {
   // Technical Documents Sub-Tab State
   const [techSubTab, setTechSubTab] = useState<'CHECKLIST' | 'COMPLETED'>('CHECKLIST');
   const [expandedTechItems, setExpandedTechItems] = useState<string[]>(['tech-f']);
-  const [techCompletedIds, setTechCompletedIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('bidocs_tech_completed_ids');
-    return saved ? JSON.parse(saved) : ['tech-b', 'tech-c'];
-  });
+  const [techCompletedIds, setTechCompletedIds] = useState<string[]>([]);
   const [fillingTemplateItem, setFillingTemplateItem] = useState<{ id: string; code: string; name: string } | null>(null);
+  const [selectedTechProjectFilter, setSelectedTechProjectFilter] = useState<string>('ALL');
 
   // Modals state
   const [uploadTargetDef, setUploadTargetDef] = useState<ClassAMasterItemDef | null>(null);
@@ -344,15 +406,17 @@ export const DocumentVaultView: React.FC = () => {
         });
         return { ...rest, previousVersions: cleanVersions };
       });
-      localStorage.setItem('bidocs_vault_items', JSON.stringify(itemsForStorage));
+      localStorage.setItem(`bidocs_vault_items_${activeTenantId}`, JSON.stringify(itemsForStorage));
     } catch (e) {
       console.error('Failed to persist vault items to localStorage:', e);
     }
-  }, [vaultItems]);
+  }, [vaultItems, activeTenantId]);
 
   React.useEffect(() => {
-    localStorage.setItem('bidocs_tech_completed_ids', JSON.stringify(techCompletedIds));
-  }, [techCompletedIds]);
+    if (activeTenantId) {
+      localStorage.setItem(`bidocs_tech_completed_ids_${activeTenantId}`, JSON.stringify(techCompletedIds));
+    }
+  }, [techCompletedIds, activeTenantId]);
 
   const resetFormState = () => {
     setDocNumber('');
@@ -378,8 +442,11 @@ export const DocumentVaultView: React.FC = () => {
   const handleResetClassAVault = () => {
     if (confirm('Are you sure you want to remove all uploaded Class A Eligibility documents and start fresh from scratch? PhilGEPS and all document slots will be reset to v1.0.')) {
       setVaultItems([]);
-      localStorage.removeItem('bidocs_vault_items');
       setSelectedItemIds([]);
+      // Clear only this tenant's vault data from IndexedDB
+      if (activeTenantId) {
+        clearVaultDataForTenant(activeTenantId).catch(e => console.error('[VaultDB] Failed to clear tenant vault:', e));
+      }
       alert('Class A Eligibility documents have been completely reset! All document slots are ready for re-uploading from scratch.');
     }
   };
@@ -388,9 +455,10 @@ export const DocumentVaultView: React.FC = () => {
     if (confirm('Are you sure you want to remove ALL uploaded documents? All uploaded files in Class A Legal Eligibility and All Vault Documents will be removed so you can re-upload everything from scratch.')) {
       setVaultItems([]);
       setSelectedItemIds([]);
-      // Clear all persistent storage (IndexedDB 200MB+ store + old localStorage fallback)
-      clearAllVaultData().catch(e => console.error('[VaultDB] Failed to clear:', e));
-      localStorage.removeItem('bidocs_vault_items');
+      // Clear only this tenant's vault data from IndexedDB (preserves other tenants)
+      if (activeTenantId) {
+        clearVaultDataForTenant(activeTenantId).catch(e => console.error('[VaultDB] Failed to clear tenant vault:', e));
+      }
       pdfDataCache.current = {};
       notifySuccess('All Documents Removed', 'All uploaded documents and PDF files have been completely removed. All slots are clean and ready for re-uploading.');
     }
@@ -408,8 +476,9 @@ export const DocumentVaultView: React.FC = () => {
     );
   };
 
-  const handleCompleteTemplate = (fileDataUrl?: string, customName?: string) => {
+  const handleCompleteTemplate = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
     if (!fillingTemplateItem) return;
+
     const itemId = fillingTemplateItem.id;
     if (!techCompletedIds.includes(itemId)) {
       setTechCompletedIds(prev => [...prev, itemId]);
@@ -418,10 +487,10 @@ export const DocumentVaultView: React.FC = () => {
     const docTitle = customName || fillingTemplateItem.name;
     const cleanDocName = docTitle.replace(/[^a-zA-Z0-9]/g, '_');
 
-    // Create DocumentVaultItem for the completed technical exhibit template
+    // Create DocumentVaultItem for the completed technical exhibit template with Project Tagging
     const newVaultDoc: DocumentVaultItem = {
       id: `doc-tech-${itemId}-${Date.now()}`,
-      tenantId: currentTenant?.id || 'tenant-001',
+      tenantId: activeTenantId,
       documentCode: fillingTemplateItem.code,
       documentName: docTitle,
       documentNumber: `EXHIBIT-${fillingTemplateItem.code.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-2026`,
@@ -439,6 +508,8 @@ export const DocumentVaultView: React.FC = () => {
       requiresIssueDate: false,
       requiresExpiryDate: false,
       conditionalRuleNote: 'Completed GPPB Statutory Legal Template',
+      philgepsRefNo: projRefNo || undefined,
+      projectTitle: projTitle || undefined,
       previousVersions: []
     };
 
@@ -546,7 +617,7 @@ export const DocumentVaultView: React.FC = () => {
 
     const newItem: DocumentVaultItem = {
       id: `doc-${uploadTargetDef.code.toLowerCase()}-${Date.now()}`,
-      tenantId: currentTenant?.id || 'tenant-001',
+      tenantId: activeTenantId,
       documentCode: uploadTargetDef.code,
       documentName: docName,
       documentNumber: docNumber.trim() || `REF-${Math.floor(Math.random() * 899999 + 100000)}`,
@@ -606,7 +677,7 @@ export const DocumentVaultView: React.FC = () => {
 
     const newItem: DocumentVaultItem = {
       id: `doc-custom-${Date.now()}`,
-      tenantId: currentTenant?.id || 'tenant-001',
+      tenantId: activeTenantId,
       documentName: customDocName.trim(),
       documentNumber: docNumber.trim() || `REF-${Math.floor(Math.random() * 899999 + 100000)}`,
       category: customUploadCategory,
@@ -821,7 +892,7 @@ export const DocumentVaultView: React.FC = () => {
         </div>
       )}
 
-      {/* ALL CATEGORY TABS RESTORED AT TOP */}
+      {/* ALL CATEGORY TABS AT TOP */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
           {[
@@ -1363,104 +1434,154 @@ export const DocumentVaultView: React.FC = () => {
           {/* SUB-TAB 2: COMPLETED TECHNICAL DOCUMENTS & FORMS */}
           {techSubTab === 'COMPLETED' && (
             <div className="space-y-4">
-              {completedTechVaultItems.length === 0 ? (
-                <div className="glass-panel p-12 text-center rounded-2xl border border-slate-800 space-y-4">
-                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto">
-                    <CheckCircle2 className="w-6 h-6" />
-                  </div>
-                  <div className="max-w-md mx-auto space-y-2">
-                    <h3 className="text-base font-bold text-white">No Completed Technical Documents Saved Yet</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Go to <span className="text-blue-400 font-bold">Technical Requirements Checklist</span> sub-tab above and click <span className="text-white font-bold">"Fill Legal Template"</span> on Item (b) Statement of Ongoing Contracts or Item (c) SLCC to generate and save your completed technical forms.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setTechSubTab('CHECKLIST')}
-                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow transition inline-flex items-center gap-2"
-                  >
-                    <FileSignature className="w-4 h-4" />
-                    <span>Go to Technical Checklist & Fill Templates</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {completedTechVaultItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-slate-700 transition space-y-4 flex flex-col justify-between"
-                    >
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Technical Completed Form
-                          </span>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">
-                            v{item.versionNumber}.0
-                          </span>
-                        </div>
+              {/* Bidding Project Filter Bar */}
+              {(() => {
+                const uniqueProjectsInCompletedTech = Array.from(new Set(
+                  completedTechVaultItems.map(i => i.philgepsRefNo).filter(Boolean)
+                )).map(ref => {
+                  const item = completedTechVaultItems.find(i => i.philgepsRefNo === ref);
+                  return { refNo: ref!, title: item?.projectTitle || 'Bidding Project' };
+                });
 
-                        <div>
-                          <h3 className="text-sm font-bold text-white leading-snug">{item.documentName}</h3>
-                          <p className="text-xs text-slate-400 mt-1 font-mono">Ref: {item.documentNumber || 'N/A'}</p>
-                        </div>
+                const displayedCompletedTechItems = completedTechVaultItems.filter(item => {
+                  if (selectedTechProjectFilter === 'ALL') return true;
+                  return item.philgepsRefNo === selectedTechProjectFilter;
+                });
 
-                        <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
-                          <p className="text-slate-300 font-semibold">{item.legalBasisReference}</p>
-                          <p className="truncate">File: {item.fileName}</p>
-                          <p className="text-[10px] text-slate-500">Saved by: {item.uploadedByName}</p>
-                        </div>
+                if (completedTechVaultItems.length === 0) {
+                  return (
+                    <div className="glass-panel p-12 text-center rounded-2xl border border-slate-800 space-y-4">
+                      <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto">
+                        <CheckCircle2 className="w-6 h-6" />
                       </div>
-
-                      <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-                        <button
-                          onClick={() => setPreviewPdfItem(item)}
-                          className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
-                          title="View completed PDF document"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>View PDF</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setFillingTemplateItem({
-                              id: item.documentCode?.toLowerCase() || 'tech-b',
-                              code: item.documentCode || 'b',
-                              name: item.documentName
-                            });
-                          }}
-                          className="px-3 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-amber-500/30"
-                          title="Edit form entries in legal template"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                          <span>Edit Form</span>
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            setReplaceTargetItem(item);
-                            resetFormState();
-                          }}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30"
-                          title="Replace PDF file"
-                        >
-                          <RefreshCw className="w-3.5 h-3.5" />
-                          <span>Replace</span>
-                        </button>
-
-                        <button
-                          onClick={() => handleDeleteCompletedTechDoc(item.id, item.documentName)}
-                          className="px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30"
-                          title="Delete completed technical document"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Delete</span>
-                        </button>
+                      <div className="max-w-md mx-auto space-y-2">
+                        <h3 className="text-base font-bold text-white">No Completed Technical Documents Saved Yet</h3>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                          Go to <span className="text-blue-400 font-bold">Technical Requirements Checklist</span> sub-tab above and click <span className="text-white font-bold">"Fill Legal Template"</span> on Item (b) Statement of Ongoing Contracts or Item (c) SLCC to generate and save your completed technical forms.
+                        </p>
                       </div>
+                      <button
+                        onClick={() => setTechSubTab('CHECKLIST')}
+                        className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow transition inline-flex items-center gap-2"
+                      >
+                        <FileSignature className="w-4 h-4" />
+                        <span>Go to Technical Checklist & Fill Templates</span>
+                      </button>
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                }
+
+                return (
+                  <div className="space-y-4">
+                    {uniqueProjectsInCompletedTech.length > 0 && (
+                      <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 font-mono">
+                        <div className="flex items-center gap-2 text-xs font-bold text-blue-400">
+                          <Building2 className="w-4 h-4 text-blue-400" />
+                          <span>Group / Filter Documents by Bidding Project:</span>
+                        </div>
+                        <select
+                          value={selectedTechProjectFilter}
+                          onChange={(e) => setSelectedTechProjectFilter(e.target.value)}
+                          className="w-full sm:w-auto bg-slate-950 border border-blue-500/60 rounded-xl px-3 py-1.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-blue-400 shadow-inner"
+                        >
+                          <option value="ALL">All Bidding Projects ({completedTechVaultItems.length} Total Documents)</option>
+                          {uniqueProjectsInCompletedTech.map(p => (
+                            <option key={p.refNo} value={p.refNo}>
+                              [{p.refNo}] {p.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {displayedCompletedTechItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-slate-700 transition space-y-4 flex flex-col justify-between"
+                        >
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Technical Completed Form
+                              </span>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">
+                                v{item.versionNumber}.0
+                              </span>
+                            </div>
+
+                            <div>
+                              <h3 className="text-sm font-bold text-white leading-snug">{item.documentName}</h3>
+                              <p className="text-xs text-slate-400 mt-1 font-mono">Ref: {item.documentNumber || 'N/A'}</p>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2 text-[11px] font-mono text-slate-400">
+                              {item.philgepsRefNo && (
+                                <div className="p-2 rounded-lg bg-blue-950/80 border border-blue-500/40 text-[11px] font-mono">
+                                  <span className="text-blue-300 font-bold flex items-center gap-1 mb-0.5">
+                                    <Building2 className="w-3.5 h-3.5 text-blue-400" /> Bidding Project Link:
+                                  </span>
+                                  <span className="text-white font-bold block truncate">[{item.philgepsRefNo}] {item.projectTitle || 'Bidding Opportunity'}</span>
+                                </div>
+                              )}
+                              <p className="text-slate-300 font-semibold">{item.legalBasisReference}</p>
+                              <p className="truncate">File: {item.fileName}</p>
+                              <p className="text-[10px] text-slate-500">Saved by: {item.uploadedByName}</p>
+                            </div>
+                          </div>
+
+                          <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                            <button
+                              onClick={() => setPreviewPdfItem(item)}
+                              className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
+                              title="View completed PDF document"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>View PDF</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setFillingTemplateItem({
+                                  id: item.documentCode?.toLowerCase() || 'tech-b',
+                                  code: item.documentCode || 'b',
+                                  name: item.documentName
+                                });
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-amber-500/30"
+                              title="Edit form entries in legal template"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                              <span>Edit Form</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setReplaceTargetItem(item);
+                                resetFormState();
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30"
+                              title="Replace PDF file"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              <span>Replace</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteCompletedTechDoc(item.id, item.documentName)}
+                              className="px-3.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30"
+                              title="Delete completed technical document"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -1469,7 +1590,55 @@ export const DocumentVaultView: React.FC = () => {
 
       {/* OTHER CATEGORY TABS (ALL, CLASS B, FINANCIAL, CORPORATE LEGAL) GRID */}
       {selectedCategory !== 'ELIGIBILITY_CLASS_A' && selectedCategory !== 'TECHNICAL' && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+
+          {/* SECTION SEPARATOR BANNER FOR ORGANIZED VIEW */}
+          {selectedCategory === 'ALL' && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950/40 to-slate-900 border border-blue-500/30 flex items-center justify-between flex-wrap gap-3 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <span>Organized Document Vault — Statutory Component Registry</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase">
+                      Class A • Technical • Financial
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                    Categorized into Class A Legal Eligibility, Technical Exhibits (Envelope 1), and Financial Component (Envelope 2).
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-slate-300 font-bold bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+                  {filteredGridItems.length} Saved Documents
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* INDIVIDUAL CATEGORY HEADER BANNER */}
+          {selectedCategory !== 'ALL' && (
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                    {selectedCategory === 'FINANCIAL' ? '3. Financial Component Documents (Envelope 2)' : selectedCategory === 'CORPORATE_LEGAL' ? '4. Corporate Legal Documents' : '5. Class B Joint Venture Documents'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                    {selectedCategory === 'FINANCIAL' ? 'Financial Bid Form, Bill of Quantities (BOQ), Detailed Estimates, Unit Price Schedules & Cash Flow Statements' : 'Corporate resolutions, secretary certificates, power of attorney, and joint venture agreements.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {filteredGridItems.length === 0 ? (
             <div className="glass-panel p-12 text-center rounded-2xl border border-slate-800 space-y-4">
               <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto">
@@ -1570,8 +1739,8 @@ export const DocumentVaultView: React.FC = () => {
       {fillingTemplateItem && fillingTemplateItem.code === '(b)' && (
         <StatementOngoingContractsModal
           tenant={currentTenant}
-          onSaveAndComplete={(dataUrl, docName) => {
-            handleCompleteTemplate(dataUrl, docName);
+          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
           }}
           onClose={() => setFillingTemplateItem(null)}
         />
@@ -1580,19 +1749,52 @@ export const DocumentVaultView: React.FC = () => {
       {fillingTemplateItem && fillingTemplateItem.code === '(c)' && (
         <StatementSlccModal
           tenant={currentTenant}
-          onSaveAndComplete={(dataUrl, docName) => {
-            handleCompleteTemplate(dataUrl, docName);
+          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
           }}
           onClose={() => setFillingTemplateItem(null)}
         />
       )}
 
-      {fillingTemplateItem && fillingTemplateItem.code !== '(b)' && fillingTemplateItem.code !== '(c)' && (
+      {fillingTemplateItem && (fillingTemplateItem.code === 'SEC-VI' || fillingTemplateItem.code === '(f.d)' || fillingTemplateItem.name.toLowerCase().includes('schedule of requirements') || fillingTemplateItem.name.toLowerCase().includes('section vi')) && (
+        <SectionViScheduleOfRequirements
+          item={fillingTemplateItem}
+          tenant={currentTenant}
+          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+          }}
+          onClose={() => setFillingTemplateItem(null)}
+        />
+      )}
+
+      {fillingTemplateItem && (fillingTemplateItem.code === 'SEC-VII' || fillingTemplateItem.name.toLowerCase().includes('technical specifications') || fillingTemplateItem.name.toLowerCase().includes('section vii')) && (
+        <TechnicalSpecifications
+          item={fillingTemplateItem}
+          tenant={currentTenant}
+          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+          }}
+          onClose={() => setFillingTemplateItem(null)}
+        />
+      )}
+
+      {fillingTemplateItem && (fillingTemplateItem.code === 'FAL-01' || fillingTemplateItem.code === 'SEC-VI-FAL' || fillingTemplateItem.name.toLowerCase().includes('framework agreement') || fillingTemplateItem.name.toLowerCase().includes('framework agreement list')) && (
+        <FrameworkAgreementList
+          item={fillingTemplateItem}
+          tenant={currentTenant}
+          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+          }}
+          onClose={() => setFillingTemplateItem(null)}
+        />
+      )}
+
+      {fillingTemplateItem && fillingTemplateItem.code !== '(b)' && fillingTemplateItem.code !== '(c)' && fillingTemplateItem.code !== 'SEC-VI' && fillingTemplateItem.code !== 'SEC-VII' && fillingTemplateItem.code !== '(f.d)' && fillingTemplateItem.code !== 'FAL-01' && !fillingTemplateItem.name.toLowerCase().includes('schedule of requirements') && !fillingTemplateItem.name.toLowerCase().includes('section vi') && !fillingTemplateItem.name.toLowerCase().includes('technical specifications') && !fillingTemplateItem.name.toLowerCase().includes('section vii') && !fillingTemplateItem.name.toLowerCase().includes('framework agreement') && (
         <TechnicalExhibitTemplateModal
           item={fillingTemplateItem}
           tenant={currentTenant}
-          onSaveAndComplete={(dataUrl, docName) => {
-            handleCompleteTemplate(dataUrl, docName);
+          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
           }}
           onClose={() => setFillingTemplateItem(null)}
         />

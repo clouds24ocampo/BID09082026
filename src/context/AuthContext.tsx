@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Tenant, User, UserRole } from '../types';
+import { clearAllVaultData } from '../utils/vaultIndexedDB';
+import { debugLog } from '../utils/debugLog';
 
 // Default Initial State (No hardcoded seed data)
 const SEED_TENANTS: Tenant[] = [];
@@ -9,7 +11,7 @@ interface AuthContextType {
   currentUser: User | null;
   currentTenant: Tenant | null;
   tenants: Tenant[];
-  login: (email: string, role?: UserRole, tenantId?: string) => boolean;
+  login: (email: string, password: string, role?: UserRole, tenantId?: string) => boolean;
   logout: () => void;
   registerTenantAndUser: (tenantData: Omit<Tenant, 'id' | 'createdAt'>, userData: Omit<User, 'id' | 'tenantId'>) => boolean;
   switchTenant: (tenantId: string) => void;
@@ -28,14 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed)) {
-        return parsed.filter((t: any) => 
-          t && 
-          t.companyName && 
-          !t.companyName.toLowerCase().includes('apex builder') && 
-          !t.companyName.toLowerCase().includes('pacific solution') &&
-          !t.companyName.toLowerCase().includes('philippine compliance enterprise') &&
-          !t.companyName.toLowerCase().includes('corp') || t.isUserRegistered
-        );
+        return parsed.filter((t: any) => t && t.companyName && t.id);
       }
     } catch (e) {
       console.error(e);
@@ -45,12 +40,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [users, setUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem('bidocs_users');
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      // #region agent log
+      debugLog('AuthContext.tsx:users-init', 'Failed to parse bidocs_users', { error: String(e) }, 'A');
+      // #endregion
+      return [];
+    }
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('bidocs_current_user');
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+    try {
+      return JSON.parse(saved);
+    } catch (e) {
+      // #region agent log
+      debugLog('AuthContext.tsx:currentUser-init', 'Failed to parse bidocs_current_user', { error: String(e) }, 'A');
+      // #endregion
+      return null;
+    }
   });
 
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(() => {
@@ -61,13 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const parsed = JSON.parse(savedTenantsStr);
         if (Array.isArray(parsed)) {
-          activeTenants = parsed.filter((t: any) => 
-            t && 
-            t.companyName && 
-            !t.companyName.toLowerCase().includes('apex builder') && 
-            !t.companyName.toLowerCase().includes('pacific solution') &&
-            !t.companyName.toLowerCase().includes('philippine compliance enterprise')
-          );
+          activeTenants = parsed.filter((t: any) => t && t.companyName && t.id);
         }
       } catch (e) {
         console.error(e);
@@ -108,46 +114,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [currentUser]);
 
-  const login = (email: string, role?: UserRole, tenantId?: string): boolean => {
-    let foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  const login = (email: string, password: string, role?: UserRole, tenantId?: string): boolean => {
+    const normalizedEmail = email.trim().toLowerCase();
 
+    // Find registered user — do NOT auto-create unknown users
+    const foundUser = users.find(u => u.email.toLowerCase() === normalizedEmail);
     if (!foundUser) {
-      // If logging in when no registered user exists, check if a target tenant exists
-      let targetTenant = tenants.find(t => t.id === tenantId);
-      if (!targetTenant && tenants.length > 0) {
-        targetTenant = tenants[0];
-      }
-
-      if (!targetTenant) {
-        // Return false if no registered company exists yet
-        return false;
-      }
-
-      foundUser = {
-        id: `user-${Date.now()}`,
-        tenantId: targetTenant.id,
-        email: email,
-        fullName: email.split('@')[0].toUpperCase(),
-        role: role || 'COMPANY_OWNER',
-        lastLoginAt: new Date().toISOString()
-      };
-      setUsers(prev => [...prev, foundUser!]);
+      // #region agent log
+      debugLog('AuthContext.tsx:login', 'Login rejected: user not found', {
+        normalizedEmail,
+        userCount: users.length
+      }, 'D');
+      // #endregion
+      return false; // Unknown email → reject login
     }
 
-    const storedPw = localStorage.getItem(`bidocs_user_password_${email.trim().toLowerCase()}`);
-    const storedFlag = localStorage.getItem(`bidocs_must_change_password_${email.trim().toLowerCase()}`);
+    // Validate password against stored password
+    const storedPw = localStorage.getItem(`bidocs_user_password_${normalizedEmail}`) || foundUser.password;
+    if (!storedPw || storedPw !== password) {
+      // #region agent log
+      debugLog('AuthContext.tsx:login', 'Login rejected: password mismatch', {
+        normalizedEmail,
+        hasStoredPwKey: !!localStorage.getItem(`bidocs_user_password_${normalizedEmail}`),
+        hasUserObjectPw: !!foundUser.password
+      }, 'D');
+      // #endregion
+      return false; // Wrong password → reject login
+    }
 
-    const isMustChange = storedFlag === 'true' || storedPw === 'BiDOCS#2026' || foundUser.mustChangePassword === true || foundUser.password === 'BiDOCS#2026';
+    const storedFlag = localStorage.getItem(`bidocs_must_change_password_${normalizedEmail}`);
+    const isMustChange = storedFlag === 'true' || storedPw === 'BiDOCS#2026' || foundUser.mustChangePassword === true;
+
+    // Resolve tenant — must match the user's own tenantId
+    const tenant = tenants.find(t => t.id === foundUser.tenantId);
+    if (!tenant) {
+      return false; // User's tenant doesn't exist → reject login
+    }
 
     const userToSet: User = {
       ...foundUser,
-      password: storedPw || foundUser.password || 'BiDOCS#2026',
-      mustChangePassword: isMustChange
+      password: storedPw,
+      mustChangePassword: isMustChange,
+      lastLoginAt: new Date().toISOString()
     };
 
-    const tenant = tenants.find(t => t.id === foundUser!.tenantId) || tenants[0];
     setCurrentUser(userToSet);
     setCurrentTenant(tenant);
+    // #region agent log
+    debugLog('AuthContext.tsx:login', 'Login succeeded', {
+      userId: userToSet.id,
+      tenantId: tenant.id,
+      mustChangePassword: isMustChange
+    }, 'D');
+    // #endregion
     return true;
   };
 
@@ -162,6 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ): boolean => {
     const newTenantId = `tenant-${Date.now()}`;
     const newUserId = `user-${Date.now()}`;
+    const userPw = userData.password || 'BiDOCS#2026';
 
     const newTenant: Tenant = {
       ...tenantData,
@@ -173,8 +193,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...userData,
       id: newUserId,
       tenantId: newTenantId,
+      password: userPw,
+      mustChangePassword: false,
       lastLoginAt: new Date().toISOString()
     };
+
+    const userEmail = userData.email.trim().toLowerCase();
+    localStorage.setItem(`bidocs_user_password_${userEmail}`, userPw);
+    localStorage.setItem(`bidocs_must_change_password_${userEmail}`, 'false');
 
     setTenants(prev => [...prev, newTenant]);
     setUsers(prev => [...prev, newUser]);
@@ -251,12 +277,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetAllData = () => {
-    localStorage.removeItem('bidocs_tenants');
-    localStorage.removeItem('bidocs_users');
-    localStorage.removeItem('bidocs_current_user');
-    localStorage.removeItem('bidocs_vault_items');
-    localStorage.removeItem('bidocs_opportunities');
-    localStorage.removeItem('bidocs_bids');
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('bidocs_')) {
+        localStorage.removeItem(key);
+      }
+    });
+    clearAllVaultData().catch(e => console.error('Failed to clear vault DB:', e));
     setTenants([]);
     setUsers([]);
     setCurrentUser(null);
@@ -303,5 +329,5 @@ function adjustColorHex(hex: string, amount: number): string {
   r = Math.min(255, Math.max(0, r));
   g = Math.min(255, Math.max(0, g));
   b = Math.min(255, Math.max(0, b));
-  return `#${(g | (r << 8) | (b << 16)).toString(16).padStart(6, '0')}`;
+  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
 }
