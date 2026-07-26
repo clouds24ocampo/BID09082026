@@ -7,6 +7,15 @@ import { StatementOngoingContractsModal } from './templates/StatementOngoingCont
 import { StatementSlccModal } from './templates/StatementSlccModal';
 import { TechnicalExhibitTemplateModal } from './templates/TechnicalExhibitTemplateModal';
 import {
+  saveVaultItems,
+  loadVaultItems,
+  savePdfData,
+  loadPdfData as loadPdfDataFromDB,
+  clearAllPdfData,
+  clearAllVaultData,
+  migrateFromLocalStorage
+} from '../../utils/vaultIndexedDB';
+import {
   FileCheck,
   Upload,
   Eye,
@@ -144,28 +153,84 @@ export interface VaultNotification {
 export const DocumentVaultView: React.FC = () => {
   const { currentTenant, currentUser } = useAuth();
 
-  // In-memory store for PDF file data URLs (NOT persisted to localStorage to avoid QuotaExceededError)
-  const pdfDataStore = React.useRef<Record<string, string>>({});
+  // In-memory cache for PDF data URLs (fast access); backed by IndexedDB (200MB+ persistent storage)
+  const pdfDataCache = React.useRef<Record<string, string>>({});
+  const [dbReady, setDbReady] = useState(false);
 
   const storePdfData = (itemId: string, dataUrl: string | undefined) => {
     if (dataUrl) {
-      pdfDataStore.current[itemId] = dataUrl;
+      pdfDataCache.current[itemId] = dataUrl;
+      // Persist to IndexedDB in background (200MB+ capacity)
+      savePdfData(itemId, dataUrl).catch(e =>
+        console.error('[VaultDB] Failed to persist PDF data:', e)
+      );
     }
   };
 
   const getPdfData = (itemId: string): string | undefined => {
-    return pdfDataStore.current[itemId];
+    return pdfDataCache.current[itemId];
   };
 
-  const [vaultItems, setVaultItems] = useState<DocumentVaultItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('bidocs_vault_items');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error('Failed to load vault items from localStorage:', e);
-      return [];
-    }
-  });
+  const [vaultItems, setVaultItems] = useState<DocumentVaultItem[]>([]);
+
+  // ─── Load vault data from IndexedDB on mount (migrates from localStorage if needed) ───
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const loadFromDB = async () => {
+      try {
+        // One-time migration from old localStorage → IndexedDB
+        const migrated = await migrateFromLocalStorage();
+
+        // Load vault items from IndexedDB
+        let items = await loadVaultItems();
+
+        // If migration produced items but loadVaultItems is empty, use migrated
+        if (items.length === 0 && migrated.length > 0) {
+          items = migrated;
+        }
+
+        if (!cancelled) {
+          setVaultItems(items);
+
+          // Pre-load all PDF blobs from IndexedDB into in-memory cache
+          for (const item of items) {
+            try {
+              const pdfData = await loadPdfDataFromDB(item.id);
+              if (pdfData) {
+                pdfDataCache.current[item.id] = pdfData;
+              }
+            } catch (_) { /* skip items without PDF data */ }
+          }
+
+          setDbReady(true);
+        }
+      } catch (e) {
+        console.error('[VaultDB] Failed to load from IndexedDB, falling back to localStorage:', e);
+        if (!cancelled) {
+          try {
+            const saved = localStorage.getItem('bidocs_vault_items');
+            setVaultItems(saved ? JSON.parse(saved) : []);
+          } catch (_) {
+            setVaultItems([]);
+          }
+          setDbReady(true);
+        }
+      }
+    };
+
+    loadFromDB();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ─── Persist vault item metadata to IndexedDB on every change (200MB+ capacity) ───
+  React.useEffect(() => {
+    if (!dbReady) return; // Don't write until initial load completes
+    saveVaultItems(vaultItems).catch(e =>
+      console.error('[VaultDB] Failed to persist vault items:', e)
+    );
+  }, [vaultItems, dbReady]);
+
   const [selectedCategory, setSelectedCategory] = useState<string>('ELIGIBILITY_CLASS_A');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -282,9 +347,12 @@ export const DocumentVaultView: React.FC = () => {
   const handleClearAllClassAUploads = () => {
     if (confirm('Are you sure you want to remove ALL uploaded documents? All uploaded files in Class A Legal Eligibility and All Vault Documents will be removed so you can re-upload everything from scratch.')) {
       setVaultItems([]);
-      localStorage.removeItem('bidocs_vault_items');
       setSelectedItemIds([]);
-      alert('All uploaded documents have been completely removed! All slots in Class A Legal Eligibility and All Vault Documents are now clean and ready for re-uploading.');
+      // Clear all persistent storage (IndexedDB 200MB+ store + old localStorage fallback)
+      clearAllVaultData().catch(e => console.error('[VaultDB] Failed to clear:', e));
+      localStorage.removeItem('bidocs_vault_items');
+      pdfDataCache.current = {};
+      notifySuccess('All Documents Removed', 'All uploaded documents and PDF files have been completely removed. All slots are clean and ready for re-uploading.');
     }
   };
 
