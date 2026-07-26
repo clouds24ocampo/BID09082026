@@ -1,0 +1,365 @@
+import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { ChecklistRequirement, LegalRegime } from '../../types';
+import { 
+  FolderKanban, 
+  FileCheck, 
+  CheckCircle2, 
+  AlertCircle, 
+  ShieldCheck, 
+  Download, 
+  FileText, 
+  ExternalLink, 
+  Clock, 
+  ChevronRight, 
+  Building2, 
+  Sparkles,
+  Send
+} from 'lucide-react';
+
+const DEFAULT_CHECKLIST: ChecklistRequirement[] = [
+  {
+    id: 'chk-01',
+    requirementCode: 'PHILGEPS_PLATINUM',
+    requirementName: 'PhilGEPS Platinum Certificate of Registration (Annex A)',
+    envelope: 'ENVELOPE_1_ELIGIBILITY_TECHNICAL',
+    isMandatory: true,
+    legalRegime: 'RA_12009_NGPA',
+    status: 'MISSING'
+  },
+  {
+    id: 'chk-02',
+    requirementCode: 'TAX_CLEARANCE',
+    requirementName: 'BIR Tax Clearance Certificate for Bidding (EO 398)',
+    envelope: 'ENVELOPE_1_ELIGIBILITY_TECHNICAL',
+    isMandatory: true,
+    legalRegime: 'RA_12009_NGPA',
+    status: 'MISSING'
+  },
+  {
+    id: 'chk-03',
+    requirementCode: 'PCAB_LICENSE',
+    requirementName: 'PCAB License and Special License (Infrastructure)',
+    envelope: 'ENVELOPE_1_ELIGIBILITY_TECHNICAL',
+    isMandatory: true,
+    legalRegime: 'RA_12009_NGPA',
+    status: 'MISSING'
+  },
+  {
+    id: 'chk-04',
+    requirementCode: 'SLCC_STATEMENT',
+    requirementName: 'Statement of Single Largest Completed Contract (SLCC)',
+    envelope: 'ENVELOPE_1_ELIGIBILITY_TECHNICAL',
+    isMandatory: true,
+    legalRegime: 'RA_12009_NGPA',
+    status: 'MISSING'
+  },
+  {
+    id: 'chk-05',
+    requirementCode: 'OMNIBUS_SWORN_STATEMENT',
+    requirementName: 'GPPB Standard Omnibus Sworn Statement (OSS)',
+    envelope: 'ENVELOPE_1_ELIGIBILITY_TECHNICAL',
+    isMandatory: true,
+    legalRegime: 'RA_12009_NGPA',
+    status: 'MISSING'
+  },
+  {
+    id: 'chk-06',
+    requirementCode: 'BID_SECURING_DECLARATION',
+    requirementName: 'Bid Securing Declaration (BSD) or Bid Security',
+    envelope: 'ENVELOPE_1_ELIGIBILITY_TECHNICAL',
+    isMandatory: true,
+    legalRegime: 'RA_12009_NGPA',
+    status: 'MISSING'
+  },
+  {
+    id: 'chk-07',
+    requirementCode: 'FINANCIAL_BID_FORM',
+    requirementName: 'Financial Bid Form (GPPB Official Format)',
+    envelope: 'ENVELOPE_2_FINANCIAL',
+    isMandatory: true,
+    legalRegime: 'RA_12009_NGPA',
+    status: 'MISSING'
+  },
+  {
+    id: 'chk-08',
+    requirementCode: 'PRICE_SCHEDULE',
+    requirementName: 'Detailed Price Schedule / Bill of Quantities (BOQ)',
+    envelope: 'ENVELOPE_2_FINANCIAL',
+    isMandatory: true,
+    legalRegime: 'RA_12009_NGPA',
+    status: 'MISSING'
+  }
+];
+
+export const BidPackageBuilderView: React.FC = () => {
+  const { currentTenant } = useAuth();
+  const [checklist, setChecklist] = useState<ChecklistRequirement[]>(() => {
+    const saved = localStorage.getItem('bidocs_checklist');
+    return saved ? JSON.parse(saved) : DEFAULT_CHECKLIST;
+  });
+  const [activeEnvelope, setActiveEnvelope] = useState<'ENVELOPE_1' | 'ENVELOPE_2'>('ENVELOPE_1');
+  const [showFormGeneratorModal, setShowFormGeneratorModal] = useState(false);
+  const [selectedFormCode, setSelectedFormCode] = useState('OMNIBUS_SWORN_STATEMENT');
+
+  // Sync to localStorage
+  React.useEffect(() => {
+    localStorage.setItem('bidocs_checklist', JSON.stringify(checklist));
+  }, [checklist]);
+
+  // Check vault documents to auto-verify checklist items & auto-sync project info when attached
+  React.useEffect(() => {
+    const savedVault = localStorage.getItem('bidocs_vault_items');
+    if (savedVault) {
+      const docs = JSON.parse(savedVault);
+      if (Array.isArray(docs) && docs.length > 0) {
+        // Active Bid Package Project details
+        const activeProjectTitle = 'Infrastructure & IT Systems Modernization Project';
+        const activePhilgepsRefNo = 'PhilGEPS-2026-901283';
+
+        // Auto-inject project info into linked vault documents upon package assignment
+        const updatedDocs = docs.map((d: any) => {
+          if (!d.projectTitle || !d.philgepsRefNo) {
+            return {
+              ...d,
+              projectTitle: activeProjectTitle,
+              philgepsRefNo: activePhilgepsRefNo
+            };
+          }
+          return d;
+        });
+
+        localStorage.setItem('bidocs_vault_items', JSON.stringify(updatedDocs));
+
+        setChecklist(prev => prev.map(item => {
+          const matchingDoc = docs.find((d: any) => 
+            d.documentName.toLowerCase().includes(item.requirementName.toLowerCase().split(' ')[0]) ||
+            (d.category.toLowerCase().includes('eligibility') && item.requirementCode === 'PHILGEPS_PLATINUM')
+          );
+          if (matchingDoc) {
+            return { ...item, status: 'VERIFIED_VALID', linkedDocId: matchingDoc.id };
+          }
+          return item;
+        }));
+      }
+    }
+  }, []);
+
+  const envelope1Items = checklist.filter(c => c.envelope === 'ENVELOPE_1_ELIGIBILITY_TECHNICAL');
+  const envelope2Items = checklist.filter(c => c.envelope === 'ENVELOPE_2_FINANCIAL');
+
+  const isEnvelope1Valid = envelope1Items.every(c => c.status === 'VERIFIED_VALID' || c.status === 'ATTACHED');
+
+  const toggleChecklistStatus = (id: string) => {
+    setChecklist(prev => prev.map(c => {
+      if (c.id === id) {
+        const nextStatus = c.status === 'VERIFIED_VALID' ? 'MISSING' : 'VERIFIED_VALID';
+        return { ...c, status: nextStatus };
+      }
+      return c;
+    }));
+  };
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <span 
+              className="w-3 h-3 rounded-full" 
+              style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }} 
+            />
+            <h1 className="text-2xl font-bold text-white">Universal Bid Package Builder</h1>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Envelope Assembly & GPPB Compliance Checklist for <span className="text-slate-200 font-semibold">{currentTenant?.companyName}</span>.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFormGeneratorModal(true)}
+            className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow transition flex items-center gap-2"
+          >
+            <Sparkles className="w-4 h-4 text-emerald-200" />
+            <span>GPPB Form Auto-Generator</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Active Bid Target Card */}
+      <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-slate-400">PhilGEPS-2026-10928371</span>
+            <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono text-[10px] font-semibold">
+              INFRASTRUCTURE
+            </span>
+            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono text-[10px] font-semibold flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3" /> RA 12009 NGPA
+            </span>
+          </div>
+          <span className="text-amber-400 font-mono font-semibold">Deadline: Aug 12, 2026</span>
+        </div>
+
+        <h2 className="text-base font-extrabold text-white">
+          Construction of Multi-Purpose Evacuation Center Phase II
+        </h2>
+        <p className="text-xs text-slate-400">
+          Procuring Entity: Department of Public Works and Highways (DPWH Region IV-A) | ABC: <span className="font-mono text-emerald-400 font-bold">₱24,500,000.00</span>
+        </p>
+
+        {/* Envelope Progress Tabs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <button
+            onClick={() => setActiveEnvelope('ENVELOPE_1')}
+            className={`p-3 rounded-xl text-left border transition ${
+              activeEnvelope === 'ENVELOPE_1'
+                ? 'border-blue-500 bg-blue-600/10 text-white'
+                : 'border-slate-800 bg-slate-900/60 text-slate-400'
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span>Envelope 1: Technical & Eligibility</span>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300">
+                6 Items
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Class A/B Documents, Bid Securing Declaration, Omnibus Sworn Statement</p>
+          </button>
+
+          <button
+            onClick={() => setActiveEnvelope('ENVELOPE_2')}
+            className={`p-3 rounded-xl text-left border transition ${
+              activeEnvelope === 'ENVELOPE_2'
+                ? 'border-emerald-500 bg-emerald-600/10 text-white'
+                : 'border-slate-800 bg-slate-900/60 text-slate-400'
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span>Envelope 2: Financial Envelope</span>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                2 Items
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Financial Bid Form & Detailed Bill of Quantities (BOQ)</p>
+          </button>
+        </div>
+      </div>
+
+      {/* Checklist Matrix Table */}
+      <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <FileCheck className="w-4 h-4 text-blue-400" />
+            {activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1 Checklist Matrix' : 'Envelope 2 Checklist Matrix'}
+          </h3>
+          <span className="text-xs text-slate-400">Click item status to toggle verification</span>
+        </div>
+
+        <div className="space-y-3">
+          {(activeEnvelope === 'ENVELOPE_1' ? envelope1Items : envelope2Items).map((item) => (
+            <div 
+              key={item.id}
+              onClick={() => toggleChecklistStatus(item.id)}
+              className="p-4 rounded-xl glass-card border border-slate-800 hover:border-slate-700 transition cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+            >
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-[10px] font-mono">
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">
+                    {item.requirementCode}
+                  </span>
+                  <span className="text-slate-400">RA 12009 NGPA Compliant</span>
+                </div>
+                <p className="text-xs font-bold text-white">{item.requirementName}</p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {item.status === 'VERIFIED_VALID' && (
+                  <span className="badge-success text-xs px-3 py-1 rounded-full font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Verified Valid
+                  </span>
+                )}
+                {item.status === 'ATTACHED' && (
+                  <span className="badge-info text-xs px-3 py-1 rounded-full font-semibold flex items-center gap-1">
+                    <FileText className="w-3.5 h-3.5" /> Attached
+                  </span>
+                )}
+                {item.status === 'EXPIRED' && (
+                  <span className="badge-warning text-xs px-3 py-1 rounded-full font-semibold flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-400" /> Expired in Vault
+                  </span>
+                )}
+                {item.status === 'MISSING' && (
+                  <span className="badge-danger text-xs px-3 py-1 rounded-full font-semibold flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-red-400" /> Missing
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* FORM AUTO-GENERATOR PREVIEW MODAL */}
+      {showFormGeneratorModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl glass-panel p-6 rounded-2xl border border-slate-800 shadow-2xl space-y-4 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  GPPB Standard Form Auto-Populator
+                </h2>
+                <p className="text-xs text-slate-400">Pre-populates corporate tenant data into Philippine government bidding templates.</p>
+              </div>
+              <button onClick={() => setShowFormGeneratorModal(false)} className="text-slate-400 hover:text-white">
+                ✕
+              </button>
+            </div>
+
+            {/* Generated Document Preview */}
+            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3 font-mono text-xs text-slate-300">
+              <div className="text-center space-y-1 border-b border-slate-800 pb-2">
+                <p className="font-bold text-white">REPUBLIC OF THE PHILIPPINES</p>
+                <p className="text-[11px] text-emerald-400">GPPB OMNIBUS SWORN STATEMENT (RA 12009 NGPA FORMAT)</p>
+              </div>
+
+              <div className="space-y-2 text-[11px] leading-relaxed">
+                <p>
+                  I, <span className="text-amber-400 font-bold">{currentTenant?.authorizedSignatory?.name}</span>, of legal age, Filipino, residing at Pasig City, after having been duly sworn in accordance with law, do hereby depose and state that:
+                </p>
+                <p>
+                  1. I am the duly authorized and designated representative of <span className="text-blue-400 font-bold">{currentTenant?.companyName}</span> with office address at {currentTenant?.address};
+                </p>
+                <p>
+                  2. <span className="text-blue-400 font-bold">{currentTenant?.companyName}</span> is granted full power and authority to do, execute and perform any and all acts necessary to participate, submit the bid, and to sign and execute the contract for <span className="text-white">Construction of Multi-Purpose Evacuation Center Phase II</span> under DPWH Region IV-A;
+                </p>
+                <p>
+                  3. Tax Identification Number (TIN): <span className="text-amber-400">{currentTenant?.tin}</span> | SEC/DTI Reg: <span className="text-amber-400">{currentTenant?.secDtiRegNo}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-[10px] text-slate-400 font-mono">Form auto-filled with dynamic tenant white-label tokens</span>
+              <button
+                onClick={() => {
+                  alert('Form generated & attached to Envelope 1!');
+                  setShowFormGeneratorModal(false);
+                }}
+                className="px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow flex items-center gap-2"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export & Attach PDF to Envelope</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+};
