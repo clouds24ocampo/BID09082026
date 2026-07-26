@@ -8,9 +8,10 @@ interface PdfPreviewModalProps {
   tenant: Tenant | null;
   onClose: () => void;
   pdfDataUrl?: string; // In-memory PDF data URL (takes priority over item.fileDataUrl)
+  hidePrintExport?: boolean; // Set to true for Document Vault tab to restrict to View only
 }
 
-export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, onClose, pdfDataUrl }) => {
+export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, onClose, pdfDataUrl, hidePrintExport = false }) => {
   const [zoomLevel, setZoomLevel] = useState(100);
 
   // Use the in-memory pdfDataUrl first, then fall back to the item's stored value
@@ -118,21 +119,25 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
               </a>
             )}
 
-            <button
-              onClick={handleExportPdf}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition shadow flex items-center gap-1.5"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export PDF</span>
-            </button>
+            {!hidePrintExport && (
+              <>
+                <button
+                  onClick={handleExportPdf}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition shadow flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export PDF</span>
+                </button>
 
-            <button
-              onClick={handlePrint}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print Document</span>
-            </button>
+                <button
+                  onClick={handlePrint}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Document</span>
+                </button>
+              </>
+            )}
 
             <button
               onClick={onClose}

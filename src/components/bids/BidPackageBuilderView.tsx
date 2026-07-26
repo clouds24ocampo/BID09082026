@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { ChecklistRequirement, LegalRegime } from '../../types';
+import { ChecklistRequirement, DocumentVaultItem } from '../../types';
 import { DocumentCoverPage } from '../vault/DocumentCoverPage';
+import { MergedPdfViewerModal } from '../vault/MergedPdfViewerModal';
+import { PdfPreviewModal } from '../vault/PdfPreviewModal';
+import { loadVaultItems, loadPdfData } from '../../utils/vaultIndexedDB';
 import {
   FolderKanban,
   FileCheck,
@@ -15,7 +18,13 @@ import {
   ChevronRight,
   Building2,
   Sparkles,
-  Send
+  Send,
+  Printer,
+  Edit3,
+  Eye,
+  Layers,
+  X,
+  RefreshCw
 } from 'lucide-react';
 
 const DEFAULT_CHECKLIST: ChecklistRequirement[] = [
@@ -104,34 +113,34 @@ export const BidPackageBuilderView: React.FC = () => {
   const [showCoverPageModal, setShowCoverPageModal] = useState(false);
   const [selectedFormCode, setSelectedFormCode] = useState('OMNIBUS_SWORN_STATEMENT');
 
-  // Sync to localStorage
+  // Package Organizer & View/Edit Modals State
+  const [showOrganizeModal, setShowOrganizeModal] = useState(false);
+  const [vaultDocs, setVaultDocs] = useState<DocumentVaultItem[]>([]);
+  const pdfDataCache = useRef<Record<string, string>>({});
+
+  const [editReqItem, setEditReqItem] = useState<ChecklistRequirement | null>(null);
+  const [editReqName, setEditReqName] = useState('');
+  const [editReqCode, setEditReqCode] = useState('');
+  const [editReqStatus, setEditReqStatus] = useState<ChecklistRequirement['status']>('VERIFIED_VALID');
+
+  const [previewDocItem, setPreviewDocItem] = useState<DocumentVaultItem | null>(null);
+
+  // Sync checklist to localStorage
   React.useEffect(() => {
     localStorage.setItem('bidocs_checklist', JSON.stringify(checklist));
   }, [checklist]);
 
-  // Check vault documents to auto-verify checklist items & auto-sync project info when attached
+  // Load vault documents from IndexedDB for organizing, previewing, and auto-verifying checklist
   React.useEffect(() => {
-    const savedVault = localStorage.getItem('bidocs_vault_items');
-    if (savedVault) {
-      const docs = JSON.parse(savedVault);
+    loadVaultItems().then(async (docs) => {
       if (Array.isArray(docs) && docs.length > 0) {
-        // Active Bid Package Project details
-        const activeProjectTitle = 'Infrastructure & IT Systems Modernization Project';
-        const activePhilgepsRefNo = 'PhilGEPS-2026-901283';
-
-        // Auto-inject project info into linked vault documents upon package assignment
-        const updatedDocs = docs.map((d: any) => {
-          if (!d.projectTitle || !d.philgepsRefNo) {
-            return {
-              ...d,
-              projectTitle: activeProjectTitle,
-              philgepsRefNo: activePhilgepsRefNo
-            };
-          }
-          return d;
-        });
-
-        localStorage.setItem('bidocs_vault_items', JSON.stringify(updatedDocs));
+        setVaultDocs(docs);
+        for (const d of docs) {
+          try {
+            const data = await loadPdfData(d.id);
+            if (data) pdfDataCache.current[d.id] = data;
+          } catch (_) { /* ignore missing blobs */ }
+        }
 
         setChecklist(prev => prev.map(item => {
           const matchingDoc = docs.find((d: any) =>
@@ -144,7 +153,7 @@ export const BidPackageBuilderView: React.FC = () => {
           return item;
         }));
       }
-    }
+    }).catch(e => console.error('[BidPackage] Failed to load vault items:', e));
   }, []);
 
   const envelope1Items = checklist.filter(c => c.envelope === 'ENVELOPE_1_ELIGIBILITY_TECHNICAL');
@@ -180,21 +189,48 @@ export const BidPackageBuilderView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowOrganizeModal(true)}
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow transition flex items-center gap-1.5"
+            title="Organize & re-sequence documents before printing or export"
+          >
+            <Layers className="w-4 h-4 text-purple-200" />
+            <span>Organize Documents</span>
+          </button>
+
           <button
             onClick={() => setShowCoverPageModal(true)}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow transition flex items-center gap-2"
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow transition flex items-center gap-1.5"
           >
-            <FileText className="w-4 h-4 text-blue-200" />
-            <span>Preview Package Cover Page</span>
+            <Eye className="w-4 h-4 text-blue-200" />
+            <span>View Cover Page</span>
           </button>
 
           <button
             onClick={() => setShowFormGeneratorModal(true)}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow transition flex items-center gap-2"
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow transition flex items-center gap-1.5"
           >
             <Sparkles className="w-4 h-4 text-emerald-200" />
-            <span>GPPB Form Auto-Generator</span>
+            <span>Form Auto-Generator</span>
+          </button>
+
+          <button
+            onClick={() => setShowOrganizeModal(true)}
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white shadow transition flex items-center gap-1.5"
+            title="Export full bid package as PDF"
+          >
+            <Download className="w-4 h-4 text-amber-200" />
+            <span>Export PDF</span>
+          </button>
+
+          <button
+            onClick={() => setShowOrganizeModal(true)}
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow transition flex items-center gap-1.5"
+            title="Print organized bid package"
+          >
+            <Printer className="w-4 h-4 text-indigo-200" />
+            <span>Print Package</span>
           </button>
         </div>
       </div>
@@ -271,8 +307,7 @@ export const BidPackageBuilderView: React.FC = () => {
           {(activeEnvelope === 'ENVELOPE_1' ? envelope1Items : envelope2Items).map((item) => (
             <div
               key={item.id}
-              onClick={() => toggleChecklistStatus(item.id)}
-              className="p-4 rounded-xl glass-card border border-slate-800 hover:border-slate-700 transition cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              className="p-4 rounded-xl glass-card border border-slate-800 hover:border-slate-700 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
             >
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-[10px] font-mono">
@@ -284,27 +319,61 @@ export const BidPackageBuilderView: React.FC = () => {
                 <p className="text-xs font-bold text-white">{item.requirementName}</p>
               </div>
 
-              <div className="flex items-center gap-3">
-                {item.status === 'VERIFIED_VALID' && (
-                  <span className="badge-success text-xs px-3 py-1 rounded-full font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Verified Valid
-                  </span>
-                )}
-                {item.status === 'ATTACHED' && (
-                  <span className="badge-info text-xs px-3 py-1 rounded-full font-semibold flex items-center gap-1">
-                    <FileText className="w-3.5 h-3.5" /> Attached
-                  </span>
-                )}
-                {item.status === 'EXPIRED' && (
-                  <span className="badge-warning text-xs px-3 py-1 rounded-full font-semibold flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5 text-amber-400" /> Expired in Vault
-                  </span>
-                )}
-                {item.status === 'MISSING' && (
-                  <span className="badge-danger text-xs px-3 py-1 rounded-full font-semibold flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5 text-red-400" /> Missing
-                  </span>
-                )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div onClick={() => toggleChecklistStatus(item.id)} className="cursor-pointer" title="Click to toggle status">
+                  {item.status === 'VERIFIED_VALID' && (
+                    <span className="badge-success text-xs px-3 py-1 rounded-full font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Verified Valid
+                    </span>
+                  )}
+                  {item.status === 'ATTACHED' && (
+                    <span className="badge-info text-xs px-3 py-1 rounded-full font-semibold flex items-center gap-1">
+                      <FileText className="w-3.5 h-3.5" /> Attached
+                    </span>
+                  )}
+                  {item.status === 'EXPIRED' && (
+                    <span className="badge-warning text-xs px-3 py-1 rounded-full font-semibold flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-400" /> Expired in Vault
+                    </span>
+                  )}
+                  {item.status === 'MISSING' && (
+                    <span className="badge-danger text-xs px-3 py-1 rounded-full font-semibold flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 text-red-400" /> Missing
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const linked = vaultDocs.find(d => d.id === item.linkedDocId) || vaultDocs[0];
+                    if (linked) {
+                      setPreviewDocItem(linked);
+                    } else {
+                      setShowCoverPageModal(true);
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold border border-blue-500/30 flex items-center gap-1"
+                  title="View attached document"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>View</span>
+                </button>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditReqItem(item);
+                    setEditReqName(item.requirementName);
+                    setEditReqCode(item.requirementCode);
+                    setEditReqStatus(item.status);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold border border-amber-500/30 flex items-center gap-1"
+                  title="Edit requirement details"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit</span>
+                </button>
               </div>
             </div>
           ))}
@@ -420,6 +489,100 @@ export const BidPackageBuilderView: React.FC = () => {
                 Close Preview
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ORGANIZE & SEQUENCE BID PACKAGE DOCUMENTS MODAL */}
+      {showOrganizeModal && (
+        <MergedPdfViewerModal
+          selectedItems={vaultDocs}
+          tenant={currentTenant}
+          onClose={() => setShowOrganizeModal(false)}
+        />
+      )}
+
+      {/* VIEW SINGLE ATTACHED DOCUMENT PREVIEW MODAL */}
+      {previewDocItem && (
+        <PdfPreviewModal
+          item={previewDocItem}
+          tenant={currentTenant}
+          onClose={() => setPreviewDocItem(null)}
+          pdfDataUrl={pdfDataCache.current[previewDocItem.id]}
+          hidePrintExport={false}
+        />
+      )}
+
+      {/* EDIT CHECKLIST REQUIREMENT MODAL */}
+      {editReqItem && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleIn my-auto">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-amber-400" />
+                <span>Edit Requirement — {editReqItem.requirementCode}</span>
+              </h3>
+              <button onClick={() => setEditReqItem(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setChecklist(prev => prev.map(item => item.id === editReqItem.id ? {
+                  ...item,
+                  requirementName: editReqName.trim() || item.requirementName,
+                  requirementCode: editReqCode.trim() || item.requirementCode,
+                  status: editReqStatus
+                } : item));
+                setEditReqItem(null);
+              }}
+              className="p-6 space-y-4 text-xs"
+            >
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Requirement Code</label>
+                <input
+                  type="text"
+                  value={editReqCode}
+                  onChange={(e) => setEditReqCode(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Requirement Name / Title</label>
+                <textarea
+                  value={editReqName}
+                  onChange={(e) => setEditReqName(e.target.value)}
+                  rows={3}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-medium focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Compliance Status</label>
+                <select
+                  value={editReqStatus}
+                  onChange={(e) => setEditReqStatus(e.target.value as any)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-medium focus:outline-none focus:border-amber-500"
+                >
+                  <option value="VERIFIED_VALID">Verified Valid</option>
+                  <option value="ATTACHED">Attached</option>
+                  <option value="EXPIRED">Expired in Vault</option>
+                  <option value="MISSING">Missing</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button type="button" onClick={() => setEditReqItem(null)} className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">
+                  Cancel
+                </button>
+                <button type="submit" className="px-5 py-2 rounded-xl text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 transition shadow">
+                  Save Requirement
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
