@@ -10,7 +10,7 @@ export interface OpportunityProjectOption {
 
 /**
  * Fetches real active bidding projects saved in Opportunity Finder (localStorage: bidocs_opportunities).
- * Strictly returns ONLY user-created/imported opportunities from Opportunity Finder, zero dummy data.
+ * Parses the exact submission deadline date & time from Opportunity Finder.
  */
 export const getOpportunityProjects = (): OpportunityProjectOption[] => {
   try {
@@ -19,9 +19,23 @@ export const getOpportunityProjects = (): OpportunityProjectOption[] => {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed.map((item: any, idx: number) => {
-          const dateStr = item.submissionDeadlineDate || item.submissionDeadline || item.dateSubmitted || new Date().toISOString().split('T')[0];
-          const timeStr = item.submissionDeadlineTime || item.submissionTime || '14:00';
-          const combinedDateTime = `${dateStr} ${timeStr}`.trim();
+          // Extract exact submission deadline datetime set in Opportunity Finder
+          const rawDateTime = item.submissionDeadlineDatetime || item.submissionDeadlineDate || item.submissionDeadline || item.dateSubmitted || '';
+          
+          let formattedDateTime = '';
+          if (rawDateTime) {
+            if (rawDateTime.includes('T')) {
+              formattedDateTime = rawDateTime.substring(0, 16); // e.g. "2026-08-30T14:00"
+            } else if (rawDateTime.includes(' ')) {
+              formattedDateTime = rawDateTime.replace(' ', 'T').substring(0, 16);
+            } else {
+              const timePart = item.submissionDeadlineTime || item.submissionTime || '14:00';
+              formattedDateTime = `${rawDateTime}T${timePart}`;
+            }
+          } else {
+            const today = new Date().toISOString().split('T')[0];
+            formattedDateTime = `${today}T14:00`;
+          }
 
           return {
             id: item.id || `opp-stg-${idx}`,
@@ -31,8 +45,8 @@ export const getOpportunityProjects = (): OpportunityProjectOption[] => {
             procuringEntity: typeof item.procuringEntity === 'string'
               ? item.procuringEntity
               : item.procuringEntity?.name || item.procuringEntityName || 'Government Agency',
-            abc: item.approvedBudgetStr || (item.approvedBudgetValue ? `₱${Number(item.approvedBudgetValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '₱0.00'),
-            dateTimeSubmitted: combinedDateTime
+            abc: item.approvedBudgetStr || (item.approvedBudgetValue ? `₱${Number(item.approvedBudgetValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : (item.approvedBudget ? `₱${Number(item.approvedBudget).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '₱0.00')),
+            dateTimeSubmitted: formattedDateTime
           };
         });
       }
@@ -41,6 +55,5 @@ export const getOpportunityProjects = (): OpportunityProjectOption[] => {
     console.error('[OpportunityProjects] Error reading storage:', e);
   }
 
-  // Strictly return empty array if no real opportunities saved in Opportunity Finder (Zero dummy fallback projects)
   return [];
 };

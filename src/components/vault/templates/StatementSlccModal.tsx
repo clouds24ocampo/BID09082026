@@ -4,16 +4,16 @@ import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine
 import { PDFDocument } from 'pdf-lib';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import html2canvas from 'html2canvas';
-import { 
-  X, 
-  Printer, 
-  Plus, 
-  Trash2, 
-  Upload, 
+import {
+  X,
+  Printer,
+  Plus,
+  Trash2,
+  Upload,
   Download,
-  CheckCircle2, 
-  FileText, 
-  CheckSquare, 
+  CheckCircle2,
+  FileText,
+  CheckSquare,
   Square,
   Paperclip,
   Edit3,
@@ -311,15 +311,28 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
   const govContracts = contracts.filter(c => c.type === 'Government');
   const privContracts = contracts.filter(c => c.type === 'Private');
 
-  // Format date-time for display
+  // Format date-time for 100% accurate display (e.g. "2026-08-30T14:00" -> "2026-08-30 02:00 PM")
   const formatDateTimeDisplay = (dtStr: string) => {
     if (!dtStr) return 'N/A';
-    return dtStr.replace('T', ' ');
+    const parts = dtStr.split('T');
+    if (parts.length === 2) {
+      const datePart = parts[0];
+      const timePart = parts[1];
+      const [hours, mins] = timePart.split(':');
+      const h = parseInt(hours, 10);
+      if (!isNaN(h)) {
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        return `${datePart} ${String(h12).padStart(2, '0')}:${mins} ${ampm}`;
+      }
+      return `${datePart} ${timePart}`;
+    }
+    return dtStr;
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-      
+
       {/* PORTRAIT PRINT STYLESHEET OVERRIDE */}
       <style>{`
         @media print {
@@ -360,7 +373,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
       `}</style>
 
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-7xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col">
-        
+
         {/* Top Header Bar */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
           <div className="flex items-center gap-3">
@@ -403,7 +416,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
 
         {/* Scrollable Modal Content Body */}
         <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6">
-          
+
           {/* Target Bidding Project Selector & Auto-Fill Bar */}
           <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
             <div className="flex items-center justify-between">
@@ -516,19 +529,18 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
               <button
                 type="button"
                 onClick={() => setIsNoSlcc(!isNoSlcc)}
-                className={`px-4 py-2 rounded-xl text-xs font-extrabold font-mono transition flex items-center gap-2 shadow-lg ${
-                  isNoSlcc 
-                    ? 'bg-amber-600 text-white border border-amber-400' 
-                    : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
-                }`}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold font-mono transition flex items-center gap-2 shadow-lg ${isNoSlcc
+                  ? 'bg-amber-600 text-white border border-amber-400'
+                  : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+                  }`}
               >
                 {isNoSlcc ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                 <span>"No SLCC" Declaration</span>
               </button>
 
               <p className="text-xs text-slate-400 font-mono">
-                {isNoSlcc 
-                  ? 'One-click "No SLCC" active. Displays "NONE" across legal template tables & marks Item (c) Complete.' 
+                {isNoSlcc
+                  ? 'One-click "No SLCC" active. Displays "NONE" across legal template tables & marks Item (c) Complete.'
                   : 'Click to declare no completed contracts or click "Fill Out SLCC Contract Form" to add entry rows.'}
               </p>
             </div>
@@ -557,12 +569,12 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
 
           {/* GPPB LEGAL PAPER CONTAINER (Legal 13" x 8.5" LANDSCAPE Printable Layout — EXPANDABLE MULTI-ENTRY FIT) */}
           <div className="single-page-paper bg-white text-slate-900 font-sans p-6 sm:p-8 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1150px] min-h-[680px] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
-            
+
             {/* Outer Legal Frame */}
             <div className="absolute inset-3 border-2 border-slate-900 pointer-events-none rounded-xl" />
 
             <div className="space-y-4">
-              
+
               {/* TEMPLATE HEADER: Auto-Populated Fields */}
               <div className="border-b-2 border-slate-900 pb-3 space-y-2">
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
@@ -600,7 +612,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
 
               {/* CONTRACT ENTRY LANDSCAPE TABLES */}
               <div className="space-y-4 text-xs font-sans">
-                
+
                 {/* GOVERNMENT CONTRACTS TABLE */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between border-b border-slate-400 pb-1">
@@ -892,7 +904,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
       {editingRow && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl animate-scaleIn my-auto flex flex-col max-h-[92vh]">
-            
+
             <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Edit3 className="w-4 h-4 text-purple-400" />
@@ -904,7 +916,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
             </div>
 
             <form onSubmit={saveEditingRow} className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
-              
+
               {/* Category */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -1061,7 +1073,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
 
               {/* Milestone Dates & Accomplishment */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
+
                 <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
                   <h4 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
                     <Calendar className="w-4 h-4 text-purple-400" />

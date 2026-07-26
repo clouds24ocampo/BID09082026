@@ -311,10 +311,23 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
   const govContracts = contracts.filter(c => c.type === 'Government');
   const privContracts = contracts.filter(c => c.type === 'Private');
 
-  // Format date-time for display
+  // Format date-time for 100% accurate display (e.g. "2026-08-30T14:00" -> "2026-08-30 02:00 PM")
   const formatDateTimeDisplay = (dtStr: string) => {
     if (!dtStr) return 'N/A';
-    return dtStr.replace('T', ' ');
+    const parts = dtStr.split('T');
+    if (parts.length === 2) {
+      const datePart = parts[0];
+      const timePart = parts[1];
+      const [hours, mins] = timePart.split(':');
+      const h = parseInt(hours, 10);
+      if (!isNaN(h)) {
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        return `${datePart} ${String(h12).padStart(2, '0')}:${mins} ${ampm}`;
+      }
+      return `${datePart} ${timePart}`;
+    }
+    return dtStr;
   };
 
   return (

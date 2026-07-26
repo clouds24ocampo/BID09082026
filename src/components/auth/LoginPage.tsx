@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
-import { 
-  Building2, 
-  Lock, 
-  Mail, 
-  Eye, 
-  EyeOff, 
-  ShieldCheck, 
-  ArrowRight, 
-  CheckCircle2, 
-  Sparkles, 
-  Briefcase, 
-  FileCheck 
+import {
+  Building2,
+  Lock,
+  Mail,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  ArrowRight,
+  CheckCircle2,
+  Sparkles,
+  Briefcase,
+  FileCheck
 } from 'lucide-react';
 
 interface LoginPageProps {
@@ -21,7 +21,7 @@ interface LoginPageProps {
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
   const { login, resetUserPassword, tenants } = useAuth();
-  
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('COMPANY_OWNER');
@@ -76,24 +76,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
   return (
     <div className="min-h-screen bg-[#070a12] text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
       {/* Background Decorative Gradients */}
-      <div 
+      <div
         className="absolute -top-40 -left-40 w-96 h-96 rounded-full blur-[128px] opacity-20 pointer-events-none transition-colors duration-500"
         style={{ backgroundColor: activeTenantPreview.brandColor || '#1e40af' }}
       />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-600/10 rounded-full blur-[128px] pointer-events-none" />
 
       <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
-        
+
         {/* Left Column: System Value Proposition & Philippine Compliance Overview */}
         <div className="lg:col-span-6 space-y-6 pr-0 lg:pr-6">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs font-medium text-emerald-400">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>RA 9184 & RA 12009 (NGPA) Compliant</span>
+            <span> Bidding document compliant </span>
           </div>
 
           <div className="space-y-3">
             <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
-              BIDOCS <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-300">System</span>
+              Quantum <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-300">Cloud</span>
             </h1>
             <p className="text-lg text-slate-400 leading-relaxed">
               Philippine Public Bidding Management Platform engineered for government procurement bids across Goods, Infrastructure, and Consulting Services.
@@ -107,7 +107,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                 <CheckCircle2 className="w-4 h-4" />
               </div>
               <div>
-                <p className="font-semibold text-sm text-slate-200">Zero Hardcoding White-Label Engine</p>
+                <p className="font-semibold text-sm text-slate-200">White-Label Engine</p>
                 <p className="text-xs text-slate-400">Instant company skinning (Logo, TIN, PCAB License, Brand Color) per business instance.</p>
               </div>
             </div>
@@ -137,7 +137,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
         {/* Right Column: Interactive Login Form */}
         <div className="lg:col-span-6">
           <div className="glass-panel p-6 sm:p-8 rounded-2xl shadow-2xl border border-slate-800 space-y-6">
-            
+
             {/* Header & Dynamic Tenant Preview Badge */}
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
               <div>
@@ -146,9 +146,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
               </div>
 
               {/* Active Tenant Badge Preview */}
-              <div 
+              <div
                 className="px-3 py-1.5 rounded-lg border flex items-center gap-2 text-xs font-medium transition-colors"
-                style={{ 
+                style={{
                   borderColor: `${activeTenantPreview.brandColor || '#1e40af'}50`,
                   backgroundColor: `${activeTenantPreview.brandColor || '#1e40af'}15`,
                   color: '#ffffff'
@@ -168,7 +168,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              
+
               {/* Select Corporate Tenant */}
               {tenants.length === 0 ? (
                 <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-mono space-y-1 text-center">
@@ -206,22 +206,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                   <button
                     type="button"
                     onClick={() => setSelectedRole('COMPANY_OWNER')}
-                    className={`py-1.5 px-3 rounded-md text-xs font-medium transition ${
-                      selectedRole === 'COMPANY_OWNER'
-                        ? 'bg-blue-600 text-white shadow'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                    className={`py-1.5 px-3 rounded-md text-xs font-medium transition ${selectedRole === 'COMPANY_OWNER'
+                      ? 'bg-blue-600 text-white shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                      }`}
                   >
                     Company Owner
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedRole('BID_MANAGER')}
-                    className={`py-1.5 px-3 rounded-md text-xs font-medium transition ${
-                      selectedRole === 'BID_MANAGER'
-                        ? 'bg-blue-600 text-white shadow'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                    className={`py-1.5 px-3 rounded-md text-xs font-medium transition ${selectedRole === 'BID_MANAGER'
+                      ? 'bg-blue-600 text-white shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                      }`}
                   >
                     Bid Manager
                   </button>
