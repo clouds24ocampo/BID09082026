@@ -134,6 +134,13 @@ const TECHNICAL_CHECKLIST_MASTER: TechnicalChecklistItem[] = [
   }
 ];
 
+export interface VaultNotification {
+  type: 'SUCCESS' | 'FAILURE';
+  title: string;
+  message: string;
+  reason?: string;
+}
+
 export const DocumentVaultView: React.FC = () => {
   const { currentTenant, currentUser } = useAuth();
   const [vaultItems, setVaultItems] = useState<DocumentVaultItem[]>(() => {
@@ -173,7 +180,33 @@ export const DocumentVaultView: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string>('');
   const [uploadError, setUploadError] = useState('');
-  const [successBannerMessage, setSuccessBannerMessage] = useState<string>('');
+  const [vaultNotification, setVaultNotification] = useState<VaultNotification | null>(null);
+
+  const readFileAsDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const notifySuccess = (title: string, message: string) => {
+    setVaultNotification({
+      type: 'SUCCESS',
+      title,
+      message
+    });
+  };
+
+  const notifyFailure = (title: string, message: string, reason: string) => {
+    setVaultNotification({
+      type: 'FAILURE',
+      title,
+      message,
+      reason
+    });
+  };
 
   // Sync states to localStorage
   React.useEffect(() => {
@@ -271,6 +304,7 @@ export const DocumentVaultView: React.FC = () => {
 
     setVaultItems(prev => [newVaultDoc, ...prev.filter(item => item.documentCode !== fillingTemplateItem.code)]);
     setFillingTemplateItem(null);
+    notifySuccess(`[${docTitle}, v1.0] Template Save Successful!`, 'Legal template saved into Document Vault as an active technical exhibit.');
   };
 
   const handleFileSelection = (file: File | undefined) => {
@@ -281,14 +315,18 @@ export const DocumentVaultView: React.FC = () => {
     }
 
     if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-      setUploadError('Invalid file format. Strictly PDF (.pdf) files are accepted.');
+      const errReason = 'Invalid File Format: Strictly PDF (.pdf) documents are accepted by GPPB bidding standards.';
+      setUploadError(errReason);
+      notifyFailure('Upload Validation Failed', 'Selected document file cannot be accepted.', errReason);
       setSelectedFile(null);
       setSelectedFileDataUrl('');
       return;
     }
 
     if (file.size > 100 * 1024 * 1024) {
-      setUploadError(`File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds maximum allowed limit of 100 MB.`);
+      const errReason = `File Size Exceeded: Selected file size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds maximum 100 MB limit.`;
+      setUploadError(errReason);
+      notifyFailure('Upload Validation Failed', 'Selected document file is too large.', errReason);
       setSelectedFile(null);
       setSelectedFileDataUrl('');
       return;
@@ -305,12 +343,16 @@ export const DocumentVaultView: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const handleUploadSubmit = (e: React.FormEvent) => {
+  const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadTargetDef) return;
 
+    const docName = uploadTargetDef.code === 'DOC-2' ? `${dtiSecType} Certificate` : uploadTargetDef.name;
+
     if (!selectedFile) {
-      setUploadError('Please select a PDF document to upload.');
+      const errReason = 'No File Selected: Please select a PDF document file from your computer.';
+      setUploadError(errReason);
+      notifyFailure(`Upload Failed for ${docName}`, 'Submission could not be completed.', errReason);
       return;
     }
 
@@ -328,20 +370,36 @@ export const DocumentVaultView: React.FC = () => {
     }
 
     if (reqIssue && !issuedDate) {
-      setUploadError('Issue Date is required for this document.');
+      const errReason = `Missing Required Field: Issue Date is mandatory for ${docName}.`;
+      setUploadError(errReason);
+      notifyFailure(`Upload Failed for ${docName}`, 'Submission could not be completed.', errReason);
       return;
     }
 
     if (reqExp && !expiryDate) {
-      setUploadError('Expiration Date is required for this document.');
+      const errReason = `Missing Required Field: Expiration Date is mandatory for ${docName}.`;
+      setUploadError(errReason);
+      notifyFailure(`Upload Failed for ${docName}`, 'Submission could not be completed.', errReason);
       return;
+    }
+
+    let fileDataUrl = selectedFileDataUrl;
+    if (!fileDataUrl && selectedFile) {
+      try {
+        fileDataUrl = await readFileAsDataUrl(selectedFile);
+      } catch (err) {
+        const errReason = 'File Processing Error: Failed to read PDF document data.';
+        setUploadError(errReason);
+        notifyFailure(`Upload Failed for ${docName}`, 'File conversion failed.', errReason);
+        return;
+      }
     }
 
     const newItem: DocumentVaultItem = {
       id: `doc-${uploadTargetDef.code.toLowerCase()}-${Date.now()}`,
       tenantId: currentTenant?.id || 'tenant-001',
       documentCode: uploadTargetDef.code,
-      documentName: uploadTargetDef.code === 'DOC-2' ? `${dtiSecType} Certificate` : uploadTargetDef.name,
+      documentName: docName,
       documentNumber: docNumber.trim() || `REF-${Math.floor(Math.random() * 899999 + 100000)}`,
       category: 'ELIGIBILITY_CLASS_A',
       procurementApplicability: ['Goods & Supply', 'Goods & Supply with Installation', 'Infrastructure', 'Consulting'],
@@ -350,7 +408,7 @@ export const DocumentVaultView: React.FC = () => {
       fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
       fileSizeBytes: selectedFile.size,
       fileName: selectedFile.name,
-      fileDataUrl: selectedFileDataUrl,
+      fileDataUrl: fileDataUrl,
       issuedDate: reqIssue ? issuedDate : undefined,
       expiryDate: reqExp ? expiryDate : undefined,
       status: reqExp && expiryDate && new Date(expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'EXPIRING_SOON' : 'ACTIVE',
@@ -362,21 +420,38 @@ export const DocumentVaultView: React.FC = () => {
       previousVersions: []
     };
 
-    setVaultItems(prev => [newItem, ...prev]);
+    setVaultItems(prev => [newItem, ...prev.filter(item => item.documentCode !== uploadTargetDef.code)]);
     setUploadTargetDef(null);
     resetFormState();
+    notifySuccess(`[${docName}, v1.0] Upload Successful!`, 'Your document has been verified and encrypted into Document Vault. Click "View PDF" to inspect your document.');
   };
 
-  const handleCustomUploadSubmit = (e: React.FormEvent) => {
+  const handleCustomUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customDocName.trim()) {
-      setUploadError('Document Name is required.');
+      const errReason = 'Missing Required Field: Document Name is required.';
+      setUploadError(errReason);
+      notifyFailure('Custom Upload Failed', 'Submission could not be completed.', errReason);
       return;
     }
 
     if (!selectedFile) {
-      setUploadError('Please select a PDF document to upload.');
+      const errReason = 'No File Selected: Please select a PDF document to upload.';
+      setUploadError(errReason);
+      notifyFailure(`Custom Upload Failed for ${customDocName}`, 'Submission could not be completed.', errReason);
       return;
+    }
+
+    let fileDataUrl = selectedFileDataUrl;
+    if (!fileDataUrl && selectedFile) {
+      try {
+        fileDataUrl = await readFileAsDataUrl(selectedFile);
+      } catch (err) {
+        const errReason = 'File Processing Error: Failed to read PDF document data.';
+        setUploadError(errReason);
+        notifyFailure(`Custom Upload Failed for ${customDocName}`, 'File conversion failed.', errReason);
+        return;
+      }
     }
 
     const newItem: DocumentVaultItem = {
@@ -391,7 +466,7 @@ export const DocumentVaultView: React.FC = () => {
       fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
       fileSizeBytes: selectedFile.size,
       fileName: selectedFile.name,
-      fileDataUrl: selectedFileDataUrl,
+      fileDataUrl: fileDataUrl,
       issuedDate: issuedDate || undefined,
       expiryDate: expiryDate || undefined,
       status: expiryDate && new Date(expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'EXPIRING_SOON' : 'ACTIVE',
@@ -406,11 +481,31 @@ export const DocumentVaultView: React.FC = () => {
     setVaultItems(prev => [newItem, ...prev]);
     setShowCustomUploadModal(false);
     resetFormState();
+    notifySuccess(`[${newItem.documentName}, v1.0] Upload Successful!`, 'Custom statutory document added to Document Vault.');
   };
 
-  const handleReplaceSubmit = (e: React.FormEvent) => {
+  const handleReplaceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!replaceTargetItem || !selectedFile) return;
+    if (!replaceTargetItem) return;
+
+    if (!selectedFile) {
+      const errReason = 'No File Selected: Please select a replacement PDF file to upload.';
+      setUploadError(errReason);
+      notifyFailure(`Replacement Failed for ${replaceTargetItem.documentName}`, 'Submission could not be completed.', errReason);
+      return;
+    }
+
+    let fileDataUrl = selectedFileDataUrl;
+    if (!fileDataUrl && selectedFile) {
+      try {
+        fileDataUrl = await readFileAsDataUrl(selectedFile);
+      } catch (err) {
+        const errReason = 'File Processing Error: Failed to read replacement PDF document data.';
+        setUploadError(errReason);
+        notifyFailure(`Replacement Failed for ${replaceTargetItem.documentName}`, 'File conversion failed.', errReason);
+        return;
+      }
+    }
 
     const archivedVersion: DocumentVersion = {
       versionNumber: replaceTargetItem.versionNumber,
@@ -423,14 +518,16 @@ export const DocumentVaultView: React.FC = () => {
       fileDataUrl: replaceTargetItem.fileDataUrl
     };
 
+    const newVersionNum = replaceTargetItem.versionNumber + 1;
+
     const updatedItem: DocumentVaultItem = {
       ...replaceTargetItem,
-      versionNumber: replaceTargetItem.versionNumber + 1,
+      versionNumber: newVersionNum,
       documentNumber: docNumber.trim() || replaceTargetItem.documentNumber,
       fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
       fileSizeBytes: selectedFile.size,
       fileName: selectedFile.name,
-      fileDataUrl: selectedFileDataUrl || replaceTargetItem.fileDataUrl,
+      fileDataUrl: fileDataUrl || replaceTargetItem.fileDataUrl,
       issuedDate: replaceTargetItem.requiresIssueDate ? (issuedDate || replaceTargetItem.issuedDate) : undefined,
       expiryDate: replaceTargetItem.requiresExpiryDate ? (expiryDate || replaceTargetItem.expiryDate) : undefined,
       status: replaceTargetItem.requiresExpiryDate && expiryDate && new Date(expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'EXPIRING_SOON' : 'ACTIVE',
@@ -441,6 +538,7 @@ export const DocumentVaultView: React.FC = () => {
     setVaultItems(prev => prev.map(item => item.id === replaceTargetItem.id ? updatedItem : item));
     setReplaceTargetItem(null);
     resetFormState();
+    notifySuccess(`[${updatedItem.documentName}, v${newVersionNum}.0] Replacement Successful!`, 'Replacement file uploaded and set as active document version.');
   };
 
   const toggleSelectDoc = (id: string) => {
@@ -524,20 +622,40 @@ export const DocumentVaultView: React.FC = () => {
         </div>
       </div>
 
-      {/* SUCCESS NOTIFICATION BANNER */}
-      {successBannerMessage && (
-        <div className="p-4 rounded-2xl bg-emerald-500/15 border-2 border-emerald-500/40 text-white flex items-center justify-between gap-4 shadow-xl animate-fadeIn">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
-              <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+      {/* UNIFIED VAULT SUCCESS / FAILURE NOTIFICATION BANNER */}
+      {vaultNotification && (
+        <div className={`p-4 rounded-2xl border-2 flex items-start justify-between gap-4 shadow-xl animate-fadeIn ${
+          vaultNotification.type === 'SUCCESS'
+            ? 'bg-emerald-500/15 border-emerald-500/40 text-white'
+            : 'bg-red-500/15 border-red-500/40 text-white'
+        }`}>
+          <div className="flex items-start gap-3">
+            <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${
+              vaultNotification.type === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+            }`}>
+              {vaultNotification.type === 'SUCCESS' ? (
+                <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+              ) : (
+                <AlertTriangle className="w-6 h-6 text-red-400" />
+              )}
             </div>
-            <div>
-              <h4 className="text-sm font-bold text-emerald-300 font-mono">{successBannerMessage}</h4>
-              <p className="text-xs text-slate-300 mt-0.5">Your document has been verified and stored in Document Vault. Click "View PDF" to preview your uploaded file.</p>
+            <div className="space-y-1">
+              <h4 className={`text-sm font-bold font-mono ${
+                vaultNotification.type === 'SUCCESS' ? 'text-emerald-300' : 'text-red-300'
+              }`}>
+                {vaultNotification.title}
+              </h4>
+              <p className="text-xs text-slate-300 leading-relaxed">{vaultNotification.message}</p>
+              {vaultNotification.reason && (
+                <div className="p-2.5 rounded-xl bg-red-950/90 border border-red-800/80 text-red-200 text-xs font-mono mt-2 shadow-inner">
+                  <strong className="text-red-400 font-bold block mb-0.5">Reason for Failure:</strong>
+                  <span>{vaultNotification.reason}</span>
+                </div>
+              )}
             </div>
           </div>
           <button
-            onClick={() => setSuccessBannerMessage('')}
+            onClick={() => setVaultNotification(null)}
             className="text-slate-400 hover:text-white transition p-1 shrink-0"
           >
             <X className="w-5 h-5" />
