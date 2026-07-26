@@ -204,12 +204,11 @@ export const DocumentVaultView: React.FC = () => {
   };
 
   const handleClearAllClassAUploads = () => {
-    if (confirm('Are you sure you want to remove ALL uploaded Class A Eligibility documents? All documents (PhilGEPS, DTI/SEC, Permits, Tax Clearance, PCAB, etc.) will be cleared so you can re-upload them from scratch.')) {
-      const remaining = vaultItems.filter(item => item.category !== 'ELIGIBILITY_CLASS_A');
-      setVaultItems(remaining);
-      localStorage.setItem('bidocs_vault_items', JSON.stringify(remaining));
+    if (confirm('Are you sure you want to remove ALL uploaded documents? All uploaded files in Class A Legal Eligibility and All Vault Documents will be removed so you can re-upload everything from scratch.')) {
+      setVaultItems([]);
+      localStorage.removeItem('bidocs_vault_items');
       setSelectedItemIds([]);
-      alert('All Class A uploaded documents have been removed! All 13 slots are now clean and ready for re-uploading.');
+      alert('All uploaded documents have been completely removed! All slots in Class A Legal Eligibility and All Vault Documents are now clean and ready for re-uploading.');
     }
   };
 
@@ -1240,6 +1239,7 @@ export const DocumentVaultView: React.FC = () => {
                   onChange={(e) => setCustomUploadCategory(e.target.value as DocCategory)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
                 >
+                  <option value="ELIGIBILITY_CLASS_A">Class A Legal Eligibility</option>
                   <option value="ELIGIBILITY_CLASS_B">Class B Joint Venture</option>
                   <option value="TECHNICAL">Technical Exhibits</option>
                   <option value="FINANCIAL">Financial / AFS</option>
