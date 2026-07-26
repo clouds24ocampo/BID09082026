@@ -58,6 +58,8 @@ export interface User {
   email: string;
   fullName: string;
   role: UserRole;
+  password?: string;
+  mustChangePassword?: boolean;
   avatarUrl?: string;
   lastLoginAt?: string;
 }

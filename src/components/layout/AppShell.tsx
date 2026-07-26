@@ -32,17 +32,19 @@ interface AppShellProps {
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, children }) => {
-  const { currentUser, currentTenant, tenants, switchTenant, logout } = useAuth();
+  const { currentUser, currentTenant, tenants, switchTenant, logout, updateUserPassword } = useAuth();
   const [showTenantDropdown, setShowTenantDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Mandatory Password Reset Enforcement State
+  // User-Specific Password Reset Enforcement State
   const [mustChangePassword, setMustChangePassword] = useState(() => {
-    const flag = localStorage.getItem('bidocs_must_change_password');
-    const pw = localStorage.getItem('bidocs_system_password');
-    return flag === 'true' || pw === 'BiDOCS#2026';
+    if (!currentUser) return false;
+    const userEmail = currentUser.email.toLowerCase();
+    const flag = localStorage.getItem(`bidocs_must_change_password_${userEmail}`);
+    const pw = localStorage.getItem(`bidocs_user_password_${userEmail}`);
+    return flag === 'true' || pw === 'BiDOCS#2026' || currentUser.mustChangePassword === true || currentUser.password === 'BiDOCS#2026';
   });
 
   const [newPassword, setNewPassword] = useState('');
@@ -71,8 +73,9 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
       return;
     }
 
-    localStorage.setItem('bidocs_system_password', newPassword);
-    localStorage.setItem('bidocs_must_change_password', 'false');
+    if (currentUser) {
+      updateUserPassword(currentUser.id, newPassword);
+    }
     setPwSuccess('Password updated successfully! System access secured.');
     setTimeout(() => {
       setMustChangePassword(false);

@@ -32,7 +32,7 @@ const PRESET_COLORS = [
 ];
 
 export const CompanyProfileView: React.FC = () => {
-  const { currentTenant, currentUser, updateTenantSettings } = useAuth();
+  const { currentTenant, currentUser, updateTenantSettings, resetUserPassword } = useAuth();
 
   const [companyName, setCompanyName] = useState(currentTenant?.companyName || '');
   const [brandCode, setBrandCode] = useState(currentTenant?.brandCode || '');
@@ -62,11 +62,11 @@ export const CompanyProfileView: React.FC = () => {
   const [uploadError, setUploadError] = useState('');
 
   const handleResetToDefaultPassword = () => {
-    if (confirm('Are you sure you want to reset system password to default (BiDOCS#2026)? You will be required to change it immediately.')) {
+    const targetEmail = systemUsername || currentUser?.email || 'admin@bidocs.ph';
+    if (confirm(`Are you sure you want to reset the password for account [${targetEmail}] to default (BiDOCS#2026)? User must log in using BiDOCS#2026 and change it immediately.`)) {
+      resetUserPassword(targetEmail);
       setSystemPassword('BiDOCS#2026');
-      localStorage.setItem('bidocs_system_password', 'BiDOCS#2026');
-      localStorage.setItem('bidocs_must_change_password', 'true');
-      alert('System Password reset to default: BiDOCS#2026. You must change your password immediately!');
+      alert(`Password for account [${targetEmail}] reset to default: BiDOCS#2026.\n\nPlease log in using BiDOCS#2026 to change your password.`);
       window.location.reload();
     }
   };

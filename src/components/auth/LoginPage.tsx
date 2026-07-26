@@ -20,7 +20,7 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
-  const { login, tenants } = useAuth();
+  const { login, resetUserPassword, tenants } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,10 +37,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
   };
 
   const handleForgotPasswordReset = () => {
-    localStorage.setItem('bidocs_system_password', 'BiDOCS#2026');
-    localStorage.setItem('bidocs_must_change_password', 'true');
+    let targetEmail = email.trim();
+    if (!targetEmail) {
+      const promptEmail = prompt('Please enter the Work Email Address of the specific account password you wish to reset:');
+      if (!promptEmail || !promptEmail.trim()) {
+        setError('Email address is required to reset password for a specific account.');
+        return;
+      }
+      targetEmail = promptEmail.trim();
+      setEmail(targetEmail);
+    }
+
+    resetUserPassword(targetEmail);
     setPassword('BiDOCS#2026');
-    alert('System password has been reset to default: BiDOCS#2026.\n\nPlease log in using BiDOCS#2026. You will be prompted to change your password immediately upon login.');
+    setError('');
+    alert(`Password for account [${targetEmail}] has been reset to default: BiDOCS#2026.\n\nPlease log in first using BiDOCS#2026. You will be prompted to change your password immediately upon logging in.`);
   };
 
   const handleSubmit = (e: React.FormEvent) => {

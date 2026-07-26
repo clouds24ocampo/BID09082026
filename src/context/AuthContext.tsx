@@ -14,6 +14,8 @@ interface AuthContextType {
   registerTenantAndUser: (tenantData: Omit<Tenant, 'id' | 'createdAt'>, userData: Omit<User, 'id' | 'tenantId'>) => boolean;
   switchTenant: (tenantId: string) => void;
   updateTenantSettings: (updatedTenant: Partial<Tenant>) => void;
+  resetUserPassword: (email: string) => boolean;
+  updateUserPassword: (userId: string, newPassword: string) => void;
   resetAllData: () => void;
 }
 
@@ -123,8 +125,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUsers(prev => [...prev, foundUser!]);
     }
 
+    const storedPw = localStorage.getItem(`bidocs_user_password_${email.trim().toLowerCase()}`);
+    const storedFlag = localStorage.getItem(`bidocs_must_change_password_${email.trim().toLowerCase()}`);
+
+    const isMustChange = storedFlag === 'true' || storedPw === 'BiDOCS#2026' || foundUser.mustChangePassword === true || foundUser.password === 'BiDOCS#2026';
+
+    const userToSet: User = {
+      ...foundUser,
+      password: storedPw || foundUser.password || 'BiDOCS#2026',
+      mustChangePassword: isMustChange
+    };
+
     const tenant = tenants.find(t => t.id === foundUser!.tenantId) || tenants[0];
-    setCurrentUser(foundUser);
+    setCurrentUser(userToSet);
     setCurrentTenant(tenant);
     return true;
   };
@@ -181,6 +194,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTenants(prev => prev.map(t => t.id === updated.id ? updated : t));
   };
 
+  const resetUserPassword = (email: string): boolean => {
+    const targetEmail = email.trim().toLowerCase();
+    if (!targetEmail) return false;
+
+    setUsers(prev => {
+      const existing = prev.find(u => u.email.toLowerCase() === targetEmail);
+      if (existing) {
+        return prev.map(u => u.email.toLowerCase() === targetEmail ? { ...u, password: 'BiDOCS#2026', mustChangePassword: true } : u);
+      } else {
+        const defaultTenantId = tenants[0]?.id || `tenant-${Date.now()}`;
+        const newUser: User = {
+          id: `user-${Date.now()}`,
+          tenantId: defaultTenantId,
+          email: email.trim(),
+          fullName: email.split('@')[0].toUpperCase(),
+          role: 'COMPANY_OWNER',
+          password: 'BiDOCS#2026',
+          mustChangePassword: true
+        };
+        return [...prev, newUser];
+      }
+    });
+
+    localStorage.setItem(`bidocs_user_password_${targetEmail}`, 'BiDOCS#2026');
+    localStorage.setItem(`bidocs_must_change_password_${targetEmail}`, 'true');
+    return true;
+  };
+
+  const updateUserPassword = (userId: string, newPassword: string) => {
+    setUsers(prev => prev.map(u => {
+      if (u.id === userId || (currentUser && u.email === currentUser.email)) {
+        const updated = { ...u, password: newPassword, mustChangePassword: false };
+        localStorage.setItem(`bidocs_user_password_${u.email.toLowerCase()}`, newPassword);
+        localStorage.setItem(`bidocs_must_change_password_${u.email.toLowerCase()}`, 'false');
+        return updated;
+      }
+      return u;
+    }));
+
+    if (currentUser) {
+      const updatedCurrent = { ...currentUser, password: newPassword, mustChangePassword: false };
+      setCurrentUser(updatedCurrent);
+      localStorage.setItem(`bidocs_user_password_${currentUser.email.toLowerCase()}`, newPassword);
+      localStorage.setItem(`bidocs_must_change_password_${currentUser.email.toLowerCase()}`, 'false');
+    }
+  };
+
   const resetAllData = () => {
     localStorage.removeItem('bidocs_tenants');
     localStorage.removeItem('bidocs_users');
@@ -205,6 +265,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         registerTenantAndUser,
         switchTenant,
         updateTenantSettings,
+        resetUserPassword,
+        updateUserPassword,
         resetAllData
       }}
     >
