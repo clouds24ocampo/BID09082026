@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import html2canvas from 'html2canvas';
 import { 
   X, 
   Printer, 
@@ -24,7 +25,7 @@ interface TechnicalExhibitTemplateModalProps {
   activeProjectRefNo?: string;
   activeProjectTitle?: string;
   activeProcuringEntity?: string;
-  onSaveAndComplete: () => void;
+  onSaveAndComplete: (fileDataUrl?: string, customName?: string) => void;
   onClose: () => void;
 }
 
@@ -94,8 +95,18 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
     await generateAndDownloadThreeLayerPdf(null, templateElem, undefined, fileName);
   };
 
-  const handleSave = () => {
-    onSaveAndComplete();
+  const handleSave = async () => {
+    try {
+      const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
+      let dataUrl: string | undefined = undefined;
+      if (templateElem) {
+        const canvas = await html2canvas(templateElem, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
+        dataUrl = canvas.toDataURL('image/png');
+      }
+      onSaveAndComplete(dataUrl, item.name);
+    } catch (e) {
+      onSaveAndComplete(undefined, item.name);
+    }
   };
 
   const addKeyPersonnel = () => {

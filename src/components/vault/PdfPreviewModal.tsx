@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { DocumentVaultItem, Tenant } from '../../types';
-import { X, FileText, Printer, Download, ZoomIn, ZoomOut } from 'lucide-react';
+import { X, FileText, Printer, Download, ZoomIn, ZoomOut, ExternalLink } from 'lucide-react';
 import { generateAndDownloadThreeLayerPdf } from '../../utils/pdfExportEngine';
 
 interface PdfPreviewModalProps {
@@ -12,7 +12,37 @@ interface PdfPreviewModalProps {
 export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, onClose }) => {
   const [zoomLevel, setZoomLevel] = useState(100);
 
+  const pdfBlobUrl = useMemo(() => {
+    if (!item.fileDataUrl) return null;
+    if (item.fileDataUrl.startsWith('data:image/')) return null;
+    if (item.fileDataUrl.startsWith('blob:')) return item.fileDataUrl;
+    try {
+      const arr = item.fileDataUrl.split(',');
+      const mimeMatch = arr[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      const blob = new Blob([u8arr], { type: mime });
+      return URL.createObjectURL(blob);
+    } catch (e) {
+      return item.fileDataUrl;
+    }
+  }, [item.fileDataUrl]);
+
+  const isImage = item.fileDataUrl?.startsWith('data:image/');
+
   const handlePrint = () => {
+    if (pdfBlobUrl) {
+      const w = window.open(pdfBlobUrl, '_blank');
+      if (w) {
+        w.print();
+        return;
+      }
+    }
     window.print();
   };
 
@@ -71,6 +101,19 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
               </button>
             </div>
 
+            {pdfBlobUrl && (
+              <a
+                href={pdfBlobUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-slate-800 hover:bg-slate-700 transition border border-slate-700 flex items-center gap-1.5"
+                title="Open PDF file directly in new browser tab"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open PDF</span>
+              </a>
+            )}
+
             <button
               onClick={handleExportPdf}
               className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition shadow flex items-center gap-1.5"
@@ -108,19 +151,23 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
               </div>
 
               {item.fileDataUrl ? (
-                <div className="w-full min-h-[850px] h-[85vh] rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-900 shadow-2xl mx-auto p-1">
-                  <object
-                    data={item.fileDataUrl}
-                    type="application/pdf"
-                    className="w-full h-full rounded-xl"
-                  >
-                    <iframe
+                isImage ? (
+                  <div className="w-full max-w-[850px] mx-auto rounded-2xl overflow-hidden border-2 border-slate-800 bg-white shadow-2xl p-3">
+                    <img
                       src={item.fileDataUrl}
-                      title={item.documentName}
-                      className="w-full h-full border-none rounded-xl"
+                      alt={item.documentName}
+                      className="w-full h-auto object-contain rounded-xl mx-auto"
                     />
-                  </object>
-                </div>
+                  </div>
+                ) : (
+                  <div className="w-full min-h-[850px] h-[85vh] rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-900 shadow-2xl mx-auto p-1">
+                    <iframe
+                      src={pdfBlobUrl || item.fileDataUrl}
+                      title={item.documentName}
+                      className="w-full h-full border-none rounded-xl bg-slate-900"
+                    />
+                  </div>
+                )
               ) : (
                 <div className="w-full aspect-[8.5/13] max-w-[850px] min-h-[650px] border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900 text-slate-100 p-8 flex flex-col items-center justify-center space-y-4 shadow-2xl mx-auto">
                   <FileText className="w-16 h-16 text-blue-400 opacity-90 mx-auto" />

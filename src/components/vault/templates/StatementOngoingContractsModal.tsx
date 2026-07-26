@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import html2canvas from 'html2canvas';
 import { 
   X, 
   Printer, 
@@ -49,7 +50,7 @@ interface StatementOngoingContractsModalProps {
   activeProjectRefNo?: string;
   activeProjectTitle?: string;
   activeProcuringEntity?: string;
-  onSaveAndComplete: () => void;
+  onSaveAndComplete: (fileDataUrl?: string, customName?: string) => void;
   onClose: () => void;
 }
 
@@ -209,8 +210,18 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
     await generateAndDownloadThreeLayerPdf(null, templateElem, undefined, fileName);
   };
 
-  const handleSaveDraft = () => {
-    onSaveAndComplete();
+  const handleSaveDraft = async () => {
+    try {
+      const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
+      let dataUrl: string | undefined = undefined;
+      if (templateElem) {
+        const canvas = await html2canvas(templateElem, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
+        dataUrl = canvas.toDataURL('image/png');
+      }
+      onSaveAndComplete(dataUrl, 'Statement of All Ongoing Government & Private Contracts');
+    } catch (e) {
+      onSaveAndComplete(undefined, 'Statement of All Ongoing Government & Private Contracts');
+    }
   };
 
   const govContracts = contracts.filter(c => c.type === 'Government');

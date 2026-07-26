@@ -234,11 +234,41 @@ export const DocumentVaultView: React.FC = () => {
     );
   };
 
-  const handleCompleteTemplate = () => {
+  const handleCompleteTemplate = (fileDataUrl?: string, customName?: string) => {
     if (!fillingTemplateItem) return;
-    if (!techCompletedIds.includes(fillingTemplateItem.id)) {
-      setTechCompletedIds(prev => [...prev, fillingTemplateItem.id]);
+    const itemId = fillingTemplateItem.id;
+    if (!techCompletedIds.includes(itemId)) {
+      setTechCompletedIds(prev => [...prev, itemId]);
     }
+
+    const docTitle = customName || fillingTemplateItem.name;
+    const cleanDocName = docTitle.replace(/[^a-zA-Z0-9]/g, '_');
+
+    // Create DocumentVaultItem for the completed technical exhibit template
+    const newVaultDoc: DocumentVaultItem = {
+      id: `doc-tech-${itemId}-${Date.now()}`,
+      tenantId: currentTenant?.id || 'tenant-001',
+      documentCode: fillingTemplateItem.code,
+      documentName: docTitle,
+      documentNumber: `EXHIBIT-${fillingTemplateItem.code.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-2026`,
+      category: 'TECHNICAL',
+      procurementApplicability: ['Goods & Supply', 'Goods & Supply with Installation', 'Infrastructure', 'Consulting'],
+      legalBasisReference: 'RA 12009 NGPA Statutory Compliance Exhibit',
+      versionNumber: 1,
+      fileHash: Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join(''),
+      fileSizeBytes: 150000,
+      fileName: `${cleanDocName}.pdf`,
+      fileDataUrl: fileDataUrl,
+      status: 'ACTIVE',
+      uploadedByName: currentUser?.fullName || 'Authorized Administrator',
+      isOptional: false,
+      requiresIssueDate: false,
+      requiresExpiryDate: false,
+      conditionalRuleNote: 'Completed GPPB Statutory Legal Template',
+      previousVersions: []
+    };
+
+    setVaultItems(prev => [newVaultDoc, ...prev.filter(item => item.documentCode !== fillingTemplateItem.code)]);
     setFillingTemplateItem(null);
   };
 
@@ -1005,8 +1035,8 @@ export const DocumentVaultView: React.FC = () => {
       {fillingTemplateItem && fillingTemplateItem.code === '(b)' && (
         <StatementOngoingContractsModal
           tenant={currentTenant}
-          onSaveAndComplete={() => {
-            handleCompleteTemplate();
+          onSaveAndComplete={(dataUrl, docName) => {
+            handleCompleteTemplate(dataUrl, docName);
           }}
           onClose={() => setFillingTemplateItem(null)}
         />
@@ -1015,8 +1045,8 @@ export const DocumentVaultView: React.FC = () => {
       {fillingTemplateItem && fillingTemplateItem.code === '(c)' && (
         <StatementSlccModal
           tenant={currentTenant}
-          onSaveAndComplete={() => {
-            handleCompleteTemplate();
+          onSaveAndComplete={(dataUrl, docName) => {
+            handleCompleteTemplate(dataUrl, docName);
           }}
           onClose={() => setFillingTemplateItem(null)}
         />
@@ -1026,8 +1056,8 @@ export const DocumentVaultView: React.FC = () => {
         <TechnicalExhibitTemplateModal
           item={fillingTemplateItem}
           tenant={currentTenant}
-          onSaveAndComplete={() => {
-            handleCompleteTemplate();
+          onSaveAndComplete={(dataUrl, docName) => {
+            handleCompleteTemplate(dataUrl, docName);
           }}
           onClose={() => setFillingTemplateItem(null)}
         />
