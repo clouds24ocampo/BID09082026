@@ -703,6 +703,11 @@ export const DocumentVaultView: React.FC = () => {
   const completedMandatoryCount = mandatoryDefs.filter(d => uploadedCodes.includes(d.code)).length;
   const isClassAFullyCompliant = completedMandatoryCount === mandatoryDefs.length;
 
+  const customClassAItems = vaultItems.filter(item =>
+    item.category === 'ELIGIBILITY_CLASS_A' &&
+    !CLASS_A_MASTER_LIST.some(d => d.code === item.documentCode)
+  );
+
   const filteredGridItems = vaultItems.filter(item => {
     const matchesSearch = item.documentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.documentNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -754,13 +759,15 @@ export const DocumentVaultView: React.FC = () => {
           <button
             onClick={() => {
               resetFormState();
+              setCustomUploadCategory('ELIGIBILITY_CLASS_A');
               setShowCustomUploadModal(true);
             }}
             className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white shadow-lg transition flex items-center gap-2 hover:opacity-90 shrink-0"
             style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
+            title="Add custom or project-specific legal document to vault"
           >
-            <Upload className="w-4 h-4" />
-            <span>Upload Vault Document</span>
+            <Plus className="w-4 h-4 text-blue-200" />
+            <span>+ Add Additional Legal Document</span>
           </button>
         </div>
       </div>
@@ -894,19 +901,33 @@ export const DocumentVaultView: React.FC = () => {
           </div>
 
           <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl space-y-0">
-            <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+            <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                 <FileCheck className="w-4 h-4 text-blue-400" />
-                Statutory Fixed Master Document List (Class A)
+                Statutory Fixed Master Document List & Custom Exhibits (Class A)
               </h3>
-              <button
-                onClick={handleClearAllClassAUploads}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition flex items-center gap-1.5"
-                title="Clear all Class A documents and start fresh"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                <span>Remove All Class A Uploads (Re-upload from Scratch)</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    resetFormState();
+                    setCustomUploadCategory('ELIGIBILITY_CLASS_A');
+                    setShowCustomUploadModal(true);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center gap-1.5"
+                  title="Add custom or project-specific legal document to Class A Eligibility"
+                >
+                  <Plus className="w-4 h-4 text-blue-200" />
+                  <span>+ Add Additional Legal Document</span>
+                </button>
+                <button
+                  onClick={handleClearAllClassAUploads}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition flex items-center gap-1.5"
+                  title="Clear all Class A documents and start fresh"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  <span>Remove All Uploads</span>
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -1056,6 +1077,94 @@ export const DocumentVaultView: React.FC = () => {
                                 <span>Upload Document</span>
                               </button>
                             )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* CUSTOM / ADDITIONAL PROJECT-SPECIFIC LEGAL DOCUMENTS */}
+                  {customClassAItems.map((item, idx) => {
+                    const daysRem = calculateDaysRemaining(item.expiryDate);
+                    const isSoonExpiring = daysRem !== null && daysRem <= 30 && daysRem >= 0;
+                    const isExp = daysRem !== null && daysRem < 0;
+
+                    return (
+                      <tr
+                        key={item.id}
+                        className="hover:bg-slate-800/40 transition bg-blue-500/5 border-l-2 border-l-blue-500"
+                      >
+                        <td className="py-3.5 px-4 font-mono font-bold text-blue-400 text-center">
+                          {CLASS_A_MASTER_LIST.length + idx + 1}
+                        </td>
+                        <td className="py-3.5 px-4 font-medium text-white">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-blue-400 shrink-0" />
+                            <div>
+                              <span className="font-bold text-slate-100">{item.documentName}</span>
+                              <span className="text-[10px] text-blue-400 font-mono block">Additional Legal Exhibit</span>
+                              {item.documentNumber && (
+                                <span className="text-[10px] text-slate-400 block font-mono">
+                                  No: {item.documentNumber}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-mono text-xs text-slate-300">
+                          {item.issuedDate || '—'}
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-mono text-xs text-slate-300">
+                          {item.expiryDate || '—'}
+                        </td>
+                        <td className="py-3.5 px-4 text-center font-mono">
+                          <span className="text-amber-400 text-sm">✅</span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="space-y-1">
+                            {isSoonExpiring || item.status === 'EXPIRING_SOON' ? (
+                              <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 animate-pulse">
+                                <AlertTriangle className="w-3 h-3 text-amber-400" /> Expiring in {daysRem ?? 30} Days
+                              </span>
+                            ) : isExp || item.status === 'EXPIRED' ? (
+                              <span className="bg-red-500/20 text-red-300 border border-red-500/40 text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 animate-pulse">
+                                <AlertTriangle className="w-3 h-3 text-red-400" /> EXPIRED — Action Required
+                              </span>
+                            ) : (
+                              <span className="badge-success text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Uploaded (v{item.versionNumber}.0)
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => setPreviewPdfItem(item)}
+                              className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-blue-500/30"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>View PDF</span>
+                            </button>
+                            <button
+                              onClick={() => openEditModal(item)}
+                              className="px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-amber-500/30"
+                              title="Edit Document Number, Title, or Validity Dates"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setReplaceTargetItem(item);
+                                resetFormState();
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition font-bold text-[11px] flex items-center gap-1.5 border border-emerald-500/30 shadow"
+                              title="Replace PDF file"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              <span>Replace PDF</span>
+                            </button>
                           </div>
                         </td>
                       </tr>
