@@ -449,6 +449,13 @@ export const DocumentVaultView: React.FC = () => {
     notifySuccess(`[${docTitle}, v1.0] Template Save Successful!`, 'Legal template saved into Document Vault as an active technical exhibit under Completed Technical Documents & Forms.');
   };
 
+  const handleDeleteCompletedTechDoc = (docId: string, docName: string) => {
+    if (confirm(`Are you sure you want to delete "${docName}" from Completed Technical Documents? This will remove the completed form and reset its item status.`)) {
+      setVaultItems(prev => prev.filter(item => item.id !== docId));
+      notifySuccess('Completed Form Deleted', `"${docName}" has been successfully removed from Technical Eligibility.`);
+    }
+  };
+
   const handleFileSelection = (file: File | undefined) => {
     if (!file) {
       setSelectedFile(null);
@@ -1444,6 +1451,15 @@ export const DocumentVaultView: React.FC = () => {
                         >
                           <RefreshCw className="w-3.5 h-3.5" />
                           <span>Replace</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteCompletedTechDoc(item.id, item.documentName)}
+                          className="px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30"
+                          title="Delete completed technical document"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
                         </button>
                       </div>
                     </div>

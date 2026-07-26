@@ -228,7 +228,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
-        ignoreElements: (el) => el.classList.contains('print:hidden') || el.classList.contains('no-export')
+        ignoreElements: (el) => el.classList.contains('no-export-btn')
       });
       const imgDataUrl = canvas.toDataURL('image/png');
 
@@ -590,8 +590,8 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                           <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Value at Award & Completion</th>
                           <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Dates & Duration</th>
                           <th className="p-1.5 border-r border-slate-300 w-24 text-center">Accomplishment %</th>
-                          <th className="p-1.5 border-r border-slate-300 w-20 text-center print:hidden no-export proof-column">Proof PDF</th>
-                          <th className="p-1.5 text-right print:hidden no-export actions-column w-16">Actions</th>
+                          <th className="p-1.5 border-r border-slate-300 w-24 text-center proof-column">Proof PDF</th>
+                          <th className="p-1.5 text-right actions-column w-20">Contract Role</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-300 font-sans">
@@ -638,21 +638,21 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                                 <div>Plan: <span className="font-semibold">{row.accomplishmentPlanned}%</span></div>
                                 <div>Act: <span className="font-bold text-blue-900">{row.accomplishmentActual}%</span></div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[9px] print:hidden no-export proof-column">
+                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[9px] proof-column">
                                 {row.pdfFile ? (
-                                  <span className="text-emerald-700 font-bold block truncate max-w-[80px]" title={row.pdfFile.fileName}>
-                                    <Paperclip className="w-3 h-3 inline text-emerald-600 mr-0.5" />
+                                  <span className="text-emerald-950 font-bold block truncate max-w-[90px]" style={{ color: '#000000', fontWeight: 'bold' }} title={row.pdfFile.fileName}>
+                                    <Paperclip className="w-3 h-3 inline text-emerald-700 mr-0.5" />
                                     {row.pdfFile.fileName}
                                   </span>
                                 ) : (
-                                  <label className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] font-bold text-blue-900 border border-slate-300 cursor-pointer block print:hidden no-export">
+                                  <label className="px-1 py-0.5 rounded bg-slate-100 text-[9px] font-bold text-blue-900 border border-slate-300 cursor-pointer block print:hidden no-export-btn">
                                     Attach PDF
                                     <input type="file" accept=".pdf" onChange={(e) => handleRowPdfUpload(row.id, e.target.files?.[0])} className="hidden" />
                                   </label>
                                 )}
                               </td>
-                              <td className="p-1.5 text-right print:hidden no-export actions-column">
-                                <div className="flex items-center justify-end gap-1">
+                              <td className="p-1.5 text-right actions-column font-mono text-[9px]">
+                                <div className="flex items-center justify-end gap-1 print:hidden no-export-btn">
                                   <button onClick={() => openFormEditor(row)} className="p-1 text-blue-900 hover:bg-blue-50 rounded" title="Edit Form">
                                     <Edit3 className="w-3.5 h-3.5" />
                                   </button>
@@ -660,6 +660,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
+                                <span className="font-bold text-black block" style={{ color: '#000000', fontWeight: 'bold' }}>{row.bidderRole || 'Contractor'}</span>
                               </td>
                             </tr>
                           ))
@@ -700,8 +701,8 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                           <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Value at Award & Completion</th>
                           <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Dates & Duration</th>
                           <th className="p-1.5 border-r border-slate-300 w-24 text-center">Accomplishment %</th>
-                          <th className="p-1.5 border-r border-slate-300 w-20 text-center print:hidden no-export proof-column">Proof PDF</th>
-                          <th className="p-1.5 text-right print:hidden no-export actions-column w-16">Actions</th>
+                          <th className="p-1.5 border-r border-slate-300 w-24 text-center proof-column">Proof PDF</th>
+                          <th className="p-1.5 text-right actions-column w-20">Contract Role</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-300 font-sans">
@@ -748,20 +749,21 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                                 <div>Plan: <span className="font-semibold">{row.accomplishmentPlanned}%</span></div>
                                 <div>Act: <span className="font-bold text-blue-900">{row.accomplishmentActual}%</span></div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[9px] print:hidden no-export proof-column">
+                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[9px] proof-column">
                                 {row.pdfFile ? (
-                                  <span className="text-emerald-700 font-bold block truncate max-w-[80px]" title={row.pdfFile.fileName}>
+                                  <span className="text-emerald-950 font-bold block truncate max-w-[90px]" style={{ color: '#000000', fontWeight: 'bold' }} title={row.pdfFile.fileName}>
+                                    <Paperclip className="w-3 h-3 inline text-emerald-700 mr-0.5" />
                                     {row.pdfFile.fileName}
                                   </span>
                                 ) : (
-                                  <label className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] font-bold text-purple-900 border border-slate-300 cursor-pointer block print:hidden no-export">
+                                  <label className="px-1 py-0.5 rounded bg-slate-100 text-[9px] font-bold text-purple-900 border border-slate-300 cursor-pointer block print:hidden no-export-btn">
                                     Attach PDF
                                     <input type="file" accept=".pdf" onChange={(e) => handleRowPdfUpload(row.id, e.target.files?.[0])} className="hidden" />
                                   </label>
                                 )}
                               </td>
-                              <td className="p-1.5 text-right print:hidden no-export actions-column">
-                                <div className="flex items-center justify-end gap-1">
+                              <td className="p-1.5 text-right actions-column font-mono text-[9px]">
+                                <div className="flex items-center justify-end gap-1 print:hidden no-export-btn">
                                   <button onClick={() => openFormEditor(row)} className="p-1 text-purple-900 hover:bg-purple-50 rounded" title="Edit Form">
                                     <Edit3 className="w-3.5 h-3.5" />
                                   </button>
@@ -769,6 +771,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
+                                <span className="font-bold text-black block" style={{ color: '#000000', fontWeight: 'bold' }}>{row.bidderRole || 'Contractor'}</span>
                               </td>
                             </tr>
                           ))
@@ -799,16 +802,16 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                     <p className="text-[11px] text-slate-700 font-semibold">
                       {tenant?.authorizedSignatory?.title || 'President & Managing Director'}
                     </p>
-                    <div className="flex items-center justify-end gap-1 text-[11px] text-slate-900 pt-1 font-mono">
+                    <div className="flex items-center justify-end gap-1 text-xs text-black pt-1 font-mono" style={{ color: '#000000', fontWeight: 'bold' }}>
                       <span className="font-bold">Date:</span>
-                      <span className="font-black text-slate-950 border-b border-slate-900 px-2 py-0.5 text-xs inline-block">
+                      <span className="font-extrabold text-black" style={{ color: '#000000', fontWeight: '900' }}>
                         {dateSubmitted || new Date().toISOString().split('T')[0]}
                       </span>
                       <input
                         type="date"
                         value={dateSubmitted}
                         onChange={(e) => setDateSubmitted(e.target.value)}
-                        className="bg-slate-100 border border-slate-300 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-950 print:hidden no-export ml-1"
+                        className="bg-transparent border-0 text-[10px] font-bold text-slate-950 print:hidden no-export-btn ml-1 cursor-pointer opacity-80"
                       />
                     </div>
                   </div>
