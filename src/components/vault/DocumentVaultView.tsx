@@ -170,6 +170,7 @@ export const DocumentVaultView: React.FC = () => {
   const [issuedDate, setIssuedDate] = useState(new Date().toISOString().split('T')[0]);
   const [expiryDate, setExpiryDate] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string>('');
   const [uploadError, setUploadError] = useState('');
 
   // Sync states to localStorage
@@ -187,8 +188,18 @@ export const DocumentVaultView: React.FC = () => {
     setIssuedDate(new Date().toISOString().split('T')[0]);
     setExpiryDate('');
     setSelectedFile(null);
+    setSelectedFileDataUrl('');
     setUploadError('');
     setCustomDocName('');
+  };
+
+  const handleResetClassAVault = () => {
+    if (confirm('Are you sure you want to remove all uploaded Class A Eligibility documents and start fresh from scratch? PhilGEPS and all document slots will be reset to v1.0.')) {
+      setVaultItems([]);
+      localStorage.removeItem('bidocs_vault_items');
+      setSelectedItemIds([]);
+      alert('Class A Eligibility documents have been completely reset! All document slots are ready for re-uploading from scratch.');
+    }
   };
 
   const toggleTechExpand = (id: string) => {
@@ -212,22 +223,35 @@ export const DocumentVaultView: React.FC = () => {
   };
 
   const handleFileSelection = (file: File | undefined) => {
-    if (!file) return;
+    if (!file) {
+      setSelectedFile(null);
+      setSelectedFileDataUrl('');
+      return;
+    }
 
     if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
       setUploadError('Invalid file format. Strictly PDF (.pdf) files are accepted.');
       setSelectedFile(null);
+      setSelectedFileDataUrl('');
       return;
     }
 
     if (file.size > 100 * 1024 * 1024) {
       setUploadError(`File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds maximum allowed limit of 100 MB.`);
       setSelectedFile(null);
+      setSelectedFileDataUrl('');
       return;
     }
 
     setSelectedFile(file);
     setUploadError('');
+
+    // Read PDF file into Base64 Data URL for rendering directly in PDF viewer
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSelectedFileDataUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleUploadSubmit = (e: React.FormEvent) => {
@@ -275,6 +299,7 @@ export const DocumentVaultView: React.FC = () => {
       fileHash: Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join(''),
       fileSizeBytes: selectedFile.size,
       fileName: selectedFile.name,
+      fileDataUrl: selectedFileDataUrl,
       issuedDate: reqIssue ? issuedDate : undefined,
       expiryDate: reqExp ? expiryDate : undefined,
       status: reqExp && expiryDate && new Date(expiryDate) < new Date(Date.now() + 30*24*60*60*1000) ? 'EXPIRING_SOON' : 'ACTIVE',
@@ -315,6 +340,7 @@ export const DocumentVaultView: React.FC = () => {
       fileHash: Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join(''),
       fileSizeBytes: selectedFile.size,
       fileName: selectedFile.name,
+      fileDataUrl: selectedFileDataUrl,
       issuedDate: issuedDate || undefined,
       expiryDate: expiryDate || undefined,
       status: expiryDate && new Date(expiryDate) < new Date(Date.now() + 30*24*60*60*1000) ? 'EXPIRING_SOON' : 'ACTIVE',
@@ -342,7 +368,8 @@ export const DocumentVaultView: React.FC = () => {
       uploadedAt: new Date().toLocaleString(),
       uploadedByName: replaceTargetItem.uploadedByName,
       fileName: replaceTargetItem.fileName || 'previous_document.pdf',
-      fileSizeBytes: replaceTargetItem.fileSizeBytes
+      fileSizeBytes: replaceTargetItem.fileSizeBytes,
+      fileDataUrl: replaceTargetItem.fileDataUrl
     };
 
     const updatedItem: DocumentVaultItem = {
@@ -352,6 +379,7 @@ export const DocumentVaultView: React.FC = () => {
       fileHash: Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join(''),
       fileSizeBytes: selectedFile.size,
       fileName: selectedFile.name,
+      fileDataUrl: selectedFileDataUrl || replaceTargetItem.fileDataUrl,
       issuedDate: replaceTargetItem.requiresIssueDate ? (issuedDate || replaceTargetItem.issuedDate) : undefined,
       expiryDate: replaceTargetItem.requiresExpiryDate ? (expiryDate || replaceTargetItem.expiryDate) : undefined,
       status: replaceTargetItem.requiresExpiryDate && expiryDate && new Date(expiryDate) < new Date(Date.now() + 30*24*60*60*1000) ? 'EXPIRING_SOON' : 'ACTIVE',
@@ -412,6 +440,15 @@ export const DocumentVaultView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleResetClassAVault}
+            className="px-4 py-2.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition flex items-center gap-2 shrink-0"
+            title="Remove all uploaded PDFs and reset PhilGEPS and Class A slots to v1.0 for re-uploading from scratch"
+          >
+            <RefreshCw className="w-4 h-4 text-amber-400" />
+            <span>Reset & Refresh Vault (Re-upload from Scratch)</span>
+          </button>
+
           {selectedItemIds.length > 0 && (
             <button
               onClick={() => setShowMergeModal(true)}

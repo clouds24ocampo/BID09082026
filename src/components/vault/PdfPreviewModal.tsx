@@ -108,31 +108,37 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
               </div>
 
               {item.fileDataUrl ? (
-                <div className="single-page-paper w-full min-h-[950px] aspect-[8.5/13] rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-900 shadow-2xl mx-auto p-2">
-                  <iframe
-                    src={item.fileDataUrl}
-                    title={item.documentName}
-                    className="w-full h-full border-none object-contain"
-                  />
+                <div className="w-full min-h-[850px] h-[85vh] rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-900 shadow-2xl mx-auto p-1">
+                  <object
+                    data={item.fileDataUrl}
+                    type="application/pdf"
+                    className="w-full h-full rounded-xl"
+                  >
+                    <iframe
+                      src={item.fileDataUrl}
+                      title={item.documentName}
+                      className="w-full h-full border-none rounded-xl"
+                    />
+                  </object>
                 </div>
               ) : (
-                <div className="single-page-paper w-full aspect-[8.5/13] min-h-[950px] border-2 border-dashed border-slate-800 rounded-2xl bg-white text-slate-900 p-8 flex flex-col items-center justify-center space-y-4 shadow-2xl mx-auto">
-                  <FileText className="w-16 h-16 text-blue-900 opacity-90 mx-auto" />
+                <div className="w-full aspect-[8.5/13] max-w-[850px] min-h-[650px] border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900 text-slate-100 p-8 flex flex-col items-center justify-center space-y-4 shadow-2xl mx-auto">
+                  <FileText className="w-16 h-16 text-blue-400 opacity-90 mx-auto" />
                   <div className="space-y-2 text-center">
-                    <h4 className="text-base font-black uppercase text-slate-950">{item.documentName}</h4>
-                    <p className="text-xs font-mono text-slate-700 leading-relaxed max-w-md mx-auto">
-                      Statutory Vault Document File: <strong className="text-blue-950 font-bold">{item.fileName || 'document.pdf'}</strong>
+                    <h4 className="text-base font-black uppercase text-white">{item.documentName}</h4>
+                    <p className="text-xs font-mono text-slate-400 leading-relaxed max-w-md mx-auto">
+                      Statutory Vault Document File: <strong className="text-blue-300 font-bold">{item.fileName || 'document.pdf'}</strong>
                       <br />
-                      Serial Number: <span className="font-bold">{item.documentNumber || 'N/A'}</span>
+                      Serial Number: <span className="font-bold text-white">{item.documentNumber || 'N/A'}</span>
                     </p>
                     {item.expiryDate && (
-                      <p className="text-xs font-mono text-emerald-700 font-bold">
+                      <p className="text-xs font-mono text-emerald-400 font-bold">
                         Verified Valid • Expiration Date: {item.expiryDate}
                       </p>
                     )}
                   </div>
-                  <span className="text-[10px] font-mono font-bold bg-blue-100 text-blue-950 px-3 py-1 rounded-full border border-blue-300">
-                    Uploaded File Verified • Legal 8.5" × 13" Standard
+                  <span className="text-[10px] font-mono font-bold bg-blue-500/20 text-blue-300 px-3.5 py-1.5 rounded-full border border-blue-500/30">
+                    Uploaded File Verified • Ready for Re-upload
                   </span>
                 </div>
               )}
