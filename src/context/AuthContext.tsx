@@ -24,7 +24,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tenants, setTenants] = useState<Tenant[]>(() => {
     const saved = localStorage.getItem('bidocs_tenants');
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((t: any) => 
+          t && 
+          t.companyName && 
+          !t.companyName.toLowerCase().includes('apex builder') && 
+          !t.companyName.toLowerCase().includes('pacific solution') &&
+          !t.companyName.toLowerCase().includes('philippine compliance enterprise') &&
+          !t.companyName.toLowerCase().includes('corp') || t.isUserRegistered
+        );
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
   });
 
   const [users, setUsers] = useState<User[]>(() => {
@@ -40,7 +56,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(() => {
     const savedUserStr = localStorage.getItem('bidocs_current_user');
     const savedTenantsStr = localStorage.getItem('bidocs_tenants');
-    const activeTenants = savedTenantsStr ? JSON.parse(savedTenantsStr) : [];
+    let activeTenants: Tenant[] = [];
+    if (savedTenantsStr) {
+      try {
+        const parsed = JSON.parse(savedTenantsStr);
+        if (Array.isArray(parsed)) {
+          activeTenants = parsed.filter((t: any) => 
+            t && 
+            t.companyName && 
+            !t.companyName.toLowerCase().includes('apex builder') && 
+            !t.companyName.toLowerCase().includes('pacific solution') &&
+            !t.companyName.toLowerCase().includes('philippine compliance enterprise')
+          );
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
     if (savedUserStr && activeTenants.length > 0) {
       const u = JSON.parse(savedUserStr);
       return activeTenants.find((t: Tenant) => t.id === u.tenantId) || activeTenants[0];
@@ -80,38 +112,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let foundUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
     if (!foundUser) {
-      // If logging in when no user exists or registering on the fly
+      // If logging in when no registered user exists, check if a target tenant exists
       let targetTenant = tenants.find(t => t.id === tenantId);
+      if (!targetTenant && tenants.length > 0) {
+        targetTenant = tenants[0];
+      }
 
       if (!targetTenant) {
-        if (tenants.length > 0) {
-          targetTenant = tenants[0];
-        } else {
-          // Create default tenant for new user if none exists
-          const newTenantId = `tenant-${Date.now()}`;
-          const companyNameFromEmail = email.split('@')[1] ? email.split('@')[1].split('.')[0].toUpperCase() + ' Corp' : 'My Company';
-          targetTenant = {
-            id: newTenantId,
-            companyName: companyNameFromEmail,
-            brandCode: companyNameFromEmail.substring(0, 4).toUpperCase(),
-            brandColor: '#1e40af',
-            tin: '000-000-000-000',
-            secDtiRegNo: '',
-            pcabLicenseNo: '',
-            pcabCategory: '',
-            philgepsPlatinumNo: '',
-            address: '',
-            authorizedSignatory: {
-              name: email.split('@')[0].toUpperCase(),
-              title: 'Authorized Managing Officer',
-              tin: ''
-            },
-            preferredRegime: 'RA_12009_NGPA',
-            primaryProcurementType: 'GOODS',
-            createdAt: new Date().toISOString()
-          };
-          setTenants([targetTenant]);
-        }
+        // Return false if no registered company exists yet
+        return false;
       }
 
       foundUser = {

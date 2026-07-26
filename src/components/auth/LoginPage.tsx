@@ -149,13 +149,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
               <div 
                 className="px-3 py-1.5 rounded-lg border flex items-center gap-2 text-xs font-medium transition-colors"
                 style={{ 
-                  borderColor: `${activeTenantPreview.brandColor}50`,
-                  backgroundColor: `${activeTenantPreview.brandColor}15`,
+                  borderColor: `${activeTenantPreview.brandColor || '#1e40af'}50`,
+                  backgroundColor: `${activeTenantPreview.brandColor || '#1e40af'}15`,
                   color: '#ffffff'
                 }}
               >
-                <Building2 className="w-3.5 h-3.5" style={{ color: activeTenantPreview.brandColor }} />
-                <span className="truncate max-w-[130px] font-semibold">{activeTenantPreview.companyName}</span>
+                <Building2 className="w-3.5 h-3.5" style={{ color: activeTenantPreview.brandColor || '#3b82f6' }} />
+                <span className="truncate max-w-[150px] font-semibold">
+                  {tenants.length > 0 ? activeTenantPreview.companyName : 'Register Company Account'}
+                </span>
               </div>
             </div>
 
@@ -168,10 +170,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
             <form onSubmit={handleSubmit} className="space-y-4">
               
               {/* Select Corporate Tenant */}
-              {tenants.length > 0 && (
+              {tenants.length === 0 ? (
+                <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-mono space-y-1 text-center">
+                  <p className="font-bold">No Registered Companies Found</p>
+                  <p className="text-[11px] text-slate-400">Click "Register New Company Account" below to register your business entity.</p>
+                </div>
+              ) : (
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Select Corporate Profile / Tenant
+                    Select Registered Corporate Profile / Tenant
                   </label>
                   <div className="relative">
                     <select
