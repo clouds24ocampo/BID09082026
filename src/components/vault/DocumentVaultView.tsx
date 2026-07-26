@@ -5,6 +5,7 @@ import { PdfPreviewModal } from './PdfPreviewModal';
 import { MergedPdfViewerModal } from './MergedPdfViewerModal';
 import { StatementOngoingContractsModal } from './templates/StatementOngoingContractsModal';
 import { StatementSlccModal } from './templates/StatementSlccModal';
+import { TechnicalExhibitTemplateModal } from './templates/TechnicalExhibitTemplateModal';
 import { 
   FileCheck, 
   Upload, 
@@ -593,9 +594,19 @@ export const DocumentVaultView: React.FC = () => {
                         <td className="py-3.5 px-4">
                           {isUploaded ? (
                             <div className="space-y-1">
-                              <span className="badge-success text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> Uploaded (v{uploadedItem.versionNumber}.0)
-                              </span>
+                              {uploadedItem.status === 'EXPIRING_SOON' ? (
+                                <span className="badge-warning text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3 text-amber-400" /> Expiring Soon (v{uploadedItem.versionNumber}.0)
+                                </span>
+                              ) : uploadedItem.status === 'EXPIRED' ? (
+                                <span className="badge-danger text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3 text-red-400" /> Expired — Action Required
+                                </span>
+                              ) : (
+                                <span className="badge-success text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Uploaded (v{uploadedItem.versionNumber}.0)
+                                </span>
+                              )}
                               {uploadedItem.expiryDate && (
                                 <span className="text-[10px] text-slate-400 block font-mono">
                                   Expires: {uploadedItem.expiryDate}
@@ -629,10 +640,14 @@ export const DocumentVaultView: React.FC = () => {
                                     setReplaceTargetItem(uploadedItem);
                                     resetFormState();
                                   }}
-                                  className="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-emerald-500/30"
+                                  className={`px-3 py-1.5 rounded-lg transition font-bold text-[11px] flex items-center gap-1.5 border shadow ${
+                                    uploadedItem.status === 'EXPIRING_SOON' || uploadedItem.status === 'EXPIRED'
+                                      ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-400 animate-pulse'
+                                      : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border-emerald-500/30'
+                                  }`}
                                 >
-                                  <RefreshCw className="w-3.5 h-3.5" />
-                                  <span>Replace</span>
+                                  <Upload className="w-3.5 h-3.5" />
+                                  <span>{uploadedItem.status === 'EXPIRING_SOON' || uploadedItem.status === 'EXPIRED' ? 'Upload Replacement' : 'Replace PDF'}</span>
                                 </button>
                               </>
                             ) : (
@@ -645,7 +660,7 @@ export const DocumentVaultView: React.FC = () => {
                                 style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
                               >
                                 <Upload className="w-3.5 h-3.5" />
-                                <span>Upload</span>
+                                <span>Upload Document</span>
                               </button>
                             )}
                           </div>
@@ -931,83 +946,192 @@ export const DocumentVaultView: React.FC = () => {
       )}
 
       {fillingTemplateItem && fillingTemplateItem.code !== '(b)' && fillingTemplateItem.code !== '(c)' && (
+        <TechnicalExhibitTemplateModal
+          item={fillingTemplateItem}
+          tenant={currentTenant}
+          onSaveAndComplete={() => {
+            handleCompleteTemplate();
+          }}
+          onClose={() => setFillingTemplateItem(null)}
+        />
+      )}
+
+      {/* CLASS A MASTER UPLOAD MODAL */}
+      {uploadTargetDef && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[92vh] flex flex-col">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleIn my-auto">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <FileSignature className="w-4 h-4 text-blue-400" />
-                Legal Template Generator — Item {fillingTemplateItem.code}
+                <Upload className="w-4 h-4 text-blue-400" />
+                <span>Upload Statutory Document — {uploadTargetDef.name}</span>
               </h3>
-              <button onClick={() => setFillingTemplateItem(null)} className="text-slate-400 hover:text-white p-1">
+              <button onClick={() => setUploadTargetDef(null)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4 text-xs overflow-y-auto flex-1">
-              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 space-y-1">
-                <h4 className="font-bold text-white text-xs">{fillingTemplateItem.name}</h4>
-                <p className="text-slate-400 text-[11px]">
-                  Fill out the required legal information below to generate the official GPPB-compliant document exhibit.
-                </p>
+            <form onSubmit={handleUploadSubmit} className="p-6 space-y-4 text-xs">
+              {uploadTargetDef.code === 'DOC-2' && (
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Registration Entity Sub-Type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDtiSecType('DTI')}
+                      className={`py-2 rounded-lg font-bold border transition ${dtiSecType === 'DTI' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-950 text-slate-400 border-slate-800'}`}
+                    >
+                      DTI Registration
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDtiSecType('SEC')}
+                      className={`py-2 rounded-lg font-bold border transition ${dtiSecType === 'SEC' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-950 text-slate-400 border-slate-800'}`}
+                    >
+                      SEC Certificate
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Document Serial / Permit Number</label>
+                <input
+                  type="text"
+                  value={docNumber}
+                  onChange={(e) => setDocNumber(e.target.value)}
+                  placeholder="e.g. PERMIT-2026-9012"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                />
               </div>
 
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Company Entity Name</label>
-                  <input
-                    type="text"
-                    value={currentTenant?.companyName || ''}
-                    readOnly
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-semibold cursor-not-allowed"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Authorized Signatory Name & Title</label>
-                  <input
-                    type="text"
-                    value={`${currentTenant?.authorizedSignatory?.name || 'Managing Officer'} (${currentTenant?.authorizedSignatory?.title || 'Director'})`}
-                    readOnly
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white cursor-not-allowed"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Official Document Title / Exhibit Reference</label>
-                  <input
-                    type="text"
-                    defaultValue={`GPPB Standard Form — Item ${fillingTemplateItem.code} Legal Statement`}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Sworn Legal Statement & Details</label>
-                  <textarea
-                    rows={4}
-                    defaultValue={`The undersigned hereby attests under oath that ${currentTenant?.companyName} complies fully with statutory requirement Item ${fillingTemplateItem.code} for public bidding.`}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-3">
+                {uploadTargetDef.requiresIssueDate && (
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Issue Date <span className="text-red-400">*</span></label>
+                    <input
+                      type="date"
+                      value={issuedDate}
+                      onChange={(e) => setIssuedDate(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                )}
+                {uploadTargetDef.requiresExpiryDate && (
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Expiration Date <span className="text-red-400">*</span></label>
+                    <input
+                      type="date"
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                )}
               </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Upload PDF File (Max 100 MB) <span className="text-red-400">*</span></label>
+                <div className="border-2 border-dashed border-slate-800 rounded-xl p-4 text-center hover:border-blue-500 transition cursor-pointer bg-slate-950">
+                  <label className="cursor-pointer block space-y-1">
+                    <FileText className="w-6 h-6 text-blue-400 mx-auto" />
+                    <p className="text-xs text-slate-300 font-semibold">{selectedFile?.name || 'Click to select PDF document'}</p>
+                    <input type="file" accept=".pdf" onChange={(e) => handleFileSelection(e.target.files?.[0])} className="hidden" />
+                  </label>
+                </div>
+                {uploadError && <p className="text-xs text-red-400 mt-1">{uploadError}</p>}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button type="button" onClick={() => setUploadTargetDef(null)} className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">
+                  Cancel
+                </button>
+                <button type="submit" className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-xl transition">
+                  Upload & Save Document
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DOCUMENT REPLACEMENT MODAL */}
+      {replaceTargetItem && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleIn my-auto">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-emerald-400" />
+                <span>Upload Replacement Document — {replaceTargetItem.documentName}</span>
+              </h3>
+              <button onClick={() => setReplaceTargetItem(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            <div className="p-4 border-t border-slate-800 flex items-center justify-end gap-2 bg-slate-900/95 sticky bottom-0 z-10 shrink-0">
-              <button
-                onClick={() => setFillingTemplateItem(null)}
-                className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCompleteTemplate}
-                className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-xl transition flex items-center gap-1.5"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Generate Template & Mark Completed</span>
-              </button>
-            </div>
+            <form onSubmit={handleReplaceSubmit} className="p-6 space-y-4 text-xs">
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 font-mono">
+                Uploading replacement will archive version <strong>v{replaceTargetItem.versionNumber}.0</strong> and increment version to <strong>v{replaceTargetItem.versionNumber + 1}.0</strong>.
+              </div>
 
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">New Serial / Permit Number</label>
+                <input
+                  type="text"
+                  value={docNumber}
+                  onChange={(e) => setDocNumber(e.target.value)}
+                  placeholder={replaceTargetItem.documentNumber || 'New Document Serial Number'}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {replaceTargetItem.requiresIssueDate && (
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">New Issue Date</label>
+                    <input
+                      type="date"
+                      value={issuedDate}
+                      onChange={(e) => setIssuedDate(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                )}
+                {replaceTargetItem.requiresExpiryDate && (
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">New Expiration Date</label>
+                    <input
+                      type="date"
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">New Replacement PDF File <span className="text-red-400">*</span></label>
+                <div className="border-2 border-dashed border-slate-800 rounded-xl p-4 text-center hover:border-emerald-500 transition cursor-pointer bg-slate-950">
+                  <label className="cursor-pointer block space-y-1">
+                    <FileText className="w-6 h-6 text-emerald-400 mx-auto" />
+                    <p className="text-xs text-slate-300 font-semibold">{selectedFile?.name || 'Click to select replacement PDF'}</p>
+                    <input type="file" accept=".pdf" onChange={(e) => handleFileSelection(e.target.files?.[0])} className="hidden" />
+                  </label>
+                </div>
+                {uploadError && <p className="text-xs text-red-400 mt-1">{uploadError}</p>}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button type="button" onClick={() => setReplaceTargetItem(null)} className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">
+                  Cancel
+                </button>
+                <button type="submit" className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-xl transition">
+                  Save Replacement & Update Vault
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
