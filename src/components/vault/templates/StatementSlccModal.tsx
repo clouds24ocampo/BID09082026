@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import { PDFDocument } from 'pdf-lib';
+import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import html2canvas from 'html2canvas';
 import { 
   X, 
@@ -55,10 +57,15 @@ interface StatementSlccModalProps {
 }
 
 const formatPhpCurrency = (val: string): string => {
+  if (!val) return '₱0.00';
   const cleaned = val.replace(/[^0-9.]/g, '');
-  const num = parseFloat(cleaned);
-  if (isNaN(num)) return val;
-  return '₱' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (!cleaned) return '₱0.00';
+  const parts = cleaned.split('.');
+  const intPart = parts[0] ? parseInt(parts[0], 10) : 0;
+  const decPart = parts.length > 1 ? parts[1].slice(0, 2) : '00';
+  const formattedInt = isNaN(intPart) ? '0' : intPart.toLocaleString('en-US');
+  const formattedDec = decPart.padEnd(2, '0');
+  return `₱${formattedInt}.${formattedDec}`;
 };
 
 export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
@@ -72,6 +79,21 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
   const [isNoSlcc, setIsNoSlcc] = useState(false);
   const todayStr = new Date().toISOString().split('T')[0];
   const [dateSubmitted, setDateSubmitted] = useState(todayStr);
+
+  // Target Project Information (Auto-filled on Legal Template)
+  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo);
+  const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
+  const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
+  const [solicitationNumber, setSolicitationNumber] = useState('SOL-2026-00891');
+
+  // Opportunity Finder Project List State
+  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
+  const [selectedOppId, setSelectedOppId] = useState<string>('');
+
+  useEffect(() => {
+    const list = getOpportunityProjects();
+    setOppProjects(list);
+  }, []);
 
   // Form Editor Modal state for editing or creating an SLCC contract row
   const [editingRow, setEditingRow] = useState<SlccContractRow | null>(null);
@@ -196,29 +218,91 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const generateMergedPackageDataUrl = async (): Promise<string | undefined> => {
+    try {
+      const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
+      if (!templateElem) return undefined;
+
+      // 1. Convert template element to high-res canvas image
+      const canvas = await html2canvas(templateElem, {
+        scale: 2.5,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        ignoreElements: (el) => el.classList.contains('no-export-btn')
+      });
+      const imgDataUrl = canvas.toDataURL('image/png');
+
+      // 2. Initialize pdf-lib document
+      const mainPdfDoc = await PDFDocument.create();
+
+      // Embed Legal Landscape Page 1 (936pt x 612pt)
+      const pngImage = await mainPdfDoc.embedPng(imgDataUrl);
+      const page1 = mainPdfDoc.addPage([936, 612]);
+      page1.drawImage(pngImage, {
+        x: 0,
+        y: 0,
+        width: 936,
+        height: 612
+      });
+
+      // 3. Append all uploaded supporting PDF documents attached to SLCC contract rows
+      for (const row of contracts) {
+        if (row.pdfFile?.fileDataUrl && row.pdfFile.fileDataUrl.startsWith('data:application/pdf')) {
+          try {
+            const base64Str = row.pdfFile.fileDataUrl.split(',')[1] || row.pdfFile.fileDataUrl;
+            const pdfBytes = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
+            const srcPdf = await PDFDocument.load(pdfBytes);
+            const copiedPages = await mainPdfDoc.copyPages(srcPdf, srcPdf.getPageIndices());
+            copiedPages.forEach(p => mainPdfDoc.addPage(p));
+          } catch (err) {
+            console.error(`[PDFMerge] Error appending supporting PDF for ${row.projectName}:`, err);
+          }
+        }
+      }
+
+      // 4. Return complete merged PDF DataURL
+      const mergedPdfBytes = await mainPdfDoc.save();
+      const blob = new Blob([mergedPdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      console.error('[PDFMerge] Error generating merged SLCC PDF package:', e);
+      return undefined;
+    }
+  };
+
   const handlePrint = () => {
     window.print();
   };
 
   const handleExportPdf = async () => {
-    const projRef = activeProjectRefNo || 'PRJ-2026-901283';
+    const projRef = projectRefNo || 'PRJ-2026-901283';
     const docName = 'Statement_of_Single_Largest_Completed_Contract_SLCC';
     const today = new Date().toISOString().split('T')[0];
     const fileName = `${projRef}_${docName}_${today}.pdf`;
 
-    const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
-    await generateAndDownloadThreeLayerPdf(null, templateElem, undefined, fileName);
+    const mergedDataUrl = await generateMergedPackageDataUrl();
+    if (mergedDataUrl) {
+      const link = document.createElement('a');
+      link.href = mergedDataUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
+      await generateAndDownloadThreeLayerPdf(null, templateElem, undefined, fileName);
+    }
   };
 
   const handleSaveDraft = async () => {
     try {
-      const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
-      let dataUrl: string | undefined = undefined;
-      if (templateElem) {
-        const canvas = await html2canvas(templateElem, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
-        dataUrl = canvas.toDataURL('image/png');
-      }
-      onSaveAndComplete(dataUrl, 'Statement of Single Largest Completed Contract (SLCC)');
+      const mergedDataUrl = await generateMergedPackageDataUrl();
+      onSaveAndComplete(mergedDataUrl, 'Statement of Single Largest Completed Contract (SLCC)');
     } catch (e) {
       onSaveAndComplete(undefined, 'Statement of Single Largest Completed Contract (SLCC)');
     }
@@ -274,7 +358,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
         {/* Top Header Bar */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
               <FileText className="w-5 h-5" />
             </div>
             <div>
@@ -285,7 +369,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                Statement of Single Largest Completed Contract (SLCC) similar to the contract to be bid.
+                Statement of Single Largest Completed Contract similar to the contract to be bid within the last 5 years.
               </p>
             </div>
           </div>
@@ -314,6 +398,102 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
         {/* Scrollable Modal Content Body */}
         <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6">
           
+          {/* Target Bidding Project Selector & Auto-Fill Bar */}
+          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-blue-400" />
+                Target Bidding Project Auto-Fill Settings
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">Changes auto-fill directly onto Legal Template header below</span>
+            </div>
+
+            {/* Opportunity Finder Project Dropdown */}
+            <div>
+              <label className="block text-slate-300 font-mono text-[11px] mb-1 flex items-center justify-between">
+                <span className="font-bold text-blue-300">Select Project from Opportunity Finder:</span>
+                <span className="text-[10px] text-emerald-400 font-semibold">⚡ Auto-populates all template header fields</span>
+              </label>
+              <select
+                value={selectedOppId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedOppId(val);
+                  const found = oppProjects.find(p => p.id === val || p.refNo === val);
+                  if (found) {
+                    setProjectRefNo(found.refNo);
+                    setProjectTitle(found.title);
+                    setProcuringEntity(found.procuringEntity);
+                  }
+                }}
+                className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3 py-2 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner"
+              >
+                <option value="">-- Select Active Bidding Opportunity / Project --</option>
+                {oppProjects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    [{p.refNo}] {p.title} — {p.procuringEntity} ({p.abc})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs pt-1 border-t border-slate-800/80">
+              <div>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">1. Project Ref. No</label>
+                <input
+                  type="text"
+                  value={projectRefNo}
+                  onChange={(e) => setProjectRefNo(e.target.value)}
+                  placeholder="e.g. PhilGEPS-2026-10928371"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">2. Solicitation No.</label>
+                <input
+                  type="text"
+                  value={solicitationNumber}
+                  onChange={(e) => setSolicitationNumber(e.target.value)}
+                  placeholder="e.g. SOL-2026-00891"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">3. Name of Project</label>
+                <input
+                  type="text"
+                  value={projectTitle}
+                  onChange={(e) => setProjectTitle(e.target.value)}
+                  placeholder="e.g. Construction of Multi-Purpose Center"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-semibold focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">4. Procuring Entity</label>
+                <input
+                  type="text"
+                  value={procuringEntity}
+                  onChange={(e) => setProcuringEntity(e.target.value)}
+                  placeholder="e.g. DPWH Region IV-A"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">5. Date of Submission</label>
+                <input
+                  type="date"
+                  value={dateSubmitted}
+                  onChange={(e) => setDateSubmitted(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Action Toolbar: "No SLCC" Toggle & Add Contract Buttons */}
           <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden no-export">
             <div className="flex items-center gap-3">
@@ -333,7 +513,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
               <p className="text-xs text-slate-400 font-mono">
                 {isNoSlcc 
                   ? 'One-click "No SLCC" active. Displays "NONE" across legal template tables & marks Item (c) Complete.' 
-                  : 'Click to declare no completed SLCC or click "Fill Out SLCC Form" to add entry rows.'}
+                  : 'Click to declare no completed contracts or click "Fill Out SLCC Contract Form" to add entry rows.'}
               </p>
             </div>
 
@@ -359,8 +539,8 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
             )}
           </div>
 
-          {/* GPPB LEGAL PAPER CONTAINER (Legal 13" x 8.5" LANDSCAPE Printable Layout — STRICT 1-PAGE FIT) */}
-          <div className="single-page-paper bg-white text-slate-900 font-sans p-6 sm:p-8 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1150px] min-h-[680px] aspect-[13/8.5] mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none print:max-h-[96vh]">
+          {/* GPPB LEGAL PAPER CONTAINER (Legal 13" x 8.5" LANDSCAPE Printable Layout — EXPANDABLE MULTI-ENTRY FIT) */}
+          <div className="single-page-paper bg-white text-slate-900 font-sans p-6 sm:p-8 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1150px] min-h-[680px] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
             
             {/* Outer Legal Frame */}
             <div className="absolute inset-3 border-2 border-slate-900 pointer-events-none rounded-xl" />
@@ -370,19 +550,23 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
               {/* TEMPLATE HEADER: Auto-Populated Fields */}
               <div className="border-b-2 border-slate-900 pb-3 space-y-2">
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
-                  <span>PROJECT REF. NO: <strong className="text-blue-950 font-extrabold">{activeProjectRefNo}</strong></span>
-                  <span>NAME OF PROJECT: <strong className="text-blue-950 font-extrabold">{activeProjectTitle}</strong></span>
+                  <span>PROJECT REF. NO: <strong className="text-blue-950 font-extrabold">{projectRefNo}</strong></span>
+                  <span>SOLICITATION NO: <strong className="text-blue-950 font-extrabold">{solicitationNumber}</strong></span>
+                </div>
+                <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
+                  <span>NAME OF PROJECT: <strong className="text-blue-950 font-extrabold">{projectTitle}</strong></span>
+                  <span>DATE OF SUBMISSION: <strong className="text-slate-950 font-extrabold">{dateSubmitted}</strong></span>
                 </div>
                 <div className="text-xs font-mono text-slate-800">
-                  <span>PROCURING ENTITY: <strong className="text-slate-950">{activeProcuringEntity}</strong></span>
+                  <span>PROCURING ENTITY: <strong className="text-slate-950">{procuringEntity}</strong></span>
                 </div>
 
                 <div className="text-center pt-1 space-y-0.5">
                   <h2 className="text-base font-black text-slate-950 uppercase tracking-wide">
-                    STATEMENT OF BIDDER'S SINGLE LARGEST COMPLETED CONTRACT (SLCC) SIMILAR TO THE CONTRACT TO BE BID
+                    STATEMENT OF SINGLE LARGEST COMPLETED CONTRACT (SLCC)
                   </h2>
                   <p className="text-[10px] font-mono text-slate-600">
-                    STATEMENT OF COMPLETED CONTRACTS (LEGAL LANDSCAPE STANDARD)
+                    SIMILAR TO THE CONTRACT TO BE BID WITHIN THE LAST 5 YEARS (LEGAL LANDSCAPE STANDARD)
                   </p>
                 </div>
 
@@ -401,11 +585,11 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
               {/* CONTRACT ENTRY LANDSCAPE TABLES */}
               <div className="space-y-4 text-xs font-sans">
                 
-                {/* GOVERNMENT COMPLETED SLCC CONTRACTS TABLE */}
+                {/* GOVERNMENT CONTRACTS TABLE */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between border-b border-slate-400 pb-1">
                     <h4 className="font-black text-blue-950 text-xs uppercase font-mono flex items-center gap-2">
-                      <span>1. Government Completed SLCC Contracts</span>
+                      <span>1. Government Completed Contracts</span>
                       <span className="text-[10px] font-mono bg-blue-100 text-blue-950 px-2 py-0.5 rounded font-bold">
                         {isNoSlcc ? 'NONE' : `${govContracts.length} Rows`}
                       </span>
@@ -432,15 +616,15 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                           <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Value at Award & Completion</th>
                           <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Dates & Duration</th>
                           <th className="p-1.5 border-r border-slate-300 w-24 text-center">Accomplishment %</th>
-                          <th className="p-1.5 border-r border-slate-300 w-20 text-center print:hidden no-export proof-column">Proof PDF</th>
-                          <th className="p-1.5 text-right print:hidden no-export actions-column w-16">Actions</th>
+                          <th className="p-1.5 border-r border-slate-300 w-24 text-center proof-column">Proof PDF</th>
+                          <th className="p-1.5 text-right actions-column w-20">Contract Role</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-300 font-sans">
                         {isNoSlcc ? (
                           <tr>
                             <td colSpan={9} className="p-4 text-center text-slate-950 font-mono font-bold uppercase tracking-wider bg-slate-50">
-                              NO SINGLE LARGEST COMPLETED CONTRACT (SLCC)
+                              NO COMPLETED GOVERNMENT CONTRACTS IN THE LAST 5 YEARS
                             </td>
                           </tr>
                         ) : govContracts.length === 0 ? (
@@ -454,7 +638,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                             <tr key={row.id} className="hover:bg-slate-50">
                               <td className="p-1.5 border-r border-slate-300 font-mono font-bold text-center">{idx + 1}</td>
                               <td className="p-1.5 border-r border-slate-300">
-                                <div className="font-bold text-slate-950 leading-tight">{row.projectName || 'Untitled SLCC Project'}</div>
+                                <div className="font-bold text-slate-950 leading-tight">{row.projectName || 'Untitled Project'}</div>
                                 <div className="text-[10px] text-slate-600 font-medium mt-0.5">{row.ownerName}</div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-[10px] text-slate-700">
@@ -469,29 +653,32 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                                 <div className="font-bold text-emerald-800">{row.amountAward || '₱0.00'}</div>
                                 <div className="text-slate-600">{row.amountCompletion || '₱0.00'}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-[10px] font-mono">
-                                <div>{row.duration}</div>
-                                <div className="text-[9px] text-slate-500">{row.dateAwarded} to {row.dateCompletion}</div>
+                              <td className="p-1.5 border-r border-slate-300 font-mono">
+                                <div className="font-bold text-black text-[11px]" style={{ color: '#000000', fontWeight: 'bold' }}>{row.duration || 'N/A'}</div>
+                                <div className="text-[10px] font-bold text-black mt-0.5 leading-tight" style={{ color: '#000000' }}>
+                                  <span className="block font-bold" style={{ color: '#000000' }}>Award: {row.dateAwarded || 'N/A'}</span>
+                                  <span className="block font-bold" style={{ color: '#000000' }}>Comp: {row.dateCompletion || 'N/A'}</span>
+                                </div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[10px]">
                                 <div>Plan: <span className="font-semibold">{row.accomplishmentPlanned}%</span></div>
                                 <div>Act: <span className="font-bold text-blue-900">{row.accomplishmentActual}%</span></div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[9px] print:hidden no-export proof-column">
+                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[9px] proof-column">
                                 {row.pdfFile ? (
-                                  <span className="text-emerald-700 font-bold block truncate max-w-[80px]" title={row.pdfFile.fileName}>
-                                    <Paperclip className="w-3 h-3 inline text-emerald-600 mr-0.5" />
+                                  <span className="text-emerald-950 font-bold block truncate max-w-[90px]" style={{ color: '#000000', fontWeight: 'bold' }} title={row.pdfFile.fileName}>
+                                    <Paperclip className="w-3 h-3 inline text-emerald-700 mr-0.5" />
                                     {row.pdfFile.fileName}
                                   </span>
                                 ) : (
-                                  <label className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] font-bold text-blue-900 border border-slate-300 cursor-pointer block print:hidden no-export">
+                                  <label className="px-1 py-0.5 rounded bg-slate-100 text-[9px] font-bold text-blue-900 border border-slate-300 cursor-pointer block print:hidden no-export-btn">
                                     Attach PDF
                                     <input type="file" accept=".pdf" onChange={(e) => handleRowPdfUpload(row.id, e.target.files?.[0])} className="hidden" />
                                   </label>
                                 )}
                               </td>
-                              <td className="p-1.5 text-right print:hidden no-export actions-column">
-                                <div className="flex items-center justify-end gap-1">
+                              <td className="p-1.5 text-right actions-column font-mono text-[9px]">
+                                <div className="flex items-center justify-end gap-1 print:hidden no-export-btn">
                                   <button onClick={() => openFormEditor(row)} className="p-1 text-blue-900 hover:bg-blue-50 rounded" title="Edit Form">
                                     <Edit3 className="w-3.5 h-3.5" />
                                   </button>
@@ -499,6 +686,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
+                                <span className="font-bold text-black block" style={{ color: '#000000', fontWeight: 'bold' }}>{row.bidderRole || 'Contractor'}</span>
                               </td>
                             </tr>
                           ))
@@ -508,11 +696,11 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   </div>
                 </div>
 
-                {/* PRIVATE COMPLETED SLCC CONTRACTS TABLE */}
+                {/* PRIVATE CONTRACTS TABLE */}
                 <div className="space-y-1.5 pt-1">
                   <div className="flex items-center justify-between border-b border-slate-400 pb-1">
                     <h4 className="font-black text-purple-950 text-xs uppercase font-mono flex items-center gap-2">
-                      <span>2. Private Completed SLCC Contracts</span>
+                      <span>2. Private Completed Contracts</span>
                       <span className="text-[10px] font-mono bg-purple-100 text-purple-950 px-2 py-0.5 rounded font-bold">
                         {isNoSlcc ? 'NONE' : `${privContracts.length} Rows`}
                       </span>
@@ -539,15 +727,15 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                           <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Value at Award & Completion</th>
                           <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Dates & Duration</th>
                           <th className="p-1.5 border-r border-slate-300 w-24 text-center">Accomplishment %</th>
-                          <th className="p-1.5 border-r border-slate-300 w-20 text-center print:hidden no-export proof-column">Proof PDF</th>
-                          <th className="p-1.5 text-right print:hidden no-export actions-column w-16">Actions</th>
+                          <th className="p-1.5 border-r border-slate-300 w-24 text-center proof-column">Proof PDF</th>
+                          <th className="p-1.5 text-right actions-column w-20">Contract Role</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-300 font-sans">
                         {isNoSlcc ? (
                           <tr>
                             <td colSpan={9} className="p-4 text-center text-slate-950 font-mono font-bold uppercase tracking-wider bg-slate-50">
-                              NO SINGLE LARGEST COMPLETED CONTRACT (SLCC)
+                              NO COMPLETED PRIVATE CONTRACTS IN THE LAST 5 YEARS
                             </td>
                           </tr>
                         ) : privContracts.length === 0 ? (
@@ -561,7 +749,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                             <tr key={row.id} className="hover:bg-slate-50">
                               <td className="p-1.5 border-r border-slate-300 font-mono font-bold text-center">{idx + 1}</td>
                               <td className="p-1.5 border-r border-slate-300">
-                                <div className="font-bold text-slate-950 leading-tight">{row.projectName || 'Untitled SLCC Project'}</div>
+                                <div className="font-bold text-slate-950 leading-tight">{row.projectName || 'Untitled Project'}</div>
                                 <div className="text-[10px] text-slate-600 font-medium mt-0.5">{row.ownerName}</div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-[10px] text-slate-700">
@@ -576,28 +764,32 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                                 <div className="font-bold text-emerald-800">{row.amountAward || '₱0.00'}</div>
                                 <div className="text-slate-600">{row.amountCompletion || '₱0.00'}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-[10px] font-mono">
-                                <div>{row.duration}</div>
-                                <div className="text-[9px] text-slate-500">{row.dateAwarded} to {row.dateCompletion}</div>
+                              <td className="p-1.5 border-r border-slate-300 font-mono">
+                                <div className="font-bold text-black text-[11px]" style={{ color: '#000000', fontWeight: 'bold' }}>{row.duration || 'N/A'}</div>
+                                <div className="text-[10px] font-bold text-black mt-0.5 leading-tight" style={{ color: '#000000' }}>
+                                  <span className="block font-bold" style={{ color: '#000000' }}>Award: {row.dateAwarded || 'N/A'}</span>
+                                  <span className="block font-bold" style={{ color: '#000000' }}>Comp: {row.dateCompletion || 'N/A'}</span>
+                                </div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[10px]">
                                 <div>Plan: <span className="font-semibold">{row.accomplishmentPlanned}%</span></div>
                                 <div>Act: <span className="font-bold text-blue-900">{row.accomplishmentActual}%</span></div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[9px] print:hidden no-export proof-column">
+                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[9px] proof-column">
                                 {row.pdfFile ? (
-                                  <span className="text-emerald-700 font-bold block truncate max-w-[80px]" title={row.pdfFile.fileName}>
+                                  <span className="text-emerald-950 font-bold block truncate max-w-[90px]" style={{ color: '#000000', fontWeight: 'bold' }} title={row.pdfFile.fileName}>
+                                    <Paperclip className="w-3 h-3 inline text-emerald-700 mr-0.5" />
                                     {row.pdfFile.fileName}
                                   </span>
                                 ) : (
-                                  <label className="px-1 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-[9px] font-bold text-purple-900 border border-slate-300 cursor-pointer block print:hidden no-export">
+                                  <label className="px-1 py-0.5 rounded bg-slate-100 text-[9px] font-bold text-purple-900 border border-slate-300 cursor-pointer block print:hidden no-export-btn">
                                     Attach PDF
                                     <input type="file" accept=".pdf" onChange={(e) => handleRowPdfUpload(row.id, e.target.files?.[0])} className="hidden" />
                                   </label>
                                 )}
                               </td>
-                              <td className="p-1.5 text-right print:hidden no-export actions-column">
-                                <div className="flex items-center justify-end gap-1">
+                              <td className="p-1.5 text-right actions-column font-mono text-[9px]">
+                                <div className="flex items-center justify-end gap-1 print:hidden no-export-btn">
                                   <button onClick={() => openFormEditor(row)} className="p-1 text-purple-900 hover:bg-purple-50 rounded" title="Edit Form">
                                     <Edit3 className="w-3.5 h-3.5" />
                                   </button>
@@ -605,6 +797,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
+                                <span className="font-bold text-black block" style={{ color: '#000000', fontWeight: 'bold' }}>{row.bidderRole || 'Contractor'}</span>
                               </td>
                             </tr>
                           ))
@@ -619,7 +812,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
               {/* FOOTER SECTION: Static Note, Signatory & Date */}
               <div className="border-t-2 border-slate-900 pt-3 space-y-3 text-xs font-mono">
                 <div className="p-2.5 rounded-lg bg-slate-100 border border-slate-300 text-[10px] text-slate-800 font-medium">
-                  <strong>This Statement Must be Supported With:</strong> 1. Contract 2. CPES Rating Sheets And / or Certificate of Completion 3. Certificate of Acceptance
+                  <strong>This Statement Must be Supported With:</strong> 1. Contract / Purchase Order 2. Certificate of Completion or Certificate of Acceptance 3. Official Receipt / Sales Invoice
                 </div>
 
                 <div className="flex items-end justify-between gap-6 pt-1">
@@ -635,13 +828,16 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                     <p className="text-[11px] text-slate-700 font-semibold">
                       {tenant?.authorizedSignatory?.title || 'President & Managing Director'}
                     </p>
-                    <div className="flex items-center justify-end gap-1 text-[10px] text-slate-600 pt-0.5">
-                      <span>Date:</span>
+                    <div className="flex items-center justify-end gap-1 text-xs text-black pt-1 font-mono" style={{ color: '#000000', fontWeight: 'bold' }}>
+                      <span className="font-bold">Date:</span>
+                      <span className="font-extrabold text-black" style={{ color: '#000000', fontWeight: '900' }}>
+                        {dateSubmitted || new Date().toISOString().split('T')[0]}
+                      </span>
                       <input
                         type="date"
                         value={dateSubmitted}
                         onChange={(e) => setDateSubmitted(e.target.value)}
-                        className="bg-slate-100 border border-slate-300 rounded px-1.5 py-0.5 text-[10px] font-bold text-slate-950"
+                        className="bg-transparent border-0 text-[10px] font-bold text-slate-950 print:hidden no-export-btn ml-1 cursor-pointer opacity-80"
                       />
                     </div>
                   </div>
@@ -666,7 +862,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
             </button>
             <button
               onClick={handleSaveDraft}
-              className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5"
+              className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 transition shadow flex items-center gap-1.5"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>Save & Mark Item (c) Completed</span>
@@ -683,7 +879,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
             
             <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Edit3 className="w-4 h-4 text-blue-400" />
+                <Edit3 className="w-4 h-4 text-purple-400" />
                 Fill Out SLCC Contract Entry Form — Item (c)
               </h3>
               <button onClick={() => setEditingRow(null)} className="text-slate-400 hover:text-white p-1">
@@ -700,10 +896,10 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   <select
                     value={editingRow.type}
                     onChange={(e) => setEditingRow({ ...editingRow, type: e.target.value as 'Government' | 'Private' })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-semibold focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-semibold focus:outline-none focus:border-purple-500"
                   >
-                    <option value="Government">Government Contract</option>
-                    <option value="Private">Private Contract</option>
+                    <option value="Government">Government SLCC Contract</option>
+                    <option value="Private">Private SLCC Contract</option>
                   </select>
                 </div>
 
@@ -713,9 +909,9 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                     type="text"
                     value={editingRow.projectName}
                     onChange={(e) => setEditingRow({ ...editingRow, projectName: e.target.value })}
-                    placeholder="e.g. Completed Infrastructure Project"
+                    placeholder="e.g. Completed Telecom Backbone Expansion"
                     required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-semibold focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-semibold focus:outline-none focus:border-purple-500"
                   />
                 </div>
               </div>
@@ -723,7 +919,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
               {/* Owner Details */}
               <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
                 <h4 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-                  <Building2 className="w-4 h-4 text-blue-400" />
+                  <Building2 className="w-4 h-4 text-purple-400" />
                   Owner / Client Information
                 </h4>
 
@@ -734,7 +930,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                       type="text"
                       value={editingRow.ownerName}
                       onChange={(e) => setEditingRow({ ...editingRow, ownerName: e.target.value })}
-                      placeholder="e.g. NTC Central Office"
+                      placeholder="e.g. National Telecommunications Commission"
                       required
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white"
                     />
@@ -774,9 +970,9 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                     rows={2}
                     value={editingRow.natureOfWork}
                     onChange={(e) => setEditingRow({ ...editingRow, natureOfWork: e.target.value })}
-                    placeholder="Fiber Optic Network Installation & Infrastructure Construction"
+                    placeholder="Fiber Optic Backbone Installation & Systems Integration"
                     required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500"
                   />
                 </div>
 
@@ -788,7 +984,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                     onChange={(e) => setEditingRow({ ...editingRow, bidderRole: e.target.value })}
                     placeholder="e.g. Sole Prime Contractor"
                     required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500"
                   />
                 </div>
               </div>
@@ -807,10 +1003,14 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                       type="text"
                       value={editingRow.amountAward}
                       onChange={(e) => setEditingRow({ ...editingRow, amountAward: e.target.value })}
+                      onBlur={() => setEditingRow({ ...editingRow, amountAward: formatPhpCurrency(editingRow.amountAward) })}
                       placeholder="₱12,500,000.00"
                       required
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold text-emerald-400"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold text-emerald-400 focus:border-emerald-400"
                     />
+                    <span className="text-[10px] text-emerald-400/80 font-mono mt-0.5 block">
+                      Formatted: {formatPhpCurrency(editingRow.amountAward)}
+                    </span>
                   </div>
 
                   <div>
@@ -819,10 +1019,14 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                       type="text"
                       value={editingRow.amountCompletion}
                       onChange={(e) => setEditingRow({ ...editingRow, amountCompletion: e.target.value })}
+                      onBlur={() => setEditingRow({ ...editingRow, amountCompletion: formatPhpCurrency(editingRow.amountCompletion) })}
                       placeholder="₱12,500,000.00"
                       required
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold text-purple-400 focus:border-purple-400"
                     />
+                    <span className="text-[10px] text-purple-400/80 font-mono mt-0.5 block">
+                      Formatted: {formatPhpCurrency(editingRow.amountCompletion)}
+                    </span>
                   </div>
 
                   <div>
@@ -844,8 +1048,8 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                 
                 <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
                   <h4 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-                    <Calendar className="w-4 h-4 text-blue-400" />
-                    Milestone Dates
+                    <Calendar className="w-4 h-4 text-purple-400" />
+                    Contract Milestone Dates
                   </h4>
                   <div className="space-y-2">
                     <div>
@@ -865,63 +1069,55 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
 
                 <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
                   <h4 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    Accomplishment Progress (%)
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    Accomplishment % & Supporting PDF Attachment
                   </h4>
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex justify-between text-slate-400 text-[11px] mb-1">
-                        <span>Planned Accomplishment:</span>
-                        <span className="font-bold text-white">100%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={100}
-                        readOnly
-                        className="w-full accent-blue-500 cursor-not-allowed"
-                      />
-                    </div>
 
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <div className="flex justify-between text-slate-400 text-[11px] mb-1">
-                        <span>Actual Accomplishment:</span>
-                        <span className="font-bold text-emerald-400">100%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={100}
-                        readOnly
-                        className="w-full accent-emerald-500 cursor-not-allowed"
-                      />
+                      <label className="block text-slate-400 text-[11px] mb-0.5">Planned % *</label>
+                      <input type="number" min={0} max={100} value={editingRow.accomplishmentPlanned} onChange={(e) => setEditingRow({ ...editingRow, accomplishmentPlanned: Number(e.target.value) })} required className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono text-center font-bold" />
                     </div>
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-0.5">Actual % *</label>
+                      <input type="number" min={0} max={100} value={editingRow.accomplishmentActual} onChange={(e) => setEditingRow({ ...editingRow, accomplishmentActual: Number(e.target.value) })} required className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono text-center font-bold text-emerald-400" />
+                    </div>
+                  </div>
 
-                    {/* Supporting PDF */}
-                    <div className="pt-2 border-t border-slate-800">
-                      <label className="block text-slate-300 font-medium mb-1">Supporting Document PDF (Certificate of Acceptance / Contract) <span className="text-red-400">*</span></label>
-                      <div className="border border-dashed border-slate-700 rounded-xl p-3 text-center bg-slate-900 hover:border-blue-500 transition cursor-pointer">
-                        <label className="cursor-pointer block space-y-1">
-                          <Paperclip className="w-5 h-5 text-blue-400 mx-auto" />
-                          <p className="text-xs font-semibold text-slate-200 truncate">{editingRow.pdfFile?.fileName || 'Attach Certificate of Acceptance / Contract PDF (Max 100 MB)'}</p>
+                  <div className="pt-2 border-t border-slate-800">
+                    <label className="block text-slate-400 text-[11px] mb-1 font-mono font-semibold">Supporting SLCC PDF File (Certificate of Completion / Contract)</label>
+                    <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-center">
+                      {editingRow.pdfFile ? (
+                        <div className="flex items-center justify-between text-xs text-emerald-400 font-mono font-bold">
+                          <span className="truncate max-w-[180px]">{editingRow.pdfFile.fileName}</span>
+                          <span className="text-[10px] text-slate-500 font-normal">({(editingRow.pdfFile.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB)</span>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer text-xs font-semibold text-purple-400 hover:underline inline-flex items-center gap-1">
+                          <Paperclip className="w-3.5 h-3.5" />
+                          <span>Attach Supporting PDF Document</span>
                           <input type="file" accept=".pdf" onChange={(e) => handleRowPdfUpload(editingRow.id, e.target.files?.[0])} className="hidden" />
                         </label>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
 
               </div>
 
-              <div className="p-4 border-t border-slate-800 flex items-center justify-end gap-2 bg-slate-900/95 sticky bottom-0 z-10 shrink-0">
-                <button type="button" onClick={() => setEditingRow(null)} className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingRow(null)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition"
+                >
                   Cancel
                 </button>
-                <button type="submit" className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-xl transition flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Save Entry to Table</span>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 transition shadow"
+                >
+                  Save SLCC Contract Entry
                 </button>
               </div>
 

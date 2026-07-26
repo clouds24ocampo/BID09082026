@@ -84,6 +84,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo);
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
+  const [solicitationNumber, setSolicitationNumber] = useState('SOL-2026-00891');
 
   // Opportunity Finder Project List State
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
@@ -436,37 +437,58 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
               </select>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1 border-t border-slate-800/80">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs pt-1 border-t border-slate-800/80">
               <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1">Project Ref. No</label>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">1. Project Ref. No</label>
                 <input
                   type="text"
                   value={projectRefNo}
                   onChange={(e) => setProjectRefNo(e.target.value)}
                   placeholder="e.g. PhilGEPS-2026-10928371"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1">Name of Project</label>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">2. Solicitation No.</label>
+                <input
+                  type="text"
+                  value={solicitationNumber}
+                  onChange={(e) => setSolicitationNumber(e.target.value)}
+                  placeholder="e.g. SOL-2026-00891"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">3. Name of Project</label>
                 <input
                   type="text"
                   value={projectTitle}
                   onChange={(e) => setProjectTitle(e.target.value)}
                   placeholder="e.g. Construction of Multi-Purpose Center"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-semibold focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-semibold focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1">Procuring Entity</label>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">4. Procuring Entity</label>
                 <input
                   type="text"
                   value={procuringEntity}
                   onChange={(e) => setProcuringEntity(e.target.value)}
                   placeholder="e.g. DPWH Region IV-A"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">5. Date of Submission</label>
+                <input
+                  type="date"
+                  value={dateSubmitted}
+                  onChange={(e) => setDateSubmitted(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
@@ -529,7 +551,11 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
               <div className="border-b-2 border-slate-900 pb-3 space-y-2">
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
                   <span>PROJECT REF. NO: <strong className="text-blue-950 font-extrabold">{projectRefNo}</strong></span>
+                  <span>SOLICITATION NO: <strong className="text-blue-950 font-extrabold">{solicitationNumber}</strong></span>
+                </div>
+                <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
                   <span>NAME OF PROJECT: <strong className="text-blue-950 font-extrabold">{projectTitle}</strong></span>
+                  <span>DATE OF SUBMISSION: <strong className="text-slate-950 font-extrabold">{dateSubmitted}</strong></span>
                 </div>
                 <div className="text-xs font-mono text-slate-800">
                   <span>PROCURING ENTITY: <strong className="text-slate-950">{procuringEntity}</strong></span>
