@@ -31,7 +31,7 @@ const PRESET_COLORS = [
 ];
 
 export const CompanyProfileView: React.FC = () => {
-  const { currentTenant, updateTenantSettings } = useAuth();
+  const { currentTenant, currentUser, updateTenantSettings } = useAuth();
 
   const [companyName, setCompanyName] = useState(currentTenant?.companyName || '');
   const [brandCode, setBrandCode] = useState(currentTenant?.brandCode || '');
@@ -46,19 +46,16 @@ export const CompanyProfileView: React.FC = () => {
   const [signatoryName, setSignatoryName] = useState(currentTenant?.authorizedSignatory?.name || '');
   const [signatoryTitle, setSignatoryTitle] = useState(currentTenant?.authorizedSignatory?.title || '');
 
-  // Bidding Portal Credentials & Eye Toggle State
-  const [portalName, setPortalName] = useState(() => {
-    return localStorage.getItem('bidocs_portal_name') || 'PhilGEPS Modernized Bidding Portal';
+  // System Credentials (THIS SYSTEM) & Eye Toggle State
+  const [systemUsername, setSystemUsername] = useState(() => {
+    return localStorage.getItem('bidocs_system_username') || currentUser?.email || 'admin@bidocs.ph';
   });
-  const [portalUsername, setPortalUsername] = useState(() => {
-    return localStorage.getItem('bidocs_portal_username') || 'bidder_corp_admin_2026';
-  });
-  const [portalPassword, setPortalPassword] = useState(() => {
-    return localStorage.getItem('bidocs_portal_password') || 'PhilGEPS#2026!Pass';
+  const [systemPassword, setSystemPassword] = useState(() => {
+    return localStorage.getItem('bidocs_system_password') || 'BiDOCS#2026!Admin';
   });
 
-  const [showUsername, setShowUsername] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showSystemUsername, setShowSystemUsername] = useState(false);
+  const [showSystemPassword, setShowSystemPassword] = useState(false);
 
   const [isSaved, setIsSaved] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -107,9 +104,8 @@ export const CompanyProfileView: React.FC = () => {
       }
     });
 
-    localStorage.setItem('bidocs_portal_name', portalName);
-    localStorage.setItem('bidocs_portal_username', portalUsername);
-    localStorage.setItem('bidocs_portal_password', portalPassword);
+    localStorage.setItem('bidocs_system_username', systemUsername);
+    localStorage.setItem('bidocs_system_password', systemPassword);
 
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2500);
@@ -126,17 +122,17 @@ export const CompanyProfileView: React.FC = () => {
               className="w-3.5 h-3.5 rounded-full" 
               style={{ backgroundColor: brandColor }} 
             />
-            <h1 className="text-2xl font-bold text-white">Company Profile & Branding Settings</h1>
+            <h1 className="text-2xl font-bold text-white">Company Profile & System Credentials</h1>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Manage your corporate profile logo, statutory registration details, and authorized signatory credentials for <span className="text-slate-200 font-semibold">{companyName || 'Your Enterprise'}</span>.
+            Manage your corporate profile logo, statutory registration details, and system login credentials for <span className="text-slate-200 font-semibold">{companyName || 'Your Enterprise'}</span>.
           </p>
         </div>
 
         {isSaved && (
           <div className="px-3.5 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs font-semibold flex items-center gap-2 shadow-lg">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>Company Profile & Logo Saved!</span>
+            <span>Company Profile & System Credentials Saved!</span>
           </div>
         )}
       </div>
@@ -364,75 +360,63 @@ export const CompanyProfileView: React.FC = () => {
           </div>
         </div>
 
-        {/* SECTION 5: GOVERNMENT BIDDING PORTAL LOGIN CREDENTIALS */}
+        {/* SECTION 5: BIDOCS SYSTEM ACCOUNT CREDENTIALS (THIS SYSTEM) */}
         <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <Key className="w-4 h-4 text-amber-400" />
-              Government Bidding Portal Login Credentials (PhilGEPS / Agency)
+              BiDOCS System Account Credentials (THIS SYSTEM)
             </h2>
             <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-full border border-slate-800 font-semibold">
-              AES-256 Encrypted Vault
+              System User Credentials
             </span>
           </div>
 
           <p className="text-xs text-slate-400">
-            Store official login credentials for PhilGEPS and procurement portals. Click the eye icon to show or mask credentials.
+            Account login credentials for accessing <strong className="text-white">THIS BiDOCS System</strong>. Click the eye icon next to Username or Password to reveal or mask your credentials.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-            {/* Portal Name */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            {/* System Username / Email with Eye Toggle */}
             <div>
-              <label className="block font-medium text-slate-300 mb-1">Procurement Portal Name</label>
-              <input
-                type="text"
-                value={portalName}
-                onChange={(e) => setPortalName(e.target.value)}
-                placeholder="e.g. PhilGEPS Modernized Portal"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-blue-500 font-medium"
-              />
-            </div>
-
-            {/* Username with Eye Toggle */}
-            <div>
-              <label className="block font-medium text-slate-300 mb-1">Company Portal Username</label>
+              <label className="block font-medium text-slate-300 mb-1">System Account Username / Email</label>
               <div className="relative">
                 <input
-                  type={showUsername ? "text" : "password"}
-                  value={portalUsername}
-                  onChange={(e) => setPortalUsername(e.target.value)}
-                  placeholder="Company Username"
+                  type={showSystemUsername ? "text" : "password"}
+                  value={systemUsername}
+                  onChange={(e) => setSystemUsername(e.target.value)}
+                  placeholder="admin@bidocs.ph"
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3.5 pr-10 py-2.5 text-white font-mono focus:outline-none focus:border-amber-500"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowUsername(!showUsername)}
+                  onClick={() => setShowSystemUsername(!showSystemUsername)}
                   className="absolute right-3 top-2.5 text-slate-400 hover:text-white transition p-0.5"
-                  title={showUsername ? "Hide Username" : "Show Username"}
+                  title={showSystemUsername ? "Hide Username" : "Show Username"}
                 >
-                  {showUsername ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
+                  {showSystemUsername ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
                 </button>
               </div>
             </div>
 
-            {/* Password with Eye Toggle */}
+            {/* System Password with Eye Toggle */}
             <div>
-              <label className="block font-medium text-slate-300 mb-1">Company Portal Password</label>
+              <label className="block font-medium text-slate-300 mb-1">System Account Password</label>
               <div className="relative">
                 <input
-                  type={showPassword ? "text" : "password"}
-                  value={portalPassword}
-                  onChange={(e) => setPortalPassword(e.target.value)}
-                  placeholder="Company Password"
+                  type={showSystemPassword ? "text" : "password"}
+                  value={systemPassword}
+                  onChange={(e) => setSystemPassword(e.target.value)}
+                  placeholder="System Password"
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3.5 pr-10 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setShowSystemPassword(!showSystemPassword)}
                   className="absolute right-3 top-2.5 text-slate-400 hover:text-white transition p-0.5"
-                  title={showPassword ? "Hide Password" : "Show Password"}
+                  title={showSystemPassword ? "Hide Password" : "Show Password"}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4 text-emerald-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
+                  {showSystemPassword ? <EyeOff className="w-4 h-4 text-emerald-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
                 </button>
               </div>
             </div>
@@ -447,7 +431,7 @@ export const CompanyProfileView: React.FC = () => {
             style={{ backgroundColor: brandColor }}
           >
             <Save className="w-4 h-4" />
-            <span>Save Company Profile & Credentials</span>
+            <span>Save Company Profile & System Credentials</span>
           </button>
         </div>
 
