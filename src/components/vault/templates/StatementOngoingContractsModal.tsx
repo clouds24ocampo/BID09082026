@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import { PDFDocument } from 'pdf-lib';
+import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import html2canvas from 'html2canvas';
 import { 
   X, 
@@ -82,6 +84,15 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo);
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
+
+  // Opportunity Finder Project List State
+  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
+  const [selectedOppId, setSelectedOppId] = useState<string>('');
+
+  useEffect(() => {
+    const list = getOpportunityProjects();
+    setOppProjects(list);
+  }, []);
 
   // Form Editor Modal state for editing or creating a contract row
   const [editingRow, setEditingRow] = useState<OngoingContractRow | null>(null);
@@ -206,29 +217,91 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
     reader.readAsDataURL(file);
   };
 
+  const generateMergedPackageDataUrl = async (): Promise<string | undefined> => {
+    try {
+      const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
+      if (!templateElem) return undefined;
+
+      // 1. Convert template element to high-res canvas image (Scale 2.5 for crisp dark text)
+      const canvas = await html2canvas(templateElem, {
+        scale: 2.5,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        ignoreElements: (el) => el.classList.contains('print:hidden') || el.classList.contains('no-export')
+      });
+      const imgDataUrl = canvas.toDataURL('image/png');
+
+      // 2. Initialize pdf-lib document
+      const mainPdfDoc = await PDFDocument.create();
+
+      // Embed Legal Landscape Page 1 (936pt x 612pt)
+      const pngImage = await mainPdfDoc.embedPng(imgDataUrl);
+      const page1 = mainPdfDoc.addPage([936, 612]);
+      page1.drawImage(pngImage, {
+        x: 0,
+        y: 0,
+        width: 936,
+        height: 612
+      });
+
+      // 3. Append all uploaded supporting PDF documents attached to ongoing contract rows
+      for (const row of contracts) {
+        if (row.pdfFile?.fileDataUrl && row.pdfFile.fileDataUrl.startsWith('data:application/pdf')) {
+          try {
+            const base64Str = row.pdfFile.fileDataUrl.split(',')[1] || row.pdfFile.fileDataUrl;
+            const pdfBytes = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
+            const srcPdf = await PDFDocument.load(pdfBytes);
+            const copiedPages = await mainPdfDoc.copyPages(srcPdf, srcPdf.getPageIndices());
+            copiedPages.forEach(p => mainPdfDoc.addPage(p));
+          } catch (err) {
+            console.error(`[PDFMerge] Error appending supporting PDF for ${row.projectName}:`, err);
+          }
+        }
+      }
+
+      // 4. Return complete merged PDF DataURL
+      const mergedPdfBytes = await mainPdfDoc.save();
+      const blob = new Blob([mergedPdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      console.error('[PDFMerge] Error generating merged PDF package:', e);
+      return undefined;
+    }
+  };
+
   const handlePrint = () => {
     window.print();
   };
 
   const handleExportPdf = async () => {
-    const projRef = activeProjectRefNo || 'PRJ-2026-901283';
+    const projRef = projectRefNo || 'PRJ-2026-901283';
     const docName = 'Statement_of_All_Ongoing_Contracts';
     const today = new Date().toISOString().split('T')[0];
     const fileName = `${projRef}_${docName}_${today}.pdf`;
 
-    const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
-    await generateAndDownloadThreeLayerPdf(null, templateElem, undefined, fileName);
+    const mergedDataUrl = await generateMergedPackageDataUrl();
+    if (mergedDataUrl) {
+      const link = document.createElement('a');
+      link.href = mergedDataUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
+      await generateAndDownloadThreeLayerPdf(null, templateElem, undefined, fileName);
+    }
   };
 
   const handleSaveDraft = async () => {
     try {
-      const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
-      let dataUrl: string | undefined = undefined;
-      if (templateElem) {
-        const canvas = await html2canvas(templateElem, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
-        dataUrl = canvas.toDataURL('image/png');
-      }
-      onSaveAndComplete(dataUrl, 'Statement of All Ongoing Government & Private Contracts');
+      const mergedDataUrl = await generateMergedPackageDataUrl();
+      onSaveAndComplete(mergedDataUrl, 'Statement of All Ongoing Government & Private Contracts');
     } catch (e) {
       onSaveAndComplete(undefined, 'Statement of All Ongoing Government & Private Contracts');
     }
@@ -325,7 +398,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
         <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6">
           
           {/* Target Bidding Project Selector & Auto-Fill Bar */}
-          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3 print:hidden no-export">
+          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-white font-mono flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-blue-400" />
@@ -334,7 +407,36 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
               <span className="text-[10px] text-slate-400 font-mono">Changes auto-fill directly onto Legal Template header below</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            {/* Opportunity Finder Project Dropdown */}
+            <div>
+              <label className="block text-slate-300 font-mono text-[11px] mb-1 flex items-center justify-between">
+                <span className="font-bold text-blue-300">Select Project from Opportunity Finder:</span>
+                <span className="text-[10px] text-emerald-400 font-semibold">⚡ Auto-populates all template header fields</span>
+              </label>
+              <select
+                value={selectedOppId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedOppId(val);
+                  const found = oppProjects.find(p => p.id === val || p.refNo === val);
+                  if (found) {
+                    setProjectRefNo(found.refNo);
+                    setProjectTitle(found.title);
+                    setProcuringEntity(found.procuringEntity);
+                  }
+                }}
+                className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3 py-2 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner"
+              >
+                <option value="">-- Select Active Bidding Opportunity / Project --</option>
+                {oppProjects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    [{p.refNo}] {p.title} — {p.procuringEntity} ({p.abc})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1 border-t border-slate-800/80">
               <div>
                 <label className="block text-slate-400 font-mono text-[10px] mb-1">Project Ref. No</label>
                 <input
@@ -525,11 +627,11 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                                 <div className="font-bold text-emerald-800">{row.amountAward || '₱0.00'}</div>
                                 <div className="text-slate-600">{row.amountCompletion || '₱0.00'}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-[10px] font-mono">
-                                <div className="font-bold text-slate-950">{row.duration || 'N/A'}</div>
-                                <div className="text-[10px] font-bold text-slate-950 mt-0.5 leading-tight">
-                                  <span className="text-slate-700 font-semibold block">Award: {row.dateAwarded || 'N/A'}</span>
-                                  <span className="text-slate-900 block">Comp: {row.dateCompletion || 'N/A'}</span>
+                              <td className="p-1.5 border-r border-slate-300 font-mono">
+                                <div className="font-bold text-black text-[11px]" style={{ color: '#000000', fontWeight: 'bold' }}>{row.duration || 'N/A'}</div>
+                                <div className="text-[10px] font-bold text-black mt-0.5 leading-tight" style={{ color: '#000000' }}>
+                                  <span className="block font-bold" style={{ color: '#000000' }}>Award: {row.dateAwarded || 'N/A'}</span>
+                                  <span className="block font-bold" style={{ color: '#000000' }}>Comp: {row.dateCompletion || 'N/A'}</span>
                                 </div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[10px]">
@@ -635,11 +737,11 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                                 <div className="font-bold text-emerald-800">{row.amountAward || '₱0.00'}</div>
                                 <div className="text-slate-600">{row.amountCompletion || '₱0.00'}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-[10px] font-mono">
-                                <div className="font-bold text-slate-950">{row.duration || 'N/A'}</div>
-                                <div className="text-[10px] font-bold text-slate-950 mt-0.5 leading-tight">
-                                  <span className="text-slate-700 font-semibold block">Award: {row.dateAwarded || 'N/A'}</span>
-                                  <span className="text-slate-900 block">Comp: {row.dateCompletion || 'N/A'}</span>
+                              <td className="p-1.5 border-r border-slate-300 font-mono">
+                                <div className="font-bold text-black text-[11px]" style={{ color: '#000000', fontWeight: 'bold' }}>{row.duration || 'N/A'}</div>
+                                <div className="text-[10px] font-bold text-black mt-0.5 leading-tight" style={{ color: '#000000' }}>
+                                  <span className="block font-bold" style={{ color: '#000000' }}>Award: {row.dateAwarded || 'N/A'}</span>
+                                  <span className="block font-bold" style={{ color: '#000000' }}>Comp: {row.dateCompletion || 'N/A'}</span>
                                 </div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[10px]">
