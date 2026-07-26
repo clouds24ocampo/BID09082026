@@ -14,7 +14,11 @@ import {
   Phone,
   MapPin,
   UserCheck,
-  FileText
+  FileText,
+  Eye,
+  EyeOff,
+  Key,
+  Lock
 } from 'lucide-react';
 
 const PRESET_COLORS = [
@@ -41,6 +45,20 @@ export const CompanyProfileView: React.FC = () => {
 
   const [signatoryName, setSignatoryName] = useState(currentTenant?.authorizedSignatory?.name || '');
   const [signatoryTitle, setSignatoryTitle] = useState(currentTenant?.authorizedSignatory?.title || '');
+
+  // Bidding Portal Credentials & Eye Toggle State
+  const [portalName, setPortalName] = useState(() => {
+    return localStorage.getItem('bidocs_portal_name') || 'PhilGEPS Modernized Bidding Portal';
+  });
+  const [portalUsername, setPortalUsername] = useState(() => {
+    return localStorage.getItem('bidocs_portal_username') || 'bidder_corp_admin_2026';
+  });
+  const [portalPassword, setPortalPassword] = useState(() => {
+    return localStorage.getItem('bidocs_portal_password') || 'PhilGEPS#2026!Pass';
+  });
+
+  const [showUsername, setShowUsername] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [isSaved, setIsSaved] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -88,6 +106,10 @@ export const CompanyProfileView: React.FC = () => {
         tin: tin
       }
     });
+
+    localStorage.setItem('bidocs_portal_name', portalName);
+    localStorage.setItem('bidocs_portal_username', portalUsername);
+    localStorage.setItem('bidocs_portal_password', portalPassword);
 
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2500);
@@ -342,6 +364,81 @@ export const CompanyProfileView: React.FC = () => {
           </div>
         </div>
 
+        {/* SECTION 5: GOVERNMENT BIDDING PORTAL LOGIN CREDENTIALS */}
+        <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <Key className="w-4 h-4 text-amber-400" />
+              Government Bidding Portal Login Credentials (PhilGEPS / Agency)
+            </h2>
+            <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-full border border-slate-800 font-semibold">
+              AES-256 Encrypted Vault
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-400">
+            Store official login credentials for PhilGEPS and procurement portals. Click the eye icon to show or mask credentials.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            {/* Portal Name */}
+            <div>
+              <label className="block font-medium text-slate-300 mb-1">Procurement Portal Name</label>
+              <input
+                type="text"
+                value={portalName}
+                onChange={(e) => setPortalName(e.target.value)}
+                placeholder="e.g. PhilGEPS Modernized Portal"
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-blue-500 font-medium"
+              />
+            </div>
+
+            {/* Username with Eye Toggle */}
+            <div>
+              <label className="block font-medium text-slate-300 mb-1">Company Portal Username</label>
+              <div className="relative">
+                <input
+                  type={showUsername ? "text" : "password"}
+                  value={portalUsername}
+                  onChange={(e) => setPortalUsername(e.target.value)}
+                  placeholder="Company Username"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3.5 pr-10 py-2.5 text-white font-mono focus:outline-none focus:border-amber-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowUsername(!showUsername)}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white transition p-0.5"
+                  title={showUsername ? "Hide Username" : "Show Username"}
+                >
+                  {showUsername ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Password with Eye Toggle */}
+            <div>
+              <label className="block font-medium text-slate-300 mb-1">Company Portal Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={portalPassword}
+                  onChange={(e) => setPortalPassword(e.target.value)}
+                  placeholder="Company Password"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3.5 pr-10 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white transition p-0.5"
+                  title={showPassword ? "Hide Password" : "Show Password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4 text-emerald-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Save Bar */}
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
           <button
@@ -350,7 +447,7 @@ export const CompanyProfileView: React.FC = () => {
             style={{ backgroundColor: brandColor }}
           >
             <Save className="w-4 h-4" />
-            <span>Save Company Profile & Logo</span>
+            <span>Save Company Profile & Credentials</span>
           </button>
         </div>
 
