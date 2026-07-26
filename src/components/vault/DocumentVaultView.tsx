@@ -240,6 +240,7 @@ export const DocumentVaultView: React.FC = () => {
   const [showMergeModal, setShowMergeModal] = useState(false);
 
   // Technical Documents Sub-Tab State
+  const [techSubTab, setTechSubTab] = useState<'CHECKLIST' | 'COMPLETED'>('CHECKLIST');
   const [expandedTechItems, setExpandedTechItems] = useState<string[]>(['tech-f']);
   const [techCompletedIds, setTechCompletedIds] = useState<string[]>(() => {
     const saved = localStorage.getItem('bidocs_tech_completed_ids');
@@ -444,7 +445,8 @@ export const DocumentVaultView: React.FC = () => {
     storePdfData(newVaultDoc.id, fileDataUrl);
     setVaultItems(prev => [newVaultDoc, ...prev.filter(item => item.documentCode !== fillingTemplateItem.code)]);
     setFillingTemplateItem(null);
-    notifySuccess(`[${docTitle}, v1.0] Template Save Successful!`, 'Legal template saved into Document Vault as an active technical exhibit.');
+    setTechSubTab('COMPLETED');
+    notifySuccess(`[${docTitle}, v1.0] Template Save Successful!`, 'Legal template saved into Document Vault as an active technical exhibit under Completed Technical Documents & Forms.');
   };
 
   const handleFileSelection = (file: File | undefined) => {
@@ -707,6 +709,8 @@ export const DocumentVaultView: React.FC = () => {
     item.category === 'ELIGIBILITY_CLASS_A' &&
     !CLASS_A_MASTER_LIST.some(d => d.code === item.documentCode)
   );
+
+  const completedTechVaultItems = vaultItems.filter(item => item.category === 'TECHNICAL');
 
   const filteredGridItems = vaultItems.filter(item => {
     const matchesSearch = item.documentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1182,155 +1186,273 @@ export const DocumentVaultView: React.FC = () => {
         <div className="space-y-6">
 
           {/* Sub-Tab Navigation Bar */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex items-center justify-between">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <button
-                className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-blue-600 shadow flex items-center gap-2"
+                onClick={() => setTechSubTab('CHECKLIST')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                  techSubTab === 'CHECKLIST'
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                }`}
               >
                 <FileSignature className="w-4 h-4" />
-                <span>Technical Documents</span>
+                <span>Technical Requirements Checklist</span>
                 <span className="text-[10px] font-mono bg-blue-950 px-2 py-0.5 rounded-full border border-blue-400">
                   {techCompletedIds.length} / 8 Completed
+                </span>
+              </button>
+
+              <button
+                onClick={() => setTechSubTab('COMPLETED')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                  techSubTab === 'COMPLETED'
+                    ? 'bg-emerald-600 text-white shadow-lg'
+                    : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                <span>Completed Technical Documents & Forms</span>
+                <span className="text-[10px] font-mono bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500 font-bold">
+                  {completedTechVaultItems.length} Saved
                 </span>
               </button>
             </div>
 
             <span className="text-xs text-slate-400 font-mono">
-              RA 12009 NGPA Statutory Technical Requirements Checklist
+              RA 12009 NGPA Statutory Technical Compliance Engine
             </span>
           </div>
 
-          {/* Technical Documents Checklist Card */}
-          <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl space-y-0">
-            <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                Technical Documents Requirement Checklist (Items b through g)
-              </h3>
-              <span className="text-xs font-mono text-slate-400">Legal Templates Provided</span>
-            </div>
+          {/* SUB-TAB 1: TECHNICAL DOCUMENTS CHECKLIST */}
+          {techSubTab === 'CHECKLIST' && (
+            <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl space-y-0">
+              <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  Technical Documents Requirement Checklist (Items b through g)
+                </h3>
+                <span className="text-xs font-mono text-slate-400">Legal Templates Provided</span>
+              </div>
 
-            <div className="divide-y divide-slate-800/80">
-              {TECHNICAL_CHECKLIST_MASTER.map((item) => {
-                const isCompleted = techCompletedIds.includes(item.id);
-                const isExpanded = expandedTechItems.includes(item.id);
+              <div className="divide-y divide-slate-800/80">
+                {TECHNICAL_CHECKLIST_MASTER.map((item) => {
+                  const isCompleted = techCompletedIds.includes(item.id);
+                  const isExpanded = expandedTechItems.includes(item.id);
 
-                return (
-                  <div key={item.id} className="bg-slate-950/60 hover:bg-slate-900/50 transition">
+                  return (
+                    <div key={item.id} className="bg-slate-950/60 hover:bg-slate-900/50 transition">
 
-                    {/* Main Row */}
-                    <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      {/* Main Row */}
+                      <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 
-                      <div className="flex items-start gap-3 min-w-0">
-                        {/* Checkbox */}
-                        <button
-                          onClick={() => toggleTechCheckbox(item.id)}
-                          className="mt-0.5 text-slate-400 hover:text-white transition shrink-0"
-                        >
-                          {isCompleted ? (
-                            <CheckSquare className="w-5 h-5 text-emerald-400" />
-                          ) : (
-                            <Square className="w-5 h-5 text-slate-600" />
-                          )}
-                        </button>
-
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono font-bold text-xs text-blue-400 bg-blue-950 px-2 py-0.5 rounded border border-blue-800">
-                              Item {item.code}
-                            </span>
-                            <span className="font-bold text-white text-xs leading-snug">{item.name}</span>
-                            {item.isExpandable && (
-                              <button
-                                onClick={() => toggleTechExpand(item.id)}
-                                className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition flex items-center gap-1"
-                              >
-                                {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                                <span>3 Sub-Items</span>
-                              </button>
+                        <div className="flex items-start gap-3 min-w-0">
+                          {/* Checkbox */}
+                          <button
+                            onClick={() => toggleTechCheckbox(item.id)}
+                            className="mt-0.5 text-slate-400 hover:text-white transition shrink-0"
+                          >
+                            {isCompleted ? (
+                              <CheckSquare className="w-5 h-5 text-emerald-400" />
+                            ) : (
+                              <Square className="w-5 h-5 text-slate-600" />
                             )}
+                          </button>
+
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono font-bold text-xs text-blue-400 bg-blue-950 px-2 py-0.5 rounded border border-blue-800">
+                                Item {item.code}
+                              </span>
+                              <span className="font-bold text-white text-xs leading-snug">{item.name}</span>
+                              {item.isExpandable && (
+                                <button
+                                  onClick={() => toggleTechExpand(item.id)}
+                                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition flex items-center gap-1"
+                                >
+                                  {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                  <span>3 Sub-Items</span>
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-400 font-mono italic">{item.notes}</p>
                           </div>
-                          <p className="text-[11px] text-slate-400 font-mono italic">{item.notes}</p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          <button
+                            onClick={() => setFillingTemplateItem({ id: item.id, code: item.code, name: item.name })}
+                            className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
+                          >
+                            <FileSignature className="w-3.5 h-3.5" />
+                            <span>Fill Legal Template</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              resetFormState();
+                              setCustomDocName(`Item ${item.code} — ${item.name}`);
+                              setCustomUploadCategory('TECHNICAL');
+                              setShowCustomUploadModal(true);
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30"
+                          >
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Upload PDF</span>
+                          </button>
+                        </div>
+
+                      </div>
+
+                      {/* Expandable Sub-Items Section for Item (f) */}
+                      {item.isExpandable && isExpanded && item.subItems && (
+                        <div className="bg-slate-900/80 p-4 border-t border-slate-800 pl-10 space-y-3">
+                          <h5 className="text-[11px] font-bold text-slate-300 uppercase font-mono tracking-wider">
+                            Item (f) Expandable Sub-Checklist Requirements:
+                          </h5>
+                          <div className="space-y-2">
+                            {item.subItems.map((sub) => {
+                              const isSubCompleted = techCompletedIds.includes(sub.id);
+
+                              return (
+                                <div
+                                  key={sub.id}
+                                  className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                                >
+                                  <div className="flex items-start gap-2.5">
+                                    <button
+                                      onClick={() => toggleTechCheckbox(sub.id)}
+                                      className="mt-0.5 text-slate-400 hover:text-white transition shrink-0"
+                                    >
+                                      {isSubCompleted ? (
+                                        <CheckSquare className="w-4 h-4 text-emerald-400" />
+                                      ) : (
+                                        <Square className="w-4 h-4 text-slate-600" />
+                                      )}
+                                    </button>
+                                    <div>
+                                      <span className="font-mono font-bold text-blue-300 mr-2">{sub.code}</span>
+                                      <span className="text-slate-200 font-medium">{sub.name}</span>
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    onClick={() => setFillingTemplateItem({ id: sub.id, code: sub.code, name: sub.name })}
+                                    className="px-2.5 py-1 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-[11px] font-semibold flex items-center gap-1 border border-blue-500/30 shrink-0"
+                                  >
+                                    <FileSignature className="w-3 h-3" />
+                                    <span>Fill Template</span>
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* SUB-TAB 2: COMPLETED TECHNICAL DOCUMENTS & FORMS */}
+          {techSubTab === 'COMPLETED' && (
+            <div className="space-y-4">
+              {completedTechVaultItems.length === 0 ? (
+                <div className="glass-panel p-12 text-center rounded-2xl border border-slate-800 space-y-4">
+                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div className="max-w-md mx-auto space-y-2">
+                    <h3 className="text-base font-bold text-white">No Completed Technical Documents Saved Yet</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Go to <span className="text-blue-400 font-bold">Technical Requirements Checklist</span> sub-tab above and click <span className="text-white font-bold">"Fill Legal Template"</span> on Item (b) Statement of Ongoing Contracts or Item (c) SLCC to generate and save your completed technical forms.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setTechSubTab('CHECKLIST')}
+                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow transition inline-flex items-center gap-2"
+                  >
+                    <FileSignature className="w-4 h-4" />
+                    <span>Go to Technical Checklist & Fill Templates</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {completedTechVaultItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-slate-700 transition space-y-4 flex flex-col justify-between"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Technical Completed Form
+                          </span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">
+                            v{item.versionNumber}.0
+                          </span>
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-bold text-white leading-snug">{item.documentName}</h3>
+                          <p className="text-xs text-slate-400 mt-1 font-mono">Ref: {item.documentNumber || 'N/A'}</p>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
+                          <p className="text-slate-300 font-semibold">{item.legalBasisReference}</p>
+                          <p className="truncate">File: {item.fileName}</p>
+                          <p className="text-[10px] text-slate-500">Saved by: {item.uploadedByName}</p>
                         </div>
                       </div>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                      <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
                         <button
-                          onClick={() => setFillingTemplateItem({ id: item.id, code: item.code, name: item.name })}
+                          onClick={() => setPreviewPdfItem(item)}
                           className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
+                          title="View completed PDF document"
                         >
-                          <FileSignature className="w-3.5 h-3.5" />
-                          <span>Fill Legal Template</span>
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View PDF</span>
                         </button>
 
                         <button
                           onClick={() => {
+                            setFillingTemplateItem({
+                              id: item.documentCode?.toLowerCase() || 'tech-b',
+                              code: item.documentCode || 'b',
+                              name: item.documentName
+                            });
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-amber-500/30"
+                          title="Edit form entries in legal template"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Edit Form</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setReplaceTargetItem(item);
                             resetFormState();
-                            setCustomDocName(`Item ${item.code} — ${item.name}`);
-                            setCustomUploadCategory('TECHNICAL');
-                            setShowCustomUploadModal(true);
                           }}
                           className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30"
+                          title="Replace PDF file"
                         >
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>Upload PDF</span>
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Replace</span>
                         </button>
                       </div>
-
                     </div>
-
-                    {/* Expandable Sub-Items Section for Item (f) */}
-                    {item.isExpandable && isExpanded && item.subItems && (
-                      <div className="bg-slate-900/80 p-4 border-t border-slate-800 pl-10 space-y-3">
-                        <h5 className="text-[11px] font-bold text-slate-300 uppercase font-mono tracking-wider">
-                          Item (f) Expandable Sub-Checklist Requirements:
-                        </h5>
-                        <div className="space-y-2">
-                          {item.subItems.map((sub) => {
-                            const isSubCompleted = techCompletedIds.includes(sub.id);
-
-                            return (
-                              <div
-                                key={sub.id}
-                                className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 text-xs"
-                              >
-                                <div className="flex items-start gap-2.5">
-                                  <button
-                                    onClick={() => toggleTechCheckbox(sub.id)}
-                                    className="mt-0.5 text-slate-400 hover:text-white transition shrink-0"
-                                  >
-                                    {isSubCompleted ? (
-                                      <CheckSquare className="w-4 h-4 text-emerald-400" />
-                                    ) : (
-                                      <Square className="w-4 h-4 text-slate-600" />
-                                    )}
-                                  </button>
-                                  <div>
-                                    <span className="font-mono font-bold text-blue-300 mr-2">{sub.code}</span>
-                                    <span className="text-slate-200 font-medium">{sub.name}</span>
-                                  </div>
-                                </div>
-
-                                <button
-                                  onClick={() => setFillingTemplateItem({ id: sub.id, code: sub.code, name: sub.name })}
-                                  className="px-2.5 py-1 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-[11px] font-semibold flex items-center gap-1 border border-blue-500/30 shrink-0"
-                                >
-                                  <FileSignature className="w-3 h-3" />
-                                  <span>Fill Template</span>
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                  </div>
-                );
-              })}
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
+          )}
+
         </div>
       )}
 

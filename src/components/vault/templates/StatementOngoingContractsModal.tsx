@@ -55,10 +55,15 @@ interface StatementOngoingContractsModalProps {
 }
 
 const formatPhpCurrency = (val: string): string => {
+  if (!val) return '₱0.00';
   const cleaned = val.replace(/[^0-9.]/g, '');
-  const num = parseFloat(cleaned);
-  if (isNaN(num)) return val;
-  return '₱' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (!cleaned) return '₱0.00';
+  const parts = cleaned.split('.');
+  const intPart = parts[0] ? parseInt(parts[0], 10) : 0;
+  const decPart = parts.length > 1 ? parts[1].slice(0, 2) : '00';
+  const formattedInt = isNaN(intPart) ? '0' : intPart.toLocaleString('en-US');
+  const formattedDec = decPart.padEnd(2, '0');
+  return `₱${formattedInt}.${formattedDec}`;
 };
 
 export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsModalProps> = ({
@@ -72,6 +77,11 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
   const [isNoOngoing, setIsNoOngoing] = useState(false);
   const todayStr = new Date().toISOString().split('T')[0];
   const [dateSubmitted, setDateSubmitted] = useState(todayStr);
+
+  // Target Project Information (Auto-filled on Legal Template)
+  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo);
+  const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
+  const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
 
   // Form Editor Modal state for editing or creating a contract row
   const [editingRow, setEditingRow] = useState<OngoingContractRow | null>(null);
@@ -314,6 +324,52 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
         {/* Scrollable Modal Content Body */}
         <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6">
           
+          {/* Target Bidding Project Selector & Auto-Fill Bar */}
+          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3 print:hidden no-export">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-blue-400" />
+                Target Bidding Project Auto-Fill Settings
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">Changes auto-fill directly onto Legal Template header below</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">Project Ref. No</label>
+                <input
+                  type="text"
+                  value={projectRefNo}
+                  onChange={(e) => setProjectRefNo(e.target.value)}
+                  placeholder="e.g. PhilGEPS-2026-10928371"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">Name of Project</label>
+                <input
+                  type="text"
+                  value={projectTitle}
+                  onChange={(e) => setProjectTitle(e.target.value)}
+                  placeholder="e.g. Construction of Multi-Purpose Center"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-semibold focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">Procuring Entity</label>
+                <input
+                  type="text"
+                  value={procuringEntity}
+                  onChange={(e) => setProcuringEntity(e.target.value)}
+                  placeholder="e.g. DPWH Region IV-A"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Action Toolbar: "No Ongoing" Toggle & Add Contract Buttons */}
           <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden no-export">
             <div className="flex items-center gap-3">
@@ -370,11 +426,11 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
               {/* TEMPLATE HEADER: Auto-Populated Fields */}
               <div className="border-b-2 border-slate-900 pb-3 space-y-2">
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
-                  <span>PROJECT REF. NO: <strong className="text-blue-950 font-extrabold">{activeProjectRefNo}</strong></span>
-                  <span>NAME OF PROJECT: <strong className="text-blue-950 font-extrabold">{activeProjectTitle}</strong></span>
+                  <span>PROJECT REF. NO: <strong className="text-blue-950 font-extrabold">{projectRefNo}</strong></span>
+                  <span>NAME OF PROJECT: <strong className="text-blue-950 font-extrabold">{projectTitle}</strong></span>
                 </div>
                 <div className="text-xs font-mono text-slate-800">
-                  <span>PROCURING ENTITY: <strong className="text-slate-950">{activeProcuringEntity}</strong></span>
+                  <span>PROCURING ENTITY: <strong className="text-slate-950">{procuringEntity}</strong></span>
                 </div>
 
                 <div className="text-center pt-1 space-y-0.5">
@@ -816,10 +872,14 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                       type="text"
                       value={editingRow.amountAward}
                       onChange={(e) => setEditingRow({ ...editingRow, amountAward: e.target.value })}
+                      onBlur={() => setEditingRow({ ...editingRow, amountAward: formatPhpCurrency(editingRow.amountAward) })}
                       placeholder="₱4,500,000.00"
                       required
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold text-emerald-400"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold text-emerald-400 focus:border-emerald-400"
                     />
+                    <span className="text-[10px] text-emerald-400/80 font-mono mt-0.5 block">
+                      Formatted: {formatPhpCurrency(editingRow.amountAward)}
+                    </span>
                   </div>
 
                   <div>
@@ -828,10 +888,14 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                       type="text"
                       value={editingRow.amountCompletion}
                       onChange={(e) => setEditingRow({ ...editingRow, amountCompletion: e.target.value })}
+                      onBlur={() => setEditingRow({ ...editingRow, amountCompletion: formatPhpCurrency(editingRow.amountCompletion) })}
                       placeholder="₱4,500,000.00"
                       required
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold text-blue-400 focus:border-blue-400"
                     />
+                    <span className="text-[10px] text-blue-400/80 font-mono mt-0.5 block">
+                      Formatted: {formatPhpCurrency(editingRow.amountCompletion)}
+                    </span>
                   </div>
 
                   <div>
