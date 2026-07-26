@@ -4,16 +4,16 @@ import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine
 import { PDFDocument } from 'pdf-lib';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import html2canvas from 'html2canvas';
-import { 
-  X, 
-  Printer, 
-  Plus, 
-  Trash2, 
-  Upload, 
+import {
+  X,
+  Printer,
+  Plus,
+  Trash2,
+  Upload,
   Download,
-  CheckCircle2, 
-  FileText, 
-  CheckSquare, 
+  CheckCircle2,
+  FileText,
+  CheckSquare,
   Square,
   Paperclip,
   Edit3,
@@ -135,10 +135,10 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
         ownerAddress: '',
         ownerTelephone: '',
         natureOfWork: '',
-        bidderRole: 'Prime Contractor',
+        bidderRole: 'Main Contractor',
         amountAward: '',
         amountCompletion: '',
-        duration: '180 calendar days',
+        duration: ' calendar days',
         dateAwarded: todayStr,
         dateStarted: todayStr,
         dateCompletion: todayStr,
@@ -332,7 +332,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-      
+
       {/* PORTRAIT PRINT STYLESHEET OVERRIDE */}
       <style>{`
         @media print {
@@ -373,7 +373,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
       `}</style>
 
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-7xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col">
-        
+
         {/* Top Header Bar */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
           <div className="flex items-center gap-3">
@@ -416,7 +416,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
 
         {/* Scrollable Modal Content Body */}
         <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6">
-          
+
           {/* Target Bidding Project Selector & Auto-Fill Bar */}
           <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
             <div className="flex items-center justify-between">
@@ -529,19 +529,18 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
               <button
                 type="button"
                 onClick={() => setIsNoOngoing(!isNoOngoing)}
-                className={`px-4 py-2 rounded-xl text-xs font-extrabold font-mono transition flex items-center gap-2 shadow-lg ${
-                  isNoOngoing 
-                    ? 'bg-amber-600 text-white border border-amber-400' 
-                    : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
-                }`}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold font-mono transition flex items-center gap-2 shadow-lg ${isNoOngoing
+                  ? 'bg-amber-600 text-white border border-amber-400'
+                  : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+                  }`}
               >
                 {isNoOngoing ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                 <span>"No Ongoing" Declaration</span>
               </button>
 
               <p className="text-xs text-slate-400 font-mono">
-                {isNoOngoing 
-                  ? 'One-click "No Ongoing" active. Displays "NONE" across legal template tables & marks Item (b) Complete.' 
+                {isNoOngoing
+                  ? 'One-click "No Ongoing" active. Displays "NONE" across legal template tables & marks Item (b) Complete.'
                   : 'Click to declare no ongoing contracts or click "Fill Out Contract Form" to add entry rows.'}
               </p>
             </div>
@@ -570,12 +569,12 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
 
           {/* GPPB LEGAL PAPER CONTAINER (Legal 13" x 8.5" LANDSCAPE Printable Layout — EXPANDABLE MULTI-ENTRY FIT) */}
           <div className="single-page-paper bg-white text-slate-900 font-sans p-6 sm:p-8 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1150px] min-h-[680px] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
-            
+
             {/* Outer Legal Frame */}
             <div className="absolute inset-3 border-2 border-slate-900 pointer-events-none rounded-xl" />
 
             <div className="space-y-4">
-              
+
               {/* TEMPLATE HEADER: Auto-Populated Fields */}
               <div className="border-b-2 border-slate-900 pb-3 space-y-2">
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
@@ -613,7 +612,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
 
               {/* CONTRACT ENTRY LANDSCAPE TABLES */}
               <div className="space-y-4 text-xs font-sans">
-                
+
                 {/* GOVERNMENT CONTRACTS TABLE */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between border-b border-slate-400 pb-1">
@@ -641,7 +640,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                           <th className="p-1.5 border-r border-slate-300 w-8 text-center">#</th>
                           <th className="p-1.5 border-r border-slate-300 min-w-[160px]">Project Name & Owner</th>
                           <th className="p-1.5 border-r border-slate-300 min-w-[130px]">Owner Address & Tel</th>
-                          <th className="p-1.5 border-r border-slate-300">Nature & Role</th>
+                          <th className="p-1.5 border-r border-slate-300">Nature of Work</th>
                           <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Value at Award & Completion</th>
                           <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Dates & Duration</th>
                           <th className="p-1.5 border-r border-slate-300 w-24 text-center">Accomplishment %</th>
@@ -752,7 +751,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                           <th className="p-1.5 border-r border-slate-300 w-8 text-center">#</th>
                           <th className="p-1.5 border-r border-slate-300 min-w-[160px]">Project Name & Owner</th>
                           <th className="p-1.5 border-r border-slate-300 min-w-[130px]">Owner Address & Tel</th>
-                          <th className="p-1.5 border-r border-slate-300">Nature & Role</th>
+                          <th className="p-1.5 border-r border-slate-300">Nature of Work</th>
                           <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Value at Award & Completion</th>
                           <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Dates & Duration</th>
                           <th className="p-1.5 border-r border-slate-300 w-24 text-center">Accomplishment %</th>
@@ -905,7 +904,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
       {editingRow && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl animate-scaleIn my-auto flex flex-col max-h-[92vh]">
-            
+
             <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Edit3 className="w-4 h-4 text-blue-400" />
@@ -917,7 +916,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
             </div>
 
             <form onSubmit={saveEditingRow} className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
-              
+
               {/* Category */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -991,7 +990,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                 </div>
               </div>
 
-              {/* Nature of Work & Role */}
+              {/* Nature of Work */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-slate-300 font-medium mb-1">Nature of Work <span className="text-red-400">*</span></label>
@@ -1074,7 +1073,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
 
               {/* Milestone Dates & Accomplishment */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
+
                 <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
                   <h4 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
                     <Calendar className="w-4 h-4 text-blue-400" />

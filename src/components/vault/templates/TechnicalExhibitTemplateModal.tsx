@@ -2,17 +2,17 @@ import React, { useState } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
 import html2canvas from 'html2canvas';
-import { 
-  X, 
-  Printer, 
-  Download, 
-  FileSignature, 
-  CheckCircle2, 
-  Building2, 
-  ShieldCheck, 
-  UserCheck, 
-  HardHat, 
-  Truck, 
+import {
+  X,
+  Printer,
+  Download,
+  FileSignature,
+  CheckCircle2,
+  Building2,
+  ShieldCheck,
+  UserCheck,
+  HardHat,
+  Truck,
   FileText,
   Plus,
   Trash2,
@@ -51,15 +51,15 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
   const [signatoryTin, setSignatoryTin] = useState(tenant?.authorizedSignatory?.tin || '123-456-789-000');
 
   // Item (d) Special PCAB License / JVA State
-  const [jvaPartnerCompany, setJvaPartnerCompany] = useState('ALLIED TECH SOLUTIONS PHILIPPINES CORP.');
-  const [pcabLicenseNo, setPcabLicenseNo] = useState(tenant?.pcabLicenseNo || 'PCAB-SP-2026-8812');
-  const [pcabCategory, setPcabCategory] = useState(tenant?.pcabCategory || 'AAAA / General Building & IT');
+  const [jvaPartnerCompany, setJvaPartnerCompany] = useState('');
+  const [pcabLicenseNo, setPcabLicenseNo] = useState(tenant?.pcabLicenseNo || '');
+  const [pcabCategory, setPcabCategory] = useState(tenant?.pcabCategory || '');
 
   // Item (e) Bid Security BSD State
-  const [securityType, setSecurityType] = useState<'BSD' | 'SURETY_BOND' | 'MANAGERS_CHECK'>('BSD');
-  const [securityAmount, setSecurityAmount] = useState('₱1,250,000.00');
-  const [validityDays, setValidityDays] = useState('120 Calendar Days');
-  const [suretyCompany, setSuretyCompany] = useState('MALAYAN INSURANCE COMPANY INC.');
+  const [securityType, setSecurityType] = useState<'BSD' | 'SURETY_BOND' | 'MANAGERS_CHECK' | 'BID Securing Declaration'>('BSD');
+  const [securityAmount, setSecurityAmount] = useState('0.00');
+  const [validityDays, setValidityDays] = useState('');
+  const [suretyCompany, setSuretyCompany] = useState('');
 
   // Item (f.b) Key Personnel State
   const [keyPersonnel, setKeyPersonnel] = useState([
@@ -148,7 +148,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-      
+
       {/* PRINT STYLESHEET OVERRIDE */}
       <style>{`
         @media print {
@@ -189,7 +189,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
       `}</style>
 
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-6xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col">
-        
+
         {/* Top Header Bar */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
           <div className="flex items-center gap-3">
@@ -232,7 +232,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
 
         {/* Body Content */}
         <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6">
-          
+
           {/* Editor Form Inputs (Screen Only) */}
           <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
             <h4 className="text-xs font-bold text-blue-400 uppercase font-mono flex items-center gap-2">
@@ -372,12 +372,12 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
 
           {/* GPPB LEGAL PAPER CONTAINER (Legal 8.5" x 13" Portrait Standard Layout) */}
           <div className="single-page-paper bg-white text-slate-900 font-sans p-8 sm:p-10 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-6 max-w-[850px] min-h-[1100px] aspect-[8.5/13] mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
-            
+
             {/* Outer Legal Frame */}
             <div className="absolute inset-4 border-2 border-slate-900 pointer-events-none rounded-xl" />
 
             <div className="space-y-6">
-              
+
               {/* Document Header */}
               <div className="border-b-2 border-slate-900 pb-4 space-y-2">
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">

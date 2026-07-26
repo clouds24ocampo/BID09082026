@@ -10,7 +10,7 @@ export interface OpportunityProjectOption {
 
 /**
  * Fetches real active bidding projects saved in Opportunity Finder (localStorage: bidocs_opportunities).
- * Parses the exact submission deadline date & time from Opportunity Finder.
+ * Strictly deduplicates projects by ID and Reference Number.
  */
 export const getOpportunityProjects = (): OpportunityProjectOption[] => {
   try {
@@ -18,14 +18,13 @@ export const getOpportunityProjects = (): OpportunityProjectOption[] => {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((item: any, idx: number) => {
-          // Extract exact submission deadline datetime set in Opportunity Finder
+        const rawList: OpportunityProjectOption[] = parsed.map((item: any, idx: number) => {
           const rawDateTime = item.submissionDeadlineDatetime || item.submissionDeadlineDate || item.submissionDeadline || item.dateSubmitted || '';
           
           let formattedDateTime = '';
           if (rawDateTime) {
             if (rawDateTime.includes('T')) {
-              formattedDateTime = rawDateTime.substring(0, 16); // e.g. "2026-08-30T14:00"
+              formattedDateTime = rawDateTime.substring(0, 16);
             } else if (rawDateTime.includes(' ')) {
               formattedDateTime = rawDateTime.replace(' ', 'T').substring(0, 16);
             } else {
@@ -49,6 +48,20 @@ export const getOpportunityProjects = (): OpportunityProjectOption[] => {
             dateTimeSubmitted: formattedDateTime
           };
         });
+
+        // Strict Deduplication by ID & Reference Number
+        const seenKeys = new Set<string>();
+        const uniqueProjects: OpportunityProjectOption[] = [];
+
+        for (const proj of rawList) {
+          const dedupeKey = `${proj.id}::${proj.refNo}`.toLowerCase();
+          if (!seenKeys.has(dedupeKey)) {
+            seenKeys.add(dedupeKey);
+            uniqueProjects.push(proj);
+          }
+        }
+
+        return uniqueProjects;
       }
     }
   } catch (e) {
