@@ -143,9 +143,28 @@ export interface VaultNotification {
 
 export const DocumentVaultView: React.FC = () => {
   const { currentTenant, currentUser } = useAuth();
+
+  // In-memory store for PDF file data URLs (NOT persisted to localStorage to avoid QuotaExceededError)
+  const pdfDataStore = React.useRef<Record<string, string>>({});
+
+  const storePdfData = (itemId: string, dataUrl: string | undefined) => {
+    if (dataUrl) {
+      pdfDataStore.current[itemId] = dataUrl;
+    }
+  };
+
+  const getPdfData = (itemId: string): string | undefined => {
+    return pdfDataStore.current[itemId];
+  };
+
   const [vaultItems, setVaultItems] = useState<DocumentVaultItem[]>(() => {
-    const saved = localStorage.getItem('bidocs_vault_items');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('bidocs_vault_items');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error('Failed to load vault items from localStorage:', e);
+      return [];
+    }
   });
   const [selectedCategory, setSelectedCategory] = useState<string>('ELIGIBILITY_CLASS_A');
   const [searchQuery, setSearchQuery] = useState('');
@@ -208,9 +227,22 @@ export const DocumentVaultView: React.FC = () => {
     });
   };
 
-  // Sync states to localStorage
+  // Sync states to localStorage — strip fileDataUrl to avoid QuotaExceededError
   React.useEffect(() => {
-    localStorage.setItem('bidocs_vault_items', JSON.stringify(vaultItems));
+    try {
+      const itemsForStorage = vaultItems.map(item => {
+        const { fileDataUrl, previousVersions, ...rest } = item;
+        // Strip fileDataUrl from previous versions too
+        const cleanVersions = (previousVersions || []).map(v => {
+          const { fileDataUrl: _fd, ...vRest } = v;
+          return vRest;
+        });
+        return { ...rest, previousVersions: cleanVersions };
+      });
+      localStorage.setItem('bidocs_vault_items', JSON.stringify(itemsForStorage));
+    } catch (e) {
+      console.error('Failed to persist vault items to localStorage:', e);
+    }
   }, [vaultItems]);
 
   React.useEffect(() => {
@@ -302,6 +334,7 @@ export const DocumentVaultView: React.FC = () => {
       previousVersions: []
     };
 
+    storePdfData(newVaultDoc.id, fileDataUrl);
     setVaultItems(prev => [newVaultDoc, ...prev.filter(item => item.documentCode !== fillingTemplateItem.code)]);
     setFillingTemplateItem(null);
     notifySuccess(`[${docTitle}, v1.0] Template Save Successful!`, 'Legal template saved into Document Vault as an active technical exhibit.');
@@ -420,6 +453,7 @@ export const DocumentVaultView: React.FC = () => {
       previousVersions: []
     };
 
+    storePdfData(newItem.id, fileDataUrl);
     setVaultItems(prev => [newItem, ...prev.filter(item => item.documentCode !== uploadTargetDef.code)]);
     setUploadTargetDef(null);
     resetFormState();
@@ -478,6 +512,7 @@ export const DocumentVaultView: React.FC = () => {
       previousVersions: []
     };
 
+    storePdfData(newItem.id, fileDataUrl);
     setVaultItems(prev => [newItem, ...prev]);
     setShowCustomUploadModal(false);
     resetFormState();
@@ -535,6 +570,7 @@ export const DocumentVaultView: React.FC = () => {
       previousVersions: [archivedVersion, ...(replaceTargetItem.previousVersions || [])]
     };
 
+    storePdfData(updatedItem.id, fileDataUrl || replaceTargetItem.fileDataUrl);
     setVaultItems(prev => prev.map(item => item.id === replaceTargetItem.id ? updatedItem : item));
     setReplaceTargetItem(null);
     resetFormState();
@@ -1392,6 +1428,7 @@ export const DocumentVaultView: React.FC = () => {
           item={previewPdfItem}
           tenant={currentTenant}
           onClose={() => setPreviewPdfItem(null)}
+          pdfDataUrl={getPdfData(previewPdfItem.id)}
         />
       )}
 

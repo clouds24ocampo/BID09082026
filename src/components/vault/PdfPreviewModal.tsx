@@ -7,17 +7,21 @@ interface PdfPreviewModalProps {
   item: DocumentVaultItem;
   tenant: Tenant | null;
   onClose: () => void;
+  pdfDataUrl?: string; // In-memory PDF data URL (takes priority over item.fileDataUrl)
 }
 
-export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, onClose }) => {
+export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, onClose, pdfDataUrl }) => {
   const [zoomLevel, setZoomLevel] = useState(100);
 
+  // Use the in-memory pdfDataUrl first, then fall back to the item's stored value
+  const effectiveDataUrl = pdfDataUrl || item.fileDataUrl;
+
   const pdfBlobUrl = useMemo(() => {
-    if (!item.fileDataUrl) return null;
-    if (item.fileDataUrl.startsWith('data:image/')) return null;
-    if (item.fileDataUrl.startsWith('blob:')) return item.fileDataUrl;
+    if (!effectiveDataUrl) return null;
+    if (effectiveDataUrl.startsWith('data:image/')) return null;
+    if (effectiveDataUrl.startsWith('blob:')) return effectiveDataUrl;
     try {
-      const arr = item.fileDataUrl.split(',');
+      const arr = effectiveDataUrl.split(',');
       const mimeMatch = arr[0].match(/:(.*?);/);
       const mime = mimeMatch ? mimeMatch[1] : 'application/pdf';
       const bstr = atob(arr[1]);
@@ -29,11 +33,11 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
       const blob = new Blob([u8arr], { type: mime });
       return URL.createObjectURL(blob);
     } catch (e) {
-      return item.fileDataUrl;
+      return effectiveDataUrl;
     }
-  }, [item.fileDataUrl]);
+  }, [effectiveDataUrl]);
 
-  const isImage = item.fileDataUrl?.startsWith('data:image/');
+  const isImage = effectiveDataUrl?.startsWith('data:image/');
 
   const handlePrint = () => {
     if (pdfBlobUrl) {
@@ -54,7 +58,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
 
     const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
 
-    await generateAndDownloadThreeLayerPdf(null, templateElem, item.fileDataUrl, fileName);
+    await generateAndDownloadThreeLayerPdf(null, templateElem, effectiveDataUrl, fileName);
   };
 
   return (
@@ -150,11 +154,11 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
                 <span>ORIGINAL UPLOADED DOCUMENT CONTENT (Legal 8.5" × 13" Fit-to-Page)</span>
               </div>
 
-              {item.fileDataUrl ? (
+              {effectiveDataUrl ? (
                 isImage ? (
                   <div className="w-full max-w-[850px] mx-auto rounded-2xl overflow-hidden border-2 border-slate-800 bg-white shadow-2xl p-3">
                     <img
-                      src={item.fileDataUrl}
+                      src={effectiveDataUrl}
                       alt={item.documentName}
                       className="w-full h-auto object-contain rounded-xl mx-auto"
                     />
@@ -162,7 +166,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
                 ) : (
                   <div className="w-full min-h-[850px] h-[85vh] rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-900 shadow-2xl mx-auto p-1">
                     <iframe
-                      src={pdfBlobUrl || item.fileDataUrl}
+                      src={pdfBlobUrl || effectiveDataUrl}
                       title={item.documentName}
                       className="w-full h-full border-none rounded-xl bg-slate-900"
                     />

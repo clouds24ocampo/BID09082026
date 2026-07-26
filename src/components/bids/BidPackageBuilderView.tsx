@@ -2,18 +2,18 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { ChecklistRequirement, LegalRegime } from '../../types';
 import { DocumentCoverPage } from '../vault/DocumentCoverPage';
-import { 
-  FolderKanban, 
-  FileCheck, 
-  CheckCircle2, 
-  AlertCircle, 
-  ShieldCheck, 
-  Download, 
-  FileText, 
-  ExternalLink, 
-  Clock, 
-  ChevronRight, 
-  Building2, 
+import {
+  FolderKanban,
+  FileCheck,
+  CheckCircle2,
+  AlertCircle,
+  ShieldCheck,
+  Download,
+  FileText,
+  ExternalLink,
+  Clock,
+  ChevronRight,
+  Building2,
   Sparkles,
   Send
 } from 'lucide-react';
@@ -134,7 +134,7 @@ export const BidPackageBuilderView: React.FC = () => {
         localStorage.setItem('bidocs_vault_items', JSON.stringify(updatedDocs));
 
         setChecklist(prev => prev.map(item => {
-          const matchingDoc = docs.find((d: any) => 
+          const matchingDoc = docs.find((d: any) =>
             d.documentName.toLowerCase().includes(item.requirementName.toLowerCase().split(' ')[0]) ||
             (d.category.toLowerCase().includes('eligibility') && item.requirementCode === 'PHILGEPS_PLATINUM')
           );
@@ -164,14 +164,14 @@ export const BidPackageBuilderView: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <span 
-              className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }} 
+            <span
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
             />
             <h1 className="text-2xl font-bold text-white">Universal Bid Package Builder</h1>
           </div>
@@ -225,14 +225,13 @@ export const BidPackageBuilderView: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
           <button
             onClick={() => setActiveEnvelope('ENVELOPE_1')}
-            className={`p-3 rounded-xl text-left border transition ${
-              activeEnvelope === 'ENVELOPE_1'
-                ? 'border-blue-500 bg-blue-600/10 text-white'
-                : 'border-slate-800 bg-slate-900/60 text-slate-400'
-            }`}
+            className={`p-3 rounded-xl text-left border transition ${activeEnvelope === 'ENVELOPE_1'
+              ? 'border-blue-500 bg-blue-600/10 text-white'
+              : 'border-slate-800 bg-slate-900/60 text-slate-400'
+              }`}
           >
             <div className="flex items-center justify-between text-xs font-bold">
-              <span>Envelope 1: Technical & Eligibility</span>
+              <span>Envelope 1: Eligibility & Technical Documents</span>
               <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300">
                 6 Items
               </span>
@@ -242,11 +241,10 @@ export const BidPackageBuilderView: React.FC = () => {
 
           <button
             onClick={() => setActiveEnvelope('ENVELOPE_2')}
-            className={`p-3 rounded-xl text-left border transition ${
-              activeEnvelope === 'ENVELOPE_2'
-                ? 'border-emerald-500 bg-emerald-600/10 text-white'
-                : 'border-slate-800 bg-slate-900/60 text-slate-400'
-            }`}
+            className={`p-3 rounded-xl text-left border transition ${activeEnvelope === 'ENVELOPE_2'
+              ? 'border-emerald-500 bg-emerald-600/10 text-white'
+              : 'border-slate-800 bg-slate-900/60 text-slate-400'
+              }`}
           >
             <div className="flex items-center justify-between text-xs font-bold">
               <span>Envelope 2: Financial Envelope</span>
@@ -271,7 +269,7 @@ export const BidPackageBuilderView: React.FC = () => {
 
         <div className="space-y-3">
           {(activeEnvelope === 'ENVELOPE_1' ? envelope1Items : envelope2Items).map((item) => (
-            <div 
+            <div
               key={item.id}
               onClick={() => toggleChecklistStatus(item.id)}
               className="p-4 rounded-xl glass-card border border-slate-800 hover:border-slate-700 transition cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
