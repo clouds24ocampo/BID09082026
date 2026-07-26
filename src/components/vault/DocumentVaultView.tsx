@@ -194,6 +194,16 @@ export const DocumentVaultView: React.FC = () => {
     setCustomDocName('');
   };
 
+  const calculateDaysRemaining = (expiryDateStr?: string) => {
+    if (!expiryDateStr) return null;
+    const expDate = new Date(expiryDateStr);
+    const today = new Date();
+    expDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    const diffTime = expDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
   const handleResetClassAVault = () => {
     if (confirm('Are you sure you want to remove all uploaded Class A Eligibility documents and start fresh from scratch? PhilGEPS and all document slots will be reset to v1.0.')) {
       setVaultItems([]);
@@ -605,6 +615,9 @@ export const DocumentVaultView: React.FC = () => {
                   {CLASS_A_MASTER_LIST.map((def, idx) => {
                     const uploadedItem = vaultItems.find(item => item.documentCode === def.code);
                     const isUploaded = !!uploadedItem;
+                    const daysRem = isUploaded ? calculateDaysRemaining(uploadedItem?.expiryDate) : null;
+                    const isSoonExpiring = daysRem !== null && daysRem <= 30 && daysRem >= 0;
+                    const isExp = daysRem !== null && daysRem < 0;
 
                     return (
                       <tr 
@@ -657,13 +670,13 @@ export const DocumentVaultView: React.FC = () => {
                         <td className="py-3.5 px-4">
                           {isUploaded ? (
                             <div className="space-y-1">
-                              {uploadedItem.status === 'EXPIRING_SOON' ? (
-                                <span className="badge-warning text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
-                                  <AlertTriangle className="w-3 h-3 text-amber-400" /> Expiring Soon (v{uploadedItem.versionNumber}.0)
+                              {isSoonExpiring || uploadedItem.status === 'EXPIRING_SOON' ? (
+                                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 animate-pulse">
+                                  <AlertTriangle className="w-3 h-3 text-amber-400" /> Expiring in {daysRem ?? 30} Days (30-Day Notice)
                                 </span>
-                              ) : uploadedItem.status === 'EXPIRED' ? (
-                                <span className="badge-danger text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1">
-                                  <AlertTriangle className="w-3 h-3 text-red-400" /> Expired — Action Required
+                              ) : isExp || uploadedItem.status === 'EXPIRED' ? (
+                                <span className="bg-red-500/20 text-red-300 border border-red-500/40 text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 animate-pulse">
+                                  <AlertTriangle className="w-3 h-3 text-red-400" /> EXPIRED ({daysRem ? Math.abs(daysRem) : 0} Days Ago) — Action Required
                                 </span>
                               ) : (
                                 <span className="badge-success text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
@@ -704,13 +717,14 @@ export const DocumentVaultView: React.FC = () => {
                                     resetFormState();
                                   }}
                                   className={`px-3 py-1.5 rounded-lg transition font-bold text-[11px] flex items-center gap-1.5 border shadow ${
-                                    uploadedItem.status === 'EXPIRING_SOON' || uploadedItem.status === 'EXPIRED'
+                                    isSoonExpiring || isExp || uploadedItem.status === 'EXPIRING_SOON' || uploadedItem.status === 'EXPIRED'
                                       ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-400 animate-pulse'
                                       : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border-emerald-500/30'
                                   }`}
+                                  title="Click to replace document at any time or update expiring document"
                                 >
-                                  <Upload className="w-3.5 h-3.5" />
-                                  <span>{uploadedItem.status === 'EXPIRING_SOON' || uploadedItem.status === 'EXPIRED' ? 'Upload Replacement' : 'Replace PDF'}</span>
+                                  <RefreshCw className="w-3.5 h-3.5" />
+                                  <span>{isSoonExpiring || isExp ? 'Upload Replacement (30-Day Notice)' : 'Replace PDF'}</span>
                                 </button>
                               </>
                             ) : (
