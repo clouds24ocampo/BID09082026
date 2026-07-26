@@ -1,6 +1,7 @@
 import React from 'react';
 import { DocumentVaultItem, Tenant } from '../../types';
 import { ShieldCheck, Building2, FileText, QrCode, Award, Mail, Phone, MapPin } from 'lucide-react';
+import DocumentQrCode from '../common/DocumentQrCode';
 
 interface DocumentCoverPageProps {
   item: DocumentVaultItem;
@@ -175,10 +176,20 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({ item, tena
       <div className="border-t-2 border-slate-950 pt-4 space-y-3">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
           
-          {/* Scannable QR Code */}
-          <div className="flex items-center">
-            {generateScannableQrSvg(qrPayload)}
-          </div>
+          {/* Scannable Smartphone QR Code */}
+          <DocumentQrCode
+            details={{
+              companyName: tenant?.companyName || 'Bidding Entity Corporate Name',
+              documentName: item.documentName,
+              documentNumber: item.documentNumber || item.id || 'SEC-REG-2026-901283',
+              projectTitle: item.projectTitle || 'Infrastructure & IT Systems Modernization Project',
+              projectRefNo: item.philgepsRefNo || 'PRJ-2026-901283',
+              procuringEntity: 'Department of Information & Communications Technology',
+              dateTimeSubmitted: new Date().toLocaleString()
+            }}
+            size={120}
+            className="shrink-0"
+          />
 
           {/* DIGITAL VERIFICATION SEAL */}
           <div className="text-right shrink-0 space-y-1.5 border-l-2 border-slate-300 pl-5">
@@ -195,7 +206,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({ item, tena
         </div>
 
         <div className="text-center pt-2 border-t border-slate-200 text-[10px] font-mono text-slate-500 font-bold">
-          BIDOCS AES-256 Verified Standard • Legal (8.5" × 13") Paper Standard
+          BIDOCS AES-256 Verified Official Bidding Document Seal
         </div>
       </div>
 

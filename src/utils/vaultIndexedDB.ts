@@ -37,16 +37,26 @@ function openDB(): Promise<IDBDatabase> {
 
 // ─── Vault Item Metadata ────────────────────────────────────────────────
 
-/** Save all vault items (metadata only, no fileDataUrl) */
-export async function saveVaultItems(items: any[]): Promise<void> {
+/** Save vault items for a specific tenant or all items (metadata only, no fileDataUrl) */
+export async function saveVaultItems(items: any[], tenantId?: string): Promise<void> {
   const db = await openDB();
   const tx = db.transaction(STORE_VAULT_ITEMS, 'readwrite');
   const store = tx.objectStore(STORE_VAULT_ITEMS);
 
-  // Clear old entries and write fresh
+  // If tenantId is specified, preserve items belonging to OTHER tenants
+  let finalItemsToWrite = items;
+  if (tenantId) {
+    const getAllReq = store.getAll();
+    await new Promise((resolve) => { getAllReq.onsuccess = resolve; });
+    const existing: any[] = getAllReq.result || [];
+    const otherTenantsItems = existing.filter(item => item.tenantId && item.tenantId !== tenantId);
+    finalItemsToWrite = [...otherTenantsItems, ...items];
+  }
+
+  // Clear old entries and write fresh combined set
   store.clear();
 
-  for (const item of items) {
+  for (const item of finalItemsToWrite) {
     // Strip fileDataUrl from item and previous versions before storing metadata
     const { fileDataUrl, previousVersions, ...rest } = item;
     const cleanVersions = (previousVersions || []).map((v: any) => {
@@ -62,15 +72,23 @@ export async function saveVaultItems(items: any[]): Promise<void> {
   });
 }
 
-/** Load all vault items (metadata only) */
-export async function loadVaultItems(): Promise<any[]> {
+/** Load vault items (metadata only), optionally filtered by tenantId */
+export async function loadVaultItems(tenantId?: string): Promise<any[]> {
   const db = await openDB();
   const tx = db.transaction(STORE_VAULT_ITEMS, 'readonly');
   const store = tx.objectStore(STORE_VAULT_ITEMS);
   const request = store.getAll();
 
   return new Promise((resolve, reject) => {
-    request.onsuccess = () => { db.close(); resolve(request.result || []); };
+    request.onsuccess = () => {
+      db.close();
+      const allItems: any[] = request.result || [];
+      if (tenantId) {
+        resolve(allItems.filter(item => item.tenantId === tenantId));
+      } else {
+        resolve(allItems);
+      }
+    };
     request.onerror = () => { db.close(); reject(request.error); };
   });
 }
@@ -129,7 +147,7 @@ export async function clearAllPdfData(): Promise<void> {
   });
 }
 
-/** Clear ALL vault data (items + PDFs) */
+/** Clear ALL vault data (items + PDFs) — USE WITH CAUTION: destroys all tenants */
 export async function clearAllVaultData(): Promise<void> {
   const db = await openDB();
   const tx = db.transaction([STORE_VAULT_ITEMS, STORE_PDF_BLOBS], 'readwrite');
@@ -139,6 +157,40 @@ export async function clearAllVaultData(): Promise<void> {
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => { db.close(); resolve(); };
     tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+
+/** Clear vault data for a SPECIFIC tenant only (items + associated PDFs). Other tenants' data is preserved. */
+export async function clearVaultDataForTenant(tenantId: string): Promise<void> {
+  const db = await openDB();
+
+  // 1. Read all items, identify which belong to this tenant
+  const readTx = db.transaction(STORE_VAULT_ITEMS, 'readonly');
+  const readStore = readTx.objectStore(STORE_VAULT_ITEMS);
+  const getAllReq = readStore.getAll();
+
+  const tenantItemIds: string[] = await new Promise((resolve, reject) => {
+    getAllReq.onsuccess = () => {
+      const allItems: any[] = getAllReq.result || [];
+      const ids = allItems.filter(item => item.tenantId === tenantId).map(item => item.id);
+      resolve(ids);
+    };
+    getAllReq.onerror = () => reject(getAllReq.error);
+  });
+
+  // 2. Delete tenant's items and their associated PDF blobs
+  const writeTx = db.transaction([STORE_VAULT_ITEMS, STORE_PDF_BLOBS], 'readwrite');
+  const itemStore = writeTx.objectStore(STORE_VAULT_ITEMS);
+  const blobStore = writeTx.objectStore(STORE_PDF_BLOBS);
+
+  for (const id of tenantItemIds) {
+    itemStore.delete(id);
+    blobStore.delete(id);
+  }
+
+  return new Promise((resolve, reject) => {
+    writeTx.oncomplete = () => { db.close(); resolve(); };
+    writeTx.onerror = () => { db.close(); reject(writeTx.error); };
   });
 }
 

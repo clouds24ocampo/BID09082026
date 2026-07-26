@@ -104,8 +104,10 @@ const DEFAULT_CHECKLIST: ChecklistRequirement[] = [
 
 export const BidPackageBuilderView: React.FC = () => {
   const { currentTenant } = useAuth();
+  const tenantId = currentTenant?.id || '';
+
   const [checklist, setChecklist] = useState<ChecklistRequirement[]>(() => {
-    const saved = localStorage.getItem('bidocs_checklist');
+    const saved = localStorage.getItem(`bidocs_checklist_${tenantId}`);
     return saved ? JSON.parse(saved) : DEFAULT_CHECKLIST;
   });
   const [activeEnvelope, setActiveEnvelope] = useState<'ENVELOPE_1' | 'ENVELOPE_2'>('ENVELOPE_1');
@@ -127,12 +129,18 @@ export const BidPackageBuilderView: React.FC = () => {
 
   // Sync checklist to localStorage
   React.useEffect(() => {
-    localStorage.setItem('bidocs_checklist', JSON.stringify(checklist));
-  }, [checklist]);
+    localStorage.setItem(`bidocs_checklist_${tenantId}`, JSON.stringify(checklist));
+  }, [checklist, tenantId]);
+
+  // Sync state on tenant switch
+  React.useEffect(() => {
+    const saved = localStorage.getItem(`bidocs_checklist_${tenantId}`);
+    setChecklist(saved ? JSON.parse(saved) : DEFAULT_CHECKLIST);
+  }, [tenantId]);
 
   // Load vault documents from IndexedDB for organizing, previewing, and auto-verifying checklist
   React.useEffect(() => {
-    loadVaultItems().then(async (docs) => {
+    loadVaultItems(tenantId).then(async (docs) => {
       if (Array.isArray(docs) && docs.length > 0) {
         setVaultDocs(docs);
         for (const d of docs) {
@@ -152,9 +160,11 @@ export const BidPackageBuilderView: React.FC = () => {
           }
           return item;
         }));
+      } else {
+        setVaultDocs([]);
       }
     }).catch(e => console.error('[BidPackage] Failed to load vault items:', e));
-  }, []);
+  }, [tenantId]);
 
   const envelope1Items = checklist.filter(c => c.envelope === 'ENVELOPE_1_ELIGIBILITY_TECHNICAL');
   const envelope2Items = checklist.filter(c => c.envelope === 'ENVELOPE_2_FINANCIAL');
@@ -456,7 +466,7 @@ export const BidPackageBuilderView: React.FC = () => {
                 <DocumentCoverPage
                   item={{
                     id: 'bid-pkg-cover',
-                    tenantId: currentTenant?.id || 'tenant-001',
+                    tenantId: tenantId,
                     documentName: 'ENVELOPE 1: TECHNICAL & ELIGIBILITY SUBMISSION PACKAGE',
                     documentNumber: 'PhilGEPS-2026-10928371',
                     category: 'ELIGIBILITY_CLASS_A',

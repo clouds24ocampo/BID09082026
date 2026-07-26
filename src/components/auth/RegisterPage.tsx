@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { LegalRegime, ProcurementType, UserRole } from '../../types';
-import { 
-  Building2, 
-  User as UserIcon, 
-  Mail, 
-  Lock, 
-  Palette, 
-  ShieldCheck, 
-  FileText, 
-  ArrowRight, 
-  ArrowLeft, 
-  Check, 
-  CheckCircle2, 
-  Award, 
-  Briefcase 
+import {
+  Building2,
+  User as UserIcon,
+  Mail,
+  Lock,
+  Palette,
+  ShieldCheck,
+  FileText,
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  CheckCircle2,
+  Award,
+  Briefcase
 } from 'lucide-react';
 
 interface RegisterPageProps {
@@ -105,8 +105,8 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
           secDtiRegNo,
           pcabLicenseNo,
           pcabCategory,
-          philgepsPlatinumNo: philgepsPlatinumNo || '202601-000000-P',
-          address: address || 'Metro Manila, Philippines',
+          philgepsPlatinumNo: philgepsPlatinumNo || '',
+          address: address || '',
           authorizedSignatory: {
             name: signatoryName,
             title: signatoryTitle,
@@ -118,7 +118,8 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
         {
           email,
           fullName,
-          role
+          role,
+          password: password || undefined
         }
       );
       setIsSubmitting(false);
@@ -131,14 +132,14 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
   return (
     <div className="min-h-screen bg-[#070a12] text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
       {/* Dynamic Background Glow */}
-      <div 
+      <div
         className="absolute -top-40 -right-40 w-96 h-96 rounded-full blur-[140px] opacity-20 pointer-events-none transition-colors duration-500"
         style={{ backgroundColor: brandColor }}
       />
       <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-600/10 rounded-full blur-[140px] pointer-events-none" />
 
       <div className="w-full max-w-4xl glass-panel p-6 sm:p-8 rounded-2xl shadow-2xl border border-slate-800 relative z-10 space-y-6">
-        
+
         {/* Registration Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
           <div>
@@ -155,13 +156,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
             {[1, 2, 3, 4].map((step) => (
               <div
                 key={step}
-                className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-semibold transition ${
-                  currentStep === step
-                    ? 'text-white shadow-lg ring-2 ring-white/20'
-                    : currentStep > step
+                className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-semibold transition ${currentStep === step
+                  ? 'text-white shadow-lg ring-2 ring-white/20'
+                  : currentStep > step
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
                     : 'bg-slate-900 text-slate-500 border border-slate-800'
-                }`}
+                  }`}
                 style={{ backgroundColor: currentStep === step ? brandColor : undefined }}
               >
                 {currentStep > step ? <Check className="w-4 h-4" /> : step}
@@ -178,7 +178,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
 
         {/* Wizard Form Content */}
         <form onSubmit={handleCompleteRegistration} className="space-y-6">
-          
+
           {/* STEP 1: Account Credentials */}
           {currentStep === 1 && (
             <div className="space-y-4 animate-fadeIn">
@@ -233,8 +233,11 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
                     onChange={(e) => setRole(e.target.value as UserRole)}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
                   >
-                    <option value="COMPANY_OWNER">Company Owner / Managing Director</option>
-                    <option value="BID_MANAGER">Bid Manager / Proposal Team Lead</option>
+                    <option value="COMPANY_OWNER">Company Owner & Authorized Managing Officer</option>
+                    <option value="BID_MANAGER">Bid Manager</option>
+                    <option value="Proposal_Team_Lead">Proposal Team Lead</option>
+                    <option value="ADMIN">Administrator</option>
+                    <option value="COMPANY_AMO">Authorized Managing Officer</option>
                   </select>
                 </div>
               </div>
@@ -367,11 +370,10 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
                       key={c.hex}
                       type="button"
                       onClick={() => setBrandColor(c.hex)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border transition ${
-                        brandColor === c.hex
-                          ? 'border-white bg-slate-800 text-white shadow'
-                          : 'border-slate-700 text-slate-400 hover:text-slate-200'
-                      }`}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border transition ${brandColor === c.hex
+                        ? 'border-white bg-slate-800 text-white shadow'
+                        : 'border-slate-700 text-slate-400 hover:text-slate-200'
+                        }`}
                     >
                       <span className="w-4 h-4 rounded-full shadow" style={{ backgroundColor: c.hex }} />
                       <span>{c.name}</span>
@@ -392,13 +394,13 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
                 {/* Live Button & Badge Preview */}
                 <div className="pt-3 border-t border-slate-800 flex items-center gap-4 text-xs">
                   <span className="text-slate-400">Brand UI Preview:</span>
-                  <div 
+                  <div
                     className="px-3 py-1.5 rounded-lg text-white font-medium text-xs shadow flex items-center gap-1"
                     style={{ backgroundColor: brandColor }}
                   >
                     <span>Primary Action Button</span>
                   </div>
-                  <div 
+                  <div
                     className="px-2.5 py-1 rounded-md text-xs font-mono font-semibold"
                     style={{ backgroundColor: `${brandColor}25`, color: brandColor, border: `1px solid ${brandColor}40` }}
                   >
@@ -466,11 +468,10 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
                       key={p.id}
                       type="button"
                       onClick={() => setPrimaryProcurementType(p.id as ProcurementType)}
-                      className={`p-3 text-left rounded-xl border transition ${
-                        primaryProcurementType === p.id
-                          ? 'border-blue-500 bg-blue-600/10 text-white'
-                          : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:text-slate-200'
-                      }`}
+                      className={`p-3 text-left rounded-xl border transition ${primaryProcurementType === p.id
+                        ? 'border-blue-500 bg-blue-600/10 text-white'
+                        : 'border-slate-800 bg-slate-900/60 text-slate-400 hover:text-slate-200'
+                        }`}
                     >
                       <p className="text-xs font-semibold text-white">{p.title}</p>
                       <p className="text-[11px] text-slate-400 mt-1">{p.desc}</p>
@@ -488,11 +489,10 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
                   <button
                     type="button"
                     onClick={() => setPreferredRegime('RA_12009_NGPA')}
-                    className={`p-3 text-left rounded-xl border transition ${
-                      preferredRegime === 'RA_12009_NGPA'
-                        ? 'border-emerald-500 bg-emerald-600/10 text-white'
-                        : 'border-slate-800 bg-slate-900/60 text-slate-400'
-                    }`}
+                    className={`p-3 text-left rounded-xl border transition ${preferredRegime === 'RA_12009_NGPA'
+                      ? 'border-emerald-500 bg-emerald-600/10 text-white'
+                      : 'border-slate-800 bg-slate-900/60 text-slate-400'
+                      }`}
                   >
                     <div className="flex items-center justify-between text-xs font-semibold text-emerald-400">
                       <span>RA 12009 (NGPA - New Procurement Act)</span>
@@ -506,11 +506,10 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
                   <button
                     type="button"
                     onClick={() => setPreferredRegime('RA_9184')}
-                    className={`p-3 text-left rounded-xl border transition ${
-                      preferredRegime === 'RA_9184'
-                        ? 'border-blue-500 bg-blue-600/10 text-white'
-                        : 'border-slate-800 bg-slate-900/60 text-slate-400'
-                    }`}
+                    className={`p-3 text-left rounded-xl border transition ${preferredRegime === 'RA_9184'
+                      ? 'border-blue-500 bg-blue-600/10 text-white'
+                      : 'border-slate-800 bg-slate-900/60 text-slate-400'
+                      }`}
                   >
                     <div className="flex items-center justify-between text-xs font-semibold text-blue-400">
                       <span>RA 9184 (2016 IRR Legacy)</span>

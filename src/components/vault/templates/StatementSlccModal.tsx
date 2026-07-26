@@ -3,6 +3,7 @@ import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
 import { PDFDocument } from 'pdf-lib';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
+import DocumentQrCode from '../../common/DocumentQrCode';
 import html2canvas from 'html2canvas';
 import {
   X,
@@ -53,7 +54,7 @@ interface StatementSlccModalProps {
   activeProjectRefNo?: string;
   activeProjectTitle?: string;
   activeProcuringEntity?: string;
-  onSaveAndComplete: (fileDataUrl?: string, customName?: string) => void;
+  onSaveAndComplete: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string) => void;
   onClose: () => void;
 }
 
@@ -88,6 +89,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
   onClose
 }) => {
   const [isNoSlcc, setIsNoSlcc] = useState(false);
+  const [isNoPrivateSlcc, setIsNoPrivateSlcc] = useState(false);
   const todayStr = new Date().toISOString().split('T')[0];
   const [dateTimeSubmitted, setDateTimeSubmitted] = useState<string>(getNowDateTimeString());
 
@@ -102,7 +104,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
   useEffect(() => {
-    const list = getOpportunityProjects();
+    const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
     if (list.length > 0 && !selectedOppId) {
       const first = list[0];
@@ -114,14 +116,51 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
       if (first.dateTimeSubmitted) {
         setDateTimeSubmitted(first.dateTimeSubmitted);
       }
+    } else if (list.length === 0) {
+      setSelectedOppId('');
+      setProjectRefNo('');
+      setSolicitationNumber('');
+      setProjectTitle('');
+      setProcuringEntity('');
     }
-  }, []);
+  }, [tenant?.id]);
 
   // Form Editor Modal state for editing or creating an SLCC contract row
   const [editingRow, setEditingRow] = useState<SlccContractRow | null>(null);
 
-  // CLEAN SLATE: Initial state has zero dummy contracts
+  // CLEAN SLATE: Initial state has zero dummy contracts (Project-scoped)
   const [contracts, setContracts] = useState<SlccContractRow[]>([]);
+
+  // STRICT PROJECT ISOLATION: Load contracts strictly scoped to current projectRefNo & tenantId
+  useEffect(() => {
+    if (!projectRefNo || !tenant?.id) {
+      setContracts([]);
+      return;
+    }
+    const storageKey = `bidocs_slcc_${tenant.id}_${projectRefNo}`;
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setContracts(parsed);
+          return;
+        }
+      } catch (e) {}
+    }
+    setContracts([]);
+  }, [tenant?.id, projectRefNo]);
+
+  const updateAndSaveContracts = (updater: (prev: SlccContractRow[]) => SlccContractRow[]) => {
+    setContracts(prev => {
+      const nextContracts = updater(prev);
+      if (projectRefNo && tenant?.id) {
+        const storageKey = `bidocs_slcc_${tenant.id}_${projectRefNo}`;
+        localStorage.setItem(storageKey, JSON.stringify(nextContracts));
+      }
+      return nextContracts;
+    });
+  };
 
   const openFormEditor = (existingRow?: SlccContractRow, defaultType: 'Government' | 'Private' = 'Government') => {
     if (existingRow) {
@@ -158,7 +197,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
       amountCompletion: editingRow.amountCompletion ? formatPhpCurrency(editingRow.amountCompletion) : '₱0.00'
     };
 
-    setContracts(prev => {
+    updateAndSaveContracts(prev => {
       const idx = prev.findIndex(c => c.id === formattedRow.id);
       if (idx >= 0) {
         const copy = [...prev];
@@ -172,7 +211,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
   };
 
   const removeRow = (id: string) => {
-    setContracts(prev => prev.filter(c => c.id !== id));
+    updateAndSaveContracts(prev => prev.filter(c => c.id !== id));
   };
 
   const handleRowPdfUpload = (id: string, file: File | undefined) => {
@@ -302,16 +341,47 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
   const handleSaveDraft = async () => {
     try {
       const mergedDataUrl = await generateMergedPackageDataUrl();
-      onSaveAndComplete(mergedDataUrl, 'Statement of Single Largest Completed Contract (SLCC)');
+      onSaveAndComplete(
+        mergedDataUrl,
+        'Statement of Single Largest Completed Contract (SLCC)',
+        projectRefNo,
+        projectTitle
+      );
     } catch (e) {
-      onSaveAndComplete(undefined, 'Statement of Single Largest Completed Contract (SLCC)');
+      onSaveAndComplete(
+        undefined,
+        'Statement of Single Largest Completed Contract (SLCC)',
+        projectRefNo,
+        projectTitle
+      );
     }
   };
 
   const govContracts = contracts.filter(c => c.type === 'Government');
   const privContracts = contracts.filter(c => c.type === 'Private');
 
-  // Format date-time for 100% accurate display (e.g. "2026-08-30T14:00" -> "2026-08-30 02:00 PM")
+  // Format date for display (e.g. "2026-08-30T14:00" -> "August 30, 2026" - DATE ONLY)
+  const formatDateDisplay = (dtStr: string) => {
+    if (!dtStr) return 'N/A';
+    const cleanDate = dtStr.split('T')[0];
+    if (!cleanDate) return 'N/A';
+    try {
+      const parts = cleanDate.split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        const d = new Date(year, month, day);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        }
+      }
+    } catch (e) {
+      // fallback
+    }
+    return cleanDate;
+  };
+
   const formatDateTimeDisplay = (dtStr: string) => {
     if (!dtStr) return 'N/A';
     const parts = dtStr.split('T');
@@ -333,11 +403,11 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
 
-      {/* PORTRAIT PRINT STYLESHEET OVERRIDE */}
+      {/* LANDSCAPE PRINT STYLESHEET OVERRIDE */}
       <style>{`
         @media print {
           @page {
-            size: 8.5in 13in;
+            size: 13in 8.5in;
             margin: 0.4in;
           }
           header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .proof-column, .actions-column, .sticky {
@@ -383,9 +453,6 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <span>GPPB Legal Template — Item (c) Statement of Single Largest Completed Contract (SLCC)</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase">
-                  Legal (8.5" × 13") Portrait Standard
-                </span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5">
                 Statement of Single Largest Completed Contract similar to the contract to be bid within the last 5 years.
@@ -406,7 +473,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
               className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print Legal (8.5" × 13")</span>
+              <span>Print Legal Landscape</span>
             </button>
             <button onClick={onClose} className="p-2 text-slate-400 hover:text-white">
               <X className="w-5 h-5" />
@@ -525,7 +592,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
 
           {/* Action Toolbar: "No SLCC" Toggle & Add Contract Buttons */}
           <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden no-export">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => setIsNoSlcc(!isNoSlcc)}
@@ -538,11 +605,17 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                 <span>"No SLCC" Declaration</span>
               </button>
 
-              <p className="text-xs text-slate-400 font-mono">
-                {isNoSlcc
-                  ? 'One-click "No SLCC" active. Displays "NONE" across legal template tables & marks Item (c) Complete.'
-                  : 'Click to declare no completed contracts or click "Fill Out SLCC Contract Form" to add entry rows.'}
-              </p>
+              <button
+                type="button"
+                onClick={() => setIsNoPrivateSlcc(!isNoPrivateSlcc)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-extrabold font-mono transition flex items-center gap-2 shadow-lg ${isNoPrivateSlcc
+                  ? 'bg-purple-700 text-white border border-purple-400'
+                  : 'bg-slate-800 text-purple-300 hover:text-white border border-slate-700'
+                  }`}
+              >
+                {isNoPrivateSlcc ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                <span>"No Private SLCC" Declaration</span>
+              </button>
             </div>
 
             {!isNoSlcc && (
@@ -555,14 +628,16 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   <Plus className="w-4 h-4" />
                   <span>Fill Out Government SLCC Form</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => openFormEditor(undefined, 'Private')}
-                  className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 transition flex items-center gap-1.5 shadow-lg"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Fill Out Private SLCC Form</span>
-                </button>
+                {!isNoPrivateSlcc && (
+                  <button
+                    type="button"
+                    onClick={() => openFormEditor(undefined, 'Private')}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 transition flex items-center gap-1.5 shadow-lg"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Fill Out Private SLCC Form</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -634,87 +709,97 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   </div>
 
                   <div className="overflow-x-auto border border-slate-400 rounded-lg">
-                    <table className="w-full text-left text-[11px] border-collapse">
+                    <table className="w-full text-left text-[11px] border-collapse table-fixed">
                       <thead className="bg-slate-100 text-slate-950 font-mono text-[9px] uppercase border-b border-slate-400">
                         <tr>
-                          <th className="p-1.5 border-r border-slate-300 w-8 text-center">#</th>
-                          <th className="p-1.5 border-r border-slate-300 min-w-[160px]">Project Name & Owner</th>
-                          <th className="p-1.5 border-r border-slate-300 min-w-[130px]">Owner Address & Tel</th>
-                          <th className="p-1.5 border-r border-slate-300">Nature & Role</th>
-                          <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Value at Award & Completion</th>
-                          <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Dates & Duration</th>
-                          <th className="p-1.5 border-r border-slate-300 w-24 text-center">Accomplishment %</th>
-                          <th className="p-1.5 border-r border-slate-300 w-24 text-center proof-column">Proof PDF</th>
-                          <th className="p-1.5 text-right actions-column w-20">Contract Role</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[3%] text-center">#</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[22%]">Project Name & Owner</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[18%]">Owner Address & Tel</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[15%]">Nature of Work</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[16%]">
+                            <div className="font-bold">VALUE AT AWARD, COMPLETION & DURATION</div>
+                            <div className="text-[8px] font-normal text-slate-600">a. Award / b. Completion / c. Duration</div>
+                          </th>
+                          <th className="p-1.5 border-r border-slate-300 w-[13%]">
+                            <div className="font-bold">DATES</div>
+                            <div className="text-[8px] font-normal text-slate-600">a. Started / b. Awarded / c. Completion</div>
+                          </th>
+                          <th className="p-1.5 border-r border-slate-300 w-[8%] text-center">Accomplishment %</th>
+                          <th className="p-1.5 text-right actions-column w-[5%]">Contract Role</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-300 font-sans">
                         {isNoSlcc ? (
                           <tr>
-                            <td colSpan={9} className="p-4 text-center text-slate-950 font-mono font-bold uppercase tracking-wider bg-slate-50">
+                            <td colSpan={8} className="p-4 text-center text-slate-950 font-mono font-bold uppercase tracking-wider bg-slate-50">
                               NO COMPLETED GOVERNMENT CONTRACTS IN THE LAST 5 YEARS
                             </td>
                           </tr>
                         ) : govContracts.length === 0 ? (
                           <tr>
-                            <td colSpan={9} className="p-3 text-center text-slate-500 font-mono italic">
+                            <td colSpan={8} className="p-3 text-center text-slate-500 font-mono italic">
                               No Government SLCC contracts added. Click "Fill Out Government SLCC Form" above.
                             </td>
                           </tr>
                         ) : (
                           govContracts.map((row, idx) => (
                             <tr key={row.id} className="hover:bg-slate-50">
-                              <td className="p-1.5 border-r border-slate-300 font-mono font-bold text-center">{idx + 1}</td>
-                              <td className="p-1.5 border-r border-slate-300">
-                                <div className="font-bold text-slate-950 leading-tight">{row.projectName || 'Untitled Project'}</div>
-                                <div className="text-[10px] text-slate-600 font-medium mt-0.5">{row.ownerName}</div>
+                              <td className="p-1.5 border-r border-slate-300 font-mono font-bold text-center align-top">{idx + 1}</td>
+                              <td className="p-1.5 border-r border-slate-300 align-top break-words [overflow-wrap:anywhere]">
+                                <div className="font-bold text-slate-950 leading-tight break-words [overflow-wrap:anywhere]">{row.projectName || 'Untitled Project'}</div>
+                                <div className="text-[10px] text-slate-600 font-medium mt-0.5 break-words [overflow-wrap:anywhere]">{row.ownerName}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-[10px] text-slate-700">
-                                <div>{row.ownerAddress}</div>
-                                <div className="font-mono text-slate-500">{row.ownerTelephone}</div>
+                              <td className="p-1.5 border-r border-slate-300 text-[10px] text-slate-700 align-top break-words [overflow-wrap:anywhere]">
+                                <div className="leading-tight break-words [overflow-wrap:anywhere]">{row.ownerAddress}</div>
+                                <div className="font-mono text-slate-500 mt-0.5 leading-tight break-words [overflow-wrap:anywhere]">{row.ownerTelephone}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-[10px]">
-                                <div className="font-medium text-slate-900">{row.natureOfWork}</div>
-                                <div className="text-slate-500 italic">{row.bidderRole}</div>
+                              <td className="p-1.5 border-r border-slate-300 text-[10px] align-top break-words [overflow-wrap:anywhere]">
+                                <div className="font-medium text-slate-900 leading-tight break-words [overflow-wrap:anywhere]">{row.natureOfWork}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 font-mono text-[10px]">
-                                <div className="font-bold text-emerald-800">{row.amountAward || '₱0.00'}</div>
-                                <div className="text-slate-600">{row.amountCompletion || '₱0.00'}</div>
+                              <td className="p-1.5 border-r border-slate-300 font-mono text-[10px] space-y-0.5 align-top break-words [overflow-wrap:anywhere]">
+                                <div className="font-bold text-emerald-800 break-words">a. {row.amountAward || '₱0.00'}</div>
+                                <div className="text-slate-700 font-semibold break-words">b. {row.amountCompletion || '₱0.00'}</div>
+                                <div className="font-bold text-slate-900 bg-slate-100 px-1 py-0.5 rounded text-[9.5px] break-words">c. {row.duration || 'N/A'}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 font-mono">
-                                <div className="font-bold text-black text-[11px]" style={{ color: '#000000', fontWeight: 'bold' }}>{row.duration || 'N/A'}</div>
-                                <div className="text-[10px] font-bold text-black mt-0.5 leading-tight" style={{ color: '#000000' }}>
-                                  <span className="block font-bold" style={{ color: '#000000' }}>Award: {row.dateAwarded || 'N/A'}</span>
-                                  <span className="block font-bold" style={{ color: '#000000' }}>Comp: {row.dateCompletion || 'N/A'}</span>
-                                </div>
+                              <td className="p-1.5 border-r border-slate-300 font-mono text-[10px] space-y-0.5 align-top break-words [overflow-wrap:anywhere]">
+                                <div className="text-slate-800 font-medium break-words">a. {row.dateStarted || 'N/A'}</div>
+                                <div className="text-slate-900 font-semibold break-words">b. {row.dateAwarded || 'N/A'}</div>
+                                <div className="font-bold text-black break-words">c. {row.dateCompletion || 'N/A'}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[10px]">
+                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[10px] align-top">
                                 <div>Plan: <span className="font-semibold">{row.accomplishmentPlanned}%</span></div>
                                 <div>Act: <span className="font-bold text-blue-900">{row.accomplishmentActual}%</span></div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[9px] proof-column">
-                                {row.pdfFile ? (
-                                  <span className="text-emerald-950 font-bold block truncate max-w-[90px]" style={{ color: '#000000', fontWeight: 'bold' }} title={row.pdfFile.fileName}>
-                                    <Paperclip className="w-3 h-3 inline text-emerald-700 mr-0.5" />
-                                    {row.pdfFile.fileName}
-                                  </span>
-                                ) : (
-                                  <label className="px-1 py-0.5 rounded bg-slate-100 text-[9px] font-bold text-blue-900 border border-slate-300 cursor-pointer block print:hidden no-export-btn">
-                                    Attach PDF
-                                    <input type="file" accept=".pdf" onChange={(e) => handleRowPdfUpload(row.id, e.target.files?.[0])} className="hidden" />
-                                  </label>
-                                )}
-                              </td>
-                              <td className="p-1.5 text-right actions-column font-mono text-[9px]">
-                                <div className="flex items-center justify-end gap-1 print:hidden no-export-btn">
-                                  <button onClick={() => openFormEditor(row)} className="p-1 text-blue-900 hover:bg-blue-50 rounded" title="Edit Form">
+                              <td className="p-1.5 text-right actions-column font-mono text-[9.5px] align-top break-words [overflow-wrap:anywhere]">
+                                <div className="flex items-center justify-end gap-1 print:hidden no-export-btn mb-1">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openFormEditor(row);
+                                    }}
+                                    className="p-1 text-blue-900 hover:bg-blue-50 rounded"
+                                    title="Edit Form"
+                                  >
                                     <Edit3 className="w-3.5 h-3.5" />
                                   </button>
-                                  <button onClick={() => removeRow(row.id)} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Delete">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      removeRow(row.id);
+                                    }}
+                                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                    title="Delete"
+                                  >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
-                                <span className="font-bold text-black block" style={{ color: '#000000', fontWeight: 'bold' }}>{row.bidderRole || 'Contractor'}</span>
+                                <span className="font-bold text-black block leading-tight break-words [overflow-wrap:anywhere]" style={{ color: '#000000', fontWeight: 'bold' }}>
+                                  {row.bidderRole || 'Contractor'}
+                                </span>
                               </td>
                             </tr>
                           ))
@@ -745,87 +830,97 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   </div>
 
                   <div className="overflow-x-auto border border-slate-400 rounded-lg">
-                    <table className="w-full text-left text-[11px] border-collapse">
+                    <table className="w-full text-left text-[11px] border-collapse table-fixed">
                       <thead className="bg-slate-100 text-slate-950 font-mono text-[9px] uppercase border-b border-slate-400">
                         <tr>
-                          <th className="p-1.5 border-r border-slate-300 w-8 text-center">#</th>
-                          <th className="p-1.5 border-r border-slate-300 min-w-[160px]">Project Name & Owner</th>
-                          <th className="p-1.5 border-r border-slate-300 min-w-[130px]">Owner Address & Tel</th>
-                          <th className="p-1.5 border-r border-slate-300">Nature & Role</th>
-                          <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Value at Award & Completion</th>
-                          <th className="p-1.5 border-r border-slate-300 min-w-[110px]">Dates & Duration</th>
-                          <th className="p-1.5 border-r border-slate-300 w-24 text-center">Accomplishment %</th>
-                          <th className="p-1.5 border-r border-slate-300 w-24 text-center proof-column">Proof PDF</th>
-                          <th className="p-1.5 text-right actions-column w-20">Contract Role</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[3%] text-center">#</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[22%]">Project Name & Owner</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[18%]">Owner Address & Tel</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[15%]">Nature of Work</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[16%]">
+                            <div className="font-bold">VALUE AT AWARD, COMPLETION & DURATION</div>
+                            <div className="text-[8px] font-normal text-slate-600">a. Award / b. Completion / c. Duration</div>
+                          </th>
+                          <th className="p-1.5 border-r border-slate-300 w-[13%]">
+                            <div className="font-bold">DATES</div>
+                            <div className="text-[8px] font-normal text-slate-600">a. Started / b. Awarded / c. Completion</div>
+                          </th>
+                          <th className="p-1.5 border-r border-slate-300 w-[8%] text-center">Accomplishment %</th>
+                          <th className="p-1.5 text-right actions-column w-[5%]">Contract Role</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-300 font-sans">
-                        {isNoSlcc ? (
+                        {(isNoSlcc || isNoPrivateSlcc) ? (
                           <tr>
-                            <td colSpan={9} className="p-4 text-center text-slate-950 font-mono font-bold uppercase tracking-wider bg-slate-50">
+                            <td colSpan={8} className="p-4 text-center text-slate-950 font-mono font-bold uppercase tracking-wider bg-slate-50">
                               NO COMPLETED PRIVATE CONTRACTS IN THE LAST 5 YEARS
                             </td>
                           </tr>
                         ) : privContracts.length === 0 ? (
                           <tr>
-                            <td colSpan={9} className="p-3 text-center text-slate-500 font-mono italic">
+                            <td colSpan={8} className="p-3 text-center text-slate-500 font-mono italic">
                               No Private SLCC contracts added. Click "Fill Out Private SLCC Form" above.
                             </td>
                           </tr>
                         ) : (
                           privContracts.map((row, idx) => (
                             <tr key={row.id} className="hover:bg-slate-50">
-                              <td className="p-1.5 border-r border-slate-300 font-mono font-bold text-center">{idx + 1}</td>
-                              <td className="p-1.5 border-r border-slate-300">
-                                <div className="font-bold text-slate-950 leading-tight">{row.projectName || 'Untitled Project'}</div>
-                                <div className="text-[10px] text-slate-600 font-medium mt-0.5">{row.ownerName}</div>
+                              <td className="p-1.5 border-r border-slate-300 font-mono font-bold text-center align-top">{idx + 1}</td>
+                              <td className="p-1.5 border-r border-slate-300 align-top break-words [overflow-wrap:anywhere]">
+                                <div className="font-bold text-slate-950 leading-tight break-words [overflow-wrap:anywhere]">{row.projectName || 'Untitled Project'}</div>
+                                <div className="text-[10px] text-slate-600 font-medium mt-0.5 break-words [overflow-wrap:anywhere]">{row.ownerName}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-[10px] text-slate-700">
-                                <div>{row.ownerAddress}</div>
-                                <div className="font-mono text-slate-500">{row.ownerTelephone}</div>
+                              <td className="p-1.5 border-r border-slate-300 text-[10px] text-slate-700 align-top break-words [overflow-wrap:anywhere]">
+                                <div className="leading-tight break-words [overflow-wrap:anywhere]">{row.ownerAddress}</div>
+                                <div className="font-mono text-slate-500 mt-0.5 leading-tight break-words [overflow-wrap:anywhere]">{row.ownerTelephone}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-[10px]">
-                                <div className="font-medium text-slate-900">{row.natureOfWork}</div>
-                                <div className="text-slate-500 italic">{row.bidderRole}</div>
+                              <td className="p-1.5 border-r border-slate-300 text-[10px] align-top break-words [overflow-wrap:anywhere]">
+                                <div className="font-medium text-slate-900 leading-tight break-words [overflow-wrap:anywhere]">{row.natureOfWork}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 font-mono text-[10px]">
-                                <div className="font-bold text-emerald-800">{row.amountAward || '₱0.00'}</div>
-                                <div className="text-slate-600">{row.amountCompletion || '₱0.00'}</div>
+                              <td className="p-1.5 border-r border-slate-300 font-mono text-[10px] space-y-0.5 align-top break-words [overflow-wrap:anywhere]">
+                                <div className="font-bold text-emerald-800 break-words">a. {row.amountAward || '₱0.00'}</div>
+                                <div className="text-slate-700 font-semibold break-words">b. {row.amountCompletion || '₱0.00'}</div>
+                                <div className="font-bold text-slate-900 bg-slate-100 px-1 py-0.5 rounded text-[9.5px] break-words">c. {row.duration || 'N/A'}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 font-mono">
-                                <div className="font-bold text-black text-[11px]" style={{ color: '#000000', fontWeight: 'bold' }}>{row.duration || 'N/A'}</div>
-                                <div className="text-[10px] font-bold text-black mt-0.5 leading-tight" style={{ color: '#000000' }}>
-                                  <span className="block font-bold" style={{ color: '#000000' }}>Award: {row.dateAwarded || 'N/A'}</span>
-                                  <span className="block font-bold" style={{ color: '#000000' }}>Comp: {row.dateCompletion || 'N/A'}</span>
-                                </div>
+                              <td className="p-1.5 border-r border-slate-300 font-mono text-[10px] space-y-0.5 align-top break-words [overflow-wrap:anywhere]">
+                                <div className="text-slate-800 font-medium break-words">a. {row.dateStarted || 'N/A'}</div>
+                                <div className="text-slate-900 font-semibold break-words">b. {row.dateAwarded || 'N/A'}</div>
+                                <div className="font-bold text-black break-words">c. {row.dateCompletion || 'N/A'}</div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[10px]">
+                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[10px] align-top">
                                 <div>Plan: <span className="font-semibold">{row.accomplishmentPlanned}%</span></div>
                                 <div>Act: <span className="font-bold text-blue-900">{row.accomplishmentActual}%</span></div>
                               </td>
-                              <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[9px] proof-column">
-                                {row.pdfFile ? (
-                                  <span className="text-emerald-950 font-bold block truncate max-w-[90px]" style={{ color: '#000000', fontWeight: 'bold' }} title={row.pdfFile.fileName}>
-                                    <Paperclip className="w-3 h-3 inline text-emerald-700 mr-0.5" />
-                                    {row.pdfFile.fileName}
-                                  </span>
-                                ) : (
-                                  <label className="px-1 py-0.5 rounded bg-slate-100 text-[9px] font-bold text-purple-900 border border-slate-300 cursor-pointer block print:hidden no-export-btn">
-                                    Attach PDF
-                                    <input type="file" accept=".pdf" onChange={(e) => handleRowPdfUpload(row.id, e.target.files?.[0])} className="hidden" />
-                                  </label>
-                                )}
-                              </td>
-                              <td className="p-1.5 text-right actions-column font-mono text-[9px]">
-                                <div className="flex items-center justify-end gap-1 print:hidden no-export-btn">
-                                  <button onClick={() => openFormEditor(row)} className="p-1 text-purple-900 hover:bg-purple-50 rounded" title="Edit Form">
+                              <td className="p-1.5 text-right actions-column font-mono text-[9.5px] align-top break-words [overflow-wrap:anywhere]">
+                                <div className="flex items-center justify-end gap-1 print:hidden no-export-btn mb-1">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      openFormEditor(row);
+                                    }}
+                                    className="p-1 text-purple-900 hover:bg-purple-50 rounded"
+                                    title="Edit Form"
+                                  >
                                     <Edit3 className="w-3.5 h-3.5" />
                                   </button>
-                                  <button onClick={() => removeRow(row.id)} className="p-1 text-red-600 hover:bg-red-50 rounded" title="Delete">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      removeRow(row.id);
+                                    }}
+                                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                    title="Delete"
+                                  >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
-                                <span className="font-bold text-black block" style={{ color: '#000000', fontWeight: 'bold' }}>{row.bidderRole || 'Contractor'}</span>
+                                <span className="font-bold text-black block leading-tight break-words [overflow-wrap:anywhere]" style={{ color: '#000000', fontWeight: 'bold' }}>
+                                  {row.bidderRole || 'Contractor'}
+                                </span>
                               </td>
                             </tr>
                           ))
@@ -844,29 +939,46 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                 </div>
 
                 <div className="flex items-end justify-between gap-6 pt-1">
-                  <div className="space-y-0.5">
-                    <span className="text-[10px] text-slate-500 block uppercase">Submitted By:</span>
-                    <p className="font-bold text-slate-950">{tenant?.companyName || 'Not Set (Register Company in Profile)'}</p>
+                  {/* Arrow 3: Verification QR Code (Company & Project Details) */}
+                  <div className="flex items-center gap-2.5">
+                    <DocumentQrCode
+                      details={{
+                        companyName: tenant?.companyName || 'Bidding Entity Corporate Name',
+                        documentName: 'Statement of Single Largest Completed Contract (SLCC Item c)',
+                        documentNumber: `SLCC-${projectRefNo || '2026-901283'}`,
+                        projectTitle: projectTitle,
+                        projectRefNo: projectRefNo,
+                        procuringEntity: procuringEntity,
+                        dateTimeSubmitted: formatDateDisplay(dateTimeSubmitted)
+                      }}
+                      size={70}
+                      showCaption={false}
+                    />
+                    <div className="text-[9px] font-mono text-slate-700 leading-tight">
+                      <span className="font-black text-slate-950 block uppercase">Document Verification QR</span>
+                      <span className="block text-slate-600">Ref: {projectRefNo || 'UNLINKED'}</span>
+                      <span className="block font-bold text-emerald-800">✓ Official Bidding Record</span>
+                    </div>
                   </div>
 
-                  <div className="text-right space-y-0.5 min-w-[240px]">
+                  {/* Arrow 1 & 2: Moved "Submitted By" into Signature Block */}
+                  <div className="text-right space-y-1 min-w-[260px]">
+                    <div className="space-y-0.5 border-b border-slate-300 pb-1 mb-1 text-right">
+                      <span className="text-[9px] text-slate-500 block uppercase font-bold">SUBMITTED BY:</span>
+                      <p className="font-bold text-slate-950 text-xs uppercase">{tenant?.companyName || 'Not Set (Register Company in Profile)'}</p>
+                    </div>
+
                     <div className="border-b-2 border-slate-950 pb-0.5 font-bold text-slate-950 text-sm">
                       {tenant?.authorizedSignatory?.name || 'Authorized Signatory'}
                     </div>
                     <p className="text-[11px] text-slate-700 font-semibold">
                       {tenant?.authorizedSignatory?.title || 'Company Representative'}
                     </p>
-                    <div className="flex items-center justify-end gap-1 text-xs text-black pt-1 font-mono" style={{ color: '#000000', fontWeight: 'bold' }}>
-                      <span className="font-bold flex items-center gap-1"><Clock className="w-3 h-3 inline text-slate-800" /> Date & Time:</span>
+                    <div className="flex items-center justify-end gap-1 text-xs text-black pt-0.5 font-mono" style={{ color: '#000000', fontWeight: 'bold' }}>
+                      <span className="font-bold">Date:</span>
                       <span className="font-extrabold text-black" style={{ color: '#000000', fontWeight: '900' }}>
-                        {formatDateTimeDisplay(dateTimeSubmitted)}
+                        {formatDateDisplay(dateTimeSubmitted)}
                       </span>
-                      <input
-                        type="datetime-local"
-                        value={dateTimeSubmitted}
-                        onChange={(e) => setDateTimeSubmitted(e.target.value)}
-                        className="bg-transparent border-0 text-[10px] font-bold text-slate-950 print:hidden no-export-btn ml-1 cursor-pointer opacity-80"
-                      />
                     </div>
                   </div>
                 </div>
@@ -1010,7 +1122,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                     type="text"
                     value={editingRow.bidderRole}
                     onChange={(e) => setEditingRow({ ...editingRow, bidderRole: e.target.value })}
-                    placeholder="e.g. Sole Prime Contractor"
+                    placeholder="e.g. Main Contractor"
                     required
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-purple-500"
                   />

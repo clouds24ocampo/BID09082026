@@ -22,7 +22,8 @@ import {
   EyeOff,
   AlertTriangle,
   Key,
-  CheckCircle2
+  CheckCircle2,
+  Trash2
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -32,7 +33,7 @@ interface AppShellProps {
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, children }) => {
-  const { currentUser, currentTenant, tenants, switchTenant, logout, updateUserPassword } = useAuth();
+  const { currentUser, currentTenant, tenants, switchTenant, logout, updateUserPassword, resetAllData } = useAuth();
   const [showTenantDropdown, setShowTenantDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -87,7 +88,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
     { id: 'opportunities', label: 'Opportunity Finder', icon: Search, badge: 'PhilGEPS' },
     { id: 'vault', label: 'Document Vault', icon: FileCheck, badge: 'Secure' },
     { id: 'bids', label: 'Bid Packages', icon: FolderKanban, badge: 'Envelopes' },
-    { id: 'forms', label: 'Forms Directory', icon: Download },
+    { id: 'forms', label: 'Notarized Documents', icon: ShieldCheck, badge: 'Legal' },
     { id: 'profile', label: 'Company Profile', icon: Building2, badge: 'Profile' },
     { id: 'settings', label: 'Tenant Settings', icon: Settings },
   ];
@@ -258,10 +259,24 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
                     logout();
                     setShowUserMenu(false);
                   }}
-                  className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-2"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <LogOut className="w-3.5 h-3.5 text-slate-400" />
                   <span>Log Out Session</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (confirm('Permanently purge all registered companies, accounts, vault documents, and IndexedDB files to register a clean company?')) {
+                      resetAllData();
+                      setShowUserMenu(false);
+                      window.location.reload();
+                    }
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg flex items-center gap-2 border-t border-slate-800 mt-1 pt-2"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  <span>Purge Workspace & Clear Companies</span>
                 </button>
               </div>
             )}

@@ -20,7 +20,7 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
-  const { login, resetUserPassword, tenants } = useAuth();
+  const { login, resetUserPassword, resetAllData, tenants } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -65,10 +65,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
 
     setIsLoading(true);
     setTimeout(() => {
-      const success = login(email, selectedRole, selectedTenantId);
+      const success = login(email, password, selectedRole, selectedTenantId);
       setIsLoading(false);
       if (!success) {
-        setError('Invalid credentials or tenant mismatch.');
+        setError('Invalid email or password. Please check your credentials and try again.');
       }
     }, 600);
   };
@@ -142,7 +142,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
               <div>
                 <h2 className="text-2xl font-bold text-white">Sign In</h2>
-                <p className="text-xs text-slate-400">Access your Philippine Bid Workspace</p>
+                <p className="text-xs text-slate-400">Access your  Bid Workspace</p>
               </div>
 
               {/* Active Tenant Badge Preview */}
@@ -318,14 +318,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
               <button
                 type="button"
                 onClick={() => {
-                  if (confirm('Clear local system storage cache to register a fresh company entity?')) {
-                    localStorage.clear();
-                    window.location.reload();
+                  if (confirm('Permanently clear all registered companies, accounts, vault documents, and IndexedDB files to start a fresh company registration?')) {
+                    resetAllData();
+                    alert('All company data and storage have been completely wiped. Redirecting to clean Registration...');
+                    onSwitchToRegister();
                   }
                 }}
                 className="text-[11px] font-mono text-slate-500 hover:text-amber-400 underline transition block mx-auto pt-1"
               >
-                Reset Storage & Start Fresh Registration
+                Purge All Data & Start Fresh Registration
               </button>
             </div>
 

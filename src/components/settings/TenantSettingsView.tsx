@@ -21,7 +21,7 @@ const PRESET_COLORS = [
 ];
 
 export const TenantSettingsView: React.FC = () => {
-  const { currentTenant, updateTenantSettings } = useAuth();
+  const { currentTenant, updateTenantSettings, resetAllData } = useAuth();
 
   const [companyName, setCompanyName] = useState(currentTenant?.companyName || '');
   const [brandCode, setBrandCode] = useState(currentTenant?.brandCode || '');
@@ -284,8 +284,7 @@ export const TenantSettingsView: React.FC = () => {
           <button
             type="button"
             onClick={() => {
-              if (window.confirm('Are you sure you want to clear all local workspace data? This will log you out and reset all saved items.')) {
-                const { resetAllData } = useAuth() as any;
+              if (window.confirm('Are you sure you want to clear all local workspace data? This will log you out, purge IndexedDB document blobs, and reset all saved items.')) {
                 resetAllData();
                 window.location.reload();
               }

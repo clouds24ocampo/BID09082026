@@ -34,6 +34,8 @@ const PRESET_COLORS = [
 export const CompanyProfileView: React.FC = () => {
   const { currentTenant, currentUser, updateTenantSettings, resetUserPassword } = useAuth();
 
+  const tenantKey = currentTenant?.id || currentUser?.id || 'default';
+
   const [companyName, setCompanyName] = useState(currentTenant?.companyName || '');
   const [brandCode, setBrandCode] = useState(currentTenant?.brandCode || '');
   const [brandColor, setBrandColor] = useState(currentTenant?.brandColor || '#1e40af');
@@ -49,11 +51,27 @@ export const CompanyProfileView: React.FC = () => {
 
   // System Credentials (THIS SYSTEM) & Eye Toggle State
   const [systemUsername, setSystemUsername] = useState(() => {
-    return localStorage.getItem('bidocs_system_username') || currentUser?.email || 'admin@bidocs.ph';
+    return localStorage.getItem(`bidocs_system_username_${tenantKey}`) || currentUser?.email || '';
   });
   const [systemPassword, setSystemPassword] = useState(() => {
-    return localStorage.getItem('bidocs_system_password') || 'BiDOCS#2026!Admin';
+    return localStorage.getItem(`bidocs_system_password_${tenantKey}`) || currentUser?.password || '';
   });
+
+  // Re-sync states when current tenant changes
+  React.useEffect(() => {
+    setCompanyName(currentTenant?.companyName || '');
+    setBrandCode(currentTenant?.brandCode || '');
+    setBrandColor(currentTenant?.brandColor || '#1e40af');
+    setLogoUrl(currentTenant?.logoUrl || '');
+    setTin(currentTenant?.tin || '');
+    setSecDtiRegNo(currentTenant?.secDtiRegNo || '');
+    setPhilgepsPlatinumNo(currentTenant?.philgepsPlatinumNo || '');
+    setAddress(currentTenant?.address || '');
+    setSignatoryName(currentTenant?.authorizedSignatory?.name || '');
+    setSignatoryTitle(currentTenant?.authorizedSignatory?.title || '');
+    setSystemUsername(localStorage.getItem(`bidocs_system_username_${tenantKey}`) || currentUser?.email || '');
+    setSystemPassword(localStorage.getItem(`bidocs_system_password_${tenantKey}`) || currentUser?.password || '');
+  }, [currentTenant?.id, currentUser?.email]);
 
   const [showSystemUsername, setShowSystemUsername] = useState(false);
   const [showSystemPassword, setShowSystemPassword] = useState(false);
@@ -115,8 +133,8 @@ export const CompanyProfileView: React.FC = () => {
       }
     });
 
-    localStorage.setItem('bidocs_system_username', systemUsername);
-    localStorage.setItem('bidocs_system_password', systemPassword);
+    localStorage.setItem(`bidocs_system_username_${tenantKey}`, systemUsername);
+    localStorage.setItem(`bidocs_system_password_${tenantKey}`, systemPassword);
 
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2500);

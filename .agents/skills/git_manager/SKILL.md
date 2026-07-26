@@ -56,3 +56,4 @@ git commit -m "feat: add legal document printing and PDF layout export engine"
 1. **Verify `.gitignore`**: Always ensure `.gitignore` excludes `node_modules`, `dist`, `.env`, and build logs before staging.
 2. **Never Commit Secret Keys**: Verify no API keys, credentials, or private secrets exist in staged code before calling `git commit`.
 3. **Clean Commit Messages**: Use clear, professional conventional commit messages.
+  

@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { PhilGEPSOpportunity, ProcurementType, SectorType, OpportunityPdfAttachment } from '../../types';
-import { 
-  Search, 
-  Filter, 
-  Building2, 
-  Clock, 
-  ShieldCheck, 
-  Plus, 
-  ExternalLink, 
-  DollarSign, 
-  MapPin, 
-  FileText, 
+import {
+  Search,
+  Filter,
+  Building2,
+  Clock,
+  ShieldCheck,
+  Plus,
+  ExternalLink,
+  DollarSign,
+  MapPin,
+  FileText,
   CheckCircle2,
   Upload,
   AlertCircle,
@@ -50,13 +50,21 @@ const isValidPhone = (phone: string) => /^[\d\+\-\s\(\)]{7,20}$/.test(phone.trim
 
 export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => void }> = ({ setActiveTab }) => {
   const { currentTenant } = useAuth();
+  const tenantId = currentTenant?.id || '';
+
   const [opportunities, setOpportunities] = useState<PhilGEPSOpportunity[]>(() => {
-    const saved = localStorage.getItem('bidocs_opportunities');
+    const saved = localStorage.getItem(`bidocs_opportunities_${tenantId}`);
     return saved ? JSON.parse(saved) : [];
   });
   const [selectedType, setSelectedType] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  
+
+  // Re-sync opportunities state when active tenant changes
+  React.useEffect(() => {
+    const saved = localStorage.getItem(`bidocs_opportunities_${tenantId}`);
+    setOpportunities(saved ? JSON.parse(saved) : []);
+  }, [tenantId]);
+
   // Modals state
   const [showAddEditModal, setShowAddEditModal] = useState(false);
   const [editingItem, setEditingItem] = useState<PhilGEPSOpportunity | null>(null);
@@ -71,23 +79,23 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
   const [projectReferenceNumber, setProjectReferenceNumber] = useState('');
   const [sector, setSector] = useState<SectorType>('Government');
   const [biddingProjectTitle, setBiddingProjectTitle] = useState('');
-  
+
   // Procuring Entity Group State
   const [procuringEntityName, setProcuringEntityName] = useState('');
   const [procuringEntityContactNumber, setProcuringEntityContactNumber] = useState('');
   const [procuringEntityAddress, setProcuringEntityAddress] = useState('');
   const [procuringEntityEmail, setProcuringEntityEmail] = useState('');
   const [procuringEntityPosition, setProcuringEntityPosition] = useState('');
-  
+
   const [procurementType, setProcurementType] = useState<ProcurementType>('Goods & Supply');
-  
+
   // Dates
   const todayStr = new Date().toISOString().split('T')[0];
   const [dateCreated, setDateCreated] = useState(todayStr);
   const [datePublished, setDatePublished] = useState(todayStr);
   const [preBidConferenceDatetime, setPreBidConferenceDatetime] = useState('');
   const [submissionDeadlineDatetime, setSubmissionDeadlineDatetime] = useState('');
-  
+
   // Creation-flow PDF attachments state (4 slots)
   const [draftPdfAttachments, setDraftPdfAttachments] = useState<{
     bidBulletin?: OpportunityPdfAttachment;
@@ -101,14 +109,16 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
   const [pdfFileName, setPdfFileName] = useState('');
   const [pdfFileDataUrl, setPdfFileDataUrl] = useState('');
   const [approvedBudgetStr, setApprovedBudgetStr] = useState('');
-  
+
   // Validation Error States
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Sync to localStorage
   React.useEffect(() => {
-    localStorage.setItem('bidocs_opportunities', JSON.stringify(opportunities));
-  }, [opportunities]);
+    if (tenantId) {
+      localStorage.setItem(`bidocs_opportunities_${tenantId}`, JSON.stringify(opportunities));
+    }
+  }, [opportunities, tenantId]);
 
   const generateUniqueProjectId = (existingOps: PhilGEPSOpportunity[]) => {
     let candidate = '';
@@ -157,7 +167,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
   const handleOpenEditModal = (op: PhilGEPSOpportunity) => {
     setEditingItem(op);
     setPhilgepsRefNo(op.philgepsRefNo);
-    setSolicitationNumber(op.solicitationNumber || `SOL-2026-${Math.floor(Math.random()*8999 + 1000)}`);
+    setSolicitationNumber(op.solicitationNumber || `SOL-2026-${Math.floor(Math.random() * 8999 + 1000)}`);
     setAreaOfDelivery(op.areaOfDelivery || op.location || 'NCR, Philippines');
     setProjectReferenceNumber(op.projectReferenceNumber);
     setSector(op.sector || 'Government');
@@ -418,8 +428,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
   // Slot Upload Handler for Detail View
   const handleSlotAttachmentUploadDetail = (
-    opId: string, 
-    slotKey: 'bidBulletin' | 'supplementalDocs' | 'procuringEntityDocs' | 'receiptOfBidDocs', 
+    opId: string,
+    slotKey: 'bidBulletin' | 'supplementalDocs' | 'procuringEntityDocs' | 'receiptOfBidDocs',
     file: File | undefined
   ) => {
     if (!file) return;
@@ -463,14 +473,14 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <span 
-              className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }} 
+            <span
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
             />
             <h1 className="text-2xl font-bold text-white">Opportunity Finder & Procurement Registry</h1>
           </div>
@@ -496,11 +506,10 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
             <button
               key={t}
               onClick={() => setSelectedType(t)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
-                selectedType === t
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-              }`}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${selectedType === t
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
             >
               {t === 'ALL' ? 'All Procurement Types' : t}
             </button>
@@ -523,7 +532,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
       {/* Opportunities List Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredOps.map((op) => (
-          <div 
+          <div
             key={op.id}
             className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-slate-700 transition space-y-4 flex flex-col justify-between group"
           >
@@ -569,7 +578,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
             <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5">
-                <button 
+                <button
                   onClick={() => setViewingItem(op)}
                   className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
                 >
@@ -614,9 +623,9 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
       {/* DETAIL VIEW MODAL & 4 PDF ATTACHMENT SLOTS */}
       {viewingItem && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[95vh] flex flex-col">
-            
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[85vh] flex flex-col">
+
             {/* Modal Header Bar */}
             <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
               <div className="flex items-center gap-3">
@@ -636,7 +645,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
             </div>
 
             <div className="p-6 space-y-6 text-xs overflow-y-auto flex-1">
-              
+
               {/* Grid 1: Stored Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
@@ -805,329 +814,341 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         </div>
       )}
 
-      {/* ADD / EDIT OPPORTUNITY MODAL (WITH INLINE CREATION PDF UPLOADS & INSTANT VIEWING) */}
+      {/* ADD / EDIT OPPORTUNITY MODAL (FIT-TO-SCREEN RESPONSIVE MODAL) */}
       {showAddEditModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[95vh] flex flex-col">
-            
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[85vh] flex flex-col">
+
+            {/* Modal Fixed Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900 shrink-0">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Plus className="w-4 h-4 text-blue-400" />
-                {editingItem ? 'Edit Bidding Opportunity' : 'Add First Bidding Opportunity'}
+                {editingItem ? 'Edit Bidding Opportunity' : 'Add Bidding Opportunity'}
               </h3>
-              <button onClick={() => setShowAddEditModal(false)} className="text-slate-400 hover:text-white p-1">
+              <button
+                type="button"
+                onClick={() => setShowAddEditModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveOpportunity} className="p-5 space-y-4 text-xs overflow-y-auto flex-1">
-              
-              {/* If Editing, display Project Reference Number as PERMANENTLY LOCKED / READ-ONLY */}
-              {editingItem && (
-                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-slate-300 font-mono">
-                    <Lock className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span>Project Reference Number (Project ID): <strong className="text-white font-bold">{projectReferenceNumber}</strong></span>
+            {/* Form Wrapping Scrollable Body & Fixed Footer */}
+            <form onSubmit={handleSaveOpportunity} className="flex-1 flex flex-col overflow-hidden">
+
+              {/* Scrollable Form Body */}
+              <div className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
+
+                {/* If Editing, display Project Reference Number as PERMANENTLY LOCKED / READ-ONLY */}
+                {editingItem && (
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-slate-300 font-mono">
+                      <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Project Reference Number (Project ID): <strong className="text-white font-bold">{projectReferenceNumber}</strong></span>
+                    </div>
+                    <span className="text-[10px] bg-slate-800 text-slate-400 font-mono px-2 py-0.5 rounded border border-slate-700 font-bold">LOCKED / READ-ONLY</span>
                   </div>
-                  <span className="text-[10px] bg-slate-800 text-slate-400 font-mono px-2 py-0.5 rounded border border-slate-700 font-bold">LOCKED / READ-ONLY</span>
-                </div>
-              )}
+                )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">PhilGEPS Reference No. <span className="text-red-400">*</span></label>
-                  <input
-                    type="text"
-                    value={philgepsRefNo}
-                    onChange={(e) => setPhilgepsRefNo(e.target.value)}
-                    placeholder="e.g. 10928371"
-                    required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
-                  />
-                  {errors.philgepsRefNo && <p className="text-[11px] text-red-400 mt-1">{errors.philgepsRefNo}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Solicitation Number <span className="text-red-400">*</span></label>
-                  <input
-                    type="text"
-                    value={solicitationNumber}
-                    onChange={(e) => setSolicitationNumber(e.target.value)}
-                    placeholder="e.g. SOL-2026-0912"
-                    required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
-                  />
-                  {errors.solicitationNumber && <p className="text-[11px] text-red-400 mt-1">{errors.solicitationNumber}</p>}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Sector <span className="text-red-400">*</span></label>
-                  <select
-                    value={sector}
-                    onChange={(e) => setSector(e.target.value as SectorType)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
-                  >
-                    <option value="Government">Government</option>
-                    <option value="Private">Private</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Procurement Type <span className="text-red-400">*</span></label>
-                  <select
-                    value={procurementType}
-                    onChange={(e) => setProcurementType(e.target.value as ProcurementType)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
-                  >
-                    <option value="Goods & Supply">Goods & Supply</option>
-                    <option value="Goods & Supply with Installation">Goods & Supply with Installation</option>
-                    <option value="Infrastructure">Infrastructure</option>
-                    <option value="Consulting">Consulting</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Bidding Project Title <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={biddingProjectTitle}
-                  onChange={(e) => setBiddingProjectTitle(e.target.value)}
-                  placeholder="e.g. Supply and Delivery of Enterprise IT Infrastructure Systems"
-                  required
-                  maxLength={500}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              {/* Procuring Entity Details */}
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-                <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider border-b border-slate-800 pb-2">
-                  Procuring Entity & Area of Delivery
-                </h4>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Entity Name <span className="text-red-400">*</span></label>
+                    <label className="block text-slate-300 font-medium mb-1">PhilGEPS Reference No. <span className="text-red-400">*</span></label>
                     <input
                       type="text"
-                      value={procuringEntityName}
-                      onChange={(e) => setProcuringEntityName(e.target.value)}
-                      placeholder="e.g. Department of Information & Communications Technology"
+                      value={philgepsRefNo}
+                      onChange={(e) => setPhilgepsRefNo(e.target.value)}
+                      placeholder="e.g. 10928371"
                       required
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
                     />
+                    {errors.philgepsRefNo && <p className="text-[11px] text-red-400 mt-1">{errors.philgepsRefNo}</p>}
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Contact Number <span className="text-red-400">*</span></label>
+                    <label className="block text-slate-300 font-medium mb-1">Solicitation Number <span className="text-red-400">*</span></label>
                     <input
                       type="text"
-                      value={procuringEntityContactNumber}
-                      onChange={(e) => setProcuringEntityContactNumber(e.target.value)}
-                      placeholder="+63 917 123 4567"
+                      value={solicitationNumber}
+                      onChange={(e) => setSolicitationNumber(e.target.value)}
+                      placeholder="e.g. SOL-2026-0912"
                       required
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
                     />
+                    {errors.solicitationNumber && <p className="text-[11px] text-red-400 mt-1">{errors.solicitationNumber}</p>}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Email Address <span className="text-red-400">*</span></label>
-                    <input
-                      type="email"
-                      value={procuringEntityEmail}
-                      onChange={(e) => setProcuringEntityEmail(e.target.value)}
-                      placeholder="bac_secretariat@dict.gov.ph"
-                      required
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                    />
+                    <label className="block text-slate-300 font-medium mb-1">Sector <span className="text-red-400">*</span></label>
+                    <select
+                      value={sector}
+                      onChange={(e) => setSector(e.target.value as SectorType)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                    >
+                      <option value="Government">Government</option>
+                      <option value="Private">Private</option>
+                    </select>
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Area of Delivery</label>
-                    <input
-                      type="text"
-                      value={areaOfDelivery}
-                      onChange={(e) => setAreaOfDelivery(e.target.value)}
-                      placeholder="e.g. Metro Manila / Visayas / Mindanao Region"
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                    />
+                    <label className="block text-slate-300 font-medium mb-1">Procurement Type <span className="text-red-400">*</span></label>
+                    <select
+                      value={procurementType}
+                      onChange={(e) => setProcurementType(e.target.value as ProcurementType)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                    >
+                      <option value="Goods & Supply">Goods & Supply</option>
+                      <option value="Goods & Supply with Installation">Goods & Supply with Installation</option>
+                      <option value="Infrastructure">Infrastructure</option>
+                      <option value="Consulting">Consulting</option>
+                    </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Officer Position <span className="text-red-400">*</span></label>
+                  <label className="block text-slate-300 font-medium mb-1">Bidding Project Title <span className="text-red-400">*</span></label>
                   <input
                     type="text"
-                    value={procuringEntityPosition}
-                    onChange={(e) => setProcuringEntityPosition(e.target.value)}
-                    placeholder="BAC Secretariat Head"
+                    value={biddingProjectTitle}
+                    onChange={(e) => setBiddingProjectTitle(e.target.value)}
+                    placeholder="e.g. Supply and Delivery of Enterprise IT Infrastructure Systems"
                     required
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Address <span className="text-red-400">*</span></label>
-                  <textarea
-                    value={procuringEntityAddress}
-                    onChange={(e) => setProcuringEntityAddress(e.target.value)}
-                    placeholder="DICT Building, C.P. Garcia Ave., Diliman, Quezon City"
-                    required
-                    rows={2}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Restored Dates: Created & Published */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Date Created <span className="text-red-400">*</span></label>
-                  <input
-                    type="date"
-                    value={dateCreated}
-                    onChange={(e) => setDateCreated(e.target.value)}
-                    required
+                    maxLength={500}
                     className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Date Published <span className="text-red-400">*</span></label>
-                  <input
-                    type="date"
-                    value={datePublished}
-                    onChange={(e) => setDatePublished(e.target.value)}
-                    required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Pre-Bid & Deadline Datetime */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Pre-Bid Conference Date & Time <span className="text-slate-500 font-mono text-[11px]">(Optional)</span></label>
-                  <input
-                    type="datetime-local"
-                    value={preBidConferenceDatetime}
-                    onChange={(e) => setPreBidConferenceDatetime(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Submission Deadline Date & Time <span className="text-red-400">*</span></label>
-                  <input
-                    type="datetime-local"
-                    value={submissionDeadlineDatetime}
-                    onChange={(e) => setSubmissionDeadlineDatetime(e.target.value)}
-                    required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Approved Budget for Contract (ABC) <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={approvedBudgetStr}
-                  onChange={(e) => setApprovedBudgetStr(e.target.value)}
-                  onBlur={handleBudgetBlur}
-                  placeholder="₱1,250,000.00"
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              {/* Main Notice PDF Upload */}
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Official PhilGEPS PDF Notice Document (Max 100 MB) <span className="text-red-400">*</span></label>
-                <div className="border-2 border-dashed border-slate-800 rounded-xl p-4 text-center hover:border-blue-500 transition cursor-pointer bg-slate-950">
-                  <label className="cursor-pointer block space-y-1">
-                    <FileText className="w-6 h-6 text-blue-400 mx-auto" />
-                    <p className="text-xs text-slate-300 font-semibold">{pdfFileName || 'Click to select PDF document'}</p>
-                    <input type="file" accept=".pdf" onChange={handlePdfUpload} className="hidden" />
-                  </label>
-                </div>
-              </div>
-
-              {/* INLINE 4 PDF ATTACHMENT SLOTS DURING CREATION / EDITING */}
-              <div className="space-y-3 pt-3 border-t border-slate-800">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                    <Upload className="w-4 h-4 text-blue-400" />
-                    Upload PDF Attachments During Creation / Edit
+                {/* Procuring Entity Details */}
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider border-b border-slate-800 pb-2">
+                    Procuring Entity & Area of Delivery
                   </h4>
-                  <span className="text-[10px] text-slate-400 font-mono">Max 100 MB per slot</span>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">Entity Name <span className="text-red-400">*</span></label>
+                      <input
+                        type="text"
+                        value={procuringEntityName}
+                        onChange={(e) => setProcuringEntityName(e.target.value)}
+                        placeholder="e.g. Department of Information & Communications Technology"
+                        required
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">Contact Number <span className="text-red-400">*</span></label>
+                      <input
+                        type="text"
+                        value={procuringEntityContactNumber}
+                        onChange={(e) => setProcuringEntityContactNumber(e.target.value)}
+                        placeholder="+63 917 123 4567"
+                        required
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">Email Address <span className="text-red-400">*</span></label>
+                      <input
+                        type="email"
+                        value={procuringEntityEmail}
+                        onChange={(e) => setProcuringEntityEmail(e.target.value)}
+                        placeholder="bac_secretariat@dict.gov.ph"
+                        required
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">Area of Delivery</label>
+                      <input
+                        type="text"
+                        value={areaOfDelivery}
+                        onChange={(e) => setAreaOfDelivery(e.target.value)}
+                        placeholder="e.g. Metro Manila / Visayas / Mindanao Region"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Officer Position <span className="text-red-400">*</span></label>
+                    <input
+                      type="text"
+                      value={procuringEntityPosition}
+                      onChange={(e) => setProcuringEntityPosition(e.target.value)}
+                      placeholder="BAC Secretariat Head"
+                      required
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Address <span className="text-red-400">*</span></label>
+                    <textarea
+                      value={procuringEntityAddress}
+                      onChange={(e) => setProcuringEntityAddress(e.target.value)}
+                      placeholder="DICT Building, C.P. Garcia Ave., Diliman, Quezon City"
+                      required
+                      rows={2}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
                 </div>
 
+                {/* Restored Dates: Created & Published */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[
-                    { key: 'bidBulletin', label: 'Bid Bulletin' },
-                    { key: 'supplementalDocs', label: 'Bid Supplemental Docs' },
-                    { key: 'procuringEntityDocs', label: 'Procuring Entity Docs' },
-                    { key: 'receiptOfBidDocs', label: 'Receipt of Bid Docs' }
-                  ].map((s) => {
-                    const slotKey = s.key as 'bidBulletin' | 'supplementalDocs' | 'procuringEntityDocs' | 'receiptOfBidDocs';
-                    const att = draftPdfAttachments[slotKey];
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Date Created <span className="text-red-400">*</span></label>
+                    <input
+                      type="date"
+                      value={dateCreated}
+                      onChange={(e) => setDateCreated(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
 
-                    return (
-                      <div key={s.key} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <span className="font-semibold text-white text-[11px] block">{s.label}</span>
-                          {att ? (
-                            <span className="text-[10px] text-blue-400 font-mono truncate block">{att.fileName}</span>
-                          ) : (
-                            <span className="text-[10px] text-slate-500 italic block">No PDF attached</span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-1 shrink-0">
-                          {att && (
-                            <button
-                              type="button"
-                              onClick={() => setPreviewPdfSlot({ title: s.label, dataUrl: att.fileDataUrl, fileName: att.fileName })}
-                              className="px-2 py-1 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white text-[10px] font-bold transition flex items-center gap-0.5 border border-blue-500/30"
-                            >
-                              <Eye className="w-3 h-3" /> View
-                            </button>
-                          )}
-
-                          <label className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-bold transition cursor-pointer flex items-center gap-0.5">
-                            <Upload className="w-3 h-3 text-blue-400" />
-                            <span>{att ? 'Replace' : 'Upload'}</span>
-                            <input
-                              type="file"
-                              accept=".pdf"
-                              onChange={(e) => handleDraftSlotUpload(slotKey, e.target.files?.[0])}
-                              className="hidden"
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Date Published <span className="text-red-400">*</span></label>
+                    <input
+                      type="date"
+                      value={datePublished}
+                      onChange={(e) => setDatePublished(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
                 </div>
+
+                {/* Pre-Bid & Deadline Datetime */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Pre-Bid Conference Date & Time <span className="text-slate-500 font-mono text-[11px]">(Optional)</span></label>
+                    <input
+                      type="datetime-local"
+                      value={preBidConferenceDatetime}
+                      onChange={(e) => setPreBidConferenceDatetime(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">Submission Deadline Date & Time <span className="text-red-400">*</span></label>
+                    <input
+                      type="datetime-local"
+                      value={submissionDeadlineDatetime}
+                      onChange={(e) => setSubmissionDeadlineDatetime(e.target.value)}
+                      required
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Approved Budget for Contract (ABC) <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    value={approvedBudgetStr}
+                    onChange={(e) => setApprovedBudgetStr(e.target.value)}
+                    onBlur={handleBudgetBlur}
+                    placeholder="₱1,250,000.00"
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Main Notice PDF Upload */}
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Official PhilGEPS PDF Notice Document (Max 100 MB) <span className="text-red-400">*</span></label>
+                  <div className="border-2 border-dashed border-slate-800 rounded-xl p-4 text-center hover:border-blue-500 transition cursor-pointer bg-slate-950">
+                    <label className="cursor-pointer block space-y-1">
+                      <FileText className="w-6 h-6 text-blue-400 mx-auto" />
+                      <p className="text-xs text-slate-300 font-semibold">{pdfFileName || 'Click to select PDF document'}</p>
+                      <input type="file" accept=".pdf" onChange={handlePdfUpload} className="hidden" />
+                    </label>
+                  </div>
+                </div>
+
+                {/* INLINE 4 PDF ATTACHMENT SLOTS DURING CREATION / EDITING */}
+                <div className="space-y-3 pt-3 border-t border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                      <Upload className="w-4 h-4 text-blue-400" />
+                      Upload PDF Attachments During Creation / Edit
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-mono">Max 100 MB per slot</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { key: 'bidBulletin', label: 'Bid Bulletin' },
+                      { key: 'supplementalDocs', label: 'Bid Supplemental Docs' },
+                      { key: 'procuringEntityDocs', label: 'Procuring Entity Docs' },
+                      { key: 'receiptOfBidDocs', label: 'Receipt of Bid Docs' }
+                    ].map((s) => {
+                      const slotKey = s.key as 'bidBulletin' | 'supplementalDocs' | 'procuringEntityDocs' | 'receiptOfBidDocs';
+                      const att = draftPdfAttachments[slotKey];
+
+                      return (
+                        <div key={s.key} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="font-semibold text-white text-[11px] block">{s.label}</span>
+                            {att ? (
+                              <span className="text-[10px] text-blue-400 font-mono truncate block">{att.fileName}</span>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 italic block">No PDF attached</span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {att && (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewPdfSlot({ title: s.label, dataUrl: att.fileDataUrl, fileName: att.fileName })}
+                                className="px-2 py-1 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white text-[10px] font-bold transition flex items-center gap-0.5 border border-blue-500/30"
+                              >
+                                <Eye className="w-3 h-3" /> View
+                              </button>
+                            )}
+
+                            <label className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-bold transition cursor-pointer flex items-center gap-0.5">
+                              <Upload className="w-3 h-3 text-blue-400" />
+                              <span>{att ? 'Replace' : 'Upload'}</span>
+                              <input
+                                type="file"
+                                accept=".pdf"
+                                onChange={(e) => handleDraftSlotUpload(slotKey, e.target.files?.[0])}
+                                className="hidden"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800 sticky bottom-0 bg-slate-900/95 py-2 z-10">
+              {/* Fixed Modal Action Buttons Footer */}
+              <div className="p-4 border-t border-slate-800 bg-slate-900 flex items-center justify-end gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowAddEditModal(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition"
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 text-xs font-semibold transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white shadow-xl transition flex items-center gap-1.5 hover:opacity-90"
+                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white shadow-xl transition flex items-center gap-1.5 hover:opacity-90 cursor-pointer"
                   style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
                 >
                   <CheckCircle2 className="w-4 h-4" />
@@ -1172,8 +1193,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
       {/* INLINE SLOT PDF PREVIEW MODAL */}
       {previewPdfSlot && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[95vh] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[85vh] flex flex-col">
             <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-blue-400" />

@@ -15,23 +15,32 @@ import {
   FileText 
 } from 'lucide-react';
 
+import { loadVaultItems } from '../../utils/vaultIndexedDB';
+
 interface DashboardViewProps {
   setActiveTab: (tab: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) => {
   const { currentTenant, currentUser } = useAuth();
+  const activeTenantId = currentTenant?.id || '';
 
-  // Read live state from localStorage
-  const vaultItems = React.useMemo(() => {
-    const saved = localStorage.getItem('bidocs_vault_items');
-    return saved ? JSON.parse(saved) : [];
-  }, []);
+  const [vaultItems, setVaultItems] = React.useState<any[]>([]);
+
+  // Load vault items from IndexedDB for active tenant
+  React.useEffect(() => {
+    loadVaultItems(activeTenantId).then((items) => {
+      setVaultItems(items || []);
+    }).catch(() => {
+      const saved = localStorage.getItem(`bidocs_vault_items_${activeTenantId}`);
+      setVaultItems(saved ? JSON.parse(saved) : []);
+    });
+  }, [activeTenantId]);
 
   const opportunities = React.useMemo(() => {
-    const saved = localStorage.getItem('bidocs_opportunities');
+    const saved = localStorage.getItem(`bidocs_opportunities_${activeTenantId}`);
     return saved ? JSON.parse(saved) : [];
-  }, []);
+  }, [activeTenantId]);
 
   const totalAbc = React.useMemo(() => {
     return opportunities.reduce((acc: number, op: any) => acc + (op.approvedBudget || 0), 0);
