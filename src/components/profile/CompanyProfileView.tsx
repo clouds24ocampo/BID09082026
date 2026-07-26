@@ -18,7 +18,8 @@ import {
   Eye,
   EyeOff,
   Key,
-  Lock
+  Lock,
+  RotateCcw
 } from 'lucide-react';
 
 const PRESET_COLORS = [
@@ -59,6 +60,16 @@ export const CompanyProfileView: React.FC = () => {
 
   const [isSaved, setIsSaved] = useState(false);
   const [uploadError, setUploadError] = useState('');
+
+  const handleResetToDefaultPassword = () => {
+    if (confirm('Are you sure you want to reset system password to default (BiDOCS#2026)? You will be required to change it immediately.')) {
+      setSystemPassword('BiDOCS#2026');
+      localStorage.setItem('bidocs_system_password', 'BiDOCS#2026');
+      localStorage.setItem('bidocs_must_change_password', 'true');
+      alert('System Password reset to default: BiDOCS#2026. You must change your password immediately!');
+      window.location.reload();
+    }
+  };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -420,6 +431,20 @@ export const CompanyProfileView: React.FC = () => {
                 </button>
               </div>
             </div>
+          </div>
+
+          <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="text-slate-400 font-mono text-[11px]">
+              Default Security Password: <code className="text-amber-400 font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">BiDOCS#2026</code>
+            </div>
+            <button
+              type="button"
+              onClick={handleResetToDefaultPassword}
+              className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition font-semibold flex items-center gap-1.5 self-start sm:self-auto"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset Password to Default (BiDOCS#2026)</span>
+            </button>
           </div>
         </div>
 

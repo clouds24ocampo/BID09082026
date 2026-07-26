@@ -36,6 +36,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
     companyName: 'Your Business Entity'
   };
 
+  const handleForgotPasswordReset = () => {
+    localStorage.setItem('bidocs_system_password', 'BiDOCS#2026');
+    localStorage.setItem('bidocs_must_change_password', 'true');
+    setPassword('BiDOCS#2026');
+    alert('System password has been reset to default: BiDOCS#2026.\n\nPlease log in using BiDOCS#2026. You will be prompted to change your password immediately upon login.');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -227,9 +234,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                   <label className="block text-xs font-medium text-slate-300">
                     Password
                   </label>
-                  <span className="text-[11px] text-blue-400 hover:underline cursor-pointer">
-                    Forgot password?
-                  </span>
+                  <button
+                    type="button"
+                    onClick={handleForgotPasswordReset}
+                    className="text-[11px] text-amber-400 hover:text-amber-300 hover:underline font-bold transition"
+                  >
+                    Reset password (BiDOCS#2026)?
+                  </button>
                 </div>
                 <div className="relative">
                   <input

@@ -16,7 +16,13 @@ import {
   Sparkles,
   Layers,
   Menu,
-  X
+  X,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  Key,
+  CheckCircle2
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -31,6 +37,47 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Mandatory Password Reset Enforcement State
+  const [mustChangePassword, setMustChangePassword] = useState(() => {
+    const flag = localStorage.getItem('bidocs_must_change_password');
+    const pw = localStorage.getItem('bidocs_system_password');
+    return flag === 'true' || pw === 'BiDOCS#2026';
+  });
+
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState('');
+
+  const handlePasswordChangeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError('');
+
+    if (!newPassword || newPassword.length < 6) {
+      setPwError('New password must be at least 6 characters long.');
+      return;
+    }
+
+    if (newPassword === 'BiDOCS#2026') {
+      setPwError('You cannot reuse the default temporary password (BiDOCS#2026). Please choose a new secure password.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPwError('New Password and Confirm Password do not match.');
+      return;
+    }
+
+    localStorage.setItem('bidocs_system_password', newPassword);
+    localStorage.setItem('bidocs_must_change_password', 'false');
+    setPwSuccess('Password updated successfully! System access secured.');
+    setTimeout(() => {
+      setMustChangePassword(false);
+    }, 1000);
+  };
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -287,8 +334,102 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[#070a12]">
           {children}
         </main>
-
       </div>
+
+      {/* MANDATORY PASSWORD CHANGE OVERLAY MODAL */}
+      {mustChangePassword && (
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-slate-900 border-2 border-amber-500/50 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleIn p-6 space-y-5">
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
+              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                <AlertTriangle className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white uppercase tracking-wider">
+                  Mandatory Password Change
+                </h3>
+                <p className="text-[11px] text-amber-400 font-mono">
+                  Default Temporary Password Active (BiDOCS#2026)
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 space-y-1">
+              <p className="font-bold">⚠️ System Security Requirement:</p>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Your account password was reset to the default temporary password (<strong>BiDOCS#2026</strong>). For system security, you MUST change your password ASAP before continuing.
+              </p>
+            </div>
+
+            {pwError && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 font-medium">
+                ⚠️ {pwError}
+              </div>
+            )}
+
+            {pwSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400 font-medium flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>{pwSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handlePasswordChangeSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">New System Password <span className="text-red-400">*</span></label>
+                <div className="relative">
+                  <input
+                    type={showNewPw ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    placeholder="Enter new password (min 6 chars)"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-white font-mono focus:outline-none focus:border-amber-500"
+                  />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPw(!showNewPw)}
+                    className="absolute right-3 top-3 text-slate-400 hover:text-white"
+                  >
+                    {showNewPw ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Confirm New Password <span className="text-red-400">*</span></label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPw ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    placeholder="Re-enter new password"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-white font-mono focus:outline-none focus:border-amber-500"
+                  />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPw(!showConfirmPw)}
+                    className="absolute right-3 top-3 text-slate-400 hover:text-white"
+                  >
+                    {showConfirmPw ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow-xl transition flex items-center justify-center gap-2"
+              >
+                <Key className="w-4 h-4" />
+                <span>Update Password & Access System</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
