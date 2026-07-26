@@ -6,23 +6,23 @@ import { MergedPdfViewerModal } from './MergedPdfViewerModal';
 import { StatementOngoingContractsModal } from './templates/StatementOngoingContractsModal';
 import { StatementSlccModal } from './templates/StatementSlccModal';
 import { TechnicalExhibitTemplateModal } from './templates/TechnicalExhibitTemplateModal';
-import { 
-  FileCheck, 
-  Upload, 
-  Eye, 
-  RefreshCw, 
-  Search, 
-  ShieldCheck, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Clock, 
-  Award, 
-  FileText, 
-  Plus, 
-  X, 
-  CheckSquare, 
-  Square, 
-  Layers, 
+import {
+  FileCheck,
+  Upload,
+  Eye,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Award,
+  FileText,
+  Plus,
+  X,
+  CheckSquare,
+  Square,
+  Layers,
   History,
   ChevronRight,
   ChevronDown,
@@ -142,7 +142,7 @@ export const DocumentVaultView: React.FC = () => {
   });
   const [selectedCategory, setSelectedCategory] = useState<string>('ELIGIBILITY_CLASS_A');
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Selection & Merging state
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [showMergeModal, setShowMergeModal] = useState(false);
@@ -160,7 +160,7 @@ export const DocumentVaultView: React.FC = () => {
   const [showCustomUploadModal, setShowCustomUploadModal] = useState(false);
   const [customUploadCategory, setCustomUploadCategory] = useState<DocCategory>('ELIGIBILITY_CLASS_B');
   const [customDocName, setCustomDocName] = useState('');
-  
+
   const [replaceTargetItem, setReplaceTargetItem] = useState<DocumentVaultItem | null>(null);
   const [detailsTargetItem, setDetailsTargetItem] = useState<DocumentVaultItem | null>(null);
   const [previewPdfItem, setPreviewPdfItem] = useState<DocumentVaultItem | null>(null);
@@ -173,6 +173,7 @@ export const DocumentVaultView: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string>('');
   const [uploadError, setUploadError] = useState('');
+  const [successBannerMessage, setSuccessBannerMessage] = useState<string>('');
 
   // Sync states to localStorage
   React.useEffect(() => {
@@ -223,13 +224,13 @@ export const DocumentVaultView: React.FC = () => {
   };
 
   const toggleTechExpand = (id: string) => {
-    setExpandedTechItems(prev => 
+    setExpandedTechItems(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
 
   const toggleTechCheckbox = (id: string) => {
-    setTechCompletedIds(prev => 
+    setTechCompletedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -255,7 +256,7 @@ export const DocumentVaultView: React.FC = () => {
       procurementApplicability: ['Goods & Supply', 'Goods & Supply with Installation', 'Infrastructure', 'Consulting'],
       legalBasisReference: 'RA 12009 NGPA Statutory Compliance Exhibit',
       versionNumber: 1,
-      fileHash: Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
       fileSizeBytes: 150000,
       fileName: `${cleanDocName}.pdf`,
       fileDataUrl: fileDataUrl,
@@ -341,18 +342,18 @@ export const DocumentVaultView: React.FC = () => {
       tenantId: currentTenant?.id || 'tenant-001',
       documentCode: uploadTargetDef.code,
       documentName: uploadTargetDef.code === 'DOC-2' ? `${dtiSecType} Certificate` : uploadTargetDef.name,
-      documentNumber: docNumber.trim() || `REF-${Math.floor(Math.random()*899999 + 100000)}`,
+      documentNumber: docNumber.trim() || `REF-${Math.floor(Math.random() * 899999 + 100000)}`,
       category: 'ELIGIBILITY_CLASS_A',
       procurementApplicability: ['Goods & Supply', 'Goods & Supply with Installation', 'Infrastructure', 'Consulting'],
       legalBasisReference: uploadTargetDef.conditionalRuleNote,
       versionNumber: 1,
-      fileHash: Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
       fileSizeBytes: selectedFile.size,
       fileName: selectedFile.name,
       fileDataUrl: selectedFileDataUrl,
       issuedDate: reqIssue ? issuedDate : undefined,
       expiryDate: reqExp ? expiryDate : undefined,
-      status: reqExp && expiryDate && new Date(expiryDate) < new Date(Date.now() + 30*24*60*60*1000) ? 'EXPIRING_SOON' : 'ACTIVE',
+      status: reqExp && expiryDate && new Date(expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'EXPIRING_SOON' : 'ACTIVE',
       uploadedByName: currentUser?.fullName || 'Authorized Administrator',
       isOptional: uploadTargetDef.isOptional,
       requiresIssueDate: reqIssue,
@@ -382,18 +383,18 @@ export const DocumentVaultView: React.FC = () => {
       id: `doc-custom-${Date.now()}`,
       tenantId: currentTenant?.id || 'tenant-001',
       documentName: customDocName.trim(),
-      documentNumber: docNumber.trim() || `REF-${Math.floor(Math.random()*899999 + 100000)}`,
+      documentNumber: docNumber.trim() || `REF-${Math.floor(Math.random() * 899999 + 100000)}`,
       category: customUploadCategory,
       procurementApplicability: ['Goods & Supply', 'Goods & Supply with Installation', 'Infrastructure', 'Consulting'],
       legalBasisReference: 'RA 12009 NGPA Statutory Compliance Exhibit',
       versionNumber: 1,
-      fileHash: Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
       fileSizeBytes: selectedFile.size,
       fileName: selectedFile.name,
       fileDataUrl: selectedFileDataUrl,
       issuedDate: issuedDate || undefined,
       expiryDate: expiryDate || undefined,
-      status: expiryDate && new Date(expiryDate) < new Date(Date.now() + 30*24*60*60*1000) ? 'EXPIRING_SOON' : 'ACTIVE',
+      status: expiryDate && new Date(expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'EXPIRING_SOON' : 'ACTIVE',
       uploadedByName: currentUser?.fullName || 'Authorized Administrator',
       isOptional: true,
       requiresIssueDate: !!issuedDate,
@@ -426,13 +427,13 @@ export const DocumentVaultView: React.FC = () => {
       ...replaceTargetItem,
       versionNumber: replaceTargetItem.versionNumber + 1,
       documentNumber: docNumber.trim() || replaceTargetItem.documentNumber,
-      fileHash: Array.from({length: 64}, () => Math.floor(Math.random()*16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
       fileSizeBytes: selectedFile.size,
       fileName: selectedFile.name,
       fileDataUrl: selectedFileDataUrl || replaceTargetItem.fileDataUrl,
       issuedDate: replaceTargetItem.requiresIssueDate ? (issuedDate || replaceTargetItem.issuedDate) : undefined,
       expiryDate: replaceTargetItem.requiresExpiryDate ? (expiryDate || replaceTargetItem.expiryDate) : undefined,
-      status: replaceTargetItem.requiresExpiryDate && expiryDate && new Date(expiryDate) < new Date(Date.now() + 30*24*60*60*1000) ? 'EXPIRING_SOON' : 'ACTIVE',
+      status: replaceTargetItem.requiresExpiryDate && expiryDate && new Date(expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'EXPIRING_SOON' : 'ACTIVE',
       uploadedByName: currentUser?.fullName || 'Authorized Administrator',
       previousVersions: [archivedVersion, ...(replaceTargetItem.previousVersions || [])]
     };
@@ -443,7 +444,7 @@ export const DocumentVaultView: React.FC = () => {
   };
 
   const toggleSelectDoc = (id: string) => {
-    setSelectedItemIds(prev => 
+    setSelectedItemIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -463,8 +464,8 @@ export const DocumentVaultView: React.FC = () => {
 
   const filteredGridItems = vaultItems.filter(item => {
     const matchesSearch = item.documentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (item.documentNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (item.legalBasisReference || '').toLowerCase().includes(searchQuery.toLowerCase());
+      (item.documentNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.legalBasisReference || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCat = selectedCategory === 'ALL' || item.category === selectedCategory;
     return matchesSearch && matchesCat;
   });
@@ -473,14 +474,14 @@ export const DocumentVaultView: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      
+
       {/* Header Banner */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
           <div className="flex items-center gap-2">
-            <span 
-              className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }} 
+            <span
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
             />
             <h1 className="text-2xl font-bold text-white">Document Vault & Statutory Registry</h1>
           </div>
@@ -493,7 +494,7 @@ export const DocumentVaultView: React.FC = () => {
           <button
             onClick={handleResetClassAVault}
             className="px-4 py-2.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition flex items-center gap-2 shrink-0"
-            title="Remove all uploaded PDFs and reset PhilGEPS and Class A slots to v1.0 for re-uploading from scratch"
+            title="Remove all uploaded PDFs and reset  and CPhilGEPSlass A slots to v1.0 for re-uploading from scratch"
           >
             <RefreshCw className="w-4 h-4 text-amber-400" />
             <span>Reset & Refresh Vault (Re-upload from Scratch)</span>
@@ -523,25 +524,45 @@ export const DocumentVaultView: React.FC = () => {
         </div>
       </div>
 
+      {/* SUCCESS NOTIFICATION BANNER */}
+      {successBannerMessage && (
+        <div className="p-4 rounded-2xl bg-emerald-500/15 border-2 border-emerald-500/40 text-white flex items-center justify-between gap-4 shadow-xl animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 shrink-0">
+              <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-emerald-300 font-mono">{successBannerMessage}</h4>
+              <p className="text-xs text-slate-300 mt-0.5">Your document has been verified and stored in Document Vault. Click "View PDF" to preview your uploaded file.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setSuccessBannerMessage('')}
+            className="text-slate-400 hover:text-white transition p-1 shrink-0"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
       {/* ALL CATEGORY TABS RESTORED AT TOP */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
           {[
-            { id: 'ELIGIBILITY_CLASS_A', label: 'Class A Eligibility Matrix (13 Fixed)' },
             { id: 'ALL', label: 'All Vault Documents' },
-            { id: 'ELIGIBILITY_CLASS_B', label: 'Class B Joint Venture' },
-            { id: 'TECHNICAL', label: 'Technical Exhibits' },
-            { id: 'FINANCIAL', label: 'Financial / AFS' },
+            { id: 'ELIGIBILITY_CLASS_A', label: 'Class A Eligibility' },
+            { id: 'TECHNICAL', label: 'Technical Eligibility' },
+            { id: 'FINANCIAL', label: 'Financial Documents' },
             { id: 'CORPORATE_LEGAL', label: 'Corporate Legal' },
+            { id: 'ELIGIBILITY_CLASS_B', label: 'Class B Joint Venture' },
           ].map((cat) => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
-                selectedCategory === cat.id
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-              }`}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${selectedCategory === cat.id
+                ? 'bg-blue-600 text-white shadow-lg'
+                : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
             >
               <span>{cat.label}</span>
             </button>
@@ -579,11 +600,10 @@ export const DocumentVaultView: React.FC = () => {
       {/* TAB 1: CLASS A ELIGIBILITY MATRIX */}
       {selectedCategory === 'ELIGIBILITY_CLASS_A' && (
         <div className="space-y-6">
-          <div className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${
-            isClassAFullyCompliant 
-              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-              : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-          }`}>
+          <div className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${isClassAFullyCompliant
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+            : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+            }`}>
             <div className="flex items-center gap-3">
               <Award className="w-6 h-6 shrink-0" />
               <div>
@@ -591,8 +611,8 @@ export const DocumentVaultView: React.FC = () => {
                   Class A Eligibility Matrix Status: {completedMandatoryCount} / {mandatoryDefs.length} Mandatory Uploaded
                 </h3>
                 <p className="text-xs text-slate-400 font-mono mt-0.5">
-                  {isClassAFullyCompliant 
-                    ? '100% Mandatory Class A documents uploaded & verified. Ready for automated bid envelope assembly.' 
+                  {isClassAFullyCompliant
+                    ? '100% Mandatory Class A documents uploaded & verified. Ready for automated bid envelope assembly.'
                     : 'Upload the remaining mandatory Class A documents in the table below to pass GPPB eligibility audit.'}
                 </p>
               </div>
@@ -650,11 +670,10 @@ export const DocumentVaultView: React.FC = () => {
                     const isExp = daysRem !== null && daysRem < 0;
 
                     return (
-                      <tr 
+                      <tr
                         key={def.code}
-                        className={`hover:bg-slate-800/40 transition ${
-                          !isUploaded && !def.isOptional ? 'bg-red-500/5' : ''
-                        }`}
+                        className={`hover:bg-slate-800/40 transition ${!isUploaded && !def.isOptional ? 'bg-red-500/5' : ''
+                          }`}
                       >
                         <td className="py-3.5 px-4 font-mono font-bold text-slate-500 text-center">
                           {idx + 1}
@@ -721,9 +740,8 @@ export const DocumentVaultView: React.FC = () => {
                             </div>
                           ) : (
                             <div className="space-y-0.5">
-                              <span className={`text-[10px] font-semibold block ${
-                                def.isOptional ? 'text-slate-400' : 'text-red-400 font-bold'
-                              }`}>
+                              <span className={`text-[10px] font-semibold block ${def.isOptional ? 'text-slate-400' : 'text-red-400 font-bold'
+                                }`}>
                                 {def.isOptional ? 'Optional — Pending Upload' : 'Required — Missing'}
                               </span>
                               <span className="text-[10px] text-slate-500 block leading-tight">{def.conditionalRuleNote}</span>
@@ -746,11 +764,10 @@ export const DocumentVaultView: React.FC = () => {
                                     setReplaceTargetItem(uploadedItem);
                                     resetFormState();
                                   }}
-                                  className={`px-3 py-1.5 rounded-lg transition font-bold text-[11px] flex items-center gap-1.5 border shadow ${
-                                    isSoonExpiring || isExp || uploadedItem.status === 'EXPIRING_SOON' || uploadedItem.status === 'EXPIRED'
-                                      ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-400 animate-pulse'
-                                      : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border-emerald-500/30'
-                                  }`}
+                                  className={`px-3 py-1.5 rounded-lg transition font-bold text-[11px] flex items-center gap-1.5 border shadow ${isSoonExpiring || isExp || uploadedItem.status === 'EXPIRING_SOON' || uploadedItem.status === 'EXPIRED'
+                                    ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-400 animate-pulse'
+                                    : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border-emerald-500/30'
+                                    }`}
                                   title="Click to replace document at any time or update expiring document"
                                 >
                                   <RefreshCw className="w-3.5 h-3.5" />
@@ -785,7 +802,7 @@ export const DocumentVaultView: React.FC = () => {
       {/* TECHNICAL EXHIBITS — TECHNICAL DOCUMENTS SUB-TAB */}
       {selectedCategory === 'TECHNICAL' && (
         <div className="space-y-6">
-          
+
           {/* Sub-Tab Navigation Bar */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -822,10 +839,10 @@ export const DocumentVaultView: React.FC = () => {
 
                 return (
                   <div key={item.id} className="bg-slate-950/60 hover:bg-slate-900/50 transition">
-                    
+
                     {/* Main Row */}
                     <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      
+
                       <div className="flex items-start gap-3 min-w-0">
                         {/* Checkbox */}
                         <button
@@ -896,7 +913,7 @@ export const DocumentVaultView: React.FC = () => {
                             const isSubCompleted = techCompletedIds.includes(sub.id);
 
                             return (
-                              <div 
+                              <div
                                 key={sub.id}
                                 className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 text-xs"
                               >
@@ -972,13 +989,12 @@ export const DocumentVaultView: React.FC = () => {
                 const isSelected = selectedItemIds.includes(item.id);
 
                 return (
-                  <div 
+                  <div
                     key={item.id}
-                    className={`glass-card p-5 rounded-2xl border transition space-y-4 flex flex-col justify-between group cursor-pointer ${
-                      isSelected 
-                        ? 'border-blue-500 bg-blue-950/20 shadow-xl' 
-                        : 'border-slate-800 hover:border-slate-700'
-                    }`}
+                    className={`glass-card p-5 rounded-2xl border transition space-y-4 flex flex-col justify-between group cursor-pointer ${isSelected
+                      ? 'border-blue-500 bg-blue-950/20 shadow-xl'
+                      : 'border-slate-800 hover:border-slate-700'
+                      }`}
                     onClick={() => toggleSelectDoc(item.id)}
                   >
                     <div className="space-y-3">
@@ -1285,8 +1301,8 @@ export const DocumentVaultView: React.FC = () => {
                 >
                   <option value="ELIGIBILITY_CLASS_A">Class A Legal Eligibility</option>
                   <option value="ELIGIBILITY_CLASS_B">Class B Joint Venture</option>
-                  <option value="TECHNICAL">Technical Exhibits</option>
-                  <option value="FINANCIAL">Financial / AFS</option>
+                  <option value="TECHNICAL">Class A Technical Eligibility</option>
+                  <option value="FINANCIAL">Financial Documents</option>
                   <option value="CORPORATE_LEGAL">Corporate Legal</option>
                 </select>
               </div>
