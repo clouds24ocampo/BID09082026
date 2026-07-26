@@ -138,7 +138,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
         bidderRole: 'Sole Prime Contractor',
         amountAward: '',
         amountCompletion: '',
-        duration: '180 calendar days',
+        duration: '',
         dateAwarded: todayStr,
         dateStarted: todayStr,
         dateCompletion: todayStr,

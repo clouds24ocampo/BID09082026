@@ -138,7 +138,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
         bidderRole: 'Main Contractor',
         amountAward: '',
         amountCompletion: '',
-        duration: ' calendar days',
+        duration: '',
         dateAwarded: todayStr,
         dateStarted: todayStr,
         dateCompletion: todayStr,

@@ -61,19 +61,11 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
   const [validityDays, setValidityDays] = useState('');
   const [suretyCompany, setSuretyCompany] = useState('');
 
-  // Item (f.b) Key Personnel State
-  const [keyPersonnel, setKeyPersonnel] = useState([
-    { id: '1', name: 'Engr. Carlos R. Mendoza', position: 'Project Manager', profession: 'Licensed Civil Engineer', prcNo: 'PRC-0089123', totalExp: '15 Years', similarExp: '10 Years' },
-    { id: '2', name: 'Engr. Maria L. Santos', position: 'Senior Systems Architect', profession: 'Licensed Electronics Engineer', prcNo: 'PRC-0094512', totalExp: '12 Years', similarExp: '8 Years' },
-    { id: '3', name: 'Mr. Juanito P. Dela Cruz', position: 'Safety & Health Officer', profession: 'DOLE-Accredited BOSH/COSH', prcNo: 'DOLE-OHSO-2024', totalExp: '8 Years', similarExp: '6 Years' }
-  ]);
+  // Item (f.b) Key Personnel State (Clean Slate)
+  const [keyPersonnel, setKeyPersonnel] = useState<{ id: string; name: string; position: string; profession: string; prcNo: string; totalExp: string; similarExp: string }[]>([]);
 
-  // Item (f.c) Equipment State
-  const [equipmentList, setEquipmentList] = useState([
-    { id: '1', description: 'Heavy Duty Fiber Fusion Splicer Machine', model: 'Fujikura 90S+', serialNo: 'FS-90S-2025-88', status: 'Owned', proofRef: 'OR/CR #90812' },
-    { id: '2', description: 'OTDR Optical Time Domain Reflectometer', model: 'EXFO FTB-1v2', serialNo: 'EX-998231-PHI', status: 'Owned', proofRef: 'OR/CR #90815' },
-    { id: '3', description: '50 KVA Mobile Diesel Generator Set', model: 'Denyo DCA-50ES', serialNo: 'DEN-2024-551', status: 'Leased', proofRef: 'Lease Agreement #LA-2026-04' }
-  ]);
+  // Item (f.c) Equipment State (Clean Slate)
+  const [equipmentList, setEquipmentList] = useState<{ id: string; description: string; model: string; serialNo: string; status: string; proofRef: string }[]>([]);
 
   // Item (g) Notary Public State
   const [notaryCity, setNotaryCity] = useState('City of Manila');
