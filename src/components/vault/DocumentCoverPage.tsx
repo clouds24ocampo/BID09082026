@@ -119,7 +119,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({ item, tena
             </div>
             <div className="space-y-0.5">
               <h1 className="text-base font-black text-blue-950 uppercase tracking-wide leading-snug">
-                {tenant?.companyName || 'PHILIPPINE COMPLIANCE ENTERPRISE INC.'}
+                {tenant?.companyName || 'Not Set (Register Company in Profile)'}
               </h1>
               <p className="text-[11px] text-slate-600 flex items-center gap-2">
                 <span><MapPin className="w-3 h-3 text-blue-900 inline mr-0.5" />{tenant?.address || 'Metro Manila, Philippines'}</span>

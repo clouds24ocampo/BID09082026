@@ -44,10 +44,10 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo);
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
-  const [companyName, setCompanyName] = useState(tenant?.companyName || 'PHILIPPINE COMPLIANCE ENTERPRISE INC.');
-  const [companyAddress, setCompanyAddress] = useState(tenant?.address || 'Metro Manila, Philippines');
-  const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || 'ENGR. ANTONIO M. VALDEZ');
-  const [signatoryTitle, setSignatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'President & Managing Director');
+  const [companyName, setCompanyName] = useState(tenant?.companyName || 'Not Set (Register Company in Profile)');
+  const [companyAddress, setCompanyAddress] = useState(tenant?.address || 'Not Set');
+  const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || 'Authorized Signatory');
+  const [signatoryTitle, setSignatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'Company Representative');
   const [signatoryTin, setSignatoryTin] = useState(tenant?.authorizedSignatory?.tin || '123-456-789-000');
 
   // Item (d) Special PCAB License / JVA State

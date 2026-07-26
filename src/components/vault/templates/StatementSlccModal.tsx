@@ -20,7 +20,8 @@ import {
   Building2,
   Calendar,
   DollarSign,
-  ShieldCheck
+  ShieldCheck,
+  Clock
 } from 'lucide-react';
 
 export interface SlccContractRow {
@@ -68,60 +69,59 @@ const formatPhpCurrency = (val: string): string => {
   return `₱${formattedInt}.${formattedDec}`;
 };
 
+const getNowDateTimeString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const mins = String(now.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${mins}`;
+};
+
 export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
   tenant,
-  activeProjectRefNo = 'PRJ-2026-901283',
-  activeProjectTitle = 'Infrastructure & IT Systems Modernization Project',
-  activeProcuringEntity = 'Department of Information & Communications Technology',
+  activeProjectRefNo = '',
+  activeProjectTitle = '',
+  activeProcuringEntity = '',
   onSaveAndComplete,
   onClose
 }) => {
   const [isNoSlcc, setIsNoSlcc] = useState(false);
   const todayStr = new Date().toISOString().split('T')[0];
-  const [dateSubmitted, setDateSubmitted] = useState(todayStr);
+  const [dateTimeSubmitted, setDateTimeSubmitted] = useState<string>(getNowDateTimeString());
 
-  // Target Project Information (Auto-filled on Legal Template)
+  // Target Project Information (Auto-filled directly from Opportunity Finder)
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo);
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
-  const [solicitationNumber, setSolicitationNumber] = useState('SOL-2026-00891');
+  const [solicitationNumber, setSolicitationNumber] = useState('');
 
-  // Opportunity Finder Project List State
+  // Opportunity Finder Project List State (Strictly real user opportunities)
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
   useEffect(() => {
     const list = getOpportunityProjects();
     setOppProjects(list);
+    if (list.length > 0 && !selectedOppId) {
+      const first = list[0];
+      setSelectedOppId(first.id);
+      setProjectRefNo(first.refNo);
+      setSolicitationNumber(first.solicitationNo || 'N/A');
+      setProjectTitle(first.title);
+      setProcuringEntity(first.procuringEntity);
+      if (first.dateTimeSubmitted) {
+        setDateTimeSubmitted(first.dateTimeSubmitted);
+      }
+    }
   }, []);
 
   // Form Editor Modal state for editing or creating an SLCC contract row
   const [editingRow, setEditingRow] = useState<SlccContractRow | null>(null);
 
-  const [contracts, setContracts] = useState<SlccContractRow[]>([
-    {
-      id: 'slcc-1',
-      type: 'Government',
-      projectName: 'Single Largest Completed Telecom & Fiber Network Expansion',
-      ownerName: 'National Telecommunications Commission (NTC)',
-      ownerAddress: 'NTC Building, BIR Road, Diliman, Quezon City',
-      ownerTelephone: '+63 2 8924 4010',
-      natureOfWork: 'Fiber Optic Backbone Installation & Systems Commissioning',
-      bidderRole: 'Sole Prime Contractor',
-      amountAward: '₱12,500,000.00',
-      amountCompletion: '₱12,500,000.00',
-      duration: '240 calendar days',
-      dateAwarded: '2025-01-10',
-      dateStarted: '2025-01-20',
-      dateCompletion: '2025-09-15',
-      accomplishmentPlanned: 100,
-      accomplishmentActual: 100,
-      pdfFile: {
-        fileName: 'Certificate_of_Acceptance_NTC_2025.pdf',
-        fileSizeBytes: 3120000
-      }
-    }
-  ]);
+  // CLEAN SLATE: Initial state has zero dummy contracts
+  const [contracts, setContracts] = useState<SlccContractRow[]>([]);
 
   const openFormEditor = (existingRow?: SlccContractRow, defaultType: 'Government' | 'Private' = 'Government') => {
     if (existingRow) {
@@ -223,7 +223,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
       const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
       if (!templateElem) return undefined;
 
-      // 1. Convert template element to high-res canvas image
+      // 1. Convert template element to high-res canvas image (Scale 2.5)
       const canvas = await html2canvas(templateElem, {
         scale: 2.5,
         useCORS: true,
@@ -280,7 +280,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
   };
 
   const handleExportPdf = async () => {
-    const projRef = projectRefNo || 'PRJ-2026-901283';
+    const projRef = projectRefNo || 'UNLINKED_PROJECT';
     const docName = 'Statement_of_Single_Largest_Completed_Contract_SLCC';
     const today = new Date().toISOString().split('T')[0];
     const fileName = `${projRef}_${docName}_${today}.pdf`;
@@ -310,6 +310,12 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
 
   const govContracts = contracts.filter(c => c.type === 'Government');
   const privContracts = contracts.filter(c => c.type === 'Private');
+
+  // Format date-time for display
+  const formatDateTimeDisplay = (dtStr: string) => {
+    if (!dtStr) return 'N/A';
+    return dtStr.replace('T', ' ');
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
@@ -403,7 +409,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-white font-mono flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-blue-400" />
-                Target Bidding Project Auto-Fill Settings
+                Target Bidding Project Auto-Fill Settings (Linked to Opportunity Finder)
               </span>
               <span className="text-[10px] text-slate-400 font-mono">Changes auto-fill directly onto Legal Template header below</span>
             </div>
@@ -412,7 +418,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
             <div>
               <label className="block text-slate-300 font-mono text-[11px] mb-1 flex items-center justify-between">
                 <span className="font-bold text-blue-300">Select Project from Opportunity Finder:</span>
-                <span className="text-[10px] text-emerald-400 font-semibold">⚡ Auto-populates all template header fields</span>
+                <span className="text-[10px] text-emerald-400 font-semibold">⚡ Auto-populates template header from real saved opportunities</span>
               </label>
               <select
                 value={selectedOppId}
@@ -422,18 +428,28 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   const found = oppProjects.find(p => p.id === val || p.refNo === val);
                   if (found) {
                     setProjectRefNo(found.refNo);
+                    setSolicitationNumber(found.solicitationNo || 'N/A');
                     setProjectTitle(found.title);
                     setProcuringEntity(found.procuringEntity);
+                    if (found.dateTimeSubmitted) {
+                      setDateTimeSubmitted(found.dateTimeSubmitted);
+                    }
                   }
                 }}
                 className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3 py-2 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner"
               >
-                <option value="">-- Select Active Bidding Opportunity / Project --</option>
-                {oppProjects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    [{p.refNo}] {p.title} — {p.procuringEntity} ({p.abc})
-                  </option>
-                ))}
+                {oppProjects.length === 0 ? (
+                  <option value="">-- No Active Bidding Projects Saved in Opportunity Finder. Add a Project in Opportunity Finder --</option>
+                ) : (
+                  <>
+                    <option value="">-- Select Active Bidding Opportunity / Project --</option>
+                    {oppProjects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        [{p.refNo}] {p.title} — {p.procuringEntity} ({p.abc})
+                      </option>
+                    ))}
+                  </>
+                )}
               </select>
             </div>
 
@@ -444,7 +460,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   type="text"
                   value={projectRefNo}
                   onChange={(e) => setProjectRefNo(e.target.value)}
-                  placeholder="e.g. PhilGEPS-2026-10928371"
+                  placeholder="Select from Opportunity Finder"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -455,7 +471,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   type="text"
                   value={solicitationNumber}
                   onChange={(e) => setSolicitationNumber(e.target.value)}
-                  placeholder="e.g. SOL-2026-00891"
+                  placeholder="e.g. SOL-2026-001"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -466,7 +482,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   type="text"
                   value={projectTitle}
                   onChange={(e) => setProjectTitle(e.target.value)}
-                  placeholder="e.g. Construction of Multi-Purpose Center"
+                  placeholder="Select from Opportunity Finder"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-semibold focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -477,18 +493,18 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   type="text"
                   value={procuringEntity}
                   onChange={(e) => setProcuringEntity(e.target.value)}
-                  placeholder="e.g. DPWH Region IV-A"
+                  placeholder="Select from Opportunity Finder"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1">5. Date of Submission</label>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">5. Date & Time of Submission</label>
                 <input
-                  type="date"
-                  value={dateSubmitted}
-                  onChange={(e) => setDateSubmitted(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono focus:outline-none focus:border-blue-500"
+                  type="datetime-local"
+                  value={dateTimeSubmitted}
+                  onChange={(e) => setDateTimeSubmitted(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono text-[11px] focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
@@ -550,15 +566,15 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
               {/* TEMPLATE HEADER: Auto-Populated Fields */}
               <div className="border-b-2 border-slate-900 pb-3 space-y-2">
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
-                  <span>PROJECT REF. NO: <strong className="text-blue-950 font-extrabold">{projectRefNo}</strong></span>
-                  <span>SOLICITATION NO: <strong className="text-blue-950 font-extrabold">{solicitationNumber}</strong></span>
+                  <span>PROJECT REF. NO: <strong className="text-blue-950 font-extrabold">{projectRefNo || 'UNLINKED (Select Project)'}</strong></span>
+                  <span>SOLICITATION NO: <strong className="text-blue-950 font-extrabold">{solicitationNumber || 'N/A'}</strong></span>
                 </div>
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
-                  <span>NAME OF PROJECT: <strong className="text-blue-950 font-extrabold">{projectTitle}</strong></span>
-                  <span>DATE OF SUBMISSION: <strong className="text-slate-950 font-extrabold">{dateSubmitted}</strong></span>
+                  <span>NAME OF PROJECT: <strong className="text-blue-950 font-extrabold">{projectTitle || 'UNLINKED (Select Project)'}</strong></span>
+                  <span>DATE & TIME OF SUBMISSION: <strong className="text-slate-950 font-extrabold">{formatDateTimeDisplay(dateTimeSubmitted)}</strong></span>
                 </div>
                 <div className="text-xs font-mono text-slate-800">
-                  <span>PROCURING ENTITY: <strong className="text-slate-950">{procuringEntity}</strong></span>
+                  <span>PROCURING ENTITY: <strong className="text-slate-950">{procuringEntity || 'UNLINKED'}</strong></span>
                 </div>
 
                 <div className="text-center pt-1 space-y-0.5">
@@ -573,11 +589,11 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                 <div className="grid grid-cols-2 gap-4 text-xs font-mono pt-1.5 border-t border-slate-300">
                   <div>
                     <span className="font-bold text-slate-950">BUSINESS NAME:</span>{' '}
-                    <strong className="text-blue-950 uppercase">{tenant?.companyName || 'PHILIPPINE COMPLIANCE ENTERPRISE INC.'}</strong>
+                    <strong className="text-blue-950 uppercase">{tenant?.companyName || 'Not Set (Register Company in Profile)'}</strong>
                   </div>
                   <div>
                     <span className="font-bold text-slate-950">BUSINESS ADDRESS:</span>{' '}
-                    <span>{tenant?.address || 'Metro Manila, Philippines'}</span>
+                    <span>{tenant?.address || 'Not Set'}</span>
                   </div>
                 </div>
               </div>
@@ -809,7 +825,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
 
               </div>
 
-              {/* FOOTER SECTION: Static Note, Signatory & Date */}
+              {/* FOOTER SECTION: Static Note, Signatory & Date & Time */}
               <div className="border-t-2 border-slate-900 pt-3 space-y-3 text-xs font-mono">
                 <div className="p-2.5 rounded-lg bg-slate-100 border border-slate-300 text-[10px] text-slate-800 font-medium">
                   <strong>This Statement Must be Supported With:</strong> 1. Contract / Purchase Order 2. Certificate of Completion or Certificate of Acceptance 3. Official Receipt / Sales Invoice
@@ -818,25 +834,25 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                 <div className="flex items-end justify-between gap-6 pt-1">
                   <div className="space-y-0.5">
                     <span className="text-[10px] text-slate-500 block uppercase">Submitted By:</span>
-                    <p className="font-bold text-slate-950">{tenant?.companyName || 'PHILIPPINE COMPLIANCE ENTERPRISE INC.'}</p>
+                    <p className="font-bold text-slate-950">{tenant?.companyName || 'Not Set (Register Company in Profile)'}</p>
                   </div>
 
-                  <div className="text-right space-y-0.5 min-w-[220px]">
+                  <div className="text-right space-y-0.5 min-w-[240px]">
                     <div className="border-b-2 border-slate-950 pb-0.5 font-bold text-slate-950 text-sm">
-                      {tenant?.authorizedSignatory?.name || 'Engr. Juan Dela Cruz'}
+                      {tenant?.authorizedSignatory?.name || 'Authorized Signatory'}
                     </div>
                     <p className="text-[11px] text-slate-700 font-semibold">
-                      {tenant?.authorizedSignatory?.title || 'President & Managing Director'}
+                      {tenant?.authorizedSignatory?.title || 'Company Representative'}
                     </p>
                     <div className="flex items-center justify-end gap-1 text-xs text-black pt-1 font-mono" style={{ color: '#000000', fontWeight: 'bold' }}>
-                      <span className="font-bold">Date:</span>
+                      <span className="font-bold flex items-center gap-1"><Clock className="w-3 h-3 inline text-slate-800" /> Date & Time:</span>
                       <span className="font-extrabold text-black" style={{ color: '#000000', fontWeight: '900' }}>
-                        {dateSubmitted || new Date().toISOString().split('T')[0]}
+                        {formatDateTimeDisplay(dateTimeSubmitted)}
                       </span>
                       <input
-                        type="date"
-                        value={dateSubmitted}
-                        onChange={(e) => setDateSubmitted(e.target.value)}
+                        type="datetime-local"
+                        value={dateTimeSubmitted}
+                        onChange={(e) => setDateTimeSubmitted(e.target.value)}
                         className="bg-transparent border-0 text-[10px] font-bold text-slate-950 print:hidden no-export-btn ml-1 cursor-pointer opacity-80"
                       />
                     </div>
@@ -909,7 +925,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                     type="text"
                     value={editingRow.projectName}
                     onChange={(e) => setEditingRow({ ...editingRow, projectName: e.target.value })}
-                    placeholder="e.g. Completed Telecom Backbone Expansion"
+                    placeholder="e.g. Single Largest Completed Project"
                     required
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-semibold focus:outline-none focus:border-purple-500"
                   />
@@ -930,7 +946,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                       type="text"
                       value={editingRow.ownerName}
                       onChange={(e) => setEditingRow({ ...editingRow, ownerName: e.target.value })}
-                      placeholder="e.g. National Telecommunications Commission"
+                      placeholder="e.g. Procuring Agency / Client"
                       required
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white"
                     />
@@ -954,7 +970,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                       type="text"
                       value={editingRow.ownerTelephone}
                       onChange={(e) => setEditingRow({ ...editingRow, ownerTelephone: e.target.value })}
-                      placeholder="+63 2 8924 4010"
+                      placeholder="+63 2 8924 0000"
                       required
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
                     />
@@ -970,7 +986,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                     rows={2}
                     value={editingRow.natureOfWork}
                     onChange={(e) => setEditingRow({ ...editingRow, natureOfWork: e.target.value })}
-                    placeholder="Fiber Optic Backbone Installation & Systems Integration"
+                    placeholder="General Construction & Engineering Work"
                     required
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500"
                   />
@@ -1004,7 +1020,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                       value={editingRow.amountAward}
                       onChange={(e) => setEditingRow({ ...editingRow, amountAward: e.target.value })}
                       onBlur={() => setEditingRow({ ...editingRow, amountAward: formatPhpCurrency(editingRow.amountAward) })}
-                      placeholder="₱12,500,000.00"
+                      placeholder="₱0.00"
                       required
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold text-emerald-400 focus:border-emerald-400"
                     />
@@ -1020,7 +1036,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                       value={editingRow.amountCompletion}
                       onChange={(e) => setEditingRow({ ...editingRow, amountCompletion: e.target.value })}
                       onBlur={() => setEditingRow({ ...editingRow, amountCompletion: formatPhpCurrency(editingRow.amountCompletion) })}
-                      placeholder="₱12,500,000.00"
+                      placeholder="₱0.00"
                       required
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold text-purple-400 focus:border-purple-400"
                     />
@@ -1035,7 +1051,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                       type="text"
                       value={editingRow.duration}
                       onChange={(e) => setEditingRow({ ...editingRow, duration: e.target.value })}
-                      placeholder="240 calendar days"
+                      placeholder="180 calendar days"
                       required
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
                     />

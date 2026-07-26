@@ -785,15 +785,13 @@ export const DocumentVaultView: React.FC = () => {
 
       {/* UNIFIED VAULT SUCCESS / FAILURE NOTIFICATION BANNER */}
       {vaultNotification && (
-        <div className={`p-4 rounded-2xl border-2 flex items-start justify-between gap-4 shadow-xl animate-fadeIn ${
-          vaultNotification.type === 'SUCCESS'
-            ? 'bg-emerald-500/15 border-emerald-500/40 text-white'
-            : 'bg-red-500/15 border-red-500/40 text-white'
-        }`}>
+        <div className={`p-4 rounded-2xl border-2 flex items-start justify-between gap-4 shadow-xl animate-fadeIn ${vaultNotification.type === 'SUCCESS'
+          ? 'bg-emerald-500/15 border-emerald-500/40 text-white'
+          : 'bg-red-500/15 border-red-500/40 text-white'
+          }`}>
           <div className="flex items-start gap-3">
-            <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${
-              vaultNotification.type === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
-            }`}>
+            <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${vaultNotification.type === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+              }`}>
               {vaultNotification.type === 'SUCCESS' ? (
                 <CheckCircle2 className="w-6 h-6 text-emerald-400" />
               ) : (
@@ -801,9 +799,8 @@ export const DocumentVaultView: React.FC = () => {
               )}
             </div>
             <div className="space-y-1">
-              <h4 className={`text-sm font-bold font-mono ${
-                vaultNotification.type === 'SUCCESS' ? 'text-emerald-300' : 'text-red-300'
-              }`}>
+              <h4 className={`text-sm font-bold font-mono ${vaultNotification.type === 'SUCCESS' ? 'text-emerald-300' : 'text-red-300'
+                }`}>
                 {vaultNotification.title}
               </h4>
               <p className="text-xs text-slate-300 leading-relaxed">{vaultNotification.message}</p>
@@ -1197,11 +1194,10 @@ export const DocumentVaultView: React.FC = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setTechSubTab('CHECKLIST')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
-                  techSubTab === 'CHECKLIST'
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                }`}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${techSubTab === 'CHECKLIST'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
               >
                 <FileSignature className="w-4 h-4" />
                 <span>Technical Requirements Checklist</span>
@@ -1212,11 +1208,10 @@ export const DocumentVaultView: React.FC = () => {
 
               <button
                 onClick={() => setTechSubTab('COMPLETED')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
-                  techSubTab === 'COMPLETED'
-                    ? 'bg-emerald-600 text-white shadow-lg'
-                    : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                }`}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${techSubTab === 'COMPLETED'
+                  ? 'bg-emerald-600 text-white shadow-lg'
+                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                  }`}
               >
                 <CheckCircle2 className="w-4 h-4 text-emerald-300" />
                 <span>Completed Technical Documents & Forms</span>

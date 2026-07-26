@@ -20,7 +20,8 @@ import {
   Building2,
   Calendar,
   DollarSign,
-  ShieldCheck
+  ShieldCheck,
+  Clock
 } from 'lucide-react';
 
 export interface OngoingContractRow {
@@ -68,60 +69,59 @@ const formatPhpCurrency = (val: string): string => {
   return `₱${formattedInt}.${formattedDec}`;
 };
 
+const getNowDateTimeString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const mins = String(now.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${mins}`;
+};
+
 export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsModalProps> = ({
   tenant,
-  activeProjectRefNo = 'PRJ-2026-901283',
-  activeProjectTitle = 'Infrastructure & IT Systems Modernization Project',
-  activeProcuringEntity = 'Department of Information & Communications Technology',
+  activeProjectRefNo = '',
+  activeProjectTitle = '',
+  activeProcuringEntity = '',
   onSaveAndComplete,
   onClose
 }) => {
   const [isNoOngoing, setIsNoOngoing] = useState(false);
   const todayStr = new Date().toISOString().split('T')[0];
-  const [dateSubmitted, setDateSubmitted] = useState(todayStr);
+  const [dateTimeSubmitted, setDateTimeSubmitted] = useState<string>(getNowDateTimeString());
 
-  // Target Project Information (Auto-filled on Legal Template)
+  // Target Project Information (Auto-filled directly from Opportunity Finder)
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo);
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
-  const [solicitationNumber, setSolicitationNumber] = useState('SOL-2026-00891');
+  const [solicitationNumber, setSolicitationNumber] = useState('');
 
-  // Opportunity Finder Project List State
+  // Opportunity Finder Project List State (Strictly real user opportunities)
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
   useEffect(() => {
     const list = getOpportunityProjects();
     setOppProjects(list);
+    if (list.length > 0 && !selectedOppId) {
+      const first = list[0];
+      setSelectedOppId(first.id);
+      setProjectRefNo(first.refNo);
+      setSolicitationNumber(first.solicitationNo || 'N/A');
+      setProjectTitle(first.title);
+      setProcuringEntity(first.procuringEntity);
+      if (first.dateTimeSubmitted) {
+        setDateTimeSubmitted(first.dateTimeSubmitted);
+      }
+    }
   }, []);
 
   // Form Editor Modal state for editing or creating a contract row
   const [editingRow, setEditingRow] = useState<OngoingContractRow | null>(null);
 
-  const [contracts, setContracts] = useState<OngoingContractRow[]>([
-    {
-      id: 'gov-1',
-      type: 'Government',
-      projectName: 'Supply and Installation of Network Operations Infrastructure',
-      ownerName: 'Department of Transportation (DOTr)',
-      ownerAddress: 'DOTr Building, Clark Freeport Zone, Pampanga',
-      ownerTelephone: '+63 45 123 4567',
-      natureOfWork: 'IT Systems Integration & Telecom Installation',
-      bidderRole: 'Prime Contractor',
-      amountAward: '₱4,500,000.00',
-      amountCompletion: '₱4,500,000.00',
-      duration: '180 calendar days',
-      dateAwarded: '2026-01-15',
-      dateStarted: '2026-02-01',
-      dateCompletion: '2026-07-30',
-      accomplishmentPlanned: 85,
-      accomplishmentActual: 82,
-      pdfFile: {
-        fileName: 'Notice_of_Award_DOTr_2026.pdf',
-        fileSizeBytes: 2450000
-      }
-    }
-  ]);
+  // CLEAN SLATE: Initial state has zero dummy contracts
+  const [contracts, setContracts] = useState<OngoingContractRow[]>([]);
 
   const openFormEditor = (existingRow?: OngoingContractRow, defaultType: 'Government' | 'Private' = 'Government') => {
     if (existingRow) {
@@ -138,7 +138,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
         bidderRole: 'Prime Contractor',
         amountAward: '',
         amountCompletion: '',
-        duration: '120 calendar days',
+        duration: '180 calendar days',
         dateAwarded: todayStr,
         dateStarted: todayStr,
         dateCompletion: todayStr,
@@ -223,7 +223,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
       const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
       if (!templateElem) return undefined;
 
-      // 1. Convert template element to high-res canvas image (Scale 2.5 for crisp dark text)
+      // 1. Convert template element to high-res canvas image (Scale 2.5)
       const canvas = await html2canvas(templateElem, {
         scale: 2.5,
         useCORS: true,
@@ -280,8 +280,8 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
   };
 
   const handleExportPdf = async () => {
-    const projRef = projectRefNo || 'PRJ-2026-901283';
-    const docName = 'Statement_of_All_Ongoing_Contracts';
+    const projRef = projectRefNo || 'UNLINKED_PROJECT';
+    const docName = 'Statement_of_All_Ongoing_Government_and_Private_Contracts';
     const today = new Date().toISOString().split('T')[0];
     const fileName = `${projRef}_${docName}_${today}.pdf`;
 
@@ -310,6 +310,12 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
 
   const govContracts = contracts.filter(c => c.type === 'Government');
   const privContracts = contracts.filter(c => c.type === 'Private');
+
+  // Format date-time for display
+  const formatDateTimeDisplay = (dtStr: string) => {
+    if (!dtStr) return 'N/A';
+    return dtStr.replace('T', ' ');
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
@@ -403,7 +409,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-white font-mono flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-blue-400" />
-                Target Bidding Project Auto-Fill Settings
+                Target Bidding Project Auto-Fill Settings (Linked to Opportunity Finder)
               </span>
               <span className="text-[10px] text-slate-400 font-mono">Changes auto-fill directly onto Legal Template header below</span>
             </div>
@@ -412,7 +418,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
             <div>
               <label className="block text-slate-300 font-mono text-[11px] mb-1 flex items-center justify-between">
                 <span className="font-bold text-blue-300">Select Project from Opportunity Finder:</span>
-                <span className="text-[10px] text-emerald-400 font-semibold">⚡ Auto-populates all template header fields</span>
+                <span className="text-[10px] text-emerald-400 font-semibold">⚡ Auto-populates template header from real saved opportunities</span>
               </label>
               <select
                 value={selectedOppId}
@@ -422,18 +428,28 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                   const found = oppProjects.find(p => p.id === val || p.refNo === val);
                   if (found) {
                     setProjectRefNo(found.refNo);
+                    setSolicitationNumber(found.solicitationNo || 'N/A');
                     setProjectTitle(found.title);
                     setProcuringEntity(found.procuringEntity);
+                    if (found.dateTimeSubmitted) {
+                      setDateTimeSubmitted(found.dateTimeSubmitted);
+                    }
                   }
                 }}
                 className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3 py-2 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner"
               >
-                <option value="">-- Select Active Bidding Opportunity / Project --</option>
-                {oppProjects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    [{p.refNo}] {p.title} — {p.procuringEntity} ({p.abc})
-                  </option>
-                ))}
+                {oppProjects.length === 0 ? (
+                  <option value="">-- No Active Bidding Projects Saved in Opportunity Finder. Add a Project in Opportunity Finder --</option>
+                ) : (
+                  <>
+                    <option value="">-- Select Active Bidding Opportunity / Project --</option>
+                    {oppProjects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        [{p.refNo}] {p.title} — {p.procuringEntity} ({p.abc})
+                      </option>
+                    ))}
+                  </>
+                )}
               </select>
             </div>
 
@@ -444,7 +460,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                   type="text"
                   value={projectRefNo}
                   onChange={(e) => setProjectRefNo(e.target.value)}
-                  placeholder="e.g. PhilGEPS-2026-10928371"
+                  placeholder="Select from Opportunity Finder"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -455,7 +471,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                   type="text"
                   value={solicitationNumber}
                   onChange={(e) => setSolicitationNumber(e.target.value)}
-                  placeholder="e.g. SOL-2026-00891"
+                  placeholder="e.g. SOL-2026-001"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -466,7 +482,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                   type="text"
                   value={projectTitle}
                   onChange={(e) => setProjectTitle(e.target.value)}
-                  placeholder="e.g. Construction of Multi-Purpose Center"
+                  placeholder="Select from Opportunity Finder"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-semibold focus:outline-none focus:border-blue-500"
                 />
               </div>
@@ -477,18 +493,18 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                   type="text"
                   value={procuringEntity}
                   onChange={(e) => setProcuringEntity(e.target.value)}
-                  placeholder="e.g. DPWH Region IV-A"
+                  placeholder="Select from Opportunity Finder"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1">5. Date of Submission</label>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1">5. Date & Time of Submission</label>
                 <input
-                  type="date"
-                  value={dateSubmitted}
-                  onChange={(e) => setDateSubmitted(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono focus:outline-none focus:border-blue-500"
+                  type="datetime-local"
+                  value={dateTimeSubmitted}
+                  onChange={(e) => setDateTimeSubmitted(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono text-[11px] focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
@@ -550,15 +566,15 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
               {/* TEMPLATE HEADER: Auto-Populated Fields */}
               <div className="border-b-2 border-slate-900 pb-3 space-y-2">
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
-                  <span>PROJECT REF. NO: <strong className="text-blue-950 font-extrabold">{projectRefNo}</strong></span>
-                  <span>SOLICITATION NO: <strong className="text-blue-950 font-extrabold">{solicitationNumber}</strong></span>
+                  <span>PROJECT REF. NO: <strong className="text-blue-950 font-extrabold">{projectRefNo || 'UNLINKED (Select Project)'}</strong></span>
+                  <span>SOLICITATION NO: <strong className="text-blue-950 font-extrabold">{solicitationNumber || 'N/A'}</strong></span>
                 </div>
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
-                  <span>NAME OF PROJECT: <strong className="text-blue-950 font-extrabold">{projectTitle}</strong></span>
-                  <span>DATE OF SUBMISSION: <strong className="text-slate-950 font-extrabold">{dateSubmitted}</strong></span>
+                  <span>NAME OF PROJECT: <strong className="text-blue-950 font-extrabold">{projectTitle || 'UNLINKED (Select Project)'}</strong></span>
+                  <span>DATE & TIME OF SUBMISSION: <strong className="text-slate-950 font-extrabold">{formatDateTimeDisplay(dateTimeSubmitted)}</strong></span>
                 </div>
                 <div className="text-xs font-mono text-slate-800">
-                  <span>PROCURING ENTITY: <strong className="text-slate-950">{procuringEntity}</strong></span>
+                  <span>PROCURING ENTITY: <strong className="text-slate-950">{procuringEntity || 'UNLINKED'}</strong></span>
                 </div>
 
                 <div className="text-center pt-1 space-y-0.5">
@@ -573,11 +589,11 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                 <div className="grid grid-cols-2 gap-4 text-xs font-mono pt-1.5 border-t border-slate-300">
                   <div>
                     <span className="font-bold text-slate-950">BUSINESS NAME:</span>{' '}
-                    <strong className="text-blue-950 uppercase">{tenant?.companyName || 'PHILIPPINE COMPLIANCE ENTERPRISE INC.'}</strong>
+                    <strong className="text-blue-950 uppercase">{tenant?.companyName || 'Not Set (Register Company in Profile)'}</strong>
                   </div>
                   <div>
                     <span className="font-bold text-slate-950">BUSINESS ADDRESS:</span>{' '}
-                    <span>{tenant?.address || 'Metro Manila, Philippines'}</span>
+                    <span>{tenant?.address || 'Not Set'}</span>
                   </div>
                 </div>
               </div>
@@ -809,7 +825,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
 
               </div>
 
-              {/* FOOTER SECTION: Static Note, Signatory & Date */}
+              {/* FOOTER SECTION: Static Note, Signatory & Date & Time */}
               <div className="border-t-2 border-slate-900 pt-3 space-y-3 text-xs font-mono">
                 <div className="p-2.5 rounded-lg bg-slate-100 border border-slate-300 text-[10px] text-slate-800 font-medium">
                   <strong>This Statement Must be Supported With:</strong> 1. Contract 2. CPES Rating Sheets And / or Certificate of Completion 3. Certificate of Acceptance
@@ -818,25 +834,25 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                 <div className="flex items-end justify-between gap-6 pt-1">
                   <div className="space-y-0.5">
                     <span className="text-[10px] text-slate-500 block uppercase">Submitted By:</span>
-                    <p className="font-bold text-slate-950">{tenant?.companyName || 'PHILIPPINE COMPLIANCE ENTERPRISE INC.'}</p>
+                    <p className="font-bold text-slate-950">{tenant?.companyName || 'Not Set (Register Company in Profile)'}</p>
                   </div>
 
-                  <div className="text-right space-y-0.5 min-w-[220px]">
+                  <div className="text-right space-y-0.5 min-w-[240px]">
                     <div className="border-b-2 border-slate-950 pb-0.5 font-bold text-slate-950 text-sm">
-                      {tenant?.authorizedSignatory?.name || 'Engr. Juan Dela Cruz'}
+                      {tenant?.authorizedSignatory?.name || 'Authorized Signatory'}
                     </div>
                     <p className="text-[11px] text-slate-700 font-semibold">
-                      {tenant?.authorizedSignatory?.title || 'President & Managing Director'}
+                      {tenant?.authorizedSignatory?.title || 'Company Representative'}
                     </p>
                     <div className="flex items-center justify-end gap-1 text-xs text-black pt-1 font-mono" style={{ color: '#000000', fontWeight: 'bold' }}>
-                      <span className="font-bold">Date:</span>
+                      <span className="font-bold flex items-center gap-1"><Clock className="w-3 h-3 inline text-slate-800" /> Date & Time:</span>
                       <span className="font-extrabold text-black" style={{ color: '#000000', fontWeight: '900' }}>
-                        {dateSubmitted || new Date().toISOString().split('T')[0]}
+                        {formatDateTimeDisplay(dateTimeSubmitted)}
                       </span>
                       <input
-                        type="date"
-                        value={dateSubmitted}
-                        onChange={(e) => setDateSubmitted(e.target.value)}
+                        type="datetime-local"
+                        value={dateTimeSubmitted}
+                        onChange={(e) => setDateTimeSubmitted(e.target.value)}
                         className="bg-transparent border-0 text-[10px] font-bold text-slate-950 print:hidden no-export-btn ml-1 cursor-pointer opacity-80"
                       />
                     </div>
@@ -880,7 +896,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
             <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Edit3 className="w-4 h-4 text-blue-400" />
-                Fill Out Contract Entry Form — Item (b)
+                Fill Out Ongoing Contract Entry Form — Item (b)
               </h3>
               <button onClick={() => setEditingRow(null)} className="text-slate-400 hover:text-white p-1">
                 <X className="w-5 h-5" />
@@ -898,8 +914,8 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                     onChange={(e) => setEditingRow({ ...editingRow, type: e.target.value as 'Government' | 'Private' })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-semibold focus:outline-none focus:border-blue-500"
                   >
-                    <option value="Government">Government Contract</option>
-                    <option value="Private">Private Contract</option>
+                    <option value="Government">Government Ongoing Contract</option>
+                    <option value="Private">Private Ongoing Contract</option>
                   </select>
                 </div>
 
@@ -909,7 +925,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                     type="text"
                     value={editingRow.projectName}
                     onChange={(e) => setEditingRow({ ...editingRow, projectName: e.target.value })}
-                    placeholder="e.g. Construction of 5-Storey Building"
+                    placeholder="e.g. Infrastructure Project"
                     required
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white font-semibold focus:outline-none focus:border-blue-500"
                   />
@@ -930,7 +946,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                       type="text"
                       value={editingRow.ownerName}
                       onChange={(e) => setEditingRow({ ...editingRow, ownerName: e.target.value })}
-                      placeholder="e.g. DPWH Region 3"
+                      placeholder="e.g. Department of Public Works"
                       required
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white"
                     />
@@ -954,7 +970,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                       type="text"
                       value={editingRow.ownerTelephone}
                       onChange={(e) => setEditingRow({ ...editingRow, ownerTelephone: e.target.value })}
-                      placeholder="+63 917 123 4567"
+                      placeholder="+63 2 8924 0000"
                       required
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
                     />
@@ -970,7 +986,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                     rows={2}
                     value={editingRow.natureOfWork}
                     onChange={(e) => setEditingRow({ ...editingRow, natureOfWork: e.target.value })}
-                    placeholder="General Building Construction / Systems Integration"
+                    placeholder="General Construction & Engineering"
                     required
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                   />
@@ -982,7 +998,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                     type="text"
                     value={editingRow.bidderRole}
                     onChange={(e) => setEditingRow({ ...editingRow, bidderRole: e.target.value })}
-                    placeholder="e.g. Sole Contractor / Prime Contractor"
+                    placeholder="e.g. Prime Contractor"
                     required
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-blue-500"
                   />
@@ -1004,7 +1020,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                       value={editingRow.amountAward}
                       onChange={(e) => setEditingRow({ ...editingRow, amountAward: e.target.value })}
                       onBlur={() => setEditingRow({ ...editingRow, amountAward: formatPhpCurrency(editingRow.amountAward) })}
-                      placeholder="₱4,500,000.00"
+                      placeholder="₱0.00"
                       required
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold text-emerald-400 focus:border-emerald-400"
                     />
@@ -1020,7 +1036,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                       value={editingRow.amountCompletion}
                       onChange={(e) => setEditingRow({ ...editingRow, amountCompletion: e.target.value })}
                       onBlur={() => setEditingRow({ ...editingRow, amountCompletion: formatPhpCurrency(editingRow.amountCompletion) })}
-                      placeholder="₱4,500,000.00"
+                      placeholder="₱0.00"
                       required
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono font-bold text-blue-400 focus:border-blue-400"
                     />
@@ -1049,7 +1065,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                 <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
                   <h4 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
                     <Calendar className="w-4 h-4 text-blue-400" />
-                    Milestone Dates
+                    Contract Milestone Dates
                   </h4>
                   <div className="space-y-2">
                     <div>
@@ -1061,7 +1077,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                       <input type="date" value={editingRow.dateStarted} onChange={(e) => setEditingRow({ ...editingRow, dateStarted: e.target.value })} required className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white" />
                     </div>
                     <div>
-                      <label className="block text-slate-400 text-[11px] mb-0.5">Estimated Completion *</label>
+                      <label className="block text-slate-400 text-[11px] mb-0.5">Estimated Completion Date *</label>
                       <input type="date" value={editingRow.dateCompletion} onChange={(e) => setEditingRow({ ...editingRow, dateCompletion: e.target.value })} required className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white" />
                     </div>
                   </div>
@@ -1069,63 +1085,55 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
 
                 <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-3">
                   <h4 className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    Accomplishment Progress (%)
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    Accomplishment % & Supporting PDF Attachment
                   </h4>
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex justify-between text-slate-400 text-[11px] mb-1">
-                        <span>Planned Accomplishment:</span>
-                        <span className="font-bold text-white">{editingRow.accomplishmentPlanned}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={editingRow.accomplishmentPlanned}
-                        onChange={(e) => setEditingRow({ ...editingRow, accomplishmentPlanned: parseFloat(e.target.value)||0 })}
-                        className="w-full accent-blue-500 cursor-pointer"
-                      />
-                    </div>
 
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <div className="flex justify-between text-slate-400 text-[11px] mb-1">
-                        <span>Actual Accomplishment:</span>
-                        <span className="font-bold text-emerald-400">{editingRow.accomplishmentActual}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={editingRow.accomplishmentActual}
-                        onChange={(e) => setEditingRow({ ...editingRow, accomplishmentActual: parseFloat(e.target.value)||0 })}
-                        className="w-full accent-emerald-500 cursor-pointer"
-                      />
+                      <label className="block text-slate-400 text-[11px] mb-0.5">Planned % *</label>
+                      <input type="number" min={0} max={100} value={editingRow.accomplishmentPlanned} onChange={(e) => setEditingRow({ ...editingRow, accomplishmentPlanned: Number(e.target.value) })} required className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono text-center font-bold" />
                     </div>
+                    <div>
+                      <label className="block text-slate-400 text-[11px] mb-0.5">Actual % *</label>
+                      <input type="number" min={0} max={100} value={editingRow.accomplishmentActual} onChange={(e) => setEditingRow({ ...editingRow, accomplishmentActual: Number(e.target.value) })} required className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono text-center font-bold text-emerald-400" />
+                    </div>
+                  </div>
 
-                    {/* Supporting PDF */}
-                    <div className="pt-2 border-t border-slate-800">
-                      <label className="block text-slate-300 font-medium mb-1">Supporting Document PDF (Notice of Award / Contract) <span className="text-red-400">*</span></label>
-                      <div className="border border-dashed border-slate-700 rounded-xl p-3 text-center bg-slate-900 hover:border-blue-500 transition cursor-pointer">
-                        <label className="cursor-pointer block space-y-1">
-                          <Paperclip className="w-5 h-5 text-blue-400 mx-auto" />
-                          <p className="text-xs font-semibold text-slate-200 truncate">{editingRow.pdfFile?.fileName || 'Attach Notice of Award / Contract PDF (Max 100 MB)'}</p>
+                  <div className="pt-2 border-t border-slate-800">
+                    <label className="block text-slate-400 text-[11px] mb-1 font-mono font-semibold">Supporting PDF File (Notice of Award / Contract / CPES)</label>
+                    <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-center">
+                      {editingRow.pdfFile ? (
+                        <div className="flex items-center justify-between text-xs text-emerald-400 font-mono font-bold">
+                          <span className="truncate max-w-[180px]">{editingRow.pdfFile.fileName}</span>
+                          <span className="text-[10px] text-slate-500 font-normal">({(editingRow.pdfFile.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB)</span>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer text-xs font-semibold text-blue-400 hover:underline inline-flex items-center gap-1">
+                          <Paperclip className="w-3.5 h-3.5" />
+                          <span>Attach Supporting PDF Document</span>
                           <input type="file" accept=".pdf" onChange={(e) => handleRowPdfUpload(editingRow.id, e.target.files?.[0])} className="hidden" />
                         </label>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
 
               </div>
 
-              <div className="p-4 border-t border-slate-800 flex items-center justify-end gap-2 bg-slate-900/95 sticky bottom-0 z-10 shrink-0">
-                <button type="button" onClick={() => setEditingRow(null)} className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingRow(null)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition"
+                >
                   Cancel
                 </button>
-                <button type="submit" className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-xl transition flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Save Entry to Table</span>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow"
+                >
+                  Save Ongoing Contract Entry
                 </button>
               </div>
 
