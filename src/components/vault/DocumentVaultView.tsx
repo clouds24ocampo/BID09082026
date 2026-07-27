@@ -17,6 +17,7 @@ import { BillOfQuantitiesModal } from './templates/billofquantities';
 import { CashFlowByQuarterModal } from './templates/cashflowbyquarter';
 import { PriceSchedule4GoodsModal } from './templates/priceschedule4goods';
 import { SummaryOfBidPriceModal } from './templates/summaryofbidprice';
+import { DetailedEstimatesModal } from './templates/detailedestimates';
 import VaultErrorBoundary from '../common/VaultErrorBoundary';
 import {
   saveVaultItems,
@@ -58,7 +59,8 @@ import {
   Filter,
   HardHat,
   Table,
-  TrendingUp
+  TrendingUp,
+  Calculator
 } from 'lucide-react';
 
 interface ClassAMasterItemDef {
@@ -568,6 +570,44 @@ export const DocumentVaultView: React.FC = () => {
     notifySuccess(
       'Summary of Bid Prices Saved!',
       `Summary of Bid Prices schedule saved to Financial Documents vault under project [${refNo}] ${title}.`
+    );
+  };
+
+  const [showDetailedEstimatesModal, setShowDetailedEstimatesModal] = useState(false);
+
+  const handleSaveCompletedDetailedEstimates = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
+    const newId = `fin-detest-${Date.now()}`;
+    const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
+    const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+
+    const newItem: DocumentVaultItem = {
+      id: newId,
+      tenantId: activeTenantId,
+      documentCode: 'PBD-DETAILED-ESTIMATES',
+      documentName: customName || `(L) Detailed Estimates Form - [${refNo}]`,
+      category: 'FINANCIAL',
+      procurementApplicability: ['INFRASTRUCTURE', 'GOODS', 'CONSULTING_SERVICES'],
+      legalBasisReference: 'Form (L) / Section 32.2.1 of RA 9184 / RA 12009 (Detailed Estimates Form)',
+      versionNumber: 1,
+      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileSizeBytes: 240000,
+      fileName: customName || `${refNo}_Financial_Envelope_Detailed_Estimates.pdf`,
+      fileDataUrl: fileDataUrl,
+      status: 'ACTIVE',
+      uploadedByName: currentUser?.fullName || 'Authorized Financial Manager',
+      isOptional: false,
+      requiresIssueDate: false,
+      requiresExpiryDate: false,
+      philgepsRefNo: refNo,
+      projectTitle: title
+    };
+
+    storePdfData(newId, fileDataUrl);
+    setVaultItems(prev => [newItem, ...prev]);
+    setShowDetailedEstimatesModal(false);
+    notifySuccess(
+      'Detailed Estimates Saved!',
+      `(L) Duly accomplished Detailed Estimates Form saved to Financial Documents vault under project [${refNo}] ${title}.`
     );
   };
 
@@ -2184,6 +2224,41 @@ export const DocumentVaultView: React.FC = () => {
                 </div>
               </div>
 
+              {/* CARD 5: (L) Detailed Estimates Form */}
+              <div className="glass-card p-4 rounded-2xl border border-slate-800 hover:border-purple-500/50 transition space-y-3 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 font-bold border border-purple-500/20 flex items-center gap-1">
+                      <Calculator className="w-3 h-3 text-purple-400" /> Detailed Estimates
+                    </span>
+                    <span className="text-[9px] font-mono text-slate-400">Form (L)</span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-bold text-white leading-snug">(L) Detailed Estimates</h3>
+                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                      Statutory Form (L) Detailed Estimates Form with unit prices of materials, labor rates, rentals, and tax breakdown.
+                    </p>
+                  </div>
+
+                  <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
+                    <p className="text-slate-300 font-bold">Ref: Statutory Form (L)</p>
+                    <p className="text-purple-400">Legal 13" × 8.5"</p>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 font-mono">detailedestim...</span>
+                  <button
+                    onClick={() => setShowDetailedEstimatesModal(true)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow transition flex items-center gap-1"
+                  >
+                    <FileSignature className="w-3.5 h-3.5" />
+                    <span>Create</span>
+                  </button>
+                </div>
+              </div>
+
               {/* CARD 4: Bill of Quantities (BOQ) */}
               <div className="glass-card p-4 rounded-2xl border border-slate-800 hover:border-blue-500/50 transition space-y-3 flex flex-col justify-between">
                 <div className="space-y-2">
@@ -2998,6 +3073,18 @@ export const DocumentVaultView: React.FC = () => {
           activeProcuringEntity={activeProcuringEntity}
           onSaveAndComplete={handleSaveCompletedSummaryBidPrice}
           onClose={() => setShowSummaryBidPriceModal(false)}
+        />
+      )}
+
+      {/* STATUTORY (L) DETAILED ESTIMATES FORM MODAL */}
+      {showDetailedEstimatesModal && (
+        <DetailedEstimatesModal
+          tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
+          onSaveAndComplete={handleSaveCompletedDetailedEstimates}
+          onClose={() => setShowDetailedEstimatesModal(false)}
         />
       )}
 
