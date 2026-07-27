@@ -14,7 +14,8 @@ import {
   RotateCcw,
   Calculator,
   HardHat,
-  PackageCheck
+  PackageCheck,
+  Truck
 } from 'lucide-react';
 
 export interface MaterialEstimateRow {
@@ -160,6 +161,15 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
       { id: `m-${Date.now()}`, itemNo: `${nextNo}`, description: '', unit: 'Pcs', quantity: 1, unitPrice: 0 }
     ]);
   };
+
+  const handleAddMobilization = () => {
+    const nextNo = materials.length + 1;
+    setMaterials(prev => [
+      { id: `m-mob-${Date.now()}`, itemNo: '1', description: 'MOBILIZATION & DEMOBILIZATION OF MATERIALS / EQUIPMENT', unit: 'Lot', quantity: 1, unitPrice: 0 },
+      ...prev.map((m, idx) => ({ ...m, itemNo: `${idx + 2}` }))
+    ]);
+  };
+
   const handleRemoveMaterial = (id: string) => setMaterials(prev => prev.filter(m => m.id !== id));
   const handleUpdateMaterial = (id: string, field: keyof MaterialEstimateRow, val: any) => {
     setMaterials(prev => prev.map(m => m.id === id ? { ...m, [field]: val } : m));
@@ -346,6 +356,13 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Material</span>
+                </button>
+                <button
+                  onClick={handleAddMobilization}
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 transition flex items-center gap-1"
+                >
+                  <Truck className="w-3.5 h-3.5" />
+                  <span>Add Mobilization</span>
                 </button>
                 <button
                   onClick={handleAddLabor}
