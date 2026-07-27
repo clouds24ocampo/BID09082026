@@ -12,6 +12,7 @@ import { TechnicalSpecifications } from './templates/TechnicalSpecifications';
 import { AfterSalesServiceModal } from './templates/AfterSalesServiceModal';
 import { NfccModal } from './templates/NfccModal';
 import { BidFormForGoodsModal } from './templates/bidform4goods';
+import { BidFormForInfrastructureModal } from './templates/bidform4infrastructure';
 import VaultErrorBoundary from '../common/VaultErrorBoundary';
 import {
   saveVaultItems,
@@ -50,7 +51,8 @@ import {
   Lock,
   Trash2,
   Edit3,
-  Filter
+  Filter,
+  HardHat
 } from 'lucide-react';
 
 interface ClassAMasterItemDef {
@@ -337,10 +339,11 @@ export const DocumentVaultView: React.FC = () => {
 
   // Financial Documents Templates State
   const [showBidFormGoodsModal, setShowBidFormGoodsModal] = useState(false);
+  const [showBidFormInfraModal, setShowBidFormInfraModal] = useState(false);
   const [showNfccModal, setShowNfccModal] = useState(false);
 
   const handleSaveCompletedBidFormGoods = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
-    const newId = `fin-bidform-${Date.now()}`;
+    const newId = `fin-bidform-goods-${Date.now()}`;
     const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
     const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
 
@@ -372,6 +375,42 @@ export const DocumentVaultView: React.FC = () => {
     notifySuccess(
       'Financial Bid Form for Goods Saved!',
       `Duly completed statutory Financial Bid Form for Goods saved to vault under project [${refNo}] ${title}.`
+    );
+  };
+
+  const handleSaveCompletedBidFormInfra = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
+    const newId = `fin-bidform-infra-${Date.now()}`;
+    const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
+    const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+
+    const newItem: DocumentVaultItem = {
+      id: newId,
+      tenantId: activeTenantId,
+      documentCode: 'GPPB-BIDFORM-INFRASTRUCTURE',
+      documentName: customName || `Bid Form for Infrastructure Projects - [${refNo}]`,
+      category: 'FINANCIAL',
+      procurementApplicability: ['INFRASTRUCTURE'],
+      legalBasisReference: 'GPPB Resolution No. 09-2020 / Section 30.1 of RA 12009 (Financial Bid Form)',
+      versionNumber: 1,
+      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileSizeBytes: 250000,
+      fileName: customName || `${refNo}_Financial_Envelope_Bid_Form_for_Infrastructure.pdf`,
+      fileDataUrl: fileDataUrl,
+      status: 'ACTIVE',
+      uploadedByName: currentUser?.fullName || 'Authorized Financial Manager',
+      isOptional: false,
+      requiresIssueDate: false,
+      requiresExpiryDate: false,
+      philgepsRefNo: refNo,
+      projectTitle: title
+    };
+
+    storePdfData(newId, fileDataUrl);
+    setVaultItems(prev => [newItem, ...prev]);
+    setShowBidFormInfraModal(false);
+    notifySuccess(
+      'Infrastructure Financial Bid Form Saved!',
+      `Duly completed statutory Bid Form for Infrastructure Projects saved to vault under project [${refNo}] ${title}.`
     );
   };
 
@@ -1846,14 +1885,14 @@ export const DocumentVaultView: React.FC = () => {
 
           {/* FINANCIAL DOCUMENTS STATUTORY FORMS GENERATOR CARDS */}
           {selectedCategory === 'FINANCIAL' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               
               {/* CARD 1: Bid Form for Goods */}
               <div className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-emerald-500/50 transition space-y-4 flex flex-col justify-between">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-1">
-                      <FileSignature className="w-3 h-3 text-emerald-400" /> Statutory Financial Form
+                      <FileSignature className="w-3 h-3 text-emerald-400" /> Goods Financial Form
                     </span>
                     <span className="text-[10px] font-mono text-slate-400">PBDs Section VIII</span>
                   </div>
@@ -1883,7 +1922,42 @@ export const DocumentVaultView: React.FC = () => {
                 </div>
               </div>
 
-              {/* CARD 2: NFCC Form */}
+              {/* CARD 2: Bid Form for Infrastructure Projects */}
+              <div className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-amber-500/50 transition space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
+                      <HardHat className="w-3 h-3 text-amber-400" /> Infra Financial Form
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">GPPB Res. 09-2020</span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-base font-bold text-white">Bid Form for Infrastructure Projects</h3>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Official statutory 2-page Financial Bid Form for Civil Works / Infrastructure. Includes points (a)-(l), discount methodology, and Bill of Quantities acknowledgement.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
+                    <p className="text-slate-300 font-bold">Ref: GPPB Res. 09-2020 (Civil Works Envelope 2)</p>
+                    <p className="text-amber-400">Legal Format: Legal 8.5" × 13" • 2 Pages</p>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-mono">bidform4infrastructure.tsx</span>
+                  <button
+                    onClick={() => setShowBidFormInfraModal(true)}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow-lg transition flex items-center gap-1.5"
+                  >
+                    <FileSignature className="w-4 h-4" />
+                    <span>Create Form</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* CARD 3: NFCC Form */}
               <div className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-blue-500/50 transition space-y-4 flex flex-col justify-between">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -2602,6 +2676,18 @@ export const DocumentVaultView: React.FC = () => {
           activeProcuringEntity={activeProcuringEntity}
           onSaveAndComplete={handleSaveCompletedBidFormGoods}
           onClose={() => setShowBidFormGoodsModal(false)}
+        />
+      )}
+
+      {/* STATUTORY FINANCIAL BID FORM FOR INFRASTRUCTURE MODAL */}
+      {showBidFormInfraModal && (
+        <BidFormForInfrastructureModal
+          tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
+          onSaveAndComplete={handleSaveCompletedBidFormInfra}
+          onClose={() => setShowBidFormInfraModal(false)}
         />
       )}
 
