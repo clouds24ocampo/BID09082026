@@ -11,6 +11,7 @@ import { FrameworkAgreementList } from './templates/FrameworkAgreementList';
 import { TechnicalSpecifications } from './templates/TechnicalSpecifications';
 import { AfterSalesServiceModal } from './templates/AfterSalesServiceModal';
 import { NfccModal } from './templates/NfccModal';
+import { BidFormForGoodsModal } from './templates/bidform4goods';
 import VaultErrorBoundary from '../common/VaultErrorBoundary';
 import {
   saveVaultItems,
@@ -333,6 +334,46 @@ export const DocumentVaultView: React.FC = () => {
   const [techCompletedIds, setTechCompletedIds] = useState<string[]>([]);
   const [fillingTemplateItem, setFillingTemplateItem] = useState<{ id: string; code: string; name: string } | null>(null);
   const [selectedTechProjectFilter, setSelectedTechProjectFilter] = useState<string>('ALL');
+
+  // Financial Documents Templates State
+  const [showBidFormGoodsModal, setShowBidFormGoodsModal] = useState(false);
+  const [showNfccModal, setShowNfccModal] = useState(false);
+
+  const handleSaveCompletedBidFormGoods = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
+    const newId = `fin-bidform-${Date.now()}`;
+    const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
+    const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+
+    const newItem: DocumentVaultItem = {
+      id: newId,
+      tenantId: activeTenantId,
+      documentCode: 'GPPB-BIDFORM-GOODS',
+      documentName: customName || `Bid Form for the Procurement of Goods - [${refNo}]`,
+      category: 'FINANCIAL',
+      procurementApplicability: ['GOODS'],
+      legalBasisReference: 'Section 30.1 of RA 12009 / Section 32.2.1 of RA 9184 (Financial Bid Form)',
+      versionNumber: 1,
+      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileSizeBytes: 245000,
+      fileName: customName || `${refNo}_Financial_Envelope_Bid_Form_for_Goods.pdf`,
+      fileDataUrl: fileDataUrl,
+      status: 'ACTIVE',
+      uploadedByName: currentUser?.fullName || 'Authorized Financial Manager',
+      isOptional: false,
+      requiresIssueDate: false,
+      requiresExpiryDate: false,
+      philgepsRefNo: refNo,
+      projectTitle: title
+    };
+
+    storePdfData(newId, fileDataUrl);
+    setVaultItems(prev => [newItem, ...prev]);
+    setShowBidFormGoodsModal(false);
+    notifySuccess(
+      'Financial Bid Form for Goods Saved!',
+      `Duly completed statutory Financial Bid Form for Goods saved to vault under project [${refNo}] ${title}.`
+    );
+  };
 
   // Modals state
   const [uploadTargetDef, setUploadTargetDef] = useState<ClassAMasterItemDef | null>(null);
@@ -1803,6 +1844,83 @@ export const DocumentVaultView: React.FC = () => {
             </div>
           )}
 
+          {/* FINANCIAL DOCUMENTS STATUTORY FORMS GENERATOR CARDS */}
+          {selectedCategory === 'FINANCIAL' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* CARD 1: Bid Form for Goods */}
+              <div className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-emerald-500/50 transition space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-1">
+                      <FileSignature className="w-3 h-3 text-emerald-400" /> Statutory Financial Form
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">PBDs Section VIII</span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-base font-bold text-white">Bid Form for the Procurement of Goods</h3>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Official statutory 2-page Financial Bid Form for goods procurement. Auto-populates total bid price in words & figures, itemized taxes, and authorized signatures.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
+                    <p className="text-slate-300 font-bold">Ref: Section 30.1 / 32.2.1 (Financial Envelope 2)</p>
+                    <p className="text-emerald-400">Legal Format: Legal 8.5" × 13" • 2 Pages</p>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-mono">bidform4goods.tsx</span>
+                  <button
+                    onClick={() => setShowBidFormGoodsModal(true)}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg transition flex items-center gap-1.5"
+                  >
+                    <FileSignature className="w-4 h-4" />
+                    <span>Create Form</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* CARD 2: NFCC Form */}
+              <div className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-blue-500/50 transition space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-bold border border-blue-500/20 flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-blue-400" /> Financial Capacity Form
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">RA 12009 / RA 9184</span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-base font-bold text-white">Net Financial Contracting Capacity (NFCC)</h3>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Statutory NFCC computation statement (K factor = 15 or 20) with Audited Financial Statement figures and Ongoing Contract values.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
+                    <p className="text-slate-300 font-bold">Ref: Section 23.4.1.4 (NFCC Capacity Computation)</p>
+                    <p className="text-blue-400">Legal Format: Legal 8.5" × 13"</p>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-mono">NfccModal.tsx</span>
+                  <button
+                    onClick={() => setShowNfccModal(true)}
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg transition flex items-center gap-1.5"
+                  >
+                    <FileSignature className="w-4 h-4" />
+                    <span>Create Form</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          )}
+
           {filteredGridItems.length === 0 ? (
             <div className="glass-panel p-12 text-center rounded-2xl border border-slate-800 space-y-4">
               <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto">
@@ -2473,6 +2591,60 @@ export const DocumentVaultView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* STATUTORY FINANCIAL BID FORM FOR GOODS MODAL */}
+      {showBidFormGoodsModal && (
+        <BidFormForGoodsModal
+          tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
+          onSaveAndComplete={handleSaveCompletedBidFormGoods}
+          onClose={() => setShowBidFormGoodsModal(false)}
+        />
+      )}
+
+      {/* STATUTORY NFCC MODAL */}
+      {showNfccModal && (
+        <NfccModal
+          tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
+          onClose={() => setShowNfccModal(false)}
+          onSaveAndComplete={(pdfDataUrl?: string, docName?: string, projRefNo?: string, projTitle?: string) => {
+            const newId = `fin-nfcc-${Date.now()}`;
+            const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
+            const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+
+            const newItem: DocumentVaultItem = {
+              id: newId,
+              tenantId: activeTenantId,
+              documentCode: 'NFCC',
+              documentName: docName || `Net Financial Contracting Capacity - [${refNo}]`,
+              category: 'FINANCIAL',
+              procurementApplicability: ['GOODS', 'INFRASTRUCTURE', 'CONSULTING_SERVICES'],
+              legalBasisReference: 'Section 23.4.1.4 of RA 12009 / RA 9184',
+              versionNumber: 1,
+              fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+              fileSizeBytes: 185000,
+              fileName: `${refNo}_Financial_Envelope_NFCC.pdf`,
+              fileDataUrl: pdfDataUrl,
+              status: 'ACTIVE',
+              uploadedByName: currentUser?.fullName || 'Authorized Financial Manager',
+              isOptional: false,
+              requiresIssueDate: false,
+              requiresExpiryDate: false,
+              philgepsRefNo: refNo,
+              projectTitle: title
+            };
+            storePdfData(newId, pdfDataUrl);
+            setVaultItems(prev => [newItem, ...prev]);
+            setShowNfccModal(false);
+            notifySuccess('NFCC Statement Saved!', `Net Financial Contracting Capacity statement saved to Financial Documents vault.`);
+          }}
+        />
       )}
 
     </div>
