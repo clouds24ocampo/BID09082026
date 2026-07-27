@@ -18,7 +18,13 @@
   --color-info-bg: rgba(59, 130, 246, 0.15);
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-legal: 'Cambria', 'Georgia', 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* Court / Legal Standard Cambria Typography Utility */
+.font-legal {
+  font-family: var(--font-legal) !important;
 }
 
 body {
@@ -175,11 +181,12 @@ body {
     box-shadow: none !important;
   }
 
-  /* 3. Printable document paper sheets flow naturally with page breaks */
+  /* 3. Printable document paper sheets flow naturally with page breaks in Cambria Legal Font */
   .print-document-sheet,
   .single-page-paper {
     display: block !important;
     position: relative !important;
+    font-family: var(--font-legal) !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 auto 0.4in auto !important;
@@ -192,5 +199,11 @@ body {
     break-after: page !important;
     overflow: visible !important;
   }
+}
+
+/* Screen Mode: Force Cambria court font for printable sheets */
+.print-document-sheet,
+.single-page-paper {
+  font-family: var(--font-legal);
 }
 

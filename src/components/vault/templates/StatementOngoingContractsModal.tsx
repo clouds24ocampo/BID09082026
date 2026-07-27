@@ -333,8 +333,14 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
       link.click();
       document.body.removeChild(link);
     } else {
-      const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
-      await generateAndDownloadThreeLayerPdf(null, templateElem, undefined, fileName);
+      const templateElems = document.querySelectorAll('.single-page-paper');
+      if (templateElems.length > 0) {
+        const elemArray = Array.from(templateElems) as HTMLElement[];
+        await generateAndDownloadThreeLayerPdf(null, elemArray, undefined, fileName);
+      } else {
+        const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
+        await generateAndDownloadThreeLayerPdf(null, templateElem, undefined, fileName);
+      }
     }
   };
 
@@ -643,7 +649,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
           </div>
 
           {/* GPPB LEGAL PAPER CONTAINER (Legal 13" x 8.5" LANDSCAPE Printable Layout — EXPANDABLE MULTI-ENTRY FIT) */}
-          <div className="single-page-paper bg-white text-slate-900 font-sans p-6 sm:p-8 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1150px] min-h-[680px] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
+          <div className="single-page-paper bg-white text-slate-900 font-legal p-6 sm:p-8 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1150px] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
 
             {/* Outer Legal Frame */}
             <div className="absolute inset-3 border-2 border-slate-900 pointer-events-none rounded-xl" />
@@ -725,7 +731,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                             <div className="text-[8px] font-normal text-slate-600">a. Started / b. Awarded / c. Completion</div>
                           </th>
                           <th className="p-1.5 border-r border-slate-300 w-[8%] text-center">Accomplishment %</th>
-                          <th className="p-1.5 text-right actions-column w-[5%]">Contract Role</th>
+                          <th className="p-1.5 text-right w-[5%]">Contract Role</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-300 font-sans">
@@ -770,7 +776,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                                 <div>Plan: <span className="font-semibold">{row.accomplishmentPlanned}%</span></div>
                                 <div>Act: <span className="font-bold text-blue-900">{row.accomplishmentActual}%</span></div>
                               </td>
-                              <td className="p-1.5 text-right actions-column font-mono text-[9.5px] align-top break-words [overflow-wrap:anywhere]">
+                              <td className="p-1.5 text-right font-mono text-[9.5px] align-top break-words [overflow-wrap:anywhere]">
                                 <div className="flex items-center justify-end gap-1 print:hidden no-export-btn mb-1">
                                   <button
                                     type="button"
@@ -846,7 +852,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                             <div className="text-[8px] font-normal text-slate-600">a. Started / b. Awarded / c. Completion</div>
                           </th>
                           <th className="p-1.5 border-r border-slate-300 w-24 text-center">Accomplishment %</th>
-                          <th className="p-1.5 text-right actions-column w-20">Contract Role</th>
+                          <th className="p-1.5 text-right w-20">Contract Role</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-300 font-sans">
@@ -891,7 +897,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                                 <div>Plan: <span className="font-semibold">{row.accomplishmentPlanned}%</span></div>
                                 <div>Act: <span className="font-bold text-blue-900">{row.accomplishmentActual}%</span></div>
                               </td>
-                              <td className="p-1.5 text-right actions-column font-mono text-[9.5px] align-top break-words [overflow-wrap:anywhere]">
+                              <td className="p-1.5 text-right font-mono text-[9.5px] align-top break-words [overflow-wrap:anywhere]">
                                 <div className="flex items-center justify-end gap-1 print:hidden no-export-btn mb-1">
                                   <button
                                     type="button"
@@ -949,7 +955,9 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                         projectTitle: projectTitle,
                         projectRefNo: projectRefNo,
                         procuringEntity: procuringEntity,
-                        dateTimeSubmitted: formatDateDisplay(dateTimeSubmitted)
+                        dateTimeSubmitted: formatDateDisplay(dateTimeSubmitted),
+                        documentCategory: 'Financial Eligibility',
+                        generatedBy: tenant?.companyName
                       }}
                       size={70}
                       showCaption={false}

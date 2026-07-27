@@ -41,7 +41,12 @@ export const DocumentQrCode: React.FC<DocumentQrCodeProps> = ({
     details.projectTitle,
     details.projectRefNo,
     details.procuringEntity,
-    details.dateTimeSubmitted
+    details.dateTimeSubmitted,
+    details.solicitationNo,
+    details.documentCategory,
+    details.generatedBy,
+    details.documentVersion,
+    details.uniqueDocumentId
   ]);
 
   if (!dataUrl) {

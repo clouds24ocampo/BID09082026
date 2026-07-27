@@ -333,8 +333,14 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
       link.click();
       document.body.removeChild(link);
     } else {
-      const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
-      await generateAndDownloadThreeLayerPdf(null, templateElem, undefined, fileName);
+      const templateElems = document.querySelectorAll('.single-page-paper');
+      if (templateElems.length > 0) {
+        const elemArray = Array.from(templateElems) as HTMLElement[];
+        await generateAndDownloadThreeLayerPdf(null, elemArray, undefined, fileName);
+      } else {
+        const templateElem = document.querySelector('.single-page-paper') as HTMLElement;
+        await generateAndDownloadThreeLayerPdf(null, templateElem, undefined, fileName);
+      }
     }
   };
 
@@ -643,7 +649,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
           </div>
 
           {/* GPPB LEGAL PAPER CONTAINER (Legal 13" x 8.5" LANDSCAPE Printable Layout — EXPANDABLE MULTI-ENTRY FIT) */}
-          <div className="single-page-paper bg-white text-slate-900 font-sans p-6 sm:p-8 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1150px] min-h-[680px] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
+          <div className="single-page-paper bg-white text-slate-900 font-legal p-6 sm:p-8 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1150px] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
 
             {/* Outer Legal Frame */}
             <div className="absolute inset-3 border-2 border-slate-900 pointer-events-none rounded-xl" />
@@ -949,7 +955,9 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                         projectTitle: projectTitle,
                         projectRefNo: projectRefNo,
                         procuringEntity: procuringEntity,
-                        dateTimeSubmitted: formatDateDisplay(dateTimeSubmitted)
+                        dateTimeSubmitted: formatDateDisplay(dateTimeSubmitted),
+                        documentCategory: 'Financial Eligibility',
+                        generatedBy: tenant?.companyName
                       }}
                       size={70}
                       showCaption={false}

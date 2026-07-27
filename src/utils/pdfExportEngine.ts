@@ -97,9 +97,17 @@ export async function exportMergedThreeLayerPdf(
 
       // STEP 2: GENERATE & APPEND FORM TEMPLATE(S) (IF PRESENT)
       if (unit.formElement) {
-        const formElements: HTMLElement[] = Array.isArray(unit.formElement)
-          ? unit.formElement
-          : [unit.formElement];
+        let formElements: HTMLElement[] = [];
+        if (Array.isArray(unit.formElement)) {
+          formElements = unit.formElement;
+        } else if (unit.formElement) {
+          const childPapers = unit.formElement.querySelectorAll('.single-page-paper, .print-document-sheet');
+          if (childPapers.length > 0) {
+            formElements = Array.from(childPapers) as HTMLElement[];
+          } else {
+            formElements = [unit.formElement];
+          }
+        }
 
         for (let elemIdx = 0; elemIdx < formElements.length; elemIdx++) {
           const elem = formElements[elemIdx];
@@ -120,20 +128,102 @@ export async function exportMergedThreeLayerPdf(
                 );
               }
             });
-            const imgData = canvas.toDataURL('image/png');
-            const pngImage = await pdfDoc.embedPng(imgData);
 
             const isLandscapeForm = canvas.width > canvas.height;
             const pageSize = isLandscapeForm ? legalLandscape : legalPortrait;
 
-            const formPage = pdfDoc.addPage(pageSize);
-            formPage.drawImage(pngImage, {
-              x: 0,
-              y: 0,
-              width: pageSize[0],
-              height: pageSize[1]
+            // Compute target single-page canvas height based on paper aspect ratio
+            const targetCanvasPageHeight = Math.round(canvas.width * (pageSize[1] / pageSize[0]));
+
+            // Measure DOM elements relative to elem for intelligent row-aware splitting
+            const elemRect = elem.getBoundingClientRect();
+            const scaleFactor = elemRect.height > 0 ? (canvas.height / elemRect.height) : 1;
+
+            const rowNodes = Array.from(elem.querySelectorAll('tr, .page-break-inside-avoid, .signatory-block, .border-b-2'));
+            const rowBreakYCanvas: number[] = [];
+            rowNodes.forEach((node) => {
+              const r = node.getBoundingClientRect();
+              const topInCanvas = Math.round((r.top - elemRect.top) * scaleFactor);
+              const bottomInCanvas = Math.round((r.bottom - elemRect.top) * scaleFactor);
+              if (topInCanvas > 0) rowBreakYCanvas.push(topInCanvas);
+              if (bottomInCanvas > 0) rowBreakYCanvas.push(bottomInCanvas);
             });
-            console.log(`✅ Form Template Page ${elemIdx + 1} Appended (${isLandscapeForm ? 'Landscape' : 'Portrait'}) for: ${unit.title}`);
+            rowBreakYCanvas.sort((a, b) => a - b);
+
+            // If canvas height fits within 105% of target page height, render as single page!
+            if (canvas.height <= targetCanvasPageHeight * 1.05) {
+              const imgData = canvas.toDataURL('image/png');
+              const pngImage = await pdfDoc.embedPng(imgData);
+
+              const formPage = pdfDoc.addPage(pageSize);
+              formPage.drawImage(pngImage, {
+                x: 0,
+                y: 0,
+                width: pageSize[0],
+                height: pageSize[1]
+              });
+              console.log(`✅ Single-Page Adaptive Form Appended (${isLandscapeForm ? 'Landscape' : 'Portrait'}) for: ${unit.title}`);
+            } else {
+              // Multi-page content: perform adaptive row-aware canvas slicing!
+              const slices: { startY: number; height: number }[] = [];
+              let currentY = 0;
+
+              while (currentY < canvas.height - 10) {
+                const maxPossibleY = currentY + targetCanvasPageHeight;
+                if (maxPossibleY >= canvas.height) {
+                  slices.push({ startY: currentY, height: canvas.height - currentY });
+                  break;
+                }
+
+                // Find highest row boundary below currentY + 0.2*targetPageHeight and <= maxPossibleY
+                let bestSplitY = maxPossibleY;
+                const minAcceptableY = currentY + (targetCanvasPageHeight * 0.2);
+                const candidates = rowBreakYCanvas.filter(y => y > minAcceptableY && y <= maxPossibleY);
+                if (candidates.length > 0) {
+                  bestSplitY = candidates[candidates.length - 1];
+                }
+
+                const sliceHeight = bestSplitY - currentY;
+                if (sliceHeight <= 0) {
+                  slices.push({ startY: currentY, height: targetCanvasPageHeight });
+                  currentY += targetCanvasPageHeight;
+                } else {
+                  slices.push({ startY: currentY, height: sliceHeight });
+                  currentY = bestSplitY;
+                }
+              }
+
+              console.log(`✂️ Adaptive Row-Aware Canvas Slicing: ${canvas.height}px split into ${slices.length} pages.`);
+
+              for (let sIdx = 0; sIdx < slices.length; sIdx++) {
+                const { startY, height } = slices[sIdx];
+                const sliceCanvas = document.createElement('canvas');
+                sliceCanvas.width = canvas.width;
+                sliceCanvas.height = targetCanvasPageHeight;
+                const ctx = sliceCanvas.getContext('2d');
+                if (ctx) {
+                  ctx.fillStyle = '#ffffff';
+                  ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+                  ctx.drawImage(
+                    canvas,
+                    0, startY, canvas.width, Math.min(height, canvas.height - startY),
+                    0, 0, canvas.width, Math.min(height, canvas.height - startY)
+                  );
+                }
+
+                const sliceImgData = sliceCanvas.toDataURL('image/png');
+                const slicePngImage = await pdfDoc.embedPng(sliceImgData);
+
+                const slicePage = pdfDoc.addPage(pageSize);
+                slicePage.drawImage(slicePngImage, {
+                  x: 0,
+                  y: 0,
+                  width: pageSize[0],
+                  height: pageSize[1]
+                });
+                console.log(`✅ Adaptive Slice ${sIdx + 1}/${slices.length} Appended for: ${unit.title}`);
+              }
+            }
           } catch (err) {
             console.error(`❌ Error generating form template page ${elemIdx + 1} for ${unit.title}:`, err);
           }

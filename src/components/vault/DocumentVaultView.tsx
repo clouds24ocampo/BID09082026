@@ -9,6 +9,8 @@ import { TechnicalExhibitTemplateModal } from './templates/TechnicalExhibitTempl
 import { SectionViScheduleOfRequirements } from './templates/SectionViScheduleOfRequirements';
 import { FrameworkAgreementList } from './templates/FrameworkAgreementList';
 import { TechnicalSpecifications } from './templates/TechnicalSpecifications';
+import { AfterSalesServiceModal } from './templates/AfterSalesServiceModal';
+import { NfccModal } from './templates/NfccModal';
 import {
   saveVaultItems,
   loadVaultItems,
@@ -19,6 +21,7 @@ import {
   clearVaultDataForTenant,
   migrateFromLocalStorage
 } from '../../utils/vaultIndexedDB';
+import { getOpportunityProjects, OpportunityProjectOption } from '../../utils/opportunityProjects';
 import { debugLog } from '../../utils/debugLog';
 import {
   FileCheck,
@@ -168,6 +171,20 @@ const TECHNICAL_CHECKLIST_MASTER: TechnicalChecklistItem[] = [
     name: 'Original duly signed Omnibus Sworn Statement (OSS). If corporation/partnership/cooperative: Original Notarized Secretary\'s Certificate. If JV: Original Special Power of Attorney authorizing officer to sign OSS and represent Bidder',
     notes: 'Legal template to follow',
     templateCode: 'OMNIBUS_SWORN_STATEMENT'
+  },
+  {
+    id: 'tech-h',
+    code: '(h)',
+    name: 'After Sales Services & Warranty Undertaking Guaranty Statement',
+    notes: 'Legal template to follow',
+    templateCode: 'AFTER_SALES_SERVICES'
+  },
+  {
+    id: 'tech-nfcc',
+    code: 'NFCC',
+    name: 'Net Financial Contracting Capacity (NFCC) — Financial Documents for Eligibility Check',
+    notes: 'Legal template to follow',
+    templateCode: 'NFCC'
   }
 ];
 
@@ -302,6 +319,26 @@ export const DocumentVaultView: React.FC = () => {
   // Selection & Merging state
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [showMergeModal, setShowMergeModal] = useState(false);
+
+  // Active Bidding Project Scoping State (Strict Project Isolation)
+  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
+  const [activeProjectRefNo, setActiveProjectRefNo] = useState<string>('');
+  const [activeProjectTitle, setActiveProjectTitle] = useState<string>('');
+  const [activeProcuringEntity, setActiveProcuringEntity] = useState<string>('');
+
+  React.useEffect(() => {
+    const list = getOpportunityProjects(activeTenantId);
+    setOppProjects(list);
+    if (list.length > 0) {
+      setActiveProjectRefNo(list[0].refNo);
+      setActiveProjectTitle(list[0].title);
+      setActiveProcuringEntity(list[0].procuringEntity);
+    } else {
+      setActiveProjectRefNo('');
+      setActiveProjectTitle('');
+      setActiveProcuringEntity('');
+    }
+  }, [activeTenantId]);
 
   // Technical Documents Sub-Tab State
   const [techSubTab, setTechSubTab] = useState<'CHECKLIST' | 'COMPLETED'>('CHECKLIST');
@@ -1739,6 +1776,9 @@ export const DocumentVaultView: React.FC = () => {
       {fillingTemplateItem && fillingTemplateItem.code === '(b)' && (
         <StatementOngoingContractsModal
           tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
           onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
             handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
           }}
@@ -1749,6 +1789,9 @@ export const DocumentVaultView: React.FC = () => {
       {fillingTemplateItem && fillingTemplateItem.code === '(c)' && (
         <StatementSlccModal
           tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
           onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
             handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
           }}
@@ -1760,6 +1803,8 @@ export const DocumentVaultView: React.FC = () => {
         <SectionViScheduleOfRequirements
           item={fillingTemplateItem}
           tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
           onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
             handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
           }}
@@ -1771,6 +1816,8 @@ export const DocumentVaultView: React.FC = () => {
         <TechnicalSpecifications
           item={fillingTemplateItem}
           tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
           onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
             handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
           }}
@@ -1782,6 +1829,8 @@ export const DocumentVaultView: React.FC = () => {
         <FrameworkAgreementList
           item={fillingTemplateItem}
           tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
           onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
             handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
           }}
@@ -1789,10 +1838,40 @@ export const DocumentVaultView: React.FC = () => {
         />
       )}
 
-      {fillingTemplateItem && fillingTemplateItem.code !== '(b)' && fillingTemplateItem.code !== '(c)' && fillingTemplateItem.code !== 'SEC-VI' && fillingTemplateItem.code !== 'SEC-VII' && fillingTemplateItem.code !== '(f.d)' && fillingTemplateItem.code !== 'FAL-01' && !fillingTemplateItem.name.toLowerCase().includes('schedule of requirements') && !fillingTemplateItem.name.toLowerCase().includes('section vi') && !fillingTemplateItem.name.toLowerCase().includes('technical specifications') && !fillingTemplateItem.name.toLowerCase().includes('section vii') && !fillingTemplateItem.name.toLowerCase().includes('framework agreement') && (
+      {fillingTemplateItem && (fillingTemplateItem.code === '(h)' || fillingTemplateItem.code === 'AFTER-SALES' || fillingTemplateItem.name.toLowerCase().includes('after sales')) && (
+        <AfterSalesServiceModal
+          item={fillingTemplateItem}
+          tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
+          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+          }}
+          onClose={() => setFillingTemplateItem(null)}
+        />
+      )}
+
+      {fillingTemplateItem && (fillingTemplateItem.code === 'NFCC' || fillingTemplateItem.name.toLowerCase().includes('nfcc') || fillingTemplateItem.name.toLowerCase().includes('net financial contracting')) && (
+        <NfccModal
+          item={fillingTemplateItem}
+          tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
+          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+          }}
+          onClose={() => setFillingTemplateItem(null)}
+        />
+      )}
+
+      {fillingTemplateItem && fillingTemplateItem.code !== '(b)' && fillingTemplateItem.code !== '(c)' && fillingTemplateItem.code !== 'SEC-VI' && fillingTemplateItem.code !== 'SEC-VII' && fillingTemplateItem.code !== '(f.d)' && fillingTemplateItem.code !== 'FAL-01' && fillingTemplateItem.code !== '(h)' && fillingTemplateItem.code !== 'NFCC' && !fillingTemplateItem.name.toLowerCase().includes('schedule of requirements') && !fillingTemplateItem.name.toLowerCase().includes('section vi') && !fillingTemplateItem.name.toLowerCase().includes('technical specifications') && !fillingTemplateItem.name.toLowerCase().includes('section vii') && !fillingTemplateItem.name.toLowerCase().includes('framework agreement') && !fillingTemplateItem.name.toLowerCase().includes('after sales') && !fillingTemplateItem.name.toLowerCase().includes('nfcc') && !fillingTemplateItem.name.toLowerCase().includes('net financial contracting') && (
         <TechnicalExhibitTemplateModal
           item={fillingTemplateItem}
           tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
           onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
             handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
           }}

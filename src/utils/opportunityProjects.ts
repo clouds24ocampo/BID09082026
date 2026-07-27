@@ -19,7 +19,7 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
   try {
     let rawItems: any[] = [];
 
-    // 1. If tenantId is provided, load tenant-scoped opportunities
+    // 1. If tenantId is provided, load tenant-scoped opportunities strictly
     if (tenantId) {
       const savedTenant = localStorage.getItem(`bidocs_opportunities_${tenantId}`);
       if (savedTenant) {
@@ -30,31 +30,43 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
           }
         } catch (e) {}
       }
-    }
-
-    // 2. Load general opportunities key
-    const savedLegacy = localStorage.getItem('bidocs_opportunities');
-    if (savedLegacy) {
-      try {
-        const parsed = JSON.parse(savedLegacy);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          rawItems.push(...parsed);
-        }
-      } catch (e) {}
-    }
-
-    // 3. Scan all keys starting with bidocs_opportunities to ensure 100% project retrieval
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('bidocs_opportunities')) {
-        const val = localStorage.getItem(key);
-        if (val) {
+      // If no tenant-specific items found, check legacy key
+      if (rawItems.length === 0) {
+        const savedLegacy = localStorage.getItem('bidocs_opportunities');
+        if (savedLegacy) {
           try {
-            const parsed = JSON.parse(val);
+            const parsed = JSON.parse(savedLegacy);
             if (Array.isArray(parsed) && parsed.length > 0) {
               rawItems.push(...parsed);
             }
           } catch (e) {}
+        }
+      }
+    } else {
+      // 2. No tenantId provided: Load general legacy opportunities key
+      const savedLegacy = localStorage.getItem('bidocs_opportunities');
+      if (savedLegacy) {
+        try {
+          const parsed = JSON.parse(savedLegacy);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            rawItems.push(...parsed);
+          }
+        } catch (e) {}
+      }
+
+      // 3. Scan all keys starting with bidocs_opportunities only when no tenantId is specified
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('bidocs_opportunities')) {
+          const val = localStorage.getItem(key);
+          if (val) {
+            try {
+              const parsed = JSON.parse(val);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                rawItems.push(...parsed);
+              }
+            } catch (e) {}
+          }
         }
       }
     }

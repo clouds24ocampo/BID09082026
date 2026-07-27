@@ -337,14 +337,25 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     await new Promise((r) => setTimeout(r, 150));
     try {
       const fileName = `${projectRefNo}_Section_VII_Technical_Specifications_${todayStr}.pdf`;
-      const templateElem = document.getElementById('technical-specifications-paper') as HTMLElement;
-      if (templateElem) {
+      const templateElems = document.querySelectorAll('.single-page-paper');
+      if (templateElems.length > 0) {
+        const elemArray = Array.from(templateElems) as HTMLElement[];
         await generateAndDownloadThreeLayerPdf(
           null,
-          templateElem,
+          elemArray,
           drawingPdfUrl || undefined,
           fileName
         );
+      } else {
+        const paperElem = document.getElementById('technical-specifications-paper');
+        if (paperElem) {
+          await generateAndDownloadThreeLayerPdf(
+            null,
+            paperElem,
+            drawingPdfUrl || undefined,
+            fileName
+          );
+        }
       }
     } finally {
       setIsExporting(false);
@@ -694,9 +705,8 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
           </div>
 
-          {/* OFFICIAL PRINTABLE PAPER DOCUMENT SHEET (Legal 13" x 8.5" LANDSCAPE Standard - Unique ID target) */}
-          <div id="technical-specifications-paper" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md min-h-[680px] w-full max-w-[1150px] flex flex-col justify-between font-serif">
-            
+          {/* OFFICIAL PRINTABLE PAPER DOCUMENT SHEET (Legal 13" x 8.5" LANDSCAPE Standard - Adaptive flow rendering) */}
+          <div id="technical-specifications-paper" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1150px] flex flex-col justify-between font-serif">
             <div>
               {/* COMPANY & PROJECT HEADER BLOCK */}
               <div className="border-b-2 border-black pb-3 mb-5 space-y-2 font-serif">
@@ -747,7 +757,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                 )}
               </div>
 
-              {/* TECHNICAL SPECIFICATIONS GRID TABLE (4 COLUMNS: Item 4%, Quantity 6%, Specification 56%, Statement of Compliance 34%) */}
+              {/* TECHNICAL SPECIFICATIONS GRID TABLE */}
               <table className={`w-full border-collapse border-2 border-black text-black table-fixed ${getTableFontSizeClass()}`}>
                 <thead>
                   <tr className="border-b-2 border-black bg-slate-50 font-serif">
@@ -788,7 +798,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                         </div>
                       </td>
 
-                      {/* Quantity Cell (100% Aligned with Section VI Quantity) */}
+                      {/* Quantity Cell */}
                       <td className="border border-black px-1.5 py-3 font-serif text-center align-top break-words">
                         {!isExporting && (
                           <input
@@ -804,7 +814,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                         </div>
                       </td>
 
-                      {/* Specification Cell (56% Width for long technical descriptions) */}
+                      {/* Specification Cell */}
                       <td className="border border-black px-3 py-3 font-serif align-top break-words">
                         {!isExporting && (
                           <textarea
@@ -820,10 +830,9 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                         </div>
                       </td>
 
-                      {/* Statement of Compliance Cell (34% Width) */}
+                      {/* Statement of Compliance Cell */}
                       <td className="border border-black px-3 py-3 font-serif align-top break-words bg-emerald-50/20">
                         <div className="space-y-2">
-                          {/* Compliance Status Toggle Pill (Screen view) */}
                           {!isExporting && (
                             <div className="flex items-center gap-1.5 print:hidden no-export">
                               <button
@@ -853,7 +862,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                             </div>
                           )}
 
-                          {/* Brand & Model Offered Input (Appears when Comply is chosen) */}
                           {!isExporting && rowItem.compliance === 'Comply' && (
                             <div className="space-y-1 print:hidden no-export">
                               <label className="text-[10px] font-mono font-bold text-slate-700 flex items-center gap-1">
@@ -870,7 +878,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                             </div>
                           )}
 
-                          {/* Compliance Supporting Evidence Text Input */}
                           {!isExporting && (
                             <textarea
                               rows={2}
@@ -881,7 +888,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                             />
                           )}
 
-                          {/* Print / Export Static Text Output (100% Strips 'Not Comply' when Comply is selected) */}
                           <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-xs leading-relaxed`}>
                             <div className={`font-bold mb-1 ${rowItem.compliance === 'Comply' ? 'text-emerald-950' : 'text-red-950'}`}>
                               Statement: {rowItem.compliance}
@@ -904,7 +910,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             </div>
 
             {/* Document Footer: Signatory Block & Verification QR */}
-            <div className="mt-8 pt-4 border-t border-slate-300 flex items-end justify-between text-xs font-serif">
+            <div className="mt-8 pt-4 border-t border-slate-300 flex items-end justify-between text-xs font-serif signatory-block">
               <div>
                 <p className="font-bold text-black uppercase">{companyName}</p>
                 <div className="mt-8 border-b border-black w-64"></div>
@@ -921,9 +927,11 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                     projectTitle: projectTitle,
                     projectRefNo: projectRefNo,
                     procuringEntity: procuringEntity,
-                    dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted)
+                    dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
+                    documentCategory: 'Technical Eligibility',
+                    generatedBy: companyName
                   }}
-                  size={95}
+                  size={90}
                   showCaption={false}
                 />
                 <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
@@ -931,7 +939,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                 </span>
               </div>
             </div>
-
           </div>
 
         </div>

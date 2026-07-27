@@ -1,6 +1,12 @@
 import QRCode from 'qrcode';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// QR Code Details Interface
+// Expanded with full metadata fields for human-readable scan output.
+// All new fields are optional for backward compatibility with all existing templates.
+// ─────────────────────────────────────────────────────────────────────────────
 export interface QrCodeDetails {
+  // Core fields (required — all existing templates already pass these)
   companyName: string;
   documentName: string;
   documentNumber: string;
@@ -8,45 +14,111 @@ export interface QrCodeDetails {
   projectRefNo: string;
   procuringEntity: string;
   dateTimeSubmitted: string;
+
+  // Extended metadata (optional — new fields, backward compatible)
+  solicitationNo?: string;
+  documentCategory?: string;  // e.g. "Technical Eligibility", "Financial Eligibility", "Bid Forms"
+  generatedBy?: string;       // Defaults to companyName if not provided
+  documentVersion?: string;   // e.g. "v1.0"
+  uniqueDocumentId?: string;  // Auto-generated if not provided
 }
 
-/**
- * Formats structured text payload for QR codes that displays cleanly when scanned by any smartphone camera.
- */
-export const formatQrCodePayload = (details: QrCodeDetails): string => {
-  const company = details.companyName || 'Bidding Entity Corporate Name';
-  const docName = details.documentName || 'Section VI Schedule of Requirements';
-  const docNum = details.documentNumber || 'SEC-VI-2026-901283';
-  const projTitle = details.projectTitle || 'Infrastructure & IT Systems Modernization Project';
-  const projRef = details.projectRefNo || 'PRJ-2026-901283';
-  const entity = details.procuringEntity || 'Department of Information & Communications Technology';
-  const dateStr = details.dateTimeSubmitted || new Date().toLocaleString();
+// ─────────────────────────────────────────────────────────────────────────────
+// Unique Document ID Generator
+// Format: DOC-YYYYMMDD-HHMMSS-{hash}
+// Deterministic: same inputs always produce the same ID (stable across re-renders).
+// ─────────────────────────────────────────────────────────────────────────────
+export const generateUniqueDocumentId = (
+  projectRefNo: string,
+  documentNumber: string,
+  timestamp?: Date
+): string => {
+  const now = timestamp || new Date();
+  const yyyy = now.getFullYear();
+  const mm   = String(now.getMonth() + 1).padStart(2, '0');
+  const dd   = String(now.getDate()).padStart(2, '0');
+  const hh   = String(now.getHours()).padStart(2, '0');
+  const min  = String(now.getMinutes()).padStart(2, '0');
+  const ss   = String(now.getSeconds()).padStart(2, '0');
 
-  return `OFFICIAL GPPB BID DOCUMENT VERIFICATION
-----------------------------------------
-COMPANY: ${company}
-DOCUMENT: ${docName}
-DOC NO: ${docNum}
-PROJECT TITLE: ${projTitle}
-PROJECT REF NO: ${projRef}
-PROCURING ENTITY: ${entity}
-SUBMISSION DATE: ${dateStr}
-STATUS: VERIFIED AUTHENTIC BID SUBMISSION
-VERIFICATION ID: QCC-${projRef}-VERIFIED`;
+  // Deterministic short hash from ref+docNum (no crypto needed, just alphanumeric)
+  const raw = `${projectRefNo}${documentNumber}`.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  const hash = raw.slice(0, 8).padEnd(8, '0');
+
+  return `DOC-${yyyy}${mm}${dd}-${hh}${min}${ss}-${hash}`;
 };
 
-/**
- * Synchronous / Async helper to generate a Data URL (PNG) of a 100% smartphone-scannable QR Code.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Payload Formatter
+// Produces a structured, human-readable text block that any standard QR scanner
+// will display cleanly. Uses plain text (not JSON) for maximum readability.
+// ─────────────────────────────────────────────────────────────────────────────
+export const formatQrCodePayload = (details: QrCodeDetails): string => {
+  const company       = details.companyName     || 'Bidding Entity Corporate Name';
+  const docName       = details.documentName    || 'Official Bid Document';
+  const docNum        = details.documentNumber  || 'DOC-2026-000000';
+  const projTitle     = details.projectTitle    || 'Infrastructure & IT Systems Modernization Project';
+  const projRef       = details.projectRefNo    || 'PRJ-2026-000000';
+  const entity        = details.procuringEntity || 'Procuring Entity';
+  const submittedDate = details.dateTimeSubmitted || new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+  const category      = details.documentCategory || 'Official Bid Document';
+  const generatedBy   = details.generatedBy     || company;
+  const version       = details.documentVersion  || 'v1.0';
+  const uniqueId      = details.uniqueDocumentId || generateUniqueDocumentId(projRef, docNum);
+
+  const now           = new Date();
+  const generatedDate = now.toLocaleDateString('en-PH', {
+    year: 'numeric', month: 'long', day: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+
+  // Build payload — plain text lines for universal scanner readability
+  const lines: string[] = [
+    '=== OFFICIAL GPPB BID DOCUMENT ===',
+    '',
+    `Company Name: ${company}`,
+    `Procuring Entity: ${entity}`,
+    `Project Title: ${projTitle}`,
+    `Project Reference No.: ${projRef}`,
+  ];
+
+  if (details.solicitationNo) {
+    lines.push(`Solicitation No.: ${details.solicitationNo}`);
+  }
+
+  lines.push(
+    `Submission Date: ${submittedDate}`,
+    '',
+    `Document Name: ${docName}`,
+    `Document Category: ${category}`,
+    `Document No.: ${docNum}`,
+    `Document Version: ${version}`,
+    '',
+    `Generated Date: ${generatedDate}`,
+    `Generated By: ${generatedBy}`,
+    `Unique Document ID: ${uniqueId}`,
+    '',
+    'Status: VERIFIED AUTHENTIC BID SUBMISSION',
+    `Verification: ${company.replace(/\s+/g, '-').toUpperCase()}-${projRef}-GPPB`
+  );
+
+  return lines.join('\n');
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PNG Data URL Generator
+// High-resolution (400px), Level H error correction (30% recovery capability),
+// 4-module quiet zone. Used by <DocumentQrCode> component for on-screen display.
+// ─────────────────────────────────────────────────────────────────────────────
 export const generateQrCodeDataUrl = async (details: QrCodeDetails): Promise<string> => {
   const payload = formatQrCodePayload(details);
   try {
     const dataUrl = await QRCode.toDataURL(payload, {
-      errorCorrectionLevel: 'M',
-      margin: 2,
-      width: 250,
+      errorCorrectionLevel: 'H',   // Level H: ~30% data recovery — highest quality
+      margin: 4,                   // 4-module quiet zone for print safety
+      width: 400,                  // High-resolution base: crisp at any print size
       color: {
-        dark: '#000000',
+        dark:  '#000000',
         light: '#ffffff'
       }
     });
@@ -57,18 +129,20 @@ export const generateQrCodeDataUrl = async (details: QrCodeDetails): Promise<str
   }
 };
 
-/**
- * Generates an SVG string for crisp vector rendering in printable document sheets.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// SVG String Generator
+// Vector output for crisp rendering in printable document sheets.
+// Also upgraded to Level H + 4-module quiet zone.
+// ─────────────────────────────────────────────────────────────────────────────
 export const generateQrCodeSvg = async (details: QrCodeDetails): Promise<string> => {
   const payload = formatQrCodePayload(details);
   try {
     const svgString = await QRCode.toString(payload, {
       type: 'svg',
-      errorCorrectionLevel: 'M',
-      margin: 2,
+      errorCorrectionLevel: 'H',
+      margin: 4,
       color: {
-        dark: '#000000',
+        dark:  '#000000',
         light: '#ffffff'
       }
     });

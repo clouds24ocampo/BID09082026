@@ -243,9 +243,15 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     await new Promise((r) => setTimeout(r, 150));
     try {
       const fileName = `${projectRefNo}_Section_VI_Schedule_of_Requirements_${todayStr}.pdf`;
-      const templateElem = document.getElementById('section-vi-paper') as HTMLElement;
-      if (templateElem) {
-        await generateAndDownloadThreeLayerPdf(null, templateElem, undefined, fileName);
+      const templateElems = document.querySelectorAll('.single-page-paper');
+      if (templateElems.length > 0) {
+        const elemArray = Array.from(templateElems) as HTMLElement[];
+        await generateAndDownloadThreeLayerPdf(null, elemArray, undefined, fileName);
+      } else {
+        const paperElem = document.getElementById('section-vi-paper');
+        if (paperElem) {
+          await generateAndDownloadThreeLayerPdf(null, paperElem, undefined, fileName);
+        }
       }
     } finally {
       setIsExporting(false);
@@ -538,9 +544,8 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
             </div>
           </div>
 
-          {/* OFFICIAL PRINTABLE PAPER DOCUMENT SHEET (Legal 13" x 8.5" LANDSCAPE Standard - Unique ID target) */}
-          <div id="section-vi-paper" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md min-h-[680px] w-full max-w-[1150px] flex flex-col justify-between font-serif">
-            
+          {/* OFFICIAL PRINTABLE PAPER DOCUMENT SHEET (Legal 13" x 8.5" LANDSCAPE Standard - Adaptive flow rendering) */}
+          <div id="section-vi-paper" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1150px] flex flex-col justify-between font-serif">
             <div>
               {/* COMPANY & PROJECT HEADER BLOCK */}
               <div className="border-b-2 border-black pb-3 mb-5 space-y-2 font-serif">
@@ -589,7 +594,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                 </p>
               </div>
 
-              {/* Requirements Grid Table (Borders 2px solid black, 6 Columns: 6%, 44%, 9%, 13%, 14%, 14%) */}
+              {/* Requirements Grid Table */}
               <table className={`w-full border-collapse border-2 border-black text-black table-fixed ${getTableFontSizeClass()}`}>
                 <thead>
                   <tr className="border-b-2 border-black bg-slate-50 font-serif">
@@ -614,10 +619,8 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Render Populated Items Dynamically */}
                   {items.map((rowItem, idx) => (
                     <tr key={rowItem.id} className="border-b border-black hover:bg-slate-50/50 transition-colors">
-                      {/* Automatic Item Number */}
                       <td className="border border-black px-1.5 py-2 text-center font-serif font-medium align-top">
                         <div className="flex flex-col items-center justify-between h-full">
                           <span className="block pt-0.5 font-bold">{idx + 1}</span>
@@ -634,7 +637,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                         </div>
                       </td>
 
-                      {/* Description Cell */}
                       <td className="border border-black px-3 py-2 font-serif align-top break-words">
                         {!isExporting && (
                           <textarea
@@ -650,7 +652,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                         </div>
                       </td>
 
-                      {/* Quantity Cell */}
                       <td className="border border-black px-1.5 py-2 font-serif text-center align-top">
                         {!isExporting && (
                           <input
@@ -666,7 +667,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                         </div>
                       </td>
 
-                      {/* Unit Amount Cell */}
                       <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
                         {!isExporting && (
                           <input
@@ -682,7 +682,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                         </div>
                       </td>
 
-                      {/* Total Cell (Quantity x Unit Amount Auto Computation) */}
                       <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
                         {!isExporting && (
                           <input
@@ -698,7 +697,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                         </div>
                       </td>
 
-                      {/* Delivered Weeks/Months Cell */}
                       <td className="border border-black px-2.5 py-2 font-serif text-center align-top break-words">
                         {!isExporting && (
                           <input
@@ -723,7 +721,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
             </div>
 
             {/* Document Footer: Signatory Block & Verification QR */}
-            <div className="mt-8 pt-4 border-t border-slate-300 flex items-end justify-between text-xs font-serif">
+            <div className="mt-8 pt-4 border-t border-slate-300 flex items-end justify-between text-xs font-serif signatory-block">
               <div>
                 <p className="font-bold text-black uppercase">{companyName}</p>
                 <div className="mt-8 border-b border-black w-64"></div>
@@ -740,9 +738,11 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                     projectTitle: projectTitle,
                     projectRefNo: projectRefNo,
                     procuringEntity: procuringEntity,
-                    dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted)
+                    dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
+                    documentCategory: 'Bid Forms',
+                    generatedBy: companyName
                   }}
-                  size={95}
+                  size={90}
                   showCaption={false}
                 />
                 <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
@@ -750,7 +750,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                 </span>
               </div>
             </div>
-
           </div>
 
         </div>

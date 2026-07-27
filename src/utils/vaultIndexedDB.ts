@@ -40,20 +40,26 @@ function openDB(): Promise<IDBDatabase> {
 /** Save vault items for a specific tenant or all items (metadata only, no fileDataUrl) */
 export async function saveVaultItems(items: any[], tenantId?: string): Promise<void> {
   const db = await openDB();
-  const tx = db.transaction(STORE_VAULT_ITEMS, 'readwrite');
-  const store = tx.objectStore(STORE_VAULT_ITEMS);
 
-  // If tenantId is specified, preserve items belonging to OTHER tenants
+  // If tenantId is specified, read items in a separate readonly transaction first
   let finalItemsToWrite = items;
   if (tenantId) {
-    const getAllReq = store.getAll();
-    await new Promise((resolve) => { getAllReq.onsuccess = resolve; });
-    const existing: any[] = getAllReq.result || [];
+    const readTx = db.transaction(STORE_VAULT_ITEMS, 'readonly');
+    const readStore = readTx.objectStore(STORE_VAULT_ITEMS);
+    const getAllReq = readStore.getAll();
+
+    const existing: any[] = await new Promise((resolve, reject) => {
+      getAllReq.onsuccess = () => resolve(getAllReq.result || []);
+      getAllReq.onerror = () => reject(getAllReq.error);
+    });
+
     const otherTenantsItems = existing.filter(item => item.tenantId && item.tenantId !== tenantId);
     finalItemsToWrite = [...otherTenantsItems, ...items];
   }
 
-  // Clear old entries and write fresh combined set
+  // Open readwrite transaction and execute synchronous writes
+  const tx = db.transaction(STORE_VAULT_ITEMS, 'readwrite');
+  const store = tx.objectStore(STORE_VAULT_ITEMS);
   store.clear();
 
   for (const item of finalItemsToWrite) {

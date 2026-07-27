@@ -206,7 +206,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             setExpectedDelivery(parsedVi[0].delivered);
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (savedTechSpecs) {
@@ -228,7 +228,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             return it;
           });
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     setItems(baseItems);
@@ -297,10 +297,10 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     const updated = items.map((it, idx) =>
       idx === index
         ? {
-            ...it,
-            compliance: 'Not Comply' as const,
-            complianceEvidence: 'Specification parameter does not meet mandatory requirement.'
-          }
+          ...it,
+          compliance: 'Not Comply' as const,
+          complianceEvidence: 'Specification parameter does not meet mandatory requirement.'
+        }
         : it
     );
     saveSharedItems(updated);
@@ -338,9 +338,15 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     await new Promise((r) => setTimeout(r, 200));
     try {
       const fileName = `${projectRefNo}_Framework_Agreement_Package_${todayStr}.pdf`;
-      const page1Elem = document.getElementById('framework-page-1');
-      if (page1Elem) {
-        await generateAndDownloadThreeLayerPdf(null, page1Elem, undefined, fileName);
+      const templateElems = document.querySelectorAll('.single-page-paper');
+      if (templateElems.length > 0) {
+        const elemArray = Array.from(templateElems) as HTMLElement[];
+        await generateAndDownloadThreeLayerPdf(null, elemArray, undefined, fileName);
+      } else {
+        const page1Elem = document.getElementById('framework-page-1');
+        if (page1Elem) {
+          await generateAndDownloadThreeLayerPdf(null, page1Elem, undefined, fileName);
+        }
       }
     } finally {
       setIsExporting(false);
@@ -500,7 +506,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       `}</style>
 
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-7xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white">
-        
+
         {/* Top Controls Header Bar */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0 print:hidden no-export">
           <div className="flex items-center gap-3">
@@ -607,27 +613,24 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                   <button
                     type="button"
                     onClick={() => setFontSizeMode('fine')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${
-                      fontSizeMode === 'fine' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                    }`}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${fontSizeMode === 'fine' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
                   >
                     9pt
                   </button>
                   <button
                     type="button"
                     onClick={() => setFontSizeMode('xs')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${
-                      fontSizeMode === 'xs' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                    }`}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${fontSizeMode === 'xs' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
                   >
                     10pt
                   </button>
                   <button
                     type="button"
                     onClick={() => setFontSizeMode('sm')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${
-                      fontSizeMode === 'sm' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                    }`}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${fontSizeMode === 'sm' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
                   >
                     11pt
                   </button>
@@ -659,7 +662,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
           </div>
 
           {/* PAGE 1: FRAMEWORK AGREEMENT LIST (100% Identical to Section VI) */}
-          <div id="framework-page-1" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md min-h-[680px] w-full max-w-[1150px] flex flex-col justify-between font-serif">
+          <div id="framework-page-1" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1150px] flex flex-col justify-between font-serif">
             <div>
               {/* COMPANY & PROJECT HEADER BLOCK */}
               <div className="border-b-2 border-black pb-3 mb-5 space-y-2 font-serif">
@@ -851,7 +854,9 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                     projectTitle: projectTitle,
                     projectRefNo: projectRefNo,
                     procuringEntity: procuringEntity,
-                    dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted)
+                    dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
+                    documentCategory: 'Legal Documents',
+                    generatedBy: companyName
                   }}
                   size={90}
                   showCaption={false}
@@ -864,7 +869,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
           </div>
 
           {/* PAGE 2: TECHNICAL SPECIFICATIONS & STATEMENT OF COMPLIANCE (100% Identical to Section VII) */}
-          <div id="framework-page-2" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md min-h-[680px] w-full max-w-[1150px] flex flex-col justify-between font-serif">
+          <div id="framework-page-2" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1150px] flex flex-col justify-between font-serif">
             <div>
               {/* PAGE 2 HEADER BLOCK */}
               <div className="border-b-2 border-black pb-3 mb-5 space-y-2 font-serif">
@@ -903,7 +908,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                   Section VII. Technical Specifications
                 </h1>
                 <p className="text-[11px] font-mono text-slate-600 uppercase mt-0.5 font-bold">
-                  (FORM 2 — TECHNICAL SPECIFICATIONS & STATEMENT OF COMPLIANCE)
+                  (FORM 2 Use this form for Framework Agreement — TECHNICAL SPECIFICATIONS & STATEMENT OF COMPLIANCE)
                 </p>
               </div>
 
@@ -955,11 +960,10 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                               <button
                                 type="button"
                                 onClick={() => handleComplyClick(idx)}
-                                className={`px-2.5 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 border ${
-                                  rowItem.compliance === 'Comply'
-                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow'
-                                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
-                                }`}
+                                className={`px-2.5 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 border ${rowItem.compliance === 'Comply'
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow'
+                                  : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                                  }`}
                               >
                                 <Check className="w-3.5 h-3.5" />
                                 <span>Comply</span>
@@ -967,11 +971,10 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                               <button
                                 type="button"
                                 onClick={() => handleNotComplyClick(idx)}
-                                className={`px-2.5 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 border ${
-                                  rowItem.compliance === 'Not Comply'
-                                    ? 'bg-red-600 text-white border-red-600 shadow'
-                                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
-                                }`}
+                                className={`px-2.5 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 border ${rowItem.compliance === 'Not Comply'
+                                  ? 'bg-red-600 text-white border-red-600 shadow'
+                                  : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                                  }`}
                               >
                                 <AlertCircle className="w-3.5 h-3.5" />
                                 <span>Not Comply</span>
@@ -1044,7 +1047,9 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                     projectTitle: projectTitle,
                     projectRefNo: projectRefNo,
                     procuringEntity: procuringEntity,
-                    dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted)
+                    dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
+                    documentCategory: 'Legal Documents',
+                    generatedBy: companyName
                   }}
                   size={90}
                   showCaption={false}

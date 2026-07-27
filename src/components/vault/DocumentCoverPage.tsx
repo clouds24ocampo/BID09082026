@@ -101,7 +101,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({ item, tena
   });
 
   return (
-    <div className="print-document-sheet w-full bg-white text-slate-900 font-sans p-6 sm:p-10 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-6 max-w-[650px] min-h-[950px] aspect-[8.5/13] mx-auto my-4 text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none print:break-inside-avoid print:page-break-inside-avoid">
+    <div className="print-document-sheet w-full bg-white text-slate-900 font-legal p-6 sm:p-10 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-6 max-w-[650px] min-h-[950px] aspect-[8.5/13] mx-auto my-4 text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none print:break-inside-avoid print:page-break-inside-avoid">
       
       {/* Outer Border Frame */}
       <div className="absolute inset-3 border-2 border-blue-950 pointer-events-none rounded-xl" />
@@ -185,7 +185,9 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({ item, tena
               projectTitle: item.projectTitle || 'Infrastructure & IT Systems Modernization Project',
               projectRefNo: item.philgepsRefNo || 'PRJ-2026-901283',
               procuringEntity: 'Department of Information & Communications Technology',
-              dateTimeSubmitted: new Date().toLocaleString()
+              dateTimeSubmitted: new Date().toLocaleString(),
+              documentCategory: 'Cover Page',
+              generatedBy: tenant?.companyName
             }}
             size={120}
             className="shrink-0"
