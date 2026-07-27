@@ -1964,179 +1964,144 @@ export const DocumentVaultView: React.FC = () => {
 
           {/* FINANCIAL DOCUMENTS STATUTORY FORMS GENERATOR CARDS */}
           {selectedCategory === 'FINANCIAL' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               
               {/* CARD 1: Bid Form for Goods */}
-              <div className="glass-card p-4 rounded-2xl border border-slate-800 hover:border-emerald-500/50 transition space-y-3 flex flex-col justify-between">
-                <div className="space-y-2">
+              <div className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-emerald-500/50 transition space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-1">
-                      <FileSignature className="w-3 h-3 text-emerald-400" /> Goods Form
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-1">
+                      <FileSignature className="w-3 h-3 text-emerald-400" /> Goods Financial Form
                     </span>
-                    <span className="text-[9px] font-mono text-slate-400">PBDs Sec VIII</span>
+                    <span className="text-[10px] font-mono text-slate-400">PBDs Section VIII</span>
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-bold text-white leading-snug">Bid Form for Goods</h3>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      Statutory 2-page Financial Bid Form for goods procurement with itemized taxes and signatures.
+                    <h3 className="text-base font-bold text-white">Bid Form for Goods</h3>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Official statutory 2-page Financial Bid Form for goods procurement with itemized taxes and signatures.
                     </p>
                   </div>
 
-                  <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
-                    <p className="text-slate-300 font-bold">Ref: Section 30.1</p>
-                    <p className="text-emerald-400">Legal 8.5" × 13"</p>
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
+                    <p className="text-slate-300 font-bold">Ref: Section 30.1 / 32.2.1</p>
+                    <p className="text-emerald-400">Legal Format: Legal 8.5" × 13"</p>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 font-mono">bidform4goods...</span>
+                <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-mono">bidform4goods.tsx</span>
                   <button
                     onClick={() => setShowBidFormGoodsModal(true)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow transition flex items-center gap-1"
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg transition flex items-center gap-1.5"
                   >
-                    <FileSignature className="w-3.5 h-3.5" />
-                    <span>Create</span>
+                    <FileSignature className="w-4 h-4" />
+                    <span>Create Form</span>
                   </button>
                 </div>
               </div>
 
               {/* CARD 2: Bid Form for Infrastructure Projects */}
-              <div className="glass-card p-4 rounded-2xl border border-slate-800 hover:border-amber-500/50 transition space-y-3 flex flex-col justify-between">
-                <div className="space-y-2">
+              <div className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-amber-500/50 transition space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
-                      <HardHat className="w-3 h-3 text-amber-400" /> Infra Form
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
+                      <HardHat className="w-3 h-3 text-amber-400" /> Infra Financial Form
                     </span>
-                    <span className="text-[9px] font-mono text-slate-400">GPPB 09-2020</span>
+                    <span className="text-[10px] font-mono text-slate-400">GPPB Res. 09-2020</span>
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-bold text-white leading-snug">Bid Form for Infra</h3>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      Statutory 2-page Financial Bid Form for Civil Works with points (a)-(l) and BOQ acknowledgement.
+                    <h3 className="text-base font-bold text-white">Bid Form for Infra</h3>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Official statutory 2-page Financial Bid Form for Civil Works / Infrastructure. Includes points (a)-(l) and BOQ acknowledgement.
                     </p>
                   </div>
 
-                  <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
-                    <p className="text-slate-300 font-bold">Ref: Res. 09-2020</p>
-                    <p className="text-amber-400">Legal 8.5" × 13"</p>
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
+                    <p className="text-slate-300 font-bold">Ref: GPPB Res. 09-2020</p>
+                    <p className="text-amber-400">Legal Format: Legal 8.5" × 13"</p>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 font-mono">bidform4infra...</span>
+                <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-mono">bidform4infra...</span>
                   <button
                     onClick={() => setShowBidFormInfraModal(true)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow transition flex items-center gap-1"
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow-lg transition flex items-center gap-1.5"
                   >
-                    <FileSignature className="w-3.5 h-3.5" />
-                    <span>Create</span>
+                    <FileSignature className="w-4 h-4" />
+                    <span>Create Form</span>
                   </button>
                 </div>
               </div>
 
               {/* CARD 3: Bill of Quantities (BOQ) */}
-              <div className="glass-card p-4 rounded-2xl border border-slate-800 hover:border-blue-500/50 transition space-y-3 flex flex-col justify-between">
-                <div className="space-y-2">
+              <div className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-blue-500/50 transition space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-bold border border-blue-500/20 flex items-center gap-1">
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-bold border border-blue-500/20 flex items-center gap-1">
                       <Table className="w-3 h-3 text-blue-400" /> BOQ Schedule
                     </span>
-                    <span className="text-[9px] font-mono text-slate-400">Cols 1 to 6</span>
+                    <span className="text-[10px] font-mono text-slate-400">PBDs Section VIII</span>
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-bold text-white leading-snug">Bill of Quantities (BOQ)</h3>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      Statutory Bill of Quantities schedule tracing columns 1-6 with unit prices, quantity & auto-totals.
+                    <h3 className="text-base font-bold text-white">Bill of Quantities (BOQ)</h3>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Official statutory Bill of Quantities schedule grid. Traces template structure with columns 1-6, unit price, quantity, and auto-computed total amount.
                     </p>
                   </div>
 
-                  <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
-                    <p className="text-slate-300 font-bold">Ref: Sec. 32.2.1</p>
-                    <p className="text-blue-400">Legal 8.5" × 13"</p>
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
+                    <p className="text-slate-300 font-bold">Ref: Section 32.2.1 (Detailed Estimates)</p>
+                    <p className="text-blue-400">Legal Format: Legal 8.5" × 13"</p>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 font-mono">billofquantities...</span>
+                <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-mono">billofquantities.tsx</span>
                   <button
                     onClick={() => setShowBoqModal(true)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center gap-1"
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg transition flex items-center gap-1.5"
                   >
-                    <FileSignature className="w-3.5 h-3.5" />
-                    <span>Create</span>
+                    <FileSignature className="w-4 h-4" />
+                    <span>Create Form</span>
                   </button>
                 </div>
               </div>
 
               {/* CARD 4: Cash Flow by Quarter (SF-INFR-56) */}
-              <div className="glass-card p-4 rounded-2xl border border-slate-800 hover:border-purple-500/50 transition space-y-3 flex flex-col justify-between">
-                <div className="space-y-2">
+              <div className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-purple-500/50 transition space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 font-bold border border-purple-500/20 flex items-center gap-1">
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-purple-500/10 text-purple-400 font-bold border border-purple-500/20 flex items-center gap-1">
                       <TrendingUp className="w-3 h-3 text-purple-400" /> Cash Flow
                     </span>
-                    <span className="text-[9px] font-mono text-slate-400">SF-INFR-56</span>
+                    <span className="text-[10px] font-mono text-slate-400">SF-INFR-56</span>
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-bold text-white leading-snug">Cash Flow by Quarter</h3>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                    <h3 className="text-base font-bold text-white">Cash Flow by Quarter</h3>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                       Statutory Cash Flow and Payment Schedule form (SF-INFR-56) with quarterly accomplishments & cumulative amounts.
                     </p>
                   </div>
 
-                  <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
                     <p className="text-slate-300 font-bold">Ref: SF-INFR-56</p>
-                    <p className="text-purple-400">Legal 13" × 8.5"</p>
+                    <p className="text-purple-400">Legal Format: Legal 13" × 8.5"</p>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 font-mono">cashflowbyquarter...</span>
+                <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-mono">cashflowbyquarter.tsx</span>
                   <button
                     onClick={() => setShowCashFlowModal(true)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow transition flex items-center gap-1"
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow-lg transition flex items-center gap-1.5"
                   >
-                    <FileSignature className="w-3.5 h-3.5" />
-                    <span>Create</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* CARD 5: NFCC Form */}
-              <div className="glass-card p-4 rounded-2xl border border-slate-800 hover:border-cyan-500/50 transition space-y-3 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-bold border border-cyan-500/20 flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3 text-cyan-400" /> Financial NFCC
-                    </span>
-                    <span className="text-[9px] font-mono text-slate-400">RA 12009</span>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-bold text-white leading-snug">Net Financial (NFCC)</h3>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      Statutory NFCC capacity computation statement (K factor 15 or 20) with Audited Financial Statement figures.
-                    </p>
-                  </div>
-
-                  <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
-                    <p className="text-slate-300 font-bold">Ref: Sec. 23.4.1.4</p>
-                    <p className="text-cyan-400">Legal 8.5" × 13"</p>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 font-mono">NfccModal.tsx</span>
-                  <button
-                    onClick={() => setShowNfccModal(true)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 shadow transition flex items-center gap-1"
-                  >
-                    <FileSignature className="w-3.5 h-3.5" />
-                    <span>Create</span>
+                    <FileSignature className="w-4 h-4" />
+                    <span>Create Form</span>
                   </button>
                 </div>
               </div>
