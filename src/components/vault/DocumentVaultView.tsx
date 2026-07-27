@@ -2257,7 +2257,7 @@ export const DocumentVaultView: React.FC = () => {
             </div>
           )}
 
-          {filteredGridItems.length === 0 ? (
+          {filteredGridItems.length === 0 && selectedCategory !== 'FINANCIAL' ? (
             <div className="glass-panel p-12 text-center rounded-2xl border border-slate-800 space-y-4">
               <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto">
                 <FileCheck className="w-6 h-6" />
@@ -2281,7 +2281,7 @@ export const DocumentVaultView: React.FC = () => {
                 <span>Upload Vault Document</span>
               </button>
             </div>
-          ) : (
+          ) : filteredGridItems.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredGridItems.map((item) => {
                 const isSelected = selectedItemIds.includes(item.id);
@@ -2349,7 +2349,7 @@ export const DocumentVaultView: React.FC = () => {
                 );
               })}
             </div>
-          )}
+          ) : null}
         </div>
       )}
 
