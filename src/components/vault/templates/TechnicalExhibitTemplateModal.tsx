@@ -372,7 +372,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
   const [govIdNumber, setGovIdNumber] = useState('PRC-0091823');
 
   // Notary Public State
-  const [notaryCity, setNotaryCity] = useState('City of Manila');
+  const [notaryCity, setNotaryCity] = useState('');
   const [docNo, setDocNo] = useState('');
   const [pageNo, setPageNo] = useState('');
   const [bookNo, setBookNo] = useState('');
@@ -412,8 +412,33 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
       const templateElems = document.querySelectorAll('.single-page-paper');
       let dataUrl: string | undefined = undefined;
       if (templateElems.length > 0) {
-        const canvas = await html2canvas(templateElems[0] as HTMLElement, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff' });
-        dataUrl = canvas.toDataURL('image/png');
+        const elemArray = Array.from(templateElems) as HTMLElement[];
+        const canvases = await Promise.all(
+          elemArray.map(el => html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }))
+        );
+
+        if (canvases.length === 1) {
+          dataUrl = canvases[0].toDataURL('image/png');
+        } else {
+          const totalWidth = Math.max(...canvases.map(c => c.width));
+          const totalHeight = canvases.reduce((sum, c) => sum + c.height + 20, 0);
+          const combinedCanvas = document.createElement('canvas');
+          combinedCanvas.width = totalWidth;
+          combinedCanvas.height = totalHeight;
+          const ctx = combinedCanvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, totalWidth, totalHeight);
+            let currentY = 0;
+            canvases.forEach(c => {
+              ctx.drawImage(c, 0, currentY);
+              currentY += c.height + 20;
+            });
+            dataUrl = combinedCanvas.toDataURL('image/png');
+          } else {
+            dataUrl = canvases[0].toDataURL('image/png');
+          }
+        }
       }
       onSaveAndComplete(dataUrl, item.name, projectRefNo, projectTitle);
     } catch {
@@ -943,7 +968,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
             )}
 
             {item.code === '(g)' && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs pt-2 border-t border-slate-800">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-xs pt-2 border-t border-slate-800">
                 <div>
                   <label className="block text-slate-400 font-medium mb-1">Affiant Civil Status</label>
                   <input type="text" value={affiantCivilStatus} onChange={(e) => setAffiantCivilStatus(e.target.value)} placeholder="Single / Married / Legal Age" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white" />
@@ -959,6 +984,10 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                 <div>
                   <label className="block text-slate-400 font-medium mb-1">Government ID Number</label>
                   <input type="text" value={govIdNumber} onChange={(e) => setGovIdNumber(e.target.value)} placeholder="PRC-0091823" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Notary Jurat Location</label>
+                  <input type="text" value={notaryCity} onChange={(e) => setNotaryCity(e.target.value)} placeholder="Leave blank or enter city" className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white" />
                 </div>
               </div>
             )}
@@ -1973,7 +2002,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                   </ol>
 
                   <p className="font-serif pt-4 leading-relaxed">
-                    IN WITNESS WHEREOF, I have hereunto set my hand this _____ day of __________, 20___ at ____________________, Philippines.
+                    IN WITNESS WHEREOF, I have hereunto set my hand this _____ day of __________, 20___ at <u>{notaryCity || '____________________'}</u>, Philippines.
                   </p>
 
                   <div className="pt-6 flex flex-col items-end text-right font-serif space-y-1">
@@ -1992,7 +2021,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                   <div className="pt-6 font-serif space-y-2 border-t border-slate-300">
                     <p className="font-bold text-center uppercase text-xs tracking-wider"></p>
                     <p className="text-[11px] font-serif leading-relaxed text-justify">
-                      SUBSCRIBED AND SWORN to before me this _____ day of [month] [year] at [place of execution], Philippines. Affiant/s is/are personally known to me and was/were identified by me through competent evidence of identity as defined in the 2004 Rules on Notarial Practice (A.M. No. 02-8-13-SC). Affiant/s exhibited to me his/her {govIdType || 'Government Issued ID'} with no. {govIdNumber || '___________'}, with his/her photograph and signature appearing thereon.
+                      SUBSCRIBED AND SWORN to before me this _____ day of __________________ 20___ at <u>{notaryCity || '____________________'}</u>, Philippines. Affiant/s is/are personally known to me and was/were identified by me through competent evidence of identity as defined in the 2004 Rules on Notarial Practice (A.M. No. 02-8-13-SC). Affiant/s exhibited to me his/her {govIdType || 'Government Issued ID'} with no. {govIdNumber || '___________'}, with his/her photograph and signature appearing thereon.
                     </p>
 
                     <p className="text-[11px] font-serif pt-1">

@@ -183,21 +183,31 @@ body {
 
   /* 3. Printable document paper sheets flow naturally with page breaks in Cambria Legal Font */
   .print-document-sheet,
-  .single-page-paper {
+  .single-page-paper,
+  .oss-legal-paper,
+  .bsd-legal-paper {
     display: block !important;
     position: relative !important;
     font-family: var(--font-legal) !important;
     width: 100% !important;
     max-width: 100% !important;
-    margin: 0 auto 0.4in auto !important;
+    margin: 0 auto !important;
     padding: 0.25in !important;
     border: none !important;
     box-shadow: none !important;
     background: #ffffff !important;
     color: #000000 !important;
-    page-break-after: always !important;
-    break-after: page !important;
+    page-break-after: always;
+    break-after: page;
     overflow: visible !important;
+  }
+
+  .print-document-sheet:last-child,
+  .single-page-paper:last-child,
+  .oss-legal-paper:last-child,
+  .bsd-legal-paper:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
 }
 

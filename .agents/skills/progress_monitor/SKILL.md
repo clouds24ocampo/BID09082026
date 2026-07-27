@@ -26,3 +26,8 @@ This agent skill monitors and audits the completion status of bidding opportunit
 3. **Status Reporting**:
    - Calculate percentage readiness (`(Completed Items / Total Required Items) * 100%`).
    - Generate summary report for BAC submission verification.
+
+
+
+# Progress Monitor Agent Skill
+

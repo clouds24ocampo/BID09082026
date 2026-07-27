@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { PhilGEPSOpportunity, ProcurementType, SectorType, OpportunityPdfAttachment } from '../../types';
+import VaultErrorBoundary from '../common/VaultErrorBoundary';
 import {
   Search,
   Filter,
@@ -472,7 +473,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
   };
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <VaultErrorBoundary fallbackTitle="Opportunity Finder Protected">
+      <div className="space-y-6 animate-fadeIn">
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
@@ -621,10 +623,10 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         ))}
       </div>
 
-      {/* DETAIL VIEW MODAL & 4 PDF ATTACHMENT SLOTS */}
+      {/* DETAIL VIEW MODAL & 4 PDF ATTACHMENT SLOTS (100% SCREEN ADAPTED RESPONSIVE MODAL) */}
       {viewingItem && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[85vh] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col p-2 sm:p-4 md:p-6 overflow-hidden animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full h-full max-w-[1800px] mx-auto shadow-2xl flex flex-col overflow-hidden">
 
             {/* Modal Header Bar */}
             <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
@@ -814,10 +816,10 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         </div>
       )}
 
-      {/* ADD / EDIT OPPORTUNITY MODAL (FIT-TO-SCREEN RESPONSIVE MODAL) */}
+      {/* ADD / EDIT OPPORTUNITY MODAL (100% SCREEN ADAPTED RESPONSIVE MODAL) */}
       {showAddEditModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[85vh] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col p-2 sm:p-4 md:p-6 overflow-hidden animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full h-full max-w-[1800px] mx-auto shadow-2xl flex flex-col overflow-hidden">
 
             {/* Modal Fixed Header */}
             <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900 shrink-0">
@@ -851,9 +853,9 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">PhilGEPS Reference No. <span className="text-red-400">*</span></label>
+                    <label className="block text-slate-300 font-medium mb-1">PhilGEPS Ref. No. <span className="text-red-400">*</span></label>
                     <input
                       type="text"
                       value={philgepsRefNo}
@@ -866,7 +868,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Solicitation Number <span className="text-red-400">*</span></label>
+                    <label className="block text-slate-300 font-medium mb-1">Solicitation No. <span className="text-red-400">*</span></label>
                     <input
                       type="text"
                       value={solicitationNumber}
@@ -877,9 +879,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     />
                     {errors.solicitationNumber && <p className="text-[11px] text-red-400 mt-1">{errors.solicitationNumber}</p>}
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-slate-300 font-medium mb-1">Sector <span className="text-red-400">*</span></label>
                     <select
@@ -1191,10 +1191,10 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         </div>
       )}
 
-      {/* INLINE SLOT PDF PREVIEW MODAL */}
+      {/* INLINE SLOT PDF PREVIEW MODAL (100% SCREEN ADAPTED RESPONSIVE MODAL) */}
       {previewPdfSlot && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[85vh] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col p-2 sm:p-4 md:p-6 overflow-hidden animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full h-full max-w-[1800px] mx-auto shadow-2xl flex flex-col overflow-hidden">
             <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-blue-400" />
@@ -1225,5 +1225,6 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
       )}
 
     </div>
+    </VaultErrorBoundary>
   );
 };

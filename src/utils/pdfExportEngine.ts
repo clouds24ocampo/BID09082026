@@ -168,10 +168,13 @@ export async function exportMergedThreeLayerPdf(
               const slices: { startY: number; height: number }[] = [];
               let currentY = 0;
 
-              while (currentY < canvas.height - 10) {
+              while (currentY < canvas.height - 30) {
                 const maxPossibleY = currentY + targetCanvasPageHeight;
                 if (maxPossibleY >= canvas.height) {
-                  slices.push({ startY: currentY, height: canvas.height - currentY });
+                  const remainingHeight = canvas.height - currentY;
+                  if (remainingHeight > 30) {
+                    slices.push({ startY: currentY, height: remainingHeight });
+                  }
                   break;
                 }
 

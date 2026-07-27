@@ -11,6 +11,7 @@ import { FrameworkAgreementList } from './templates/FrameworkAgreementList';
 import { TechnicalSpecifications } from './templates/TechnicalSpecifications';
 import { AfterSalesServiceModal } from './templates/AfterSalesServiceModal';
 import { NfccModal } from './templates/NfccModal';
+import VaultErrorBoundary from '../common/VaultErrorBoundary';
 import {
   saveVaultItems,
   loadVaultItems,
@@ -131,13 +132,6 @@ const TECHNICAL_CHECKLIST_MASTER: TechnicalChecklistItem[] = [
     templateCode: 'SPECIAL_PCAB_LICENSE'
   },
   {
-    id: 'tech-e',
-    code: '(e)',
-    name: 'Original Bid Security. If Surety Bond: include Insurance Commission certification. If Bid Securing Declaration: original notarized copy',
-    notes: 'Legal template to follow',
-    templateCode: 'BID_SECURITY_BSD'
-  },
-  {
     id: 'tech-f',
     code: '(f)',
     name: 'Project Requirements — Key Personnel, Equipment & Organizational Chart',
@@ -164,13 +158,6 @@ const TECHNICAL_CHECKLIST_MASTER: TechnicalChecklistItem[] = [
         notes: 'Legal template to follow'
       }
     ]
-  },
-  {
-    id: 'tech-g',
-    code: '(g)',
-    name: 'Original duly signed Omnibus Sworn Statement (OSS). If corporation/partnership/cooperative: Original Notarized Secretary\'s Certificate. If JV: Original Special Power of Attorney authorizing officer to sign OSS and represent Bidder',
-    notes: 'Legal template to follow',
-    templateCode: 'OMNIBUS_SWORN_STATEMENT'
   },
   {
     id: 'tech-h',
@@ -364,6 +351,42 @@ export const DocumentVaultView: React.FC = () => {
   const [editIssuedDate, setEditIssuedDate] = useState('');
   const [editExpiryDate, setEditExpiryDate] = useState('');
 
+  // Re-Tag Bidding Project State (Zero-Mistake Project Isolation)
+  const [retagTargetItem, setRetagTargetItem] = useState<DocumentVaultItem | null>(null);
+  const [retagProjectRefNo, setRetagProjectRefNo] = useState<string>('');
+  const [retagProjectTitle, setRetagProjectTitle] = useState<string>('');
+
+  const openRetagModal = (item: DocumentVaultItem) => {
+    setRetagTargetItem(item);
+    const initialRef = item.philgepsRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
+    const initialTitle = item.projectTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+    setRetagProjectRefNo(initialRef);
+    setRetagProjectTitle(initialTitle);
+  };
+
+  const handleRetagSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!retagTargetItem) return;
+
+    const matchedOpp = oppProjects.find(p => p.refNo === retagProjectRefNo);
+    const updatedRefNo = retagProjectRefNo.trim();
+    const updatedTitle = (matchedOpp?.title || retagProjectTitle).trim();
+
+    setVaultItems(prev => prev.map(item => {
+      if (item.id === retagTargetItem.id) {
+        return {
+          ...item,
+          philgepsRefNo: updatedRefNo || undefined,
+          projectTitle: updatedTitle || undefined
+        };
+      }
+      return item;
+    }));
+
+    setRetagTargetItem(null);
+    notifySuccess('Bidding Project Tag Updated', `"${retagTargetItem.documentName}" is now successfully tagged to project [${updatedRefNo || 'N/A'}] ${updatedTitle}.`);
+  };
+
   const openEditModal = (item: DocumentVaultItem) => {
     setEditTargetItem(item);
     setEditDocName(item.documentName);
@@ -551,7 +574,7 @@ export const DocumentVaultView: React.FC = () => {
     };
 
     storePdfData(newVaultDoc.id, fileDataUrl);
-    setVaultItems(prev => [newVaultDoc, ...prev.filter(item => item.documentCode !== fillingTemplateItem.code)]);
+    setVaultItems(prev => [newVaultDoc, ...prev.filter(item => item.id !== newVaultDoc.id)]);
     setFillingTemplateItem(null);
     setTechSubTab('COMPLETED');
     notifySuccess(`[${docTitle}, v1.0] Template Save Successful!`, 'Legal template saved into Document Vault as an active technical exhibit under Completed Technical Documents & Forms.');
@@ -678,7 +701,7 @@ export const DocumentVaultView: React.FC = () => {
     };
 
     storePdfData(newItem.id, fileDataUrl);
-    setVaultItems(prev => [newItem, ...prev.filter(item => item.documentCode !== uploadTargetDef.code)]);
+    setVaultItems(prev => [newItem, ...prev.filter(item => item.id !== newItem.id)]);
     setUploadTargetDef(null);
     resetFormState();
     notifySuccess(`[${docName}, v1.0] Upload Successful!`, 'Your document has been verified and encrypted into Document Vault. Click "View PDF" to inspect your document.');
@@ -825,7 +848,10 @@ export const DocumentVaultView: React.FC = () => {
     !CLASS_A_MASTER_LIST.some(d => d.code === item.documentCode)
   );
 
-  const completedTechVaultItems = vaultItems.filter(item => item.category === 'TECHNICAL');
+  const completedTechVaultItems = vaultItems.filter(item =>
+    item.category === 'TECHNICAL' &&
+    (selectedTechProjectFilter === 'ALL' || item.philgepsRefNo === selectedTechProjectFilter)
+  );
 
   const filteredGridItems = vaultItems.filter(item => {
     const matchesSearch = item.documentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -838,7 +864,8 @@ export const DocumentVaultView: React.FC = () => {
   const selectedVaultObjects = vaultItems.filter(item => selectedItemIds.includes(item.id));
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <VaultErrorBoundary fallbackTitle="Document Vault Render Protected">
+      <div className="space-y-6 animate-fadeIn">
 
       {/* Header Banner */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-5">
@@ -1471,14 +1498,36 @@ export const DocumentVaultView: React.FC = () => {
           {/* SUB-TAB 2: COMPLETED TECHNICAL DOCUMENTS & FORMS */}
           {techSubTab === 'COMPLETED' && (
             <div className="space-y-4">
-              {/* Bidding Project Filter Bar */}
+              {/* Bidding Project Filter Bar & Document Management */}
               {(() => {
-                const uniqueProjectsInCompletedTech = Array.from(new Set(
-                  completedTechVaultItems.map(i => i.philgepsRefNo).filter(Boolean)
-                )).map(ref => {
-                  const item = completedTechVaultItems.find(i => i.philgepsRefNo === ref);
-                  return { refNo: ref!, title: item?.projectTitle || 'Bidding Project' };
-                });
+                // Build complete option list combining Opportunity Finder projects and existing form project tags
+                const allAvailableProjects = (() => {
+                  const seenRefs = new Set<string>();
+                  const list: { refNo: string; title: string; docCount: number }[] = [];
+
+                  oppProjects.forEach(p => {
+                    if (p.refNo && !seenRefs.has(p.refNo)) {
+                      seenRefs.add(p.refNo);
+                      const count = completedTechVaultItems.filter(i => i.philgepsRefNo === p.refNo).length;
+                      list.push({ refNo: p.refNo, title: p.title, docCount: count });
+                    }
+                  });
+
+                  completedTechVaultItems.forEach(i => {
+                    if (i.philgepsRefNo && !seenRefs.has(i.philgepsRefNo)) {
+                      seenRefs.add(i.philgepsRefNo);
+                      list.push({
+                        refNo: i.philgepsRefNo,
+                        title: i.projectTitle || 'Bidding Opportunity',
+                        docCount: completedTechVaultItems.filter(doc => doc.philgepsRefNo === i.philgepsRefNo).length
+                      });
+                    }
+                  });
+
+                  return list;
+                })();
+
+                const selectedProjectOption = allAvailableProjects.find(p => p.refNo === selectedTechProjectFilter);
 
                 const displayedCompletedTechItems = completedTechVaultItems.filter(item => {
                   if (selectedTechProjectFilter === 'ALL') return true;
@@ -1510,112 +1559,190 @@ export const DocumentVaultView: React.FC = () => {
 
                 return (
                   <div className="space-y-4">
-                    {uniqueProjectsInCompletedTech.length > 0 && (
-                      <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 font-mono">
-                        <div className="flex items-center gap-2 text-xs font-bold text-blue-400">
-                          <Building2 className="w-4 h-4 text-blue-400" />
-                          <span>Group / Filter Documents by Bidding Project:</span>
-                        </div>
+                    {/* Filter Bar */}
+                    <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 font-mono">
+                      <div className="flex items-center gap-2 text-xs font-bold text-blue-400">
+                        <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
+                        <span>Filter Completed Technical Forms by Bidding Project:</span>
+                      </div>
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
                         <select
                           value={selectedTechProjectFilter}
                           onChange={(e) => setSelectedTechProjectFilter(e.target.value)}
-                          className="w-full sm:w-auto bg-slate-950 border border-blue-500/60 rounded-xl px-3 py-1.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-blue-400 shadow-inner"
+                          className="w-full sm:w-auto bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-1.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer"
                         >
-                          <option value="ALL">All Bidding Projects ({completedTechVaultItems.length} Total Documents)</option>
-                          {uniqueProjectsInCompletedTech.map(p => (
+                          <option value="ALL">All Bidding Projects ({completedTechVaultItems.length} Total Forms)</option>
+                          {allAvailableProjects.map(p => (
                             <option key={p.refNo} value={p.refNo}>
-                              [{p.refNo}] {p.title}
+                              [{p.refNo}] {p.title} ({p.docCount} saved)
                             </option>
                           ))}
                         </select>
+                        {selectedTechProjectFilter !== 'ALL' && (
+                          <button
+                            onClick={() => setSelectedTechProjectFilter('ALL')}
+                            className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-950 border border-slate-800 hover:text-white transition shrink-0"
+                            title="Clear project filter to show all"
+                          >
+                            Clear Filter
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Filter Active Summary Banner */}
+                    {selectedTechProjectFilter !== 'ALL' && (
+                      <div className="p-3 rounded-xl bg-blue-950/60 border border-blue-500/40 flex items-center justify-between flex-wrap gap-2 text-xs font-mono">
+                        <div className="flex items-center gap-2">
+                          <Filter className="w-4 h-4 text-blue-400 shrink-0" />
+                          <span className="text-slate-300 font-medium">Active Project Filter:</span>
+                          <span className="text-white font-bold">[{selectedTechProjectFilter}] {selectedProjectOption?.title || 'Selected Opportunity'}</span>
+                        </div>
+                        <span className="text-blue-300 font-bold bg-blue-900/80 px-2.5 py-0.5 rounded-full border border-blue-400 text-[11px]">
+                          {displayedCompletedTechItems.length} Completed Form{displayedCompletedTechItems.length !== 1 ? 's' : ''} Found
+                        </span>
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {displayedCompletedTechItems.map((item) => (
-                        <div
-                          key={item.id}
-                          className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-slate-700 transition space-y-4 flex flex-col justify-between"
-                        >
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> Technical Completed Form
-                              </span>
-                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">
-                                v{item.versionNumber}.0
-                              </span>
-                            </div>
-
-                            <div>
-                              <h3 className="text-sm font-bold text-white leading-snug">{item.documentName}</h3>
-                              <p className="text-xs text-slate-400 mt-1 font-mono">Ref: {item.documentNumber || 'N/A'}</p>
-                            </div>
-
-                            <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2 text-[11px] font-mono text-slate-400">
-                              {item.philgepsRefNo && (
-                                <div className="p-2 rounded-lg bg-blue-950/80 border border-blue-500/40 text-[11px] font-mono">
-                                  <span className="text-blue-300 font-bold flex items-center gap-1 mb-0.5">
-                                    <Building2 className="w-3.5 h-3.5 text-blue-400" /> Bidding Project Link:
-                                  </span>
-                                  <span className="text-white font-bold block truncate">[{item.philgepsRefNo}] {item.projectTitle || 'Bidding Opportunity'}</span>
-                                </div>
-                              )}
-                              <p className="text-slate-300 font-semibold">{item.legalBasisReference}</p>
-                              <p className="truncate">File: {item.fileName}</p>
-                              <p className="text-[10px] text-slate-500">Saved by: {item.uploadedByName}</p>
-                            </div>
-                          </div>
-
-                          <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-                            <button
-                              onClick={() => setPreviewPdfItem(item)}
-                              className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
-                              title="View completed PDF document"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>View PDF</span>
-                            </button>
-
-                            <button
-                              onClick={() => {
-                                setFillingTemplateItem({
-                                  id: item.documentCode?.toLowerCase() || 'tech-b',
-                                  code: item.documentCode || 'b',
-                                  name: item.documentName
-                                });
-                              }}
-                              className="px-3 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-amber-500/30"
-                              title="Edit form entries in legal template"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                              <span>Edit Form</span>
-                            </button>
-
-                            <button
-                              onClick={() => {
-                                setReplaceTargetItem(item);
-                                resetFormState();
-                              }}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30"
-                              title="Replace PDF file"
-                            >
-                              <RefreshCw className="w-3.5 h-3.5" />
-                              <span>Replace</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleDeleteCompletedTechDoc(item.id, item.documentName)}
-                              className="px-3.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30"
-                              title="Delete completed technical document"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Delete</span>
-                            </button>
-                          </div>
+                    {/* Empty State for specific project filter */}
+                    {displayedCompletedTechItems.length === 0 ? (
+                      <div className="glass-panel p-8 text-center rounded-2xl border border-slate-800 space-y-4">
+                        <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto">
+                          <Building2 className="w-6 h-6" />
                         </div>
-                      ))}
-                    </div>
+                        <div className="max-w-md mx-auto space-y-1">
+                          <h3 className="text-sm font-bold text-white">No Completed Technical Forms Found for Filtered Project</h3>
+                          <p className="text-xs text-blue-400 font-mono font-bold truncate">
+                            [{selectedTechProjectFilter}] {selectedProjectOption?.title || 'Selected Bidding Project'}
+                          </p>
+                          <p className="text-xs text-slate-400 leading-relaxed pt-1">
+                            No completed technical forms have been generated and saved for this project reference yet. Switch to the Checklist tab to generate forms for this project.
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-center gap-3 pt-2">
+                          <button
+                            onClick={() => setSelectedTechProjectFilter('ALL')}
+                            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-900 border border-slate-800 hover:text-white transition"
+                          >
+                            Show All Projects ({completedTechVaultItems.length} Total)
+                          </button>
+                          <button
+                            onClick={() => setTechSubTab('CHECKLIST')}
+                            className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center gap-1.5"
+                          >
+                            <FileSignature className="w-4 h-4" />
+                            <span>Go to Technical Checklist & Fill Form</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {displayedCompletedTechItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-slate-700 transition space-y-4 flex flex-col justify-between"
+                          >
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" /> Technical Completed Form
+                                </span>
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">
+                                  v{item.versionNumber}.0
+                                </span>
+                              </div>
+
+                              <div>
+                                <h3 className="text-sm font-bold text-white leading-snug">{item.documentName}</h3>
+                                <p className="text-xs text-slate-400 mt-1 font-mono">Ref: {item.documentNumber || 'N/A'}</p>
+                              </div>
+
+                              <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2 text-[11px] font-mono text-slate-400">
+                                {item.philgepsRefNo ? (
+                                  <div className="p-2.5 rounded-lg bg-blue-950/90 border border-blue-500/50 text-[11px] font-mono space-y-1">
+                                    <div className="flex items-center justify-between gap-1">
+                                      <span className="text-blue-300 font-bold flex items-center gap-1">
+                                        <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" /> Tagged Bidding Project:
+                                      </span>
+                                      <button
+                                        onClick={() => openRetagModal(item)}
+                                        className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline flex items-center gap-1 transition"
+                                        title="Change or update associated Bidding Project tag"
+                                      >
+                                        <Edit3 className="w-3 h-3" /> Change Tag
+                                      </button>
+                                    </div>
+                                    <span className="text-white font-bold block truncate">[{item.philgepsRefNo}] {item.projectTitle || 'Bidding Opportunity'}</span>
+                                  </div>
+                                ) : (
+                                  <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2">
+                                    <span className="text-amber-300 text-[11px] font-bold flex items-center gap-1">
+                                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" /> No Project Tagged
+                                    </span>
+                                    <button
+                                      onClick={() => openRetagModal(item)}
+                                      className="px-2 py-1 rounded bg-amber-400 text-slate-950 font-bold text-[10px] hover:bg-amber-300 transition"
+                                    >
+                                      Tag Project
+                                    </button>
+                                  </div>
+                                )}
+                                <p className="text-slate-300 font-semibold">{item.legalBasisReference}</p>
+                                <p className="truncate">File: {item.fileName}</p>
+                                <p className="text-[10px] text-slate-500">Saved by: {item.uploadedByName}</p>
+                              </div>
+                            </div>
+
+                            <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                              <button
+                                onClick={() => setPreviewPdfItem(item)}
+                                className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
+                                title="View completed PDF document"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>View PDF</span>
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setFillingTemplateItem({
+                                    id: item.documentCode?.toLowerCase() || 'tech-b',
+                                    code: item.documentCode || 'b',
+                                    name: item.documentName
+                                  });
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-amber-500/30"
+                                title="Edit form entries in legal template"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                <span>Edit Form</span>
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setReplaceTargetItem(item);
+                                  resetFormState();
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30"
+                                title="Replace PDF file"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                <span>Replace</span>
+                              </button>
+
+                              <button
+                                onClick={() => handleDeleteCompletedTechDoc(item.id, item.documentName)}
+                                className="px-3.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30"
+                                title="Delete completed technical document"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
@@ -2135,6 +2262,92 @@ export const DocumentVaultView: React.FC = () => {
         </div>
       )}
 
+      {/* RE-TAG BIDDING PROJECT MODAL */}
+      {retagTargetItem && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleIn my-auto">
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-blue-400" />
+                <span>Assign / Update Bidding Project Tag</span>
+              </h3>
+              <button onClick={() => setRetagTargetItem(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRetagSubmit} className="p-6 space-y-4 text-xs">
+              <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-300 font-mono space-y-1">
+                <p className="font-bold text-white">Document: {retagTargetItem.documentName}</p>
+                <p>Tagging this document ensures zero cross-project data leakage and accurate filtering in Technical Eligibility.</p>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Select Bidding Project (Opportunity Finder)</label>
+                <select
+                  value={retagProjectRefNo}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setRetagProjectRefNo(val);
+                    const found = oppProjects.find(p => p.refNo === val);
+                    if (found) {
+                      setRetagProjectTitle(found.title);
+                    }
+                  }}
+                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-400 cursor-pointer"
+                >
+                  {oppProjects.map(p => (
+                    <option key={p.id} value={p.refNo}>
+                      [{p.refNo}] {p.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Project Reference Number</label>
+                <input
+                  type="text"
+                  value={retagProjectRefNo}
+                  onChange={(e) => setRetagProjectRefNo(e.target.value)}
+                  placeholder="e.g. PRJ-2026-901283"
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Bidding Project Title</label>
+                <input
+                  type="text"
+                  value={retagProjectTitle}
+                  onChange={(e) => setRetagProjectTitle(e.target.value)}
+                  placeholder="e.g. Supply and Delivery of IT Equipment"
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-medium focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setRetagTargetItem(null)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-xl transition"
+                >
+                  Update Project Tag
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MERGED PDF VIEWER MODAL */}
       {showMergeModal && (
         <MergedPdfViewerModal
@@ -2263,5 +2476,6 @@ export const DocumentVaultView: React.FC = () => {
       )}
 
     </div>
+    </VaultErrorBoundary>
   );
 };

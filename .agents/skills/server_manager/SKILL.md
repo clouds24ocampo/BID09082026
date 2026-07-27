@@ -64,3 +64,6 @@ If a port collision occurs (e.g., port 3000 occupied by orphaned process):
 1. **Never Block Execution**: Always launch long-running servers in non-blocking mode (`WaitMsBeforeAsync: 5000`) and interact via background task management (`manage_task`).
 2. **Synthesize Findings Clearly**: When answering server status queries, list exact server URLs (`http://localhost:<PORT>`), framework names, process IDs, and health status.
 3. **Automatic Fallback Handling**: Recognize that Vite will automatically increment port numbers if the base port is busy (`3000` → `3001`), and inform the user of the active listening URL.
+
+
+# Server Management Agent Skill
