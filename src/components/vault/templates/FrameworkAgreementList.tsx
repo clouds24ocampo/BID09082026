@@ -338,16 +338,18 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     await new Promise((r) => setTimeout(r, 200));
     try {
       const fileName = `${projectRefNo}_Framework_Agreement_Package_${todayStr}.pdf`;
-      const templateElems = document.querySelectorAll('.single-page-paper');
-      if (templateElems.length > 0) {
-        const elemArray = Array.from(templateElems) as HTMLElement[];
-        await generateAndDownloadThreeLayerPdf(null, elemArray, undefined, fileName);
-      } else {
-        const page1Elem = document.getElementById('framework-page-1');
-        if (page1Elem) {
-          await generateAndDownloadThreeLayerPdf(null, page1Elem, undefined, fileName);
-        }
+      const page1Elem = document.getElementById('framework-page-1');
+      const page2Elem = document.getElementById('framework-page-2');
+
+      const elementsToExport: HTMLElement[] = [];
+      if (page1Elem) elementsToExport.push(page1Elem);
+      if (page2Elem) elementsToExport.push(page2Elem);
+
+      if (elementsToExport.length > 0) {
+        await generateAndDownloadThreeLayerPdf(null, elementsToExport, undefined, fileName);
       }
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
     } finally {
       setIsExporting(false);
     }
@@ -406,24 +408,45 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     await new Promise((r) => setTimeout(r, 200));
     try {
       const page1Elem = document.getElementById('framework-page-1');
+      const page2Elem = document.getElementById('framework-page-2');
       let dataUrl: string | undefined = undefined;
-      if (page1Elem) {
-        const canvas = await html2canvas(page1Elem, {
-          scale: 2.5,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          ignoreElements: (element: Element) => {
-            return (
-              element.classList.contains('print:hidden') ||
-              element.classList.contains('no-export') ||
-              element.classList.contains('proof-column') ||
-              element.classList.contains('actions-column') ||
-              element.tagName === 'BUTTON'
-            );
-          }
-        });
+
+      const opts = {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        ignoreElements: (element: Element) => {
+          return (
+            element.classList.contains('print:hidden') ||
+            element.classList.contains('no-export') ||
+            element.classList.contains('proof-column') ||
+            element.classList.contains('actions-column') ||
+            element.tagName === 'BUTTON'
+          );
+        }
+      };
+
+      if (page1Elem && page2Elem) {
+        const canvas1 = await html2canvas(page1Elem, opts);
+        const canvas2 = await html2canvas(page2Elem, opts);
+
+        const combinedCanvas = document.createElement('canvas');
+        combinedCanvas.width = Math.max(canvas1.width, canvas2.width);
+        combinedCanvas.height = canvas1.height + canvas2.height;
+
+        const ctx = combinedCanvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
+          ctx.drawImage(canvas1, 0, 0);
+          ctx.drawImage(canvas2, 0, canvas1.height);
+          dataUrl = combinedCanvas.toDataURL('image/png');
+        }
+      } else if (page1Elem) {
+        const canvas = await html2canvas(page1Elem, opts);
         dataUrl = canvas.toDataURL('image/png');
       }
+
       if (onSaveAndComplete) {
         onSaveAndComplete(dataUrl, item.name, projectRefNo, projectTitle);
       }

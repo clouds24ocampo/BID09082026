@@ -1,18 +1,18 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { 
-  FolderKanban, 
-  FileCheck, 
-  AlertTriangle, 
-  TrendingUp, 
-  Search, 
-  Plus, 
-  ArrowUpRight, 
-  ShieldCheck, 
-  Building2, 
-  Clock, 
-  Award, 
-  FileText 
+import {
+  FolderKanban,
+  FileCheck,
+  AlertTriangle,
+  TrendingUp,
+  Search,
+  Plus,
+  ArrowUpRight,
+  ShieldCheck,
+  Building2,
+  Clock,
+  Award,
+  FileText
 } from 'lucide-react';
 
 import { loadVaultItems } from '../../utils/vaultIndexedDB';
@@ -47,23 +47,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
   }, [opportunities]);
 
   const expiringDocs = React.useMemo(() => {
-    return vaultItems.filter((doc: any) => doc.status === 'EXPIRING_SOON' || (doc.expiryDate && new Date(doc.expiryDate) < new Date(Date.now() + 30*24*60*60*1000)));
+    return vaultItems.filter((doc: any) => doc.status === 'EXPIRING_SOON' || (doc.expiryDate && new Date(doc.expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)));
   }, [vaultItems]);
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      
+
       {/* Welcome & Tenant Banner */}
-      <div 
+      <div
         className="p-6 sm:p-8 rounded-2xl relative overflow-hidden shadow-2xl border border-slate-800"
-        style={{ 
+        style={{
           background: `linear-gradient(135deg, ${currentTenant?.brandColor || '#1e40af'}25 0%, rgba(15, 23, 42, 0.9) 100%)`
         }}
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <span 
+              <span
                 className="px-2.5 py-1 rounded-md text-xs font-mono font-bold text-white shadow"
                 style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
               >
@@ -103,7 +103,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
+
         {/* Metric 1 */}
         <div className="glass-panel p-5 rounded-2xl space-y-3">
           <div className="flex items-center justify-between text-slate-400">
@@ -187,7 +187,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
 
       {/* Two Column Section: Recent Opportunities & Active Bids */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
+
         {/* Left: Active Bids in Preparation */}
         <div className="lg:col-span-7 glass-panel p-6 rounded-2xl space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -219,8 +219,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
           ) : (
             <div className="space-y-3">
               {opportunities.slice(0, 3).map((bid: any) => (
-                <div 
-                  key={bid.id} 
+                <div
+                  key={bid.id}
                   onClick={() => setActiveTab('bids')}
                   className="p-4 rounded-xl glass-card border border-slate-800 hover:border-slate-700 transition cursor-pointer space-y-2 group"
                 >

@@ -16,7 +16,10 @@ import {
   HardHat,
   PackageCheck,
   Truck,
-  Users
+  Users,
+  Layers,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 export interface MaterialEstimateRow {
@@ -80,6 +83,9 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
+  // Active Editor Section Tab
+  const [activeTab, setActiveTab] = useState<'HEADER' | 'MATERIALS' | 'LABOR' | 'LOGISTICS' | 'EQUIPMENT' | 'CONTRACTOR'>('MATERIALS');
+
   // Header Parameters
   const [projectName, setProjectName] = useState(activeProjectTitle || 'PROCUREMENT/INSTALLATION OF CCTV CAMERAS & ELECTRICAL SYSTEM');
   const [projectLocation, setProjectLocation] = useState('BRGY. SAN ANTONIO, LOS BAÑOS, LAGUNA');
@@ -108,7 +114,7 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
     { id: 'm-8', itemNo: '8', description: '8PORT GIGABIT POE WITH SFP', unit: 'Electronic', quantity: 2, unitPrice: 5500.00 }
   ]);
 
-  // SECTION II: LABOR COST ROWS (SEPARATE FROM LOGISTICS & MOBILIZATION)
+  // SECTION II: LABOR COST ROWS
   const [labors, setLabors] = useState<LaborEstimateRow[]>([
     { id: 'l-1', itemNo: '1', description: 'PROJECT MANAGER', noOfWorkers: 1, unit: 'Person', noOfDays: 30, dailyPrice: 1000.00 },
     { id: 'l-2', itemNo: '2', description: 'COMMUNICATION ENGINEER', noOfWorkers: 1, unit: 'Person', noOfDays: 30, dailyPrice: 1000.00 },
@@ -117,7 +123,7 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
     { id: 'l-5', itemNo: '5', description: 'NETWORK TECHNICIAN', noOfWorkers: 2, unit: 'Person', noOfDays: 30, dailyPrice: 1000.00 }
   ]);
 
-  // SECTION III: LOGISTICS & MOBILIZATION ROWS (SEPARATED AS DISTINCT SECTION)
+  // SECTION III: LOGISTICS & MOBILIZATION ROWS
   const [logistics, setLogistics] = useState<LogisticsEstimateRow[]>([
     { id: 'log-1', itemNo: '1', description: 'FB VAN MOBILIZATION & DEMOBILIZATION OF MATERIALS', noOfVehicles: 1, unit: 'Vehicle', noOfDays: 2, dailyRate: 44973.50 }
   ]);
@@ -171,6 +177,7 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
 
   // Materials Row Manipulations
   const handleAddMaterial = () => {
+    setActiveTab('MATERIALS');
     const nextNo = materials.length + 1;
     setMaterials(prev => [
       ...prev,
@@ -184,6 +191,7 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
 
   // Labor Row Manipulations
   const handleAddLabor = () => {
+    setActiveTab('LABOR');
     const nextNo = labors.length + 1;
     setLabors(prev => [
       ...prev,
@@ -197,6 +205,7 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
 
   // Logistics & Mobilization Row Manipulations
   const handleAddLogistics = () => {
+    setActiveTab('LOGISTICS');
     const nextNo = logistics.length + 1;
     setLogistics(prev => [
       ...prev,
@@ -210,6 +219,7 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
 
   // Equipment Row Manipulations
   const handleAddEquipment = () => {
+    setActiveTab('EQUIPMENT');
     setNoEquipmentNeeded(false);
     const nextNo = equipments.length + 1;
     setEquipments(prev => [
@@ -223,13 +233,14 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
   };
 
   const handleResetToCleanSlate = () => {
-    setMaterials([{ id: `m-${Date.now()}-1`, itemNo: '1', description: '', unit: 'Lot', quantity: 1, unitPrice: 0 }]);
-    setLabors([{ id: `l-${Date.now()}-1`, itemNo: '1', description: '', noOfWorkers: 1, unit: 'Person', noOfDays: 1, dailyPrice: 0 }]);
-    setLogistics([{ id: `log-${Date.now()}-1`, itemNo: '1', description: 'MOBILIZATION & DEMOBILIZATION / LOGISTICS', noOfVehicles: 1, unit: 'Vehicle', noOfDays: 1, dailyRate: 0 }]);
+    setMaterials([]);
+    setLabors([]);
+    setLogistics([]);
     setEquipments([]);
     setNoEquipmentNeeded(true);
     setPlusItemOverhead(0);
     setContractorProfit(0);
+    setActiveTab('MATERIALS');
   };
 
   // Calculation Formula Mechanics
@@ -359,15 +370,17 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
         {/* Scrollable Form Body & Paper Preview */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6">
 
-          {/* Interactive Form Controls */}
+          {/* Interactive Form Controls & Tabbed Line Item Editors */}
           <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 no-print">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            
+            {/* Top Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
               <label className="block text-xs font-mono font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-purple-400" />
-                <span>Detailed Estimates Form Header & Section Controls:</span>
+                <span>Interactive Data Input Panel:</span>
               </label>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={handleResetToCleanSlate}
                   className="px-2.5 py-1 rounded-lg text-[11px] font-mono text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition flex items-center gap-1"
@@ -375,121 +388,570 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                   <RotateCcw className="w-3 h-3" />
                   <span>Clean Slate</span>
                 </button>
+
                 <button
                   onClick={handleAddMaterial}
-                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition flex items-center gap-1"
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition flex items-center gap-1 shadow"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Add Material</span>
+                  <span>+ Add Material</span>
                 </button>
+
                 <button
                   onClick={handleAddLabor}
-                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 transition flex items-center gap-1"
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 transition flex items-center gap-1 shadow"
                 >
                   <Users className="w-3.5 h-3.5" />
-                  <span>Add Labor</span>
+                  <span>+ Add Labor</span>
                 </button>
+
                 <button
                   onClick={handleAddLogistics}
-                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 transition flex items-center gap-1"
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 transition flex items-center gap-1 shadow"
                 >
                   <Truck className="w-3.5 h-3.5" />
-                  <span>Add Logistics & Mobilization</span>
+                  <span>+ Add Logistics</span>
                 </button>
+
                 <button
                   onClick={handleAddEquipment}
-                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 transition flex items-center gap-1"
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 transition flex items-center gap-1 shadow"
                 >
                   <HardHat className="w-3.5 h-3.5" />
-                  <span>Add Rental Equipment</span>
+                  <span>+ Add Rental Equipment</span>
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-              <div className="col-span-full">
-                <label className="block text-slate-300 font-mono mb-1 font-bold">
-                  Select Active Bidding Opportunity from Opportunity Finder:
-                </label>
-                <select
-                  value={selectedOppId}
-                  onChange={(e) => handleSelectOpportunity(e.target.value)}
-                  className="w-full bg-slate-950 border border-purple-500/60 rounded-xl px-3.5 py-2 text-white font-mono text-xs font-bold focus:outline-none focus:border-purple-400 shadow-inner cursor-pointer"
-                >
-                  <option value="">-- Custom Inputs --</option>
-                  {oppProjects.map(p => (
-                    <option key={p.id} value={p.id}>
-                      [{p.refNo}] {p.title} — {p.procuringEntity} ({p.abc})
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Navigation Tabs for Editors */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-800">
+              <button
+                onClick={() => setActiveTab('HEADER')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition flex items-center gap-1.5 border ${
+                  activeTab === 'HEADER'
+                    ? 'bg-slate-800 text-white border-slate-700 shadow'
+                    : 'text-slate-400 hover:text-white border-transparent'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                <span>1. Header Info</span>
+              </button>
 
-              <div>
-                <label className="block text-slate-400 font-mono mb-1">Project Name <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  placeholder="e.g. PROCUREMENT/INSTALLATION OF CCTV..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-bold"
-                />
-              </div>
+              <button
+                onClick={() => setActiveTab('MATERIALS')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition flex items-center gap-1.5 border ${
+                  activeTab === 'MATERIALS'
+                    ? 'bg-emerald-950 text-emerald-300 border-emerald-700 shadow'
+                    : 'text-slate-400 hover:text-white border-transparent'
+                }`}
+              >
+                <PackageCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>2. Materials ({materials.length})</span>
+              </button>
 
-              <div>
-                <label className="block text-slate-400 font-mono mb-1">Location of Project <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={projectLocation}
-                  onChange={(e) => setProjectLocation(e.target.value)}
-                  placeholder="e.g. PUROK 1-6 BRGY. SAN ANTONIO, LOS BAÑOS, LAGUNA"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white"
-                />
-              </div>
+              <button
+                onClick={() => setActiveTab('LABOR')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition flex items-center gap-1.5 border ${
+                  activeTab === 'LABOR'
+                    ? 'bg-blue-950 text-blue-300 border-blue-700 shadow'
+                    : 'text-slate-400 hover:text-white border-transparent'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 text-blue-400" />
+                <span>3. Labor ({labors.length})</span>
+              </button>
 
-              <div>
-                <label className="block text-slate-400 font-mono mb-1">Owner / Procuring Entity <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={ownerName}
-                  onChange={(e) => setOwnerName(e.target.value)}
-                  placeholder="e.g. BARANGAY SAN ANTONIO LOS BAÑOS LAGUNA"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white"
-                />
-              </div>
+              <button
+                onClick={() => setActiveTab('LOGISTICS')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition flex items-center gap-1.5 border ${
+                  activeTab === 'LOGISTICS'
+                    ? 'bg-amber-950 text-amber-300 border-amber-700 shadow'
+                    : 'text-slate-400 hover:text-white border-transparent'
+                }`}
+              >
+                <Truck className="w-3.5 h-3.5 text-amber-400" />
+                <span>4. Logistics ({logistics.length})</span>
+              </button>
 
-              <div>
-                <label className="block text-slate-400 font-mono mb-1">Contractor's Name <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={contractorName}
-                  onChange={(e) => setContractorName(e.target.value)}
-                  placeholder="e.g. Quantum Cloud Corporation"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-bold"
-                />
-              </div>
+              <button
+                onClick={() => setActiveTab('EQUIPMENT')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition flex items-center gap-1.5 border ${
+                  activeTab === 'EQUIPMENT'
+                    ? 'bg-purple-950 text-purple-300 border-purple-700 shadow'
+                    : 'text-slate-400 hover:text-white border-transparent'
+                }`}
+              >
+                <HardHat className="w-3.5 h-3.5 text-purple-400" />
+                <span>5. Rentals ({noEquipmentNeeded ? 0 : equipments.length})</span>
+              </button>
 
-              <div>
-                <label className="block text-slate-400 font-mono mb-1">Project Reference No. <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={projectRefNo}
-                  onChange={(e) => setProjectRefNo(e.target.value)}
-                  placeholder="e.g. 2026-DET-EST-01"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-mono mb-1">Date of Estimate</label>
-                <input
-                  type="date"
-                  value={estimateDate}
-                  onChange={(e) => setEstimateDate(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono"
-                />
-              </div>
+              <button
+                onClick={() => setActiveTab('CONTRACTOR')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition flex items-center gap-1.5 border ${
+                  activeTab === 'CONTRACTOR'
+                    ? 'bg-slate-800 text-purple-300 border-purple-700 shadow'
+                    : 'text-slate-400 hover:text-white border-transparent'
+                }`}
+              >
+                <Calculator className="w-3.5 h-3.5 text-purple-400" />
+                <span>6. Profit & Overhead</span>
+              </button>
             </div>
+
+            {/* TAB 1: HEADER & PROJECT METADATA */}
+            {activeTab === 'HEADER' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs pt-1">
+                <div className="col-span-full">
+                  <label className="block text-slate-300 font-mono mb-1 font-bold">
+                    Select Active Bidding Opportunity from Opportunity Finder:
+                  </label>
+                  <select
+                    value={selectedOppId}
+                    onChange={(e) => handleSelectOpportunity(e.target.value)}
+                    className="w-full bg-slate-950 border border-purple-500/60 rounded-xl px-3.5 py-2 text-white font-mono text-xs font-bold focus:outline-none focus:border-purple-400 shadow-inner cursor-pointer"
+                  >
+                    <option value="">-- Custom Inputs --</option>
+                    {oppProjects.map(p => (
+                      <option key={p.id} value={p.id}>
+                        [{p.refNo}] {p.title} — {p.procuringEntity} ({p.abc})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">Project Name <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    placeholder="e.g. PROCUREMENT/INSTALLATION OF CCTV..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">Location of Project <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    value={projectLocation}
+                    onChange={(e) => setProjectLocation(e.target.value)}
+                    placeholder="e.g. PUROK 1-6 BRGY. SAN ANTONIO, LOS BAÑOS, LAGUNA"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">Owner / Procuring Entity <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    value={ownerName}
+                    onChange={(e) => setOwnerName(e.target.value)}
+                    placeholder="e.g. BARANGAY SAN ANTONIO LOS BAÑOS LAGUNA"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">Contractor's Name <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    value={contractorName}
+                    onChange={(e) => setContractorName(e.target.value)}
+                    placeholder="e.g. Quantum Cloud Corporation"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">Project Reference No. <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    value={projectRefNo}
+                    onChange={(e) => setProjectRefNo(e.target.value)}
+                    placeholder="e.g. 2026-DET-EST-01"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">Date of Estimate</label>
+                  <input
+                    type="date"
+                    value={estimateDate}
+                    onChange={(e) => setEstimateDate(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: MATERIALS ESTIMATE INTERACTIVE INPUT EDITOR */}
+            {activeTab === 'MATERIALS' && (
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-mono text-emerald-400 font-bold uppercase">
+                    Section I. Materials Estimate Input Rows ({materials.length} Items):
+                  </label>
+                  <span className="text-xs font-mono text-emerald-400 font-bold">
+                    Subtotal: ₱{fmtPeso(totalMaterialsCost)}
+                  </span>
+                </div>
+
+                {materials.length === 0 ? (
+                  <div className="p-4 text-center rounded-xl bg-slate-950 border border-slate-800 text-slate-400 text-xs font-mono">
+                    No material items added yet. Click "+ Add Material" above to add line items.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {materials.map((m, idx) => (
+                      <div key={m.id} className="grid grid-cols-12 gap-2 items-center bg-slate-950 p-2 rounded-xl border border-slate-800 text-xs">
+                        <div className="col-span-1 text-center font-mono font-bold text-slate-400">
+                          #{idx + 1}
+                        </div>
+                        <div className="col-span-4">
+                          <input
+                            type="text"
+                            value={m.description}
+                            onChange={(e) => handleUpdateMaterial(m.id, 'description', e.target.value)}
+                            placeholder="Material Description (e.g., FIBER OPTIC 2 CORE)"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-white font-medium focus:border-emerald-500"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="text"
+                            value={m.unit}
+                            onChange={(e) => handleUpdateMaterial(m.id, 'unit', e.target.value)}
+                            placeholder="Unit (e.g., Lot, Pcs)"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white text-center font-mono"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="number"
+                            value={m.quantity || ''}
+                            onChange={(e) => handleUpdateMaterial(m.id, 'quantity', parseFloat(e.target.value) || 0)}
+                            placeholder="QTY"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white text-center font-mono font-bold"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="number"
+                            value={m.unitPrice || ''}
+                            onChange={(e) => handleUpdateMaterial(m.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                            placeholder="Unit Price (₱)"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-emerald-400 text-right font-mono font-bold"
+                          />
+                        </div>
+                        <div className="col-span-1 flex items-center justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMaterial(m.id)}
+                            className="p-1 rounded text-red-400 hover:bg-red-500/20 transition"
+                            title="Remove Material"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: LABOR COST INTERACTIVE INPUT EDITOR */}
+            {activeTab === 'LABOR' && (
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-mono text-blue-400 font-bold uppercase">
+                    Section II. Labor Cost Input Rows ({labors.length} Items):
+                  </label>
+                  <span className="text-xs font-mono text-blue-400 font-bold">
+                    Subtotal: ₱{fmtPeso(totalLaborCost)}
+                  </span>
+                </div>
+
+                {labors.length === 0 ? (
+                  <div className="p-4 text-center rounded-xl bg-slate-950 border border-slate-800 text-slate-400 text-xs font-mono">
+                    No labor items added yet. Click "+ Add Labor" above to add personnel items.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {labors.map((l, idx) => (
+                      <div key={l.id} className="grid grid-cols-12 gap-2 items-center bg-slate-950 p-2 rounded-xl border border-slate-800 text-xs">
+                        <div className="col-span-1 text-center font-mono font-bold text-slate-400">
+                          #{idx + 1}
+                        </div>
+                        <div className="col-span-3">
+                          <input
+                            type="text"
+                            value={l.description}
+                            onChange={(e) => handleUpdateLabor(l.id, 'description', e.target.value)}
+                            placeholder="Designation (e.g. PROJECT MANAGER)"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-white font-medium focus:border-blue-500"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="number"
+                            value={l.noOfWorkers || ''}
+                            onChange={(e) => handleUpdateLabor(l.id, 'noOfWorkers', parseInt(e.target.value) || 0)}
+                            placeholder="No. Workers"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white text-center font-mono"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="text"
+                            value={l.unit}
+                            onChange={(e) => handleUpdateLabor(l.id, 'unit', e.target.value)}
+                            placeholder="Unit (Person)"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white text-center font-mono"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="number"
+                            value={l.noOfDays || ''}
+                            onChange={(e) => handleUpdateLabor(l.id, 'noOfDays', parseInt(e.target.value) || 0)}
+                            placeholder="Days"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white text-center font-mono"
+                          />
+                        </div>
+                        <div className="col-span-1 font-mono">
+                          <input
+                            type="number"
+                            value={l.dailyPrice || ''}
+                            onChange={(e) => handleUpdateLabor(l.id, 'dailyPrice', parseFloat(e.target.value) || 0)}
+                            placeholder="Daily (₱)"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-blue-400 text-right font-mono font-bold"
+                          />
+                        </div>
+                        <div className="col-span-1 flex items-center justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveLabor(l.id)}
+                            className="p-1 rounded text-red-400 hover:bg-red-500/20 transition"
+                            title="Remove Labor"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 4: LOGISTICS & MOBILIZATION INTERACTIVE INPUT EDITOR */}
+            {activeTab === 'LOGISTICS' && (
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-mono text-amber-400 font-bold uppercase">
+                    Section III. Logistics & Mobilization Input Rows ({logistics.length} Items):
+                  </label>
+                  <span className="text-xs font-mono text-amber-400 font-bold">
+                    Subtotal: ₱{fmtPeso(totalLogisticsCost)}
+                  </span>
+                </div>
+
+                {logistics.length === 0 ? (
+                  <div className="p-4 text-center rounded-xl bg-slate-950 border border-slate-800 text-slate-400 text-xs font-mono">
+                    No logistics or mobilization items added yet. Click "+ Add Logistics" above to add vehicle/transport items.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {logistics.map((lg, idx) => (
+                      <div key={lg.id} className="grid grid-cols-12 gap-2 items-center bg-slate-950 p-2 rounded-xl border border-slate-800 text-xs">
+                        <div className="col-span-1 text-center font-mono font-bold text-slate-400">
+                          #{idx + 1}
+                        </div>
+                        <div className="col-span-3">
+                          <input
+                            type="text"
+                            value={lg.description}
+                            onChange={(e) => handleUpdateLogistics(lg.id, 'description', e.target.value)}
+                            placeholder="Description (e.g. FB VAN MOBILIZATION)"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-white font-medium focus:border-amber-500"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="number"
+                            value={lg.noOfVehicles || ''}
+                            onChange={(e) => handleUpdateLogistics(lg.id, 'noOfVehicles', parseInt(e.target.value) || 0)}
+                            placeholder="No. Vehicles"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white text-center font-mono"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="text"
+                            value={lg.unit}
+                            onChange={(e) => handleUpdateLogistics(lg.id, 'unit', e.target.value)}
+                            placeholder="Unit (Vehicle)"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white text-center font-mono"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="number"
+                            value={lg.noOfDays || ''}
+                            onChange={(e) => handleUpdateLogistics(lg.id, 'noOfDays', parseInt(e.target.value) || 0)}
+                            placeholder="Days"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white text-center font-mono"
+                          />
+                        </div>
+                        <div className="col-span-1">
+                          <input
+                            type="number"
+                            value={lg.dailyRate || ''}
+                            onChange={(e) => handleUpdateLogistics(lg.id, 'dailyRate', parseFloat(e.target.value) || 0)}
+                            placeholder="Rate (₱)"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-amber-400 text-right font-mono font-bold"
+                          />
+                        </div>
+                        <div className="col-span-1 flex items-center justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveLogistics(lg.id)}
+                            className="p-1 rounded text-red-400 hover:bg-red-500/20 transition"
+                            title="Remove Logistics Item"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 5: EQUIPMENT RENTAL ESTIMATES INTERACTIVE INPUT EDITOR */}
+            {activeTab === 'EQUIPMENT' && (
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <label className="block text-xs font-mono text-purple-400 font-bold uppercase">
+                      Section IV. Equipment Rental Inputs ({equipments.length} Items):
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        id="noEquipmentCheck"
+                        checked={noEquipmentNeeded}
+                        onChange={(e) => setNoEquipmentNeeded(e.target.checked)}
+                        className="w-4 h-4 rounded bg-slate-950 border-slate-700 text-purple-500 focus:ring-0 cursor-pointer"
+                      />
+                      <label htmlFor="noEquipmentCheck" className="text-xs text-slate-300 cursor-pointer">
+                        No Heavy Equipment Needed
+                      </label>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono text-purple-400 font-bold">
+                    Subtotal: ₱{fmtPeso(totalEquipmentCost)}
+                  </span>
+                </div>
+
+                {noEquipmentNeeded ? (
+                  <div className="p-4 text-center rounded-xl bg-slate-950 border border-slate-800 text-slate-400 text-xs font-mono uppercase font-bold">
+                    NO EQUIPMENT NEEDED NO HEAVY EQUIPMENT RENTALS
+                  </div>
+                ) : equipments.length === 0 ? (
+                  <div className="p-4 text-center rounded-xl bg-slate-950 border border-slate-800 text-slate-400 text-xs font-mono">
+                    No rental equipment added yet. Click "+ Add Rental Equipment" above to add line items.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {equipments.map((e, idx) => (
+                      <div key={e.id} className="grid grid-cols-12 gap-2 items-center bg-slate-950 p-2 rounded-xl border border-slate-800 text-xs">
+                        <div className="col-span-1 text-center font-mono font-bold text-slate-400">
+                          #{idx + 1}
+                        </div>
+                        <div className="col-span-4">
+                          <input
+                            type="text"
+                            value={e.description}
+                            onChange={(ev) => handleUpdateEquipment(e.id, 'description', ev.target.value)}
+                            placeholder="Equipment Description (e.g., EXCAVATOR / BOOM TRUCK)"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-white font-medium focus:border-purple-500"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="text"
+                            value={e.unit}
+                            onChange={(ev) => handleUpdateEquipment(e.id, 'unit', ev.target.value)}
+                            placeholder="Unit (Unit, Set)"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white text-center font-mono"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="number"
+                            value={e.noOfDays || ''}
+                            onChange={(ev) => handleUpdateEquipment(e.id, 'noOfDays', parseInt(ev.target.value) || 0)}
+                            placeholder="Days"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white text-center font-mono"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <input
+                            type="number"
+                            value={e.dailyPrice || ''}
+                            onChange={(ev) => handleUpdateEquipment(e.id, 'dailyPrice', parseFloat(ev.target.value) || 0)}
+                            placeholder="Daily Price (₱)"
+                            className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-purple-400 text-right font-mono font-bold"
+                          />
+                        </div>
+                        <div className="col-span-1 flex items-center justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEquipment(e.id)}
+                            className="p-1 rounded text-red-400 hover:bg-red-500/20 transition"
+                            title="Remove Equipment"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 6: CONTRACTOR PROFIT & OVERHEAD INPUTS */}
+            {activeTab === 'CONTRACTOR' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-1">
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">PLUST ITEM / Overhead Amount (₱)</label>
+                  <input
+                    type="number"
+                    value={plusItemOverhead || ''}
+                    onChange={(e) => setPlusItemOverhead(parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-mono mb-1">CONTRACTOR PROFIT Amount (₱)</label>
+                  <input
+                    type="number"
+                    value={contractorProfit || ''}
+                    onChange={(e) => setContractorProfit(parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-emerald-400 font-mono font-bold"
+                  />
+                </div>
+              </div>
+            )}
 
           </div>
 
@@ -539,19 +1001,27 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                       </tr>
                     </thead>
                     <tbody>
-                      {materials.map((m) => {
-                        const rowTotal = computeMaterialTotal(m);
-                        return (
-                          <tr key={m.id} className="border-b border-slate-950">
-                            <td className="border border-slate-950 p-1 text-center font-bold font-mono">{m.itemNo}</td>
-                            <td className="border border-slate-950 p-1 font-medium">{m.description || '-'}</td>
-                            <td className="border border-slate-950 p-1 text-center">{m.unit}</td>
-                            <td className="border border-slate-950 p-1 text-center font-mono font-bold">{m.quantity}</td>
-                            <td className="border border-slate-950 p-1 text-right font-mono">{fmtPeso(m.unitPrice)}</td>
-                            <td className="border border-slate-950 p-1 text-right font-mono font-bold">{fmtPeso(rowTotal)}</td>
-                          </tr>
-                        );
-                      })}
+                      {materials.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="border border-slate-950 p-1 text-center font-mono text-slate-500">
+                            (No material items listed)
+                          </td>
+                        </tr>
+                      ) : (
+                        materials.map((m) => {
+                          const rowTotal = computeMaterialTotal(m);
+                          return (
+                            <tr key={m.id} className="border-b border-slate-950">
+                              <td className="border border-slate-950 p-1 text-center font-bold font-mono">{m.itemNo}</td>
+                              <td className="border border-slate-950 p-1 font-medium">{m.description || '-'}</td>
+                              <td className="border border-slate-950 p-1 text-center">{m.unit}</td>
+                              <td className="border border-slate-950 p-1 text-center font-mono font-bold">{m.quantity}</td>
+                              <td className="border border-slate-950 p-1 text-right font-mono">{fmtPeso(m.unitPrice)}</td>
+                              <td className="border border-slate-950 p-1 text-right font-mono font-bold">{fmtPeso(rowTotal)}</td>
+                            </tr>
+                          );
+                        })
+                      )}
                       <tr className="bg-slate-100 font-bold border-t-2 border-slate-950">
                         <td colSpan={5} className="border border-slate-950 p-1 text-right font-extrabold uppercase">
                           TOTAL MATERIALS COST
@@ -580,20 +1050,28 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                       </tr>
                     </thead>
                     <tbody>
-                      {labors.map((l) => {
-                        const rowTotal = computeLaborTotal(l);
-                        return (
-                          <tr key={l.id} className="border-b border-slate-950">
-                            <td className="border border-slate-950 p-1 text-center font-bold font-mono">{l.itemNo}</td>
-                            <td className="border border-slate-950 p-1 font-medium">{l.description || '-'}</td>
-                            <td className="border border-slate-950 p-1 text-center font-mono">{l.noOfWorkers}</td>
-                            <td className="border border-slate-950 p-1 text-center">{l.unit}</td>
-                            <td className="border border-slate-950 p-1 text-center font-mono">{l.noOfDays}</td>
-                            <td className="border border-slate-950 p-1 text-right font-mono">{fmtPeso(l.dailyPrice)}</td>
-                            <td className="border border-slate-950 p-1 text-right font-mono font-bold">{fmtPeso(rowTotal)}</td>
-                          </tr>
-                        );
-                      })}
+                      {labors.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="border border-slate-950 p-1 text-center font-mono text-slate-500">
+                            (No labor items listed)
+                          </td>
+                        </tr>
+                      ) : (
+                        labors.map((l) => {
+                          const rowTotal = computeLaborTotal(l);
+                          return (
+                            <tr key={l.id} className="border-b border-slate-950">
+                              <td className="border border-slate-950 p-1 text-center font-bold font-mono">{l.itemNo}</td>
+                              <td className="border border-slate-950 p-1 font-medium">{l.description || '-'}</td>
+                              <td className="border border-slate-950 p-1 text-center font-mono">{l.noOfWorkers}</td>
+                              <td className="border border-slate-950 p-1 text-center">{l.unit}</td>
+                              <td className="border border-slate-950 p-1 text-center font-mono">{l.noOfDays}</td>
+                              <td className="border border-slate-950 p-1 text-right font-mono">{fmtPeso(l.dailyPrice)}</td>
+                              <td className="border border-slate-950 p-1 text-right font-mono font-bold">{fmtPeso(rowTotal)}</td>
+                            </tr>
+                          );
+                        })
+                      )}
                       <tr className="bg-slate-100 font-bold border-t-2 border-slate-950">
                         <td colSpan={6} className="border border-slate-950 p-1 text-right font-extrabold uppercase">
                           TOTAL LABOR COST
@@ -606,7 +1084,7 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                   </table>
                 </div>
 
-                {/* SECTION III: LOGISTICS & MOBILIZATION TABLE (SEPARATE DEDICATED SECTION) */}
+                {/* SECTION III: LOGISTICS & MOBILIZATION TABLE */}
                 <div className="space-y-1 pt-1">
                   <div className="font-bold text-[8.5pt] uppercase text-amber-900">III. LOGISTICS & MOBILIZATION</div>
                   <table className="w-full border-collapse border-2 border-slate-950 text-[8pt] font-sans">
@@ -622,20 +1100,28 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                       </tr>
                     </thead>
                     <tbody>
-                      {logistics.map((lg) => {
-                        const rowTotal = computeLogisticsTotal(lg);
-                        return (
-                          <tr key={lg.id} className="border-b border-slate-950">
-                            <td className="border border-slate-950 p-1 text-center font-bold font-mono">{lg.itemNo}</td>
-                            <td className="border border-slate-950 p-1 font-medium">{lg.description || '-'}</td>
-                            <td className="border border-slate-950 p-1 text-center font-mono">{lg.noOfVehicles}</td>
-                            <td className="border border-slate-950 p-1 text-center">{lg.unit}</td>
-                            <td className="border border-slate-950 p-1 text-center font-mono">{lg.noOfDays}</td>
-                            <td className="border border-slate-950 p-1 text-right font-mono">{fmtPeso(lg.dailyRate)}</td>
-                            <td className="border border-slate-950 p-1 text-right font-mono font-bold">{fmtPeso(rowTotal)}</td>
-                          </tr>
-                        );
-                      })}
+                      {logistics.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="border border-slate-950 p-1 text-center font-mono text-slate-500">
+                            (No logistics or mobilization items listed)
+                          </td>
+                        </tr>
+                      ) : (
+                        logistics.map((lg) => {
+                          const rowTotal = computeLogisticsTotal(lg);
+                          return (
+                            <tr key={lg.id} className="border-b border-slate-950">
+                              <td className="border border-slate-950 p-1 text-center font-bold font-mono">{lg.itemNo}</td>
+                              <td className="border border-slate-950 p-1 font-medium">{lg.description || '-'}</td>
+                              <td className="border border-slate-950 p-1 text-center font-mono">{lg.noOfVehicles}</td>
+                              <td className="border border-slate-950 p-1 text-center">{lg.unit}</td>
+                              <td className="border border-slate-950 p-1 text-center font-mono">{lg.noOfDays}</td>
+                              <td className="border border-slate-950 p-1 text-right font-mono">{fmtPeso(lg.dailyRate)}</td>
+                              <td className="border border-slate-950 p-1 text-right font-mono font-bold">{fmtPeso(rowTotal)}</td>
+                            </tr>
+                          );
+                        })
+                      )}
                       <tr className="bg-slate-100 font-bold border-t-2 border-slate-950">
                         <td colSpan={6} className="border border-slate-950 p-1 text-right font-extrabold uppercase">
                           TOTAL LOGISTICS & MOBILIZATION COST
@@ -667,6 +1153,12 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                         <tr>
                           <td colSpan={6} className="border border-slate-950 p-1.5 text-center font-bold text-slate-700 uppercase">
                             NO EQUIPMENT NEEDED NO HEAVY EQUIPMENT RENTALS
+                          </td>
+                        </tr>
+                      ) : equipments.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="border border-slate-950 p-1 text-center font-mono text-slate-500">
+                            (No rental equipment listed)
                           </td>
                         </tr>
                       ) : (

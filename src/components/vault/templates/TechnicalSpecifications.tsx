@@ -115,37 +115,26 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // PDF Export rendering mode state
   const [isExporting, setIsExporting] = useState(false);
-
-  // Uploaded PDF Drawing State
   const [drawingPdfUrl, setDrawingPdfUrl] = useState<string | null>(null);
   const [drawingPdfName, setDrawingPdfName] = useState<string>('');
-
-  // Adjustable Table Font Size State ('fine' = 9pt, 'xs' = 10pt, 'sm' = 11pt)
   const [fontSizeMode, setFontSizeMode] = useState<'fine' | 'xs' | 'sm'>('xs');
-
-  // Opportunity Finder Project List State
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
-  // Document & Project Metadata State
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo);
   const [solicitationNumber, setSolicitationNumber] = useState('SOL-2026-001');
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
   const [dateTimeSubmitted, setDateTimeSubmitted] = useState<string>(getNowDateTimeString());
 
-  // Company Details State
   const [companyName] = useState(tenant?.companyName || 'Bidding Entity Corporate Name');
   const [companyAddress] = useState(tenant?.address || 'Metro Manila, Philippines');
   const [signatoryName] = useState(tenant?.authorizedSignatory?.name || 'Authorized Signatory Name');
   const [signatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'President / General Manager');
 
-  // Items State (100% Aligned & Synced with Section VI)
   const [items, setItems] = useState<TechSpecItem[]>(DEFAULT_SECTION_VI_ITEMS);
 
-  // Load real saved opportunity projects
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
@@ -162,16 +151,12 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     }
   }, [tenant?.id]);
 
-  // Load shared Section VI data & sync item descriptions + quantities into Section VII
   useEffect(() => {
     if (!projectRefNo) return;
     const tenantKey = tenant?.id || 'default';
-
-    // Read Section VI item descriptions & quantities
     const secViKey = `bidocs_sec_vi_${tenantKey}_${projectRefNo}`;
     const savedSecVi = localStorage.getItem(secViKey);
 
-    // Read Section VII compliance data
     const techSpecsKey = `bidocs_tech_specs_${tenantKey}_${projectRefNo}`;
     const savedTechSpecs = localStorage.getItem(techSpecsKey);
 
@@ -191,7 +176,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             complianceEvidence: 'Supported by Manufacturer Sales Literature and Technical Data Sheet.'
           }));
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     if (savedTechSpecs) {
@@ -213,13 +198,12 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             return it;
           });
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     setItems(baseItems);
   }, [projectRefNo, tenant?.id]);
 
-  // Save shared technical specification data whenever items change
   const saveSharedItems = (newItems: TechSpecItem[]) => {
     setItems(newItems);
     if (projectRefNo) {
@@ -252,10 +236,10 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     const updated = items.map((it, idx) =>
       idx === index
         ? {
-            ...it,
-            compliance: 'Not Comply' as const,
-            complianceEvidence: 'Specification parameter does not meet mandatory requirement.'
-          }
+          ...it,
+          compliance: 'Not Comply' as const,
+          complianceEvidence: 'Specification parameter does not meet mandatory requirement.'
+        }
         : it
     );
     saveSharedItems(updated);
@@ -301,7 +285,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
           saveSharedItems(synced);
           return;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     saveSharedItems(DEFAULT_SECTION_VI_ITEMS);
   };
@@ -332,31 +316,23 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     window.print();
   };
 
+  // FIXED EXPORT PDF FUNCTION
   const handleExportPdf = async () => {
     setIsExporting(true);
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 200));
     try {
       const fileName = `${projectRefNo}_Section_VII_Technical_Specifications_${todayStr}.pdf`;
-      const templateElems = document.querySelectorAll('.single-page-paper');
-      if (templateElems.length > 0) {
-        const elemArray = Array.from(templateElems) as HTMLElement[];
+      const paperElem = document.getElementById('technical-specifications-paper');
+      if (paperElem) {
         await generateAndDownloadThreeLayerPdf(
           null,
-          elemArray,
+          paperElem,
           drawingPdfUrl || undefined,
           fileName
         );
-      } else {
-        const paperElem = document.getElementById('technical-specifications-paper');
-        if (paperElem) {
-          await generateAndDownloadThreeLayerPdf(
-            null,
-            paperElem,
-            drawingPdfUrl || undefined,
-            fileName
-          );
-        }
       }
+    } catch (err) {
+      console.error('PDF Export Error:', err);
     } finally {
       setIsExporting(false);
     }
@@ -403,7 +379,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
   const handleSave = async () => {
     setIsExporting(true);
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 200));
     try {
       const templateElem = document.getElementById('technical-specifications-paper') as HTMLElement;
       let dataUrl: string | undefined = undefined;
@@ -498,8 +474,8 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
       `}</style>
 
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-7xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white">
-        
-        {/* Top Controls Header Bar */}
+
+        {/* Controls Bar */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0 print:hidden no-export">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
@@ -522,7 +498,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             <button
               onClick={handleExportExcel}
               className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-600 transition shadow flex items-center gap-1.5 border border-emerald-500/40"
-              title="Export table data directly to Microsoft Excel CSV"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
               <span>Export to Excel</span>
@@ -553,10 +528,8 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
         {/* Scrollable Container */}
         <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6 print:p-0 print:bg-white">
 
-          {/* Interactive Screen Controls (Hidden in Print & PDF) */}
           <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
-            
-            {/* Target Opportunity / Project Dropdown Selector & Quick Row Actions */}
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex-1 space-y-1.5">
                 <label className="block text-slate-200 font-mono text-xs font-bold flex items-center justify-between">
@@ -600,7 +573,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
               </div>
 
               <div className="flex flex-wrap items-center gap-2 pt-4 sm:pt-0 shrink-0">
-                {/* Font Size Selector for Long Specifications */}
                 <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-mono">
                   <span className="text-slate-400 px-1.5 flex items-center gap-1 text-[11px]">
                     <Type className="w-3.5 h-3.5 text-blue-400" /> Font Size:
@@ -608,30 +580,24 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                   <button
                     type="button"
                     onClick={() => setFontSizeMode('fine')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${
-                      fontSizeMode === 'fine' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                    }`}
-                    title="Ultra-compact font (9pt)"
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${fontSizeMode === 'fine' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
                   >
                     9pt
                   </button>
                   <button
                     type="button"
                     onClick={() => setFontSizeMode('xs')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${
-                      fontSizeMode === 'xs' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                    }`}
-                    title="Compact font (10pt)"
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${fontSizeMode === 'xs' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
                   >
                     10pt
                   </button>
                   <button
                     type="button"
                     onClick={() => setFontSizeMode('sm')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${
-                      fontSizeMode === 'sm' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                    }`}
-                    title="Standard font (11pt)"
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${fontSizeMode === 'sm' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
                   >
                     11pt
                   </button>
@@ -646,7 +612,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                 </button>
                 <button
                   onClick={handleSyncWithSectionVi}
-                  title="Resync item descriptions & quantities directly from Section VI"
                   className="px-3.5 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 flex items-center gap-1.5 transition"
                 >
                   <RefreshCw className="w-4 h-4" />
@@ -662,7 +627,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
               </span>
             </div>
 
-            {/* TECHNICAL DRAWING PDF UPLOADER CONTROL */}
             <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-200 flex items-center gap-2">
@@ -682,7 +646,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                     <button
                       type="button"
                       onClick={handleRemovePdf}
-                      title="Remove attached PDF drawing"
                       className="p-1 hover:text-red-400 transition"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -705,18 +668,15 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
           </div>
 
-          {/* OFFICIAL PRINTABLE PAPER DOCUMENT SHEET (Legal 13" x 8.5" LANDSCAPE Standard - Adaptive flow rendering) */}
+          {/* DOCUMENT SHEET */}
           <div id="technical-specifications-paper" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1150px] flex flex-col justify-between font-serif">
             <div>
-              {/* COMPANY & PROJECT HEADER BLOCK */}
               <div className="border-b-2 border-black pb-3 mb-5 space-y-2 font-serif">
-                {/* Company Header */}
                 <div className="text-center pb-2 border-b border-slate-300">
                   <h2 className="text-lg sm:text-xl font-bold text-black uppercase tracking-wide font-serif">{companyName}</h2>
                   <p className="text-xs text-slate-700 font-serif mt-0.5">{companyAddress}</p>
                 </div>
 
-                {/* Bidding Project Info Grid */}
                 <div className="space-y-1.5 text-xs font-serif text-black pt-1">
                   <div className="flex items-center justify-between gap-6">
                     <div>
@@ -745,7 +705,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                 </div>
               </div>
 
-              {/* Document Header Title */}
               <div className="text-center mb-4">
                 <h1 className="text-2xl sm:text-3xl font-bold font-serif italic text-black tracking-tight">
                   Section VII. Technical Specifications
@@ -757,7 +716,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                 )}
               </div>
 
-              {/* TECHNICAL SPECIFICATIONS GRID TABLE */}
               <table className={`w-full border-collapse border-2 border-black text-black table-fixed ${getTableFontSizeClass()}`}>
                 <thead>
                   <tr className="border-b-2 border-black bg-slate-50 font-serif">
@@ -781,7 +739,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                 <tbody>
                   {items.map((rowItem, idx) => (
                     <tr key={rowItem.id} className="border-b border-black hover:bg-slate-50/50 transition-colors">
-                      {/* Item Number */}
                       <td className="border border-black px-1.5 py-3 text-center font-serif font-bold align-top">
                         <div className="flex flex-col items-center justify-between h-full">
                           <span className="block pt-0.5">{idx + 1}</span>
@@ -789,7 +746,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(idx)}
-                              title="Remove item"
                               className="text-red-500 hover:text-red-700 mt-2 print:hidden no-export p-1"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -798,9 +754,8 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                         </div>
                       </td>
 
-                      {/* Quantity Cell */}
                       <td className="border border-black px-1.5 py-3 font-serif text-center align-top break-words">
-                        {!isExporting && (
+                        {!isExporting ? (
                           <input
                             type="text"
                             value={rowItem.quantity}
@@ -808,15 +763,14 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                             placeholder="Qty"
                             className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
                           />
-                        )}
+                        ) : null}
                         <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
                           {rowItem.quantity || ''}
                         </div>
                       </td>
 
-                      {/* Specification Cell */}
                       <td className="border border-black px-3 py-3 font-serif align-top break-words">
-                        {!isExporting && (
+                        {!isExporting ? (
                           <textarea
                             rows={4}
                             value={rowItem.specification}
@@ -824,13 +778,12 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                             placeholder="Enter detailed technical specification parameter..."
                             className={`w-full bg-transparent resize-y outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
                           />
-                        )}
+                        ) : null}
                         <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black pt-0.5 whitespace-pre-wrap font-normal break-words ${getTableFontSizeClass()}`}>
                           {rowItem.specification || ''}
                         </div>
                       </td>
 
-                      {/* Statement of Compliance Cell */}
                       <td className="border border-black px-3 py-3 font-serif align-top break-words bg-emerald-50/20">
                         <div className="space-y-2">
                           {!isExporting && (
@@ -838,11 +791,10 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                               <button
                                 type="button"
                                 onClick={() => handleComplyClick(idx)}
-                                className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer ${
-                                  rowItem.compliance === 'Comply'
+                                className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer ${rowItem.compliance === 'Comply'
                                     ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-400'
                                     : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                                }`}
+                                  }`}
                               >
                                 <Check className="w-3.5 h-3.5 stroke-[3]" />
                                 <span>Comply</span>
@@ -850,11 +802,10 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                               <button
                                 type="button"
                                 onClick={() => handleNotComplyClick(idx)}
-                                className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer ${
-                                  rowItem.compliance === 'Not Comply'
+                                className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer ${rowItem.compliance === 'Not Comply'
                                     ? 'bg-red-600 text-white border-red-600 shadow-md ring-2 ring-red-400'
                                     : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                                }`}
+                                  }`}
                               >
                                 <AlertCircle className="w-3.5 h-3.5 stroke-[3]" />
                                 <span>Not Comply</span>
@@ -909,7 +860,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
               </table>
             </div>
 
-            {/* Document Footer: Signatory Block & Verification QR */}
             <div className="mt-8 pt-4 border-t border-slate-300 flex items-end justify-between text-xs font-serif signatory-block">
               <div>
                 <p className="font-bold text-black uppercase">{companyName}</p>
@@ -943,7 +893,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
         </div>
 
-        {/* Bottom Modal Actions (Hidden in Print) */}
+        {/* Modal Footer */}
         <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900 shrink-0 print:hidden no-export">
           <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />

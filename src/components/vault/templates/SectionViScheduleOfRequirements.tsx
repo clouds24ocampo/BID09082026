@@ -169,7 +169,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
         if (Array.isArray(parsed) && parsed.length > 0) {
           setItems(parsed);
         }
-      } catch (e) {}
+      } catch (e) { }
     }
   }, [projectRefNo, tenant?.id]);
 
@@ -240,19 +240,15 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
 
   const handleExportPdf = async () => {
     setIsExporting(true);
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 200));
     try {
       const fileName = `${projectRefNo}_Section_VI_Schedule_of_Requirements_${todayStr}.pdf`;
-      const templateElems = document.querySelectorAll('.single-page-paper');
-      if (templateElems.length > 0) {
-        const elemArray = Array.from(templateElems) as HTMLElement[];
-        await generateAndDownloadThreeLayerPdf(null, elemArray, undefined, fileName);
-      } else {
-        const paperElem = document.getElementById('section-vi-paper');
-        if (paperElem) {
-          await generateAndDownloadThreeLayerPdf(null, paperElem, undefined, fileName);
-        }
+      const paperElem = document.getElementById('section-vi-paper');
+      if (paperElem) {
+        await generateAndDownloadThreeLayerPdf(null, paperElem, undefined, fileName);
       }
+    } catch (err) {
+      console.error('PDF export error:', err);
     } finally {
       setIsExporting(false);
     }
@@ -296,21 +292,19 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
 
   const handleSave = async () => {
     setIsExporting(true);
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 200));
     try {
       const templateElem = document.getElementById('section-vi-paper') as HTMLElement;
       let dataUrl: string | undefined = undefined;
       if (templateElem) {
         const canvas = await html2canvas(templateElem, {
-          scale: 2.5,
+          scale: 2,
           useCORS: true,
           backgroundColor: '#ffffff',
           ignoreElements: (element: Element) => {
             return (
               element.classList.contains('print:hidden') ||
               element.classList.contains('no-export') ||
-              element.classList.contains('proof-column') ||
-              element.classList.contains('actions-column') ||
               element.tagName === 'BUTTON'
             );
           }
@@ -343,7 +337,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
             size: 13in 8.5in;
             margin: 0.4in;
           }
-          header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .proof-column, .actions-column, .sticky {
+          header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .sticky {
             display: none !important;
           }
           html, body, #root, .fixed, .backdrop-blur-md, .bg-slate-900, .bg-slate-950 {
@@ -354,14 +348,12 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
             padding: 0 !important;
             width: 100% !important;
             height: auto !important;
-            max-height: none !important;
             overflow: visible !important;
             border: none !important;
             box-shadow: none !important;
           }
           .single-page-paper {
             display: block !important;
-            position: relative !important;
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 auto !important;
@@ -370,16 +362,12 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
             box-shadow: none !important;
             background: #ffffff !important;
             color: #000000 !important;
-            overflow: visible !important;
-          }
-          .export-text {
-            display: block !important;
           }
         }
       `}</style>
 
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-7xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white">
-        
+
         {/* Top Controls Header Bar */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0 print:hidden no-export">
           <div className="flex items-center gap-3">
@@ -434,10 +422,8 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
         {/* Scrollable Container */}
         <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6 print:p-0 print:bg-white">
 
-          {/* Interactive Screen Controls (Hidden in Print & PDF) */}
+          {/* Interactive Screen Controls */}
           <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
-            
-            {/* Target Opportunity / Project Dropdown Selector & Quick Row Actions */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex-1 space-y-1.5">
                 <label className="block text-slate-200 font-mono text-xs font-bold flex items-center justify-between">
@@ -445,7 +431,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                     <Building2 className="w-4 h-4 text-blue-400" />
                     Select Target Project from Opportunity Finder:
                   </span>
-                  <span className="text-[10px] text-emerald-400 font-semibold font-mono">⚡ Auto-populates Document Header & Mirrors Framework Agreement</span>
                 </label>
                 <select
                   value={selectedOppId}
@@ -481,7 +466,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
               </div>
 
               <div className="flex flex-wrap items-center gap-2 pt-4 sm:pt-0 shrink-0">
-                {/* Font Size Selector for Long Specifications */}
                 <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-mono">
                   <span className="text-slate-400 px-1.5 flex items-center gap-1 text-[11px]">
                     <Type className="w-3.5 h-3.5 text-blue-400" /> Font Size:
@@ -489,30 +473,24 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                   <button
                     type="button"
                     onClick={() => setFontSizeMode('fine')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${
-                      fontSizeMode === 'fine' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                    }`}
-                    title="Ultra-compact font (9pt)"
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${fontSizeMode === 'fine' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
                   >
                     9pt
                   </button>
                   <button
                     type="button"
                     onClick={() => setFontSizeMode('xs')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${
-                      fontSizeMode === 'xs' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                    }`}
-                    title="Compact font (10pt)"
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${fontSizeMode === 'xs' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
                   >
                     10pt
                   </button>
                   <button
                     type="button"
                     onClick={() => setFontSizeMode('sm')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${
-                      fontSizeMode === 'sm' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                    }`}
-                    title="Standard font (11pt)"
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${fontSizeMode === 'sm' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
                   >
                     11pt
                   </button>
@@ -527,7 +505,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                 </button>
                 <button
                   onClick={handleSyncAllWithItem1}
-                  title="Propagate Item 1 Delivery Schedule to all items"
                   className="px-3.5 py-2 rounded-xl text-xs font-semibold text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 flex items-center gap-1.5 transition"
                 >
                   <RefreshCw className="w-4 h-4" />
@@ -544,18 +521,16 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
             </div>
           </div>
 
-          {/* OFFICIAL PRINTABLE PAPER DOCUMENT SHEET (Legal 13" x 8.5" LANDSCAPE Standard - Adaptive flow rendering) */}
+          {/* OFFICIAL PRINTABLE PAPER DOCUMENT SHEET */}
           <div id="section-vi-paper" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1150px] flex flex-col justify-between font-serif">
             <div>
               {/* COMPANY & PROJECT HEADER BLOCK */}
               <div className="border-b-2 border-black pb-3 mb-5 space-y-2 font-serif">
-                {/* Company Header */}
                 <div className="text-center pb-2 border-b border-slate-300">
                   <h2 className="text-lg sm:text-xl font-bold text-black uppercase tracking-wide font-serif">{companyName}</h2>
                   <p className="text-xs text-slate-700 font-serif mt-0.5">{companyAddress}</p>
                 </div>
 
-                {/* Bidding Project Info Grid (Legal Landscape) */}
                 <div className="space-y-1.5 text-xs font-serif text-black pt-1">
                   <div className="flex items-center justify-between gap-6">
                     <div>
@@ -598,24 +573,12 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
               <table className={`w-full border-collapse border-2 border-black text-black table-fixed ${getTableFontSizeClass()}`}>
                 <thead>
                   <tr className="border-b-2 border-black bg-slate-50 font-serif">
-                    <th className="border border-black px-1.5 py-2 text-center font-bold w-[6%]">
-                      Item<br />Number
-                    </th>
-                    <th className="border border-black px-3 py-2 text-center font-bold w-[44%]">
-                      Description
-                    </th>
-                    <th className="border border-black px-1.5 py-2 text-center font-bold w-[9%]">
-                      Quantity
-                    </th>
-                    <th className="border border-black px-2 py-2 text-center font-bold w-[13%]">
-                      Unit Amount
-                    </th>
-                    <th className="border border-black px-2 py-2 text-center font-bold w-[14%]">
-                      Total
-                    </th>
-                    <th className="border border-black px-2.5 py-2 text-center font-bold w-[14%]">
-                      Delivered,<br />Weeks/Months
-                    </th>
+                    <th className="border border-black px-1.5 py-2 text-center font-bold w-[6%]">Item<br />Number</th>
+                    <th className="border border-black px-3 py-2 text-center font-bold w-[44%]">Description</th>
+                    <th className="border border-black px-1.5 py-2 text-center font-bold w-[9%]">Quantity</th>
+                    <th className="border border-black px-2 py-2 text-center font-bold w-[13%]">Unit Amount</th>
+                    <th className="border border-black px-2 py-2 text-center font-bold w-[14%]">Total</th>
+                    <th className="border border-black px-2.5 py-2 text-center font-bold w-[14%]">Delivered,<br />Weeks/Months</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -628,7 +591,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(idx)}
-                              title="Remove item"
                               className="text-red-500 hover:text-red-700 mt-2 print:hidden no-export p-1"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -638,7 +600,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                       </td>
 
                       <td className="border border-black px-3 py-2 font-serif align-top break-words">
-                        {!isExporting && (
+                        {!isExporting ? (
                           <textarea
                             rows={3}
                             value={rowItem.description}
@@ -646,14 +608,14 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                             placeholder="Enter detailed technical specification..."
                             className={`w-full bg-transparent resize-y outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
                           />
-                        )}
+                        ) : null}
                         <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black pt-0.5 whitespace-pre-wrap font-normal break-words ${getTableFontSizeClass()}`}>
                           {rowItem.description || ''}
                         </div>
                       </td>
 
                       <td className="border border-black px-1.5 py-2 font-serif text-center align-top">
-                        {!isExporting && (
+                        {!isExporting ? (
                           <input
                             type="text"
                             value={rowItem.quantity}
@@ -661,14 +623,14 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                             placeholder="Qty"
                             className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
                           />
-                        )}
+                        ) : null}
                         <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
                           {rowItem.quantity || ''}
                         </div>
                       </td>
 
                       <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
-                        {!isExporting && (
+                        {!isExporting ? (
                           <input
                             type="text"
                             value={rowItem.unitAmount}
@@ -676,14 +638,14 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                             placeholder="Unit Amount"
                             className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
                           />
-                        )}
+                        ) : null}
                         <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
                           {rowItem.unitAmount || ''}
                         </div>
                       </td>
 
                       <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
-                        {!isExporting && (
+                        {!isExporting ? (
                           <input
                             type="text"
                             value={computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total}
@@ -691,25 +653,23 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                             placeholder="Total Amount"
                             className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 font-semibold ${getTableFontSizeClass()}`}
                           />
-                        )}
+                        ) : null}
                         <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-semibold break-words ${getTableFontSizeClass()}`}>
                           {computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total || ''}
                         </div>
                       </td>
 
                       <td className="border border-black px-2.5 py-2 font-serif text-center align-top break-words">
-                        {!isExporting && (
+                        {!isExporting ? (
                           <input
                             type="text"
                             value={rowItem.delivered}
                             onChange={(e) => handleFieldChange(idx, 'delivered', e.target.value)}
                             placeholder="e.g. 30 Days"
-                            title={idx === 0 ? "Item 1 Delivery: Changing this updates all rows automatically" : "Delivery Weeks/Months"}
-                            className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${
-                              idx === 0 ? 'font-semibold text-blue-950' : ''
-                            } ${getTableFontSizeClass()}`}
+                            className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${idx === 0 ? 'font-semibold text-blue-950' : ''
+                              } ${getTableFontSizeClass()}`}
                           />
-                        )}
+                        ) : null}
                         <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
                           {rowItem.delivered || ''}
                         </div>
@@ -720,7 +680,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
               </table>
             </div>
 
-            {/* Document Footer: Signatory Block & Verification QR */}
+            {/* Document Footer */}
             <div className="mt-8 pt-4 border-t border-slate-300 flex items-end justify-between text-xs font-serif signatory-block">
               <div>
                 <p className="font-bold text-black uppercase">{companyName}</p>
@@ -754,7 +714,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
 
         </div>
 
-        {/* Bottom Modal Actions (Hidden in Print) */}
+        {/* Bottom Modal Actions */}
         <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900 shrink-0 print:hidden no-export">
           <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />

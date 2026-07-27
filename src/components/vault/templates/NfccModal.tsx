@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
+import html2canvas from 'html2canvas';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
@@ -166,23 +167,32 @@ export const NfccModal: React.FC<NfccModalProps> = ({
 
   const handleSaveAndComplete = async () => {
     setIsExporting(true);
+    saveState();
+    let dataUrl: string | undefined = undefined;
     try {
-      const el = document.getElementById('nfcc-paper') as HTMLElement | null;
-      await generateAndDownloadThreeLayerPdf(
-        null,
-        el,
-        undefined,
-        `NFCC-Financial-Eligibility-${projectRefNo || '2026'}.pdf`
-      );
-      onSaveAndComplete?.(undefined, 'NFCC — Net Financial Contracting Capacity', projectRefNo, projectTitle);
+      const el = document.getElementById('nfcc-paper');
+      if (el) {
+        const canvas = await html2canvas(el, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          ignoreElements: (element: Element) => {
+            return (
+              element.classList.contains('print:hidden') ||
+              element.classList.contains('no-export')
+            );
+          }
+        });
+        dataUrl = canvas.toDataURL('image/png');
+      }
+    } catch (err) {
+      console.error('Failed to capture NFCC preview:', err);
     } finally {
       setIsExporting(false);
     }
+    onSaveAndComplete?.(dataUrl, 'NFCC — Net Financial Contracting Capacity', projectRefNo, projectTitle);
   };
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-start justify-center p-2 sm:p-4 overflow-y-auto">
       <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-5xl shadow-2xl flex flex-col my-4 overflow-hidden">

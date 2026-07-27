@@ -4,7 +4,7 @@ import { debugLog } from '../../utils/debugLog';
 
 export interface DocumentQrCodeProps {
   details: QrCodeDetails;
-  size?: number; // width/height in px
+  size?: number; // Width/Height in px
   className?: string;
   showCaption?: boolean;
 }
@@ -19,6 +19,7 @@ export const DocumentQrCode: React.FC<DocumentQrCodeProps> = ({
 
   useEffect(() => {
     let isMounted = true;
+
     generateQrCodeDataUrl(details).then((url) => {
       if (isMounted) {
         setDataUrl(url);
@@ -31,22 +32,22 @@ export const DocumentQrCode: React.FC<DocumentQrCodeProps> = ({
         // #endregion
       }
     });
+
     return () => {
       isMounted = false;
     };
   }, [
-    details.companyName,
-    details.documentName,
-    details.documentNumber,
     details.projectTitle,
     details.projectRefNo,
-    details.procuringEntity,
     details.dateTimeSubmitted,
+    details.documentName,
+    details.documentNumber,
+    details.companyName,
+    details.procuringEntity,
     details.solicitationNo,
+    details.logoUrl,
     details.documentCategory,
-    details.generatedBy,
-    details.documentVersion,
-    details.uniqueDocumentId
+    details.generatedBy
   ]);
 
   if (!dataUrl) {
@@ -62,11 +63,11 @@ export const DocumentQrCode: React.FC<DocumentQrCodeProps> = ({
 
   return (
     <div className={`flex flex-col items-center justify-center ${className}`}>
-      <div className="bg-white p-1 rounded border-2 border-black shadow-sm">
+      <div className="bg-white p-1 rounded border border-slate-400 shadow-sm">
         <img
           src={dataUrl}
-          alt="Scannable GPPB Document Verification QR Code"
-          style={{ width: size, height: size }}
+          alt="Scannable Document Verification QR Code"
+          style={{ width: size, height: size, imageRendering: 'pixelated' }}
           className="block object-contain"
         />
       </div>

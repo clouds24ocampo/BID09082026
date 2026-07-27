@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 import {
@@ -7,12 +8,16 @@ import {
   Mail,
   Eye,
   EyeOff,
-  ShieldCheck,
   ArrowRight,
-  CheckCircle2,
-  Sparkles,
   Briefcase,
-  FileCheck
+  FileCheck,
+  Sparkles,
+  AlertCircle,
+  RefreshCw,
+  Rocket,
+  Globe2,
+  Radio,
+  Compass
 } from 'lucide-react';
 
 interface LoginPageProps {
@@ -30,10 +35,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const activeTenantPreview = tenants.find(t => t.id === selectedTenantId) || tenants[0] || {
-    brandCode: 'BIDOCS',
-    brandColor: '#1e40af',
-    companyName: 'Your Business Entity'
+  const activeTenantPreview = tenants.find((t) => t.id === selectedTenantId) || tenants[0] || {
+    brandCode: 'ARTEMIS',
+    brandColor: '#0284c7',
+    companyName: 'Lunar Command Base'
   };
 
   const handleForgotPasswordReset = () => {
@@ -74,119 +79,244 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#070a12] text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
-      {/* Background Decorative Gradients */}
-      <div
-        className="absolute -top-40 -left-40 w-96 h-96 rounded-full blur-[128px] opacity-20 pointer-events-none transition-colors duration-500"
-        style={{ backgroundColor: activeTenantPreview.brandColor || '#1e40af' }}
-      />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-600/10 rounded-full blur-[128px] pointer-events-none" />
+    <div className="min-h-screen bg-[#02040a] text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden font-sans select-none">
 
+      {/* ================= CONTINUOUS DEEP SPACE TRAVEL ENGINE ================= */}
+
+      {/* 1. Warp Speed Travelling Stars (Moving Toward Screen) */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        {Array.from({ length: 45 }).map((_, i) => {
+          const startX = Math.random() * 100 - 50;
+          const startY = Math.random() * 100 - 50;
+          const duration = Math.random() * 3 + 2;
+          const delay = Math.random() * 4;
+
+          return (
+            <motion.div
+              key={i}
+              initial={{
+                x: `${startX}vw`,
+                y: `${startY}vh`,
+                scale: 0.1,
+                opacity: 0
+              }}
+              animate={{
+                x: `${startX * 3.5}vw`,
+                y: `${startY * 3.5}vh`,
+                scale: [0.1, 1.2, 2.5],
+                opacity: [0, 1, 0]
+              }}
+              transition={{
+                duration: duration,
+                repeat: Infinity,
+                ease: 'easeIn',
+                delay: delay
+              }}
+              className="absolute top-1/2 left-1/2 w-1 h-1 bg-cyan-200 rounded-full shadow-[0_0_10px_#38bdf8]"
+            />
+          );
+        })}
+      </div>
+
+      {/* 2. Panning Deep Space Nebula Glow */}
+      <motion.div
+        animate={{
+          x: [-60, 60, -60],
+          y: [-40, 40, -40],
+          scale: [1, 1.2, 1],
+          opacity: [0.2, 0.4, 0.2]
+        }}
+        transition={{
+          duration: 25,
+          repeat: Infinity,
+          ease: 'easeInOut'
+        }}
+        className="absolute w-[50rem] h-[50rem] rounded-full blur-[180px] pointer-events-none z-0"
+        style={{ backgroundColor: activeTenantPreview.brandColor || '#0284c7' }}
+      />
+
+      {/* 3. Traveling Moon in Deep Space Background */}
+      <motion.div
+        animate={{
+          y: [-15, 15, -15],
+          x: [-10, 10, -10],
+          rotate: [0, 360]
+        }}
+        transition={{
+          y: { duration: 8, repeat: Infinity, ease: 'easeInOut' },
+          x: { duration: 10, repeat: Infinity, ease: 'easeInOut' },
+          rotate: { duration: 180, repeat: Infinity, ease: 'linear' }
+        }}
+        className="absolute -bottom-28 -left-28 w-[32rem] h-[32rem] rounded-full bg-gradient-to-br from-slate-300 via-slate-600 to-slate-950 border border-slate-700/50 shadow-[inset_-30px_-30px_70px_rgba(0,0,0,0.95),0_0_50px_rgba(56,189,248,0.15)] pointer-events-none opacity-40 xl:opacity-80 z-0"
+      >
+        {/* Dynamic Craters */}
+        <div className="absolute top-16 left-28 w-16 h-16 rounded-full bg-slate-800/60 border border-slate-600/40 shadow-inner" />
+        <div className="absolute top-48 right-24 w-24 h-24 rounded-full bg-slate-800/50 border border-slate-600/30 shadow-inner" />
+        <div className="absolute bottom-20 left-36 w-12 h-12 rounded-full bg-slate-800/70 border border-slate-600/40 shadow-inner" />
+      </motion.div>
+
+      {/* 4. Flying Spacecraft across the Screen */}
+      <motion.div
+        animate={{
+          x: ['-20vw', '120vw'],
+          y: ['80vh', '-20vh']
+        }}
+        transition={{
+          duration: 18,
+          repeat: Infinity,
+          ease: 'linear',
+          delay: 2
+        }}
+        className="absolute z-0 pointer-events-none flex items-center gap-2 opacity-70"
+      >
+        <div className="w-16 h-[2px] bg-gradient-to-r from-transparent to-cyan-400 shadow-[0_0_8px_#38bdf8]" />
+        <Rocket className="w-6 h-6 text-cyan-300 transform -rotate-45 drop-shadow-[0_0_10px_#38bdf8]" />
+      </motion.div>
+
+      {/* ================= MAIN CONTENT GRID ================= */}
       <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
 
-        {/* Left Column: System Value Proposition & Philippine Compliance Overview */}
-        <div className="lg:col-span-6 space-y-6 pr-0 lg:pr-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs font-medium text-emerald-400">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span> Bidding document compliant </span>
+        {/* Left Column: Mission Space Telemetry & Platform Features */}
+        <motion.div
+          initial={{ opacity: 0, x: -40 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.7 }}
+          className="lg:col-span-6 space-y-6 pr-0 lg:pr-6"
+        >
+          {/* Artemis Space Telemetry Badge */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-cyan-500/40 text-xs font-mono font-medium text-cyan-300 backdrop-blur-md shadow-[0_0_20px_rgba(6,182,212,0.2)]">
+            <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+            <span>ARTEMIS DEEP SPACE TRAVERSAL LINK</span>
           </div>
 
           <div className="space-y-3">
             <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
-              Quantum <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-300">Cloud</span>
+              Quantum <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-500">Lunar</span>
             </h1>
-            <p className="text-lg text-slate-400 leading-relaxed">
-              Philippine Public Bidding Management Platform engineered for government procurement bids across Goods, Infrastructure, and Consulting Services.
+            <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
+              Philippine Public Bidding Management Platform engineered for high-precision government procurement across Goods, Infrastructure, and Consulting Services.
             </p>
           </div>
 
-          {/* Core Highlights */}
+          {/* Artemis Spec Feature Highlights */}
           <div className="space-y-3 pt-2">
-            <div className="flex items-start gap-3 text-slate-300">
-              <div className="mt-1 p-1 rounded bg-blue-500/10 text-blue-400">
-                <CheckCircle2 className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="font-semibold text-sm text-slate-200">White-Label Engine</p>
-                <p className="text-xs text-slate-400">Instant company skinning (Logo, TIN, PCAB License, Brand Color) per business instance.</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 text-slate-300">
-              <div className="mt-1 p-1 rounded bg-amber-500/10 text-amber-400">
-                <FileCheck className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="font-semibold text-sm text-slate-200">Encrypted Document Vault & Expiry Alerts</p>
-                <p className="text-xs text-slate-400">Automated tracking for Mayor's Permit, Tax Clearance, SEC/DTI & PCAB certificates.</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 text-slate-300">
-              <div className="mt-1 p-1 rounded bg-indigo-500/10 text-indigo-400">
-                <Briefcase className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="font-semibold text-sm text-slate-200">Dual-Regime Transition Engine</p>
-                <p className="text-xs text-slate-400">Supports legacy RA 9184 (2016 IRR) & current RA 12009 (NGPA GPPB Res 02-2025).</p>
-              </div>
-            </div>
+            {[
+              {
+                icon: Globe2,
+                color: 'text-cyan-400',
+                bg: 'bg-cyan-500/10 border-cyan-500/20',
+                title: 'White-Label Branding Module',
+                desc: 'Instant company skinning (Logo, TIN, PCAB License, Brand Color) per corporate entity.'
+              },
+              {
+                icon: FileCheck,
+                color: 'text-amber-400',
+                bg: 'bg-amber-500/10 border-amber-500/20',
+                title: 'Encrypted Vault & Expiry Alerts',
+                desc: "Automated tracking for Mayor's Permit, Tax Clearance, SEC/DTI & PCAB certificates."
+              },
+              {
+                icon: Briefcase,
+                color: 'text-sky-400',
+                bg: 'bg-sky-500/10 border-sky-500/20',
+                title: 'Dual-Regime Transition Engine',
+                desc: 'Supports legacy RA 9184 (2016 IRR) & current RA 12009 (NGPA GPPB Res 02-2025).'
+              }
+            ].map((feature, idx) => (
+              <motion.div
+                key={idx}
+                whileHover={{ x: 8, scale: 1.02 }}
+                className="flex items-start gap-3 p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-cyan-500/50 backdrop-blur-md transition-all shadow-md"
+              >
+                <div className={`mt-0.5 p-2 rounded-lg border ${feature.bg} ${feature.color}`}>
+                  <feature.icon className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm text-slate-100">{feature.title}</p>
+                  <p className="text-xs text-slate-400">{feature.desc}</p>
+                </div>
+              </motion.div>
+            ))}
           </div>
-        </div>
+        </motion.div>
 
-        {/* Right Column: Interactive Login Form */}
-        <div className="lg:col-span-6">
-          <div className="glass-panel p-6 sm:p-8 rounded-2xl shadow-2xl border border-slate-800 space-y-6">
+        {/* Right Column: Floating Mission Control Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.1 }}
+          className="lg:col-span-6"
+        >
+          <div className="bg-slate-950/85 backdrop-blur-2xl p-6 sm:p-8 rounded-3xl shadow-[0_0_70px_rgba(0,0,0,0.95)] border border-slate-800/90 space-y-6 relative overflow-hidden">
 
-            {/* Header & Dynamic Tenant Preview Badge */}
+            {/* Top Accent Line */}
+            <div
+              className="absolute top-0 left-0 right-0 h-1 transition-colors duration-500"
+              style={{ backgroundColor: activeTenantPreview.brandColor || '#0284c7' }}
+            />
+
+            {/* Form Header */}
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
               <div>
-                <h2 className="text-2xl font-bold text-white">Sign In</h2>
-                <p className="text-xs text-slate-400">Access your  Bid Workspace</p>
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <span>Mission Control</span>
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                </h2>
+                <p className="text-xs text-slate-400">Access your Bid Operations Center</p>
               </div>
 
-              {/* Active Tenant Badge Preview */}
-              <div
-                className="px-3 py-1.5 rounded-lg border flex items-center gap-2 text-xs font-medium transition-colors"
+              {/* Active Tenant / Base Badge */}
+              <motion.div
+                layout
+                className="px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-medium transition-all shadow-inner backdrop-blur-md"
                 style={{
-                  borderColor: `${activeTenantPreview.brandColor || '#1e40af'}50`,
-                  backgroundColor: `${activeTenantPreview.brandColor || '#1e40af'}15`,
+                  borderColor: `${activeTenantPreview.brandColor || '#0284c7'}60`,
+                  backgroundColor: `${activeTenantPreview.brandColor || '#0284c7'}20`,
                   color: '#ffffff'
                 }}
               >
-                <Building2 className="w-3.5 h-3.5" style={{ color: activeTenantPreview.brandColor || '#3b82f6' }} />
+                <Building2 className="w-3.5 h-3.5" style={{ color: activeTenantPreview.brandColor || '#38bdf8' }} />
                 <span className="truncate max-w-[150px] font-semibold">
                   {tenants.length > 0 ? activeTenantPreview.companyName : 'Register Company Account'}
                 </span>
-              </div>
+              </motion.div>
             </div>
 
-            {error && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
-                <span>⚠️ {error}</span>
-              </div>
-            )}
+            {/* Error Message Alert */}
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2"
+                >
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{error}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <form onSubmit={handleSubmit} className="space-y-4">
 
               {/* Select Corporate Tenant */}
               {tenants.length === 0 ? (
-                <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-mono space-y-1 text-center">
+                <div className="p-3.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono space-y-1 text-center">
                   <p className="font-bold">No Registered Companies Found</p>
-                  <p className="text-[11px] text-slate-400">Click "Register New Company Account" below to register your business entity.</p>
+                  <p className="text-[11px] text-slate-400">Click "Register New Company Account" below to onboard your entity.</p>
                 </div>
               ) : (
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                    Select Registered Corporate Profile / Tenant
+                  <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase tracking-wider">
+                    Target Corporate Command Unit
                   </label>
                   <div className="relative">
                     <select
                       value={selectedTenantId}
                       onChange={(e) => setSelectedTenantId(e.target.value)}
-                      className="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition appearance-none cursor-pointer"
+                      className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition appearance-none cursor-pointer"
                     >
-                      {tenants.map(t => (
+                      {tenants.map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.companyName} ({t.brandCode}) - TIN: {t.tin}
                         </option>
@@ -197,36 +327,47 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                 </div>
               )}
 
-              {/* Select Role */}
+              {/* User Role Toggle Buttons */}
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  User Role Scope
+                <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase tracking-wider">
+                  Operator Clearance Scope
                 </label>
-                <div className="grid grid-cols-2 gap-2 p-1 rounded-lg bg-slate-900/90 border border-slate-800">
+                <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-900/90 border border-slate-800">
                   <button
                     type="button"
                     onClick={() => setSelectedRole('COMPANY_OWNER')}
-                    className={`py-1.5 px-3 rounded-md text-xs font-medium transition ${selectedRole === 'COMPANY_OWNER'
-                      ? 'bg-blue-600 text-white shadow'
-                      : 'text-slate-400 hover:text-slate-200'
+                    className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all relative ${selectedRole === 'COMPANY_OWNER' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
                       }`}
                   >
-                    Company Owner
+                    {selectedRole === 'COMPANY_OWNER' && (
+                      <motion.div
+                        layoutId="activeRoleSpaceTravel"
+                        className="absolute inset-0 bg-cyan-600 rounded-lg shadow-[0_0_12px_rgba(8,145,178,0.5)]"
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                      />
+                    )}
+                    <span className="relative z-10">Company Owner</span>
                   </button>
+
                   <button
                     type="button"
                     onClick={() => setSelectedRole('BID_MANAGER')}
-                    className={`py-1.5 px-3 rounded-md text-xs font-medium transition ${selectedRole === 'BID_MANAGER'
-                      ? 'bg-blue-600 text-white shadow'
-                      : 'text-slate-400 hover:text-slate-200'
+                    className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all relative ${selectedRole === 'BID_MANAGER' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
                       }`}
                   >
-                    Bid Manager
+                    {selectedRole === 'BID_MANAGER' && (
+                      <motion.div
+                        layoutId="activeRoleSpaceTravel"
+                        className="absolute inset-0 bg-cyan-600 rounded-lg shadow-[0_0_12px_rgba(8,145,178,0.5)]"
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                      />
+                    )}
+                    <span className="relative z-10">Bid Manager</span>
                   </button>
                 </div>
               </div>
 
-              {/* Email Input */}
+              {/* Work Email Address */}
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1.5">
                   Work Email Address
@@ -238,9 +379,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@company.ph"
                     required
-                    className="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg pl-9 pr-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+                    className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
                   />
-                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
                 </div>
               </div>
 
@@ -248,7 +389,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-medium text-slate-300">
-                    Password
+                    Access Key / Password
                   </label>
                   <button
                     type="button"
@@ -265,54 +406,48 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
                     required
-                    className="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg pl-9 pr-10 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
+                    className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-9 pr-10 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
                   />
-                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-200"
+                    className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-200 transition"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
 
-              {/* Remember Me */}
-              <div className="flex items-center justify-between pt-1">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" defaultChecked className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-blue-600 focus:ring-0" />
-                  <span className="text-xs text-slate-400">Remember company session</span>
-                </label>
-              </div>
-
-              {/* Submit Button */}
-              <button
+              {/* Submit Launch Button */}
+              <motion.button
+                whileHover={{ scale: 1.015 }}
+                whileTap={{ scale: 0.985 }}
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3 rounded-lg text-sm font-semibold text-white shadow-lg transition flex items-center justify-center gap-2"
-                style={{ backgroundColor: activeTenantPreview.brandColor || '#1e40af' }}
+                className="w-full py-3 rounded-xl text-sm font-semibold text-white shadow-[0_0_25px_rgba(2,132,199,0.5)] transition-all flex items-center justify-center gap-2 cursor-pointer relative overflow-hidden"
+                style={{ backgroundColor: activeTenantPreview.brandColor || '#0284c7' }}
               >
                 {isLoading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <RefreshCw className="w-5 h-5 animate-spin" />
                 ) : (
                   <>
-                    <span>Log In to Workspace</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <span>Engage Deep Space Workspace</span>
+                    <Rocket className="w-4 h-4" />
                   </>
                 )}
-              </button>
+              </motion.button>
             </form>
 
             {/* Registration Switcher & System Reset */}
-            <div className="pt-4 border-t border-slate-800 text-center space-y-2">
+            <div className="pt-4 border-t border-slate-800/80 text-center space-y-2">
               <p className="text-xs text-slate-400">
-                Need to onboard a new business entity?{' '}
+                Need to register a new entity?{' '}
                 <button
                   onClick={onSwitchToRegister}
-                  className="font-semibold text-blue-400 hover:text-blue-300 underline focus:outline-none"
+                  className="font-semibold text-cyan-400 hover:text-cyan-300 underline focus:outline-none transition"
                 >
-                  Register New Company Account
+                  Onboard Corporate Account
                 </button>
               </p>
               <button
@@ -326,12 +461,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                 }}
                 className="text-[11px] font-mono text-slate-500 hover:text-amber-400 underline transition block mx-auto pt-1"
               >
-                Purge All Data & Start Fresh Registration
+                Purge All Systems & Start Fresh Registration
               </button>
             </div>
 
           </div>
-        </div>
+        </motion.div>
 
       </div>
     </div>
