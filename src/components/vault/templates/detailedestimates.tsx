@@ -15,7 +15,8 @@ import {
   Calculator,
   HardHat,
   PackageCheck,
-  Truck
+  Truck,
+  Users
 } from 'lucide-react';
 
 export interface MaterialEstimateRow {
@@ -35,6 +36,16 @@ export interface LaborEstimateRow {
   unit: string;
   noOfDays: number;
   dailyPrice: number;
+}
+
+export interface LogisticsEstimateRow {
+  id: string;
+  itemNo: string;
+  description: string;
+  noOfVehicles: number;
+  unit: string;
+  noOfDays: number;
+  dailyRate: number;
 }
 
 export interface EquipmentEstimateRow {
@@ -87,17 +98,17 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
 
   // SECTION I: MATERIALS ESTIMATE ROWS
   const [materials, setMaterials] = useState<MaterialEstimateRow[]>([
-    { id: 'm-1', itemNo: '1', description: 'MOBILIZATION', unit: 'Lot', quantity: 1, unitPrice: 89947.00 },
-    { id: 'm-2', itemNo: '2', description: 'FIBER OPTIC 2 CORE', unit: 'Electronic', quantity: 4, unitPrice: 10000.00 },
-    { id: 'm-3', itemNo: '3', description: 'FOC MEDIA CONVERTER TX RX', unit: 'Electronic', quantity: 10, unitPrice: 4500.00 },
-    { id: 'm-4', itemNo: '4', description: '4MP IP CAMERA BULLET TYPE COLORED H.265+ 2.8-12MM', unit: 'Plastic', quantity: 10, unitPrice: 6500.00 },
-    { id: 'm-5', itemNo: '5', description: 'SFP MODULE', unit: 'Electronic', quantity: 10, unitPrice: 2200.00 },
-    { id: 'm-6', itemNo: '6', description: 'POE SPLITTER', unit: 'Electronic', quantity: 10, unitPrice: 1500.00 },
-    { id: 'm-7', itemNo: '7', description: 'CCTV PANEL BOX', unit: 'Electronic', quantity: 10, unitPrice: 600.00 },
+    { id: 'm-1', itemNo: '1', description: 'FIBER OPTIC 2 CORE', unit: 'Electronic', quantity: 4, unitPrice: 10000.00 },
+    { id: 'm-2', itemNo: '2', description: 'FOC MEDIA CONVERTER TX RX', unit: 'Electronic', quantity: 10, unitPrice: 4500.00 },
+    { id: 'm-3', itemNo: '3', description: '4MP IP CAMERA BULLET TYPE COLORED H.265+ 2.8-12MM', unit: 'Plastic', quantity: 10, unitPrice: 6500.00 },
+    { id: 'm-4', itemNo: '4', description: 'SFP MODULE', unit: 'Electronic', quantity: 10, unitPrice: 2200.00 },
+    { id: 'm-5', itemNo: '5', description: 'POE SPLITTER', unit: 'Electronic', quantity: 10, unitPrice: 1500.00 },
+    { id: 'm-6', itemNo: '6', description: 'CCTV PANEL BOX', unit: 'Electronic', quantity: 10, unitPrice: 600.00 },
+    { id: 'm-7', itemNo: '7', description: 'CCTV ELECTRICAL BOX BIG', unit: 'Electronic', quantity: 3, unitPrice: 850.00 },
     { id: 'm-8', itemNo: '8', description: '8PORT GIGABIT POE WITH SFP', unit: 'Electronic', quantity: 2, unitPrice: 5500.00 }
   ]);
 
-  // SECTION II: LABOR COST & LOGISTICS ROWS
+  // SECTION II: LABOR COST ROWS (SEPARATE FROM LOGISTICS & MOBILIZATION)
   const [labors, setLabors] = useState<LaborEstimateRow[]>([
     { id: 'l-1', itemNo: '1', description: 'PROJECT MANAGER', noOfWorkers: 1, unit: 'Person', noOfDays: 30, dailyPrice: 1000.00 },
     { id: 'l-2', itemNo: '2', description: 'COMMUNICATION ENGINEER', noOfWorkers: 1, unit: 'Person', noOfDays: 30, dailyPrice: 1000.00 },
@@ -106,7 +117,12 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
     { id: 'l-5', itemNo: '5', description: 'NETWORK TECHNICIAN', noOfWorkers: 2, unit: 'Person', noOfDays: 30, dailyPrice: 1000.00 }
   ]);
 
-  // SECTION III: EQUIPMENT RENTAL ESTIMATES ROWS
+  // SECTION III: LOGISTICS & MOBILIZATION ROWS (SEPARATED AS DISTINCT SECTION)
+  const [logistics, setLogistics] = useState<LogisticsEstimateRow[]>([
+    { id: 'log-1', itemNo: '1', description: 'FB VAN MOBILIZATION & DEMOBILIZATION OF MATERIALS', noOfVehicles: 1, unit: 'Vehicle', noOfDays: 2, dailyRate: 44973.50 }
+  ]);
+
+  // SECTION IV: EQUIPMENT RENTAL ESTIMATES ROWS
   const [equipments, setEquipments] = useState<EquipmentEstimateRow[]>([]);
   const [noEquipmentNeeded, setNoEquipmentNeeded] = useState(true);
 
@@ -161,15 +177,6 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
       { id: `m-${Date.now()}`, itemNo: `${nextNo}`, description: '', unit: 'Pcs', quantity: 1, unitPrice: 0 }
     ]);
   };
-
-  const handleAddMobilization = () => {
-    const nextNo = materials.length + 1;
-    setMaterials(prev => [
-      { id: `m-mob-${Date.now()}`, itemNo: '1', description: 'MOBILIZATION & DEMOBILIZATION OF MATERIALS / EQUIPMENT', unit: 'Lot', quantity: 1, unitPrice: 0 },
-      ...prev.map((m, idx) => ({ ...m, itemNo: `${idx + 2}` }))
-    ]);
-  };
-
   const handleRemoveMaterial = (id: string) => setMaterials(prev => prev.filter(m => m.id !== id));
   const handleUpdateMaterial = (id: string, field: keyof MaterialEstimateRow, val: any) => {
     setMaterials(prev => prev.map(m => m.id === id ? { ...m, [field]: val } : m));
@@ -188,6 +195,19 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
     setLabors(prev => prev.map(l => l.id === id ? { ...l, [field]: val } : l));
   };
 
+  // Logistics & Mobilization Row Manipulations
+  const handleAddLogistics = () => {
+    const nextNo = logistics.length + 1;
+    setLogistics(prev => [
+      ...prev,
+      { id: `log-${Date.now()}`, itemNo: `${nextNo}`, description: 'MOBILIZATION & DEMOBILIZATION OF MATERIALS / VEHICLE', noOfVehicles: 1, unit: 'Vehicle', noOfDays: 1, dailyRate: 0 }
+    ]);
+  };
+  const handleRemoveLogistics = (id: string) => setLogistics(prev => prev.filter(lg => lg.id !== id));
+  const handleUpdateLogistics = (id: string, field: keyof LogisticsEstimateRow, val: any) => {
+    setLogistics(prev => prev.map(lg => lg.id === id ? { ...lg, [field]: val } : lg));
+  };
+
   // Equipment Row Manipulations
   const handleAddEquipment = () => {
     const nextNo = equipments.length + 1;
@@ -204,6 +224,7 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
   const handleResetToCleanSlate = () => {
     setMaterials([{ id: `m-${Date.now()}-1`, itemNo: '1', description: '', unit: 'Lot', quantity: 1, unitPrice: 0 }]);
     setLabors([{ id: `l-${Date.now()}-1`, itemNo: '1', description: '', noOfWorkers: 1, unit: 'Person', noOfDays: 1, dailyPrice: 0 }]);
+    setLogistics([{ id: `log-${Date.now()}-1`, itemNo: '1', description: 'MOBILIZATION & DEMOBILIZATION / LOGISTICS', noOfVehicles: 1, unit: 'Vehicle', noOfDays: 1, dailyRate: 0 }]);
     setEquipments([]);
     setNoEquipmentNeeded(true);
     setPlusItemOverhead(0);
@@ -217,10 +238,13 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
   const computeLaborTotal = (l: LaborEstimateRow) => (l.noOfWorkers || 0) * (l.noOfDays || 0) * (l.dailyPrice || 0);
   const totalLaborCost = labors.reduce((sum, l) => sum + computeLaborTotal(l), 0);
 
+  const computeLogisticsTotal = (lg: LogisticsEstimateRow) => (lg.noOfVehicles || 0) * (lg.noOfDays || 0) * (lg.dailyRate || 0);
+  const totalLogisticsCost = logistics.reduce((sum, lg) => sum + computeLogisticsTotal(lg), 0);
+
   const computeEquipmentTotal = (e: EquipmentEstimateRow) => (e.noOfDays || 0) * (e.dailyPrice || 0);
   const totalEquipmentCost = noEquipmentNeeded ? 0 : equipments.reduce((sum, e) => sum + computeEquipmentTotal(e), 0);
 
-  const totalEstimatedProjectCost = totalMaterialsCost + totalLaborCost + totalEquipmentCost;
+  const totalEstimatedProjectCost = totalMaterialsCost + totalLaborCost + totalLogisticsCost + totalEquipmentCost;
 
   // Taxes Breakdown
   const vat12 = totalEstimatedProjectCost * 0.12;
@@ -303,7 +327,7 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                Summary Sheet Indicating Unit Prices of Materials, Labor Rates, Equipment Rentals & Tax Breakdown
+                Summary Sheet Indicating Unit Prices of Materials, Labor Rates, Logistics/Mobilization, Equipment & Tax Breakdown
               </p>
             </div>
           </div>
@@ -339,7 +363,7 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <label className="block text-xs font-mono font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-purple-400" />
-                <span>Detailed Estimates Form Header & Controls:</span>
+                <span>Detailed Estimates Form Header & Section Controls:</span>
               </label>
 
               <div className="flex items-center gap-2">
@@ -358,18 +382,18 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                   <span>Add Material</span>
                 </button>
                 <button
-                  onClick={handleAddMobilization}
-                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 transition flex items-center gap-1"
-                >
-                  <Truck className="w-3.5 h-3.5" />
-                  <span>Add Mobilization</span>
-                </button>
-                <button
                   onClick={handleAddLabor}
                   className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 transition flex items-center gap-1"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Users className="w-3.5 h-3.5" />
                   <span>Add Labor</span>
+                </button>
+                <button
+                  onClick={handleAddLogistics}
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 transition flex items-center gap-1"
+                >
+                  <Truck className="w-3.5 h-3.5" />
+                  <span>Add Logistics & Mobilization</span>
                 </button>
               </div>
             </div>
@@ -457,28 +481,6 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono"
                 />
               </div>
-
-              <div>
-                <label className="block text-slate-400 font-mono mb-1">Prepared By (Signatory Name) <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={signatoryName}
-                  onChange={(e) => setSignatoryName(e.target.value)}
-                  placeholder="e.g. Mark-Vin 'cloud' F. Ocampo"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-bold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-mono mb-1">Position / Title <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={signatoryTitle}
-                  onChange={(e) => setSignatoryTitle(e.target.value)}
-                  placeholder="e.g. President"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white"
-                />
-              </div>
             </div>
 
           </div>
@@ -554,9 +556,9 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                   </table>
                 </div>
 
-                {/* SECTION II: LABOR COST & LOGISTICS TABLE */}
+                {/* SECTION II: LABOR COST TABLE (PURE LABOR ONLY) */}
                 <div className="space-y-1 pt-1">
-                  <div className="font-bold text-[8.5pt] uppercase">II. LABOR COST & LOGISTICS</div>
+                  <div className="font-bold text-[8.5pt] uppercase">II. LABOR COST</div>
                   <table className="w-full border-collapse border-2 border-slate-950 text-[8pt] font-sans">
                     <thead>
                       <tr className="bg-slate-100 border-b-2 border-slate-950 text-center font-bold">
@@ -596,9 +598,51 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                   </table>
                 </div>
 
-                {/* SECTION III: EQUIPMENT RENTAL ESTIMATES */}
+                {/* SECTION III: LOGISTICS & MOBILIZATION TABLE (SEPARATE DEDICATED SECTION) */}
                 <div className="space-y-1 pt-1">
-                  <div className="font-bold text-[8.5pt] uppercase">III. EQUIPMENT RENTAL ESTIMATES</div>
+                  <div className="font-bold text-[8.5pt] uppercase text-amber-900">III. LOGISTICS & MOBILIZATION</div>
+                  <table className="w-full border-collapse border-2 border-slate-950 text-[8pt] font-sans">
+                    <thead>
+                      <tr className="bg-amber-50/80 border-b-2 border-slate-950 text-center font-bold">
+                        <th className="border border-slate-950 p-1 w-10">Item</th>
+                        <th className="border border-slate-950 p-1 text-left">DESCRIPTION</th>
+                        <th className="border border-slate-950 p-1 w-24">No. of Vehicle</th>
+                        <th className="border border-slate-950 p-1 w-20">Unit</th>
+                        <th className="border border-slate-950 p-1 w-20">No. of Days</th>
+                        <th className="border border-slate-950 p-1 w-24">Daily Rate</th>
+                        <th className="border border-slate-950 p-1 w-28">Total Logistics Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {logistics.map((lg) => {
+                        const rowTotal = computeLogisticsTotal(lg);
+                        return (
+                          <tr key={lg.id} className="border-b border-slate-950">
+                            <td className="border border-slate-950 p-1 text-center font-bold font-mono">{lg.itemNo}</td>
+                            <td className="border border-slate-950 p-1 font-medium">{lg.description || '-'}</td>
+                            <td className="border border-slate-950 p-1 text-center font-mono">{lg.noOfVehicles}</td>
+                            <td className="border border-slate-950 p-1 text-center">{lg.unit}</td>
+                            <td className="border border-slate-950 p-1 text-center font-mono">{lg.noOfDays}</td>
+                            <td className="border border-slate-950 p-1 text-right font-mono">{fmtPeso(lg.dailyRate)}</td>
+                            <td className="border border-slate-950 p-1 text-right font-mono font-bold">{fmtPeso(rowTotal)}</td>
+                          </tr>
+                        );
+                      })}
+                      <tr className="bg-slate-100 font-bold border-t-2 border-slate-950">
+                        <td colSpan={6} className="border border-slate-950 p-1 text-right font-extrabold uppercase">
+                          TOTAL LOGISTICS & MOBILIZATION COST
+                        </td>
+                        <td className="border border-slate-950 p-1 text-right font-mono font-extrabold text-[8.5pt]">
+                          ₱{fmtPeso(totalLogisticsCost)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* SECTION IV: EQUIPMENT RENTAL ESTIMATES */}
+                <div className="space-y-1 pt-1">
+                  <div className="font-bold text-[8.5pt] uppercase">IV. EQUIPMENT RENTAL ESTIMATES</div>
                   <table className="w-full border-collapse border-2 border-slate-950 text-[8pt] font-sans">
                     <thead>
                       <tr className="bg-slate-100 border-b-2 border-slate-950 text-center font-bold">
@@ -636,15 +680,15 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                   </table>
                 </div>
 
-                {/* SECTION IV & TAXES & SUMMARY BOX GRID */}
+                {/* SECTION V & TAXES & SUMMARY BOX GRID */}
                 <div className="grid grid-cols-12 gap-4 pt-1">
                   
                   {/* Left Column: Summary Sheet & Tax Table */}
                   <div className="col-span-7 space-y-3">
                     
-                    {/* SECTION IV: SUMMARY SHEET */}
+                    {/* SECTION V: SUMMARY SHEET */}
                     <div>
-                      <div className="font-bold text-[8.5pt] uppercase mb-1">IV. SUMMARY SHEET</div>
+                      <div className="font-bold text-[8.5pt] uppercase mb-1">V. SUMMARY SHEET</div>
                       <table className="w-full border-collapse border-2 border-slate-950 text-[8pt] font-sans">
                         <tbody>
                           <tr className="border-b border-slate-950">
@@ -654,6 +698,10 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                           <tr className="border-b border-slate-950">
                             <td className="p-1 font-semibold">Total Labor Cost</td>
                             <td className="p-1 text-right font-mono font-bold">₱{fmtPeso(totalLaborCost)}</td>
+                          </tr>
+                          <tr className="border-b border-slate-950 bg-amber-50/50">
+                            <td className="p-1 font-semibold text-amber-950">Total Logistics & Mobilization Cost</td>
+                            <td className="p-1 text-right font-mono font-bold text-amber-950">₱{fmtPeso(totalLogisticsCost)}</td>
                           </tr>
                           <tr className="border-b border-slate-950">
                             <td className="p-1 font-semibold">Total Equipment Rental Cost</td>
@@ -713,8 +761,16 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                       <table className="w-full border-collapse text-[8pt] font-sans">
                         <tbody>
                           <tr className="border-b border-slate-950">
+                            <td className="p-1 font-bold">MATERIALS</td>
+                            <td className="p-1 text-right font-mono font-bold">₱{fmtPeso(totalMaterialsCost)}</td>
+                          </tr>
+                          <tr className="border-b border-slate-950">
                             <td className="p-1 font-bold">LABOR</td>
                             <td className="p-1 text-right font-mono font-bold">₱{fmtPeso(totalLaborCost)}</td>
+                          </tr>
+                          <tr className="border-b border-slate-950 bg-amber-50/50">
+                            <td className="p-1 font-bold text-amber-950">LOGISTICS & MOBILIZATION</td>
+                            <td className="p-1 text-right font-mono font-bold text-amber-950">₱{fmtPeso(totalLogisticsCost)}</td>
                           </tr>
                           <tr className="border-b border-slate-950">
                             <td className="p-1">PLUST ITEM</td>
