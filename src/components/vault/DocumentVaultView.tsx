@@ -13,6 +13,7 @@ import { AfterSalesServiceModal } from './templates/AfterSalesServiceModal';
 import { NfccModal } from './templates/NfccModal';
 import { BidFormForGoodsModal } from './templates/bidform4goods';
 import { BidFormForInfrastructureModal } from './templates/bidform4infrastructure';
+import { BillOfQuantitiesModal } from './templates/billofquantities';
 import VaultErrorBoundary from '../common/VaultErrorBoundary';
 import {
   saveVaultItems,
@@ -52,7 +53,8 @@ import {
   Trash2,
   Edit3,
   Filter,
-  HardHat
+  HardHat,
+  Table
 } from 'lucide-react';
 
 interface ClassAMasterItemDef {
@@ -340,6 +342,7 @@ export const DocumentVaultView: React.FC = () => {
   // Financial Documents Templates State
   const [showBidFormGoodsModal, setShowBidFormGoodsModal] = useState(false);
   const [showBidFormInfraModal, setShowBidFormInfraModal] = useState(false);
+  const [showBoqModal, setShowBoqModal] = useState(false);
   const [showNfccModal, setShowNfccModal] = useState(false);
 
   const handleSaveCompletedBidFormGoods = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
@@ -411,6 +414,42 @@ export const DocumentVaultView: React.FC = () => {
     notifySuccess(
       'Infrastructure Financial Bid Form Saved!',
       `Duly completed statutory Bid Form for Infrastructure Projects saved to vault under project [${refNo}] ${title}.`
+    );
+  };
+
+  const handleSaveCompletedBoq = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
+    const newId = `fin-boq-${Date.now()}`;
+    const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
+    const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+
+    const newItem: DocumentVaultItem = {
+      id: newId,
+      tenantId: activeTenantId,
+      documentCode: 'BOQ',
+      documentName: customName || `Bill of Quantities Schedule - [${refNo}]`,
+      category: 'FINANCIAL',
+      procurementApplicability: ['GOODS', 'INFRASTRUCTURE'],
+      legalBasisReference: 'Section 32.2.1 of RA 9184 / RA 12009 (Bill of Quantities / Detailed Estimates)',
+      versionNumber: 1,
+      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileSizeBytes: 210000,
+      fileName: customName || `${refNo}_Financial_Envelope_Bill_of_Quantities.pdf`,
+      fileDataUrl: fileDataUrl,
+      status: 'ACTIVE',
+      uploadedByName: currentUser?.fullName || 'Authorized Financial Manager',
+      isOptional: false,
+      requiresIssueDate: false,
+      requiresExpiryDate: false,
+      philgepsRefNo: refNo,
+      projectTitle: title
+    };
+
+    storePdfData(newId, fileDataUrl);
+    setVaultItems(prev => [newItem, ...prev]);
+    setShowBoqModal(false);
+    notifySuccess(
+      'Bill of Quantities Saved!',
+      `Bill of Quantities schedule saved to Financial Documents vault under project [${refNo}] ${title}.`
     );
   };
 
@@ -1885,7 +1924,7 @@ export const DocumentVaultView: React.FC = () => {
 
           {/* FINANCIAL DOCUMENTS STATUTORY FORMS GENERATOR CARDS */}
           {selectedCategory === 'FINANCIAL' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               
               {/* CARD 1: Bid Form for Goods */}
               <div className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-emerald-500/50 transition space-y-4 flex flex-col justify-between">
@@ -1898,15 +1937,15 @@ export const DocumentVaultView: React.FC = () => {
                   </div>
 
                   <div>
-                    <h3 className="text-base font-bold text-white">Bid Form for the Procurement of Goods</h3>
+                    <h3 className="text-base font-bold text-white">Bid Form for Goods</h3>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                      Official statutory 2-page Financial Bid Form for goods procurement. Auto-populates total bid price in words & figures, itemized taxes, and authorized signatures.
+                      Official statutory 2-page Financial Bid Form for goods procurement. Auto-populates total bid price in words & figures, itemized taxes, and signatures.
                     </p>
                   </div>
 
                   <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
-                    <p className="text-slate-300 font-bold">Ref: Section 30.1 / 32.2.1 (Financial Envelope 2)</p>
-                    <p className="text-emerald-400">Legal Format: Legal 8.5" × 13" • 2 Pages</p>
+                    <p className="text-slate-300 font-bold">Ref: Section 30.1 / 32.2.1</p>
+                    <p className="text-emerald-400">Legal Format: Legal 8.5" × 13"</p>
                   </div>
                 </div>
 
@@ -1914,7 +1953,7 @@ export const DocumentVaultView: React.FC = () => {
                   <span className="text-xs text-slate-400 font-mono">bidform4goods.tsx</span>
                   <button
                     onClick={() => setShowBidFormGoodsModal(true)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg transition flex items-center gap-1.5"
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg transition flex items-center gap-1.5"
                   >
                     <FileSignature className="w-4 h-4" />
                     <span>Create Form</span>
@@ -1933,23 +1972,23 @@ export const DocumentVaultView: React.FC = () => {
                   </div>
 
                   <div>
-                    <h3 className="text-base font-bold text-white">Bid Form for Infrastructure Projects</h3>
+                    <h3 className="text-base font-bold text-white">Bid Form for Infra</h3>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                      Official statutory 2-page Financial Bid Form for Civil Works / Infrastructure. Includes points (a)-(l), discount methodology, and Bill of Quantities acknowledgement.
+                      Official statutory 2-page Financial Bid Form for Civil Works / Infrastructure. Includes points (a)-(l) and Bill of Quantities acknowledgement.
                     </p>
                   </div>
 
                   <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
-                    <p className="text-slate-300 font-bold">Ref: GPPB Res. 09-2020 (Civil Works Envelope 2)</p>
-                    <p className="text-amber-400">Legal Format: Legal 8.5" × 13" • 2 Pages</p>
+                    <p className="text-slate-300 font-bold">Ref: GPPB Res. 09-2020</p>
+                    <p className="text-amber-400">Legal Format: Legal 8.5" × 13"</p>
                   </div>
                 </div>
 
                 <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
-                  <span className="text-xs text-slate-400 font-mono">bidform4infrastructure.tsx</span>
+                  <span className="text-xs text-slate-400 font-mono">bidform4infra...</span>
                   <button
                     onClick={() => setShowBidFormInfraModal(true)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow-lg transition flex items-center gap-1.5"
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 shadow-lg transition flex items-center gap-1.5"
                   >
                     <FileSignature className="w-4 h-4" />
                     <span>Create Form</span>
@@ -1957,26 +1996,61 @@ export const DocumentVaultView: React.FC = () => {
                 </div>
               </div>
 
-              {/* CARD 3: NFCC Form */}
+              {/* CARD 3: Bill of Quantities (BOQ) */}
               <div className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-blue-500/50 transition space-y-4 flex flex-col justify-between">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-bold border border-blue-500/20 flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3 text-blue-400" /> Financial Capacity Form
+                      <Table className="w-3 h-3 text-blue-400" /> BOQ Financial Schedule
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">PBDs Section VIII</span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-base font-bold text-white">Bill of Quantities (BOQ)</h3>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Official statutory Bill of Quantities schedule grid. Traces template structure with columns 1-6, unit price, quantity, and auto-computed total amount.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
+                    <p className="text-slate-300 font-bold">Ref: Section 32.2.1 (Detailed Estimates)</p>
+                    <p className="text-blue-400">Legal Format: Legal 8.5" × 13"</p>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-mono">billofquantities.tsx</span>
+                  <button
+                    onClick={() => setShowBoqModal(true)}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg transition flex items-center gap-1.5"
+                  >
+                    <FileSignature className="w-4 h-4" />
+                    <span>Create Form</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* CARD 4: NFCC Form */}
+              <div className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-purple-500/50 transition space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-purple-500/10 text-purple-400 font-bold border border-purple-500/20 flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-purple-400" /> Financial Capacity
                     </span>
                     <span className="text-[10px] font-mono text-slate-400">RA 12009 / RA 9184</span>
                   </div>
 
                   <div>
-                    <h3 className="text-base font-bold text-white">Net Financial Contracting Capacity (NFCC)</h3>
+                    <h3 className="text-base font-bold text-white">Net Financial Contracting (NFCC)</h3>
                     <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                       Statutory NFCC computation statement (K factor = 15 or 20) with Audited Financial Statement figures and Ongoing Contract values.
                     </p>
                   </div>
 
                   <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 text-[11px] font-mono text-slate-400">
-                    <p className="text-slate-300 font-bold">Ref: Section 23.4.1.4 (NFCC Capacity Computation)</p>
-                    <p className="text-blue-400">Legal Format: Legal 8.5" × 13"</p>
+                    <p className="text-slate-300 font-bold">Ref: Section 23.4.1.4 (NFCC)</p>
+                    <p className="text-purple-400">Legal Format: Legal 8.5" × 13"</p>
                   </div>
                 </div>
 
@@ -1984,7 +2058,7 @@ export const DocumentVaultView: React.FC = () => {
                   <span className="text-xs text-slate-400 font-mono">NfccModal.tsx</span>
                   <button
                     onClick={() => setShowNfccModal(true)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg transition flex items-center gap-1.5"
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow-lg transition flex items-center gap-1.5"
                   >
                     <FileSignature className="w-4 h-4" />
                     <span>Create Form</span>
@@ -2688,6 +2762,18 @@ export const DocumentVaultView: React.FC = () => {
           activeProcuringEntity={activeProcuringEntity}
           onSaveAndComplete={handleSaveCompletedBidFormInfra}
           onClose={() => setShowBidFormInfraModal(false)}
+        />
+      )}
+
+      {/* STATUTORY BILL OF QUANTITIES (BOQ) MODAL */}
+      {showBoqModal && (
+        <BillOfQuantitiesModal
+          tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
+          onSaveAndComplete={handleSaveCompletedBoq}
+          onClose={() => setShowBoqModal(false)}
         />
       )}
 
