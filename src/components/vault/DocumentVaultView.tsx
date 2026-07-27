@@ -16,6 +16,7 @@ import { BidFormForInfrastructureModal } from './templates/bidform4infrastructur
 import { BillOfQuantitiesModal } from './templates/billofquantities';
 import { CashFlowByQuarterModal } from './templates/cashflowbyquarter';
 import { PriceSchedule4GoodsModal } from './templates/priceschedule4goods';
+import { SummaryOfBidPriceModal } from './templates/summaryofbidprice';
 import VaultErrorBoundary from '../common/VaultErrorBoundary';
 import {
   saveVaultItems,
@@ -529,6 +530,44 @@ export const DocumentVaultView: React.FC = () => {
     notifySuccess(
       'Price Schedule for Goods Saved!',
       `Price Schedule for Goods (Columns 1-10) saved to Financial Documents vault under project [${refNo}] ${title}.`
+    );
+  };
+
+  const [showSummaryBidPriceModal, setShowSummaryBidPriceModal] = useState(false);
+
+  const handleSaveCompletedSummaryBidPrice = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
+    const newId = `fin-summarybid-${Date.now()}`;
+    const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
+    const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+
+    const newItem: DocumentVaultItem = {
+      id: newId,
+      tenantId: activeTenantId,
+      documentCode: 'PBD-SUMMARY-BIDPRICE',
+      documentName: customName || `Summary of Bid Prices - [${refNo}]`,
+      category: 'FINANCIAL',
+      procurementApplicability: ['GOODS', 'INFRASTRUCTURE', 'CONSULTING_SERVICES'],
+      legalBasisReference: 'Section 32.2.1 of RA 9184 / RA 12009 (Summary of Bid Prices)',
+      versionNumber: 1,
+      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileSizeBytes: 215000,
+      fileName: customName || `${refNo}_Financial_Envelope_Summary_Of_Bid_Prices.pdf`,
+      fileDataUrl: fileDataUrl,
+      status: 'ACTIVE',
+      uploadedByName: currentUser?.fullName || 'Authorized Financial Manager',
+      isOptional: false,
+      requiresIssueDate: false,
+      requiresExpiryDate: false,
+      philgepsRefNo: refNo,
+      projectTitle: title
+    };
+
+    storePdfData(newId, fileDataUrl);
+    setVaultItems(prev => [newItem, ...prev]);
+    setShowSummaryBidPriceModal(false);
+    notifySuccess(
+      'Summary of Bid Prices Saved!',
+      `Summary of Bid Prices schedule saved to Financial Documents vault under project [${refNo}] ${title}.`
     );
   };
 
@@ -2110,6 +2149,41 @@ export const DocumentVaultView: React.FC = () => {
                 </div>
               </div>
 
+              {/* CARD 4: Summary of Bid Prices */}
+              <div className="glass-card p-4 rounded-2xl border border-slate-800 hover:border-blue-500/50 transition space-y-3 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-bold border border-blue-500/20 flex items-center gap-1">
+                      <FileText className="w-3 h-3 text-blue-400" /> Summary of Bid
+                    </span>
+                    <span className="text-[9px] font-mono text-slate-400">Cols 1 to 4</span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-bold text-white leading-snug">Summary of Bid Prices</h3>
+                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                      Statutory Summary of Bid Prices table with Item No, Item, Particulars/Description, and Total Amount.
+                    </p>
+                  </div>
+
+                  <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
+                    <p className="text-slate-300 font-bold">Ref: Section 32.2.1</p>
+                    <p className="text-blue-400">Legal 8.5" × 13"</p>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 font-mono">summaryofbidpr...</span>
+                  <button
+                    onClick={() => setShowSummaryBidPriceModal(true)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center gap-1"
+                  >
+                    <FileSignature className="w-3.5 h-3.5" />
+                    <span>Create</span>
+                  </button>
+                </div>
+              </div>
+
               {/* CARD 4: Bill of Quantities (BOQ) */}
               <div className="glass-card p-4 rounded-2xl border border-slate-800 hover:border-blue-500/50 transition space-y-3 flex flex-col justify-between">
                 <div className="space-y-2">
@@ -2912,6 +2986,18 @@ export const DocumentVaultView: React.FC = () => {
           activeProcuringEntity={activeProcuringEntity}
           onSaveAndComplete={handleSaveCompletedPriceScheduleGoods}
           onClose={() => setShowPriceScheduleGoodsModal(false)}
+        />
+      )}
+
+      {/* STATUTORY SUMMARY OF BID PRICES MODAL */}
+      {showSummaryBidPriceModal && (
+        <SummaryOfBidPriceModal
+          tenant={currentTenant}
+          activeProjectRefNo={activeProjectRefNo}
+          activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
+          onSaveAndComplete={handleSaveCompletedSummaryBidPrice}
+          onClose={() => setShowSummaryBidPriceModal(false)}
         />
       )}
 
