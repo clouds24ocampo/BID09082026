@@ -210,6 +210,7 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
 
   // Equipment Row Manipulations
   const handleAddEquipment = () => {
+    setNoEquipmentNeeded(false);
     const nextNo = equipments.length + 1;
     setEquipments(prev => [
       ...prev,
@@ -394,6 +395,13 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
                 >
                   <Truck className="w-3.5 h-3.5" />
                   <span>Add Logistics & Mobilization</span>
+                </button>
+                <button
+                  onClick={handleAddEquipment}
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 transition flex items-center gap-1"
+                >
+                  <HardHat className="w-3.5 h-3.5" />
+                  <span>Add Rental Equipment</span>
                 </button>
               </div>
             </div>
