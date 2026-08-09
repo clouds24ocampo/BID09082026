@@ -186,15 +186,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
           {/* Artemis Space Telemetry Badge */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-cyan-500/40 text-xs font-mono font-medium text-cyan-300 backdrop-blur-md shadow-[0_0_20px_rgba(6,182,212,0.2)]">
             <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-            <span>ARTEMIS DEEP SPACE TRAVERSAL LINK</span>
+            <span>Quantum Cloud Corp.</span>
           </div>
 
           <div className="space-y-3">
             <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
-              Quantum <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-500">Lunar</span>
+              Quantum <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-500">Cloud</span>
             </h1>
             <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
-              Philippine Public Bidding Management Platform engineered for high-precision government procurement across Goods, Infrastructure, and Consulting Services.
+              Philippine Public Bidding Management.
             </p>
           </div>
 
@@ -206,7 +206,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                 color: 'text-cyan-400',
                 bg: 'bg-cyan-500/10 border-cyan-500/20',
                 title: 'White-Label Branding Module',
-                desc: 'Instant company skinning (Logo, TIN, PCAB License, Brand Color) per corporate entity.'
+                desc: 'Instant company skinning (Logo, T.I.N., P.C.A.B. License,) per corporate entity.'
               },
               {
                 icon: FileCheck,

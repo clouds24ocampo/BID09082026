@@ -261,7 +261,7 @@ export const FormsDirectoryView: React.FC = () => {
         <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950/40 to-slate-900 border border-blue-500/40 space-y-4 shadow-xl">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1.5 flex-1">
-              <label className="block text-slate-200 font-mono text-xs font-bold flex items-center gap-2">
+              <label className="text-slate-200 font-mono text-xs font-bold flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-blue-400" />
                 <span>Select Active Bidding Opportunity from Opportunity Finder:</span>
               </label>

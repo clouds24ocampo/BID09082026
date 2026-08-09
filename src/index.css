@@ -27,10 +27,16 @@
   font-family: var(--font-legal) !important;
 }
 
+html, body, #root {
+  min-height: 100%;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: #0b0f19;
   color: #f1f5f9;
+  min-width: 320px;
+  overflow-x: hidden;
 }
 
 /* Keyframe Animations */
