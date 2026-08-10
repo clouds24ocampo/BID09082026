@@ -49,6 +49,15 @@ const parsePhpCurrency = (val: string): number => {
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 const isValidPhone = (phone: string) => /^[\d\+\-\s\(\)]{7,20}$/.test(phone.trim());
 
+const readFileAsDataUrl = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Unable to read file'));
+    reader.readAsDataURL(file);
+  });
+};
+
 export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => void }> = ({ setActiveTab }) => {
   const { currentTenant } = useAuth();
   const tenantId = currentTenant?.id || '';
@@ -342,8 +351,22 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSaveOpportunity = (e: React.FormEvent) => {
+  const handleSaveOpportunity = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (pdfFile && !pdfFileDataUrl) {
+      try {
+        const fileDataUrl = await readFileAsDataUrl(pdfFile);
+        setPdfFileDataUrl(fileDataUrl);
+      } catch (error) {
+        setErrors(prev => ({
+          ...prev,
+          pdfFile: 'Unable to load the selected PDF file. Please re-upload the document.'
+        }));
+        return;
+      }
+    }
+
     if (!validateForm()) return;
 
     const numBudget = parsePhpCurrency(approvedBudgetStr);
@@ -625,8 +648,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
         {/* DETAIL VIEW MODAL & 4 PDF ATTACHMENT SLOTS (100% SCREEN ADAPTED RESPONSIVE MODAL) */}
         {viewingItem && (
-          <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col p-2 sm:p-4 md:p-6 overflow-hidden animate-fadeIn">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full h-full max-w-[1800px] mx-auto shadow-2xl flex flex-col overflow-hidden">
+          <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto animate-fadeIn">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-h-[calc(100vh-3rem)] max-w-[1800px] mx-auto shadow-2xl flex flex-col overflow-hidden">
 
               {/* Modal Header Bar */}
               <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
@@ -837,10 +860,10 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
               </div>
 
               {/* Form Wrapping Scrollable Body & Fixed Footer */}
-              <form onSubmit={handleSaveOpportunity} className="flex-1 flex flex-col overflow-hidden">
+              <form onSubmit={handleSaveOpportunity} className="flex-1 flex flex-col overflow-hidden min-h-0">
 
                 {/* Scrollable Form Body */}
-                <div className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
+                <div className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1 min-h-0">
 
                   {/* If Editing, display Project Reference Number as PERMANENTLY LOCKED / READ-ONLY */}
                   {editingItem && (
@@ -1193,8 +1216,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
         {/* INLINE SLOT PDF PREVIEW MODAL (100% SCREEN ADAPTED RESPONSIVE MODAL) */}
         {previewPdfSlot && (
-          <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col p-2 sm:p-4 md:p-6 overflow-hidden animate-fadeIn">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full h-full max-w-[1800px] mx-auto shadow-2xl flex flex-col overflow-hidden">
+          <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto animate-fadeIn">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-h-[calc(100vh-3rem)] max-w-[1800px] mx-auto shadow-2xl flex flex-col overflow-hidden">
               <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
                 <div className="flex items-center gap-2">
                   <FileText className="w-5 h-5 text-blue-400" />

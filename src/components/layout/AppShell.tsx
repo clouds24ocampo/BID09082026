@@ -126,7 +126,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
                   v2.5
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 truncate max-w-[150px] sm:max-w-[200px]">
+              <p className="text-[10px] text-slate-400 truncate max-w-37.5 sm:max-w-50">
                 {currentTenant?.companyName}
               </p>
             </div>
@@ -164,7 +164,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
                 >
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.brandColor }} />
-                    <div className="truncate max-w-[180px]">
+                    <div className="truncate max-w-45">
                       <p className="font-medium text-white truncate">{t.companyName}</p>
                       <p className="text-[10px] text-slate-400">TIN: {t.tin}</p>
                     </div>

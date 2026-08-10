@@ -200,13 +200,13 @@ export const DocumentVaultView: React.FC = () => {
   const pdfDataCache = React.useRef<Record<string, string>>({});
   const [dbReady, setDbReady] = useState(false);
 
-  const storePdfData = (itemId: string, dataUrl: string | undefined) => {
-    if (dataUrl) {
-      pdfDataCache.current[itemId] = dataUrl;
-      // Persist to IndexedDB in background (200MB+ capacity)
-      savePdfData(itemId, dataUrl).catch(e =>
-        console.error('[VaultDB] Failed to persist PDF data:', e)
-      );
+  const storePdfData = async (itemId: string, dataUrl: string | undefined) => {
+    if (!dataUrl) return;
+    pdfDataCache.current[itemId] = dataUrl;
+    try {
+      await savePdfData(itemId, dataUrl);
+    } catch (e) {
+      console.error('[VaultDB] Failed to persist PDF data:', e);
     }
   };
 
@@ -235,19 +235,20 @@ export const DocumentVaultView: React.FC = () => {
         }
 
         if (!cancelled) {
-          setVaultItems(items);
-
-          // Pre-load PDF blobs from IndexedDB into in-memory cache
+          // Pre-load PDF blobs from IndexedDB into in-memory cache and attach them to item state
           let pdfLoadedCount = 0;
           for (const item of items) {
             try {
               const pdfData = await loadPdfDataFromDB(item.id);
               if (pdfData) {
                 pdfDataCache.current[item.id] = pdfData;
+                item.fileDataUrl = pdfData;
                 pdfLoadedCount++;
               }
             } catch (_) { /* skip items without PDF data */ }
           }
+
+          setVaultItems(items);
 
           // #region agent log
           debugLog('DocumentVaultView.tsx:loadFromDB', 'Vault load complete', {
@@ -621,6 +622,21 @@ export const DocumentVaultView: React.FC = () => {
   const [detailsTargetItem, setDetailsTargetItem] = useState<DocumentVaultItem | null>(null);
   const [previewPdfItem, setPreviewPdfItem] = useState<DocumentVaultItem | null>(null);
 
+  const openPreviewItem = async (item: DocumentVaultItem) => {
+    setPreviewPdfItem(item);
+    if (getPdfData(item.id)) return;
+
+    try {
+      const loaded = await loadPdfDataFromDB(item.id);
+      if (loaded) {
+        pdfDataCache.current[item.id] = loaded;
+        setPreviewPdfItem(prev => prev && prev.id === item.id ? { ...prev, fileDataUrl: loaded } : prev);
+      }
+    } catch (err) {
+      console.error('[VaultDB] Failed to load PDF data for preview:', err);
+    }
+  };
+
   // Edit Metadata State
   const [editTargetItem, setEditTargetItem] = useState<DocumentVaultItem | null>(null);
   const [editDocName, setEditDocName] = useState('');
@@ -813,7 +829,7 @@ export const DocumentVaultView: React.FC = () => {
     );
   };
 
-  const handleCompleteTemplate = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
+  const handleCompleteTemplate = async (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
     if (!fillingTemplateItem) return;
 
     const itemId = fillingTemplateItem.id;
@@ -850,7 +866,7 @@ export const DocumentVaultView: React.FC = () => {
       previousVersions: []
     };
 
-    storePdfData(newVaultDoc.id, fileDataUrl);
+    await storePdfData(newVaultDoc.id, fileDataUrl);
     setVaultItems(prev => [newVaultDoc, ...prev.filter(item => item.id !== newVaultDoc.id)]);
     setFillingTemplateItem(null);
     setTechSubTab('COMPLETED');
@@ -977,7 +993,7 @@ export const DocumentVaultView: React.FC = () => {
       previousVersions: []
     };
 
-    storePdfData(newItem.id, fileDataUrl);
+    await storePdfData(newItem.id, fileDataUrl);
     setVaultItems(prev => [newItem, ...prev.filter(item => item.id !== newItem.id)]);
     setUploadTargetDef(null);
     resetFormState();
@@ -1036,7 +1052,7 @@ export const DocumentVaultView: React.FC = () => {
       previousVersions: []
     };
 
-    storePdfData(newItem.id, fileDataUrl);
+    await storePdfData(newItem.id, fileDataUrl);
     setVaultItems(prev => [newItem, ...prev]);
     setShowCustomUploadModal(false);
     resetFormState();
@@ -1094,7 +1110,7 @@ export const DocumentVaultView: React.FC = () => {
       previousVersions: [archivedVersion, ...(replaceTargetItem.previousVersions || [])]
     };
 
-    storePdfData(updatedItem.id, fileDataUrl || replaceTargetItem.fileDataUrl);
+    await storePdfData(updatedItem.id, fileDataUrl || replaceTargetItem.fileDataUrl);
     setVaultItems(prev => prev.map(item => item.id === replaceTargetItem.id ? updatedItem : item));
     setReplaceTargetItem(null);
     resetFormState();
@@ -1455,7 +1471,7 @@ export const DocumentVaultView: React.FC = () => {
                             {isUploaded ? (
                               <>
                                 <button
-                                  onClick={() => setPreviewPdfItem(uploadedItem)}
+                                  onClick={() => openPreviewItem(uploadedItem)}
                                   className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-blue-500/30"
                                 >
                                   <Eye className="w-3.5 h-3.5" />
@@ -1560,7 +1576,7 @@ export const DocumentVaultView: React.FC = () => {
                         <td className="py-3.5 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
-                              onClick={() => setPreviewPdfItem(item)}
+                              onClick={() => openPreviewItem(item)}
                               className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-blue-500/30"
                             >
                               <Eye className="w-3.5 h-3.5" />
@@ -1972,7 +1988,7 @@ export const DocumentVaultView: React.FC = () => {
 
                             <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
                               <button
-                                onClick={() => setPreviewPdfItem(item)}
+                                onClick={() => openPreviewItem(item)}
                                 className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
                                 title="View completed PDF document"
                               >
@@ -2394,7 +2410,7 @@ export const DocumentVaultView: React.FC = () => {
 
                     <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => setPreviewPdfItem(item)}
+                        onClick={() => openPreviewItem(item)}
                         className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
                       >
                         <Eye className="w-3.5 h-3.5" />
