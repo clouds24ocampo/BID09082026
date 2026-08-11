@@ -1,0 +1,225 @@
+@import "tailwindcss";
+
+:root {
+  /* Default Tenant Theme */
+  --brand-primary: #1e40af;
+  --brand-primary-hover: #1e3a8a;
+
+  /* System Semantic Colors */
+  --color-success: #107c10;
+  --color-success-bg: rgba(16, 124, 16, 0.15);
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.15);
+  --color-danger: #ef4444;
+  --color-danger-bg: rgba(239, 68, 68, 0.15);
+  --color-info: #3b82f6;
+  --color-info-bg: rgba(59, 130, 246, 0.15);
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-legal: 'Cambria', 'Georgia', 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* Court / Legal Standard Cambria Typography Utility */
+.font-legal {
+  font-family: var(--font-legal) !important;
+}
+
+html, body, #root {
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #0b0f19;
+  color: #f1f5f9;
+  min-width: 320px;
+  overflow-x: hidden;
+}
+
+/* Keyframe Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+/* Custom Glassmorphism Cards */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: rgba(30, 41, 59, 0.6);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Dynamic Brand Utilities */
+.bg-brand-primary {
+  background-color: var(--brand-primary);
+}
+
+.bg-brand-primary:hover {
+  background-color: var(--brand-primary-hover);
+}
+
+.text-brand-primary {
+  color: var(--brand-primary);
+}
+
+.border-brand-primary {
+  border-color: var(--brand-primary);
+}
+
+.ring-brand-primary:focus {
+  --tw-ring-color: var(--brand-primary);
+}
+
+/* Status Badges */
+.badge-success {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-danger {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge-info {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* GLOBAL STRICT PRINT STYLES — EXPORT PLAIN DOCUMENTS ONLY (NO WEB APP UI) */
+@media print {
+  @page {
+    size: 8.5in 13in;
+    margin: 0.4in;
+  }
+
+  /* 1. Hide web app headers, sidebars, buttons, modal headers & toolbars */
+  header, 
+  nav, 
+  aside, 
+  button, 
+  .print\:hidden,
+  .no-print,
+  .no-export,
+  .proof-column,
+  .actions-column,
+  .sticky {
+    display: none !important;
+  }
+
+  /* 2. Reset document root and modal backgrounds so multi-page documents flow naturally */
+  html, body, #root, .fixed, .backdrop-blur-md, .bg-slate-900, .bg-slate-950 {
+    position: static !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* 3. Printable document paper sheets flow naturally with page breaks in Cambria Legal Font */
+  .print-document-sheet,
+  .single-page-paper,
+  .oss-legal-paper,
+  .bsd-legal-paper {
+    display: block !important;
+    position: relative !important;
+    font-family: var(--font-legal) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0.25in !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    page-break-after: always;
+    break-after: page;
+    overflow: visible !important;
+  }
+
+  .print-document-sheet:last-child,
+  .single-page-paper:last-child,
+  .oss-legal-paper:last-child,
+  .bsd-legal-paper:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+}
+
+/* Screen Mode: Force Cambria court font for printable sheets */
+.print-document-sheet,
+.single-page-paper {
+  font-family: var(--font-legal);
+}
+
