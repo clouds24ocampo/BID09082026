@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
+  Download,
   Edit3,
   Trash2,
   RefreshCw,
@@ -49,6 +50,22 @@ const parsePhpCurrency = (val: string): number => {
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 const isValidPhone = (phone: string) => /^[\d\+\-\s\(\)]{7,20}$/.test(phone.trim());
 
+const sanitizePhilgepsRefNo = (value: string): string => {
+  if (value === null || value === undefined) return '';
+  const digits = String(value).trim().match(/\d+/g);
+  return digits ? digits.join('') : '';
+};
+
+const sanitizeProjectTitle = (value: string): string => {
+  if (value === null || value === undefined) return '';
+
+  return String(value)
+    .replace(/\bproject\b/gi, ' ')
+    .replace(/[-–—:]/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
 const readFileAsDataUrl = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -56,6 +73,23 @@ const readFileAsDataUrl = (file: File): Promise<string> => {
     reader.onerror = () => reject(new Error('Unable to read file'));
     reader.readAsDataURL(file);
   });
+};
+
+const downloadFile = (fileName: string, dataUrl?: string, file?: File | null) => {
+  if (!fileName) return;
+  const href = dataUrl || (file ? URL.createObjectURL(file) : undefined);
+  if (!href) return;
+
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  if (file && href.startsWith('blob:')) {
+    URL.revokeObjectURL(href);
+  }
 };
 
 export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => void }> = ({ setActiveTab }) => {
@@ -122,6 +156,27 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
   // Validation Error States
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [projectMetadataLocked, setProjectMetadataLocked] = useState(false);
+
+  React.useEffect(() => {
+    const normalizedTitle = sanitizeProjectTitle(biddingProjectTitle);
+    if (!normalizedTitle) {
+      setProjectMetadataLocked(false);
+      return;
+    }
+
+    const match = opportunities.find(op => sanitizeProjectTitle(op.title) === normalizedTitle);
+    if (!match) {
+      setProjectMetadataLocked(false);
+      return;
+    }
+
+    setProjectMetadataLocked(true);
+    setPhilgepsRefNo(sanitizePhilgepsRefNo(match.philgepsRefNo));
+    setSolicitationNumber(match.solicitationNumber || '');
+    setProcuringEntityName(match.procuringEntity || '');
+    setDatePublished(match.datePublished || todayStr);
+  }, [biddingProjectTitle, opportunities, todayStr]);
 
   // Sync to localStorage
   React.useEffect(() => {
@@ -176,12 +231,12 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
   const handleOpenEditModal = (op: PhilGEPSOpportunity) => {
     setEditingItem(op);
-    setPhilgepsRefNo(op.philgepsRefNo);
+    setPhilgepsRefNo(sanitizePhilgepsRefNo(op.philgepsRefNo));
     setSolicitationNumber(op.solicitationNumber || `SOL-2026-${Math.floor(Math.random() * 8999 + 1000)}`);
     setAreaOfDelivery(op.areaOfDelivery || op.location || 'NCR, Philippines');
     setProjectReferenceNumber(op.projectReferenceNumber);
     setSector(op.sector || 'Government');
-    setBiddingProjectTitle(op.title);
+    setBiddingProjectTitle(sanitizeProjectTitle(op.title));
     setProcuringEntityName(op.procuringEntity);
     setProcuringEntityContactNumber(op.procuringEntityContactNumber || '');
     setProcuringEntityAddress(op.procuringEntityAddress || '');
@@ -294,8 +349,10 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
+    const normalizedRefNo = sanitizePhilgepsRefNo(philgepsRefNo);
+    const normalizedProjectTitle = sanitizeProjectTitle(biddingProjectTitle);
 
-    if (!philgepsRefNo.trim()) {
+    if (!normalizedRefNo) {
       newErrors.philgepsRefNo = 'PhilGEPS Reference Number is required.';
     }
 
@@ -303,9 +360,9 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
       newErrors.solicitationNumber = 'Solicitation Number is required.';
     }
 
-    if (!biddingProjectTitle.trim()) {
+    if (!normalizedProjectTitle) {
       newErrors.biddingProjectTitle = 'Bidding Project Title is required.';
-    } else if (biddingProjectTitle.length > 500) {
+    } else if (normalizedProjectTitle.length > 500) {
       newErrors.biddingProjectTitle = 'Title cannot exceed 500 characters.';
     }
 
@@ -370,18 +427,22 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     if (!validateForm()) return;
 
     const numBudget = parsePhpCurrency(approvedBudgetStr);
-    const trimmedRefNo = philgepsRefNo.trim();
+    const normalizedRefNo = sanitizePhilgepsRefNo(philgepsRefNo);
+    const normalizedProjectTitle = sanitizeProjectTitle(biddingProjectTitle);
+
+    setPhilgepsRefNo(normalizedRefNo);
+    setBiddingProjectTitle(normalizedProjectTitle);
 
     if (editingItem) {
       // Edit mode (Project Reference Number is read-only and preserved)
       const updatedOp: PhilGEPSOpportunity = {
         ...editingItem,
-        philgepsRefNo: trimmedRefNo.toUpperCase().startsWith('PHILGEPS-') ? trimmedRefNo.toUpperCase() : `PhilGEPS-${trimmedRefNo}`,
+        philgepsRefNo: normalizedRefNo,
         projectReferenceNumber: editingItem.projectReferenceNumber,
         solicitationNumber: solicitationNumber.trim(),
         areaOfDelivery: areaOfDelivery.trim() || procuringEntityAddress.trim(),
         sector,
-        title: biddingProjectTitle.trim(),
+        title: normalizedProjectTitle,
         procuringEntity: procuringEntityName.trim(),
         procuringEntityContactNumber: procuringEntityContactNumber.trim(),
         procuringEntityAddress: procuringEntityAddress.trim(),
@@ -407,12 +468,12 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
       const newOp: PhilGEPSOpportunity = {
         id: `op-${Date.now()}`,
-        philgepsRefNo: trimmedRefNo.toUpperCase().startsWith('PHILGEPS-') ? trimmedRefNo.toUpperCase() : `PhilGEPS-${trimmedRefNo}`,
+        philgepsRefNo: normalizedRefNo,
         projectReferenceNumber: generatedProjectId,
         solicitationNumber: solicitationNumber.trim(),
         areaOfDelivery: areaOfDelivery.trim() || procuringEntityAddress.trim(),
         sector,
-        title: biddingProjectTitle.trim(),
+        title: normalizedProjectTitle,
         procuringEntity: procuringEntityName.trim(),
         procuringEntityContactNumber: procuringEntityContactNumber.trim(),
         procuringEntityAddress: procuringEntityAddress.trim(),
@@ -432,7 +493,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         pdfFileDataUrl,
         status: 'OPEN',
         location: procuringEntityAddress.trim() || 'Philippines',
-        description: `${biddingProjectTitle.trim()} — Procured by ${procuringEntityName.trim()}`,
+        description: `${normalizedProjectTitle} — Procured by ${procuringEntityName.trim()}`,
         pdfAttachments: draftPdfAttachments
       };
 
@@ -623,6 +684,15 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     <FileText className="w-3.5 h-3.5" />
                     <span>View PhilGEPS PDF</span>
                   </button>
+
+                  <button
+                    onClick={() => downloadFile(op.pdfFileName || `${op.philgepsRefNo}_Notice.pdf`, op.pdfFileDataUrl)}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition text-xs font-semibold flex items-center gap-1 border border-slate-700/80"
+                    title="Download Official PhilGEPS PDF Notice Document"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download</span>
+                  </button>
                 </div>
 
                 <div className="flex items-center gap-1.5">
@@ -735,6 +805,14 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   >
                     <Eye className="w-4 h-4" />
                     <span>View Official PhilGEPS PDF</span>
+                  </button>
+
+                  <button
+                    onClick={() => downloadFile(viewingItem.pdfFileName || `${viewingItem.philgepsRefNo}_Notice.pdf`, viewingItem.pdfFileDataUrl)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs shadow-lg transition flex items-center justify-center gap-2 shrink-0"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Official PDF</span>
                   </button>
                 </div>
 
@@ -885,7 +963,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                         onChange={(e) => setPhilgepsRefNo(e.target.value)}
                         placeholder="e.g. 10928371"
                         required
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                        readOnly={projectMetadataLocked}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-75"
                       />
                       {errors.philgepsRefNo && <p className="text-[11px] text-red-400 mt-1">{errors.philgepsRefNo}</p>}
                     </div>
@@ -898,7 +977,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                         onChange={(e) => setSolicitationNumber(e.target.value)}
                         placeholder="e.g. SOL-2026-0912"
                         required
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                        readOnly={projectMetadataLocked}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-75"
                       />
                       {errors.solicitationNumber && <p className="text-[11px] text-red-400 mt-1">{errors.solicitationNumber}</p>}
                     </div>
@@ -941,6 +1021,11 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                       maxLength={500}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                     />
+                    {projectMetadataLocked && (
+                      <p className="mt-1 text-[11px] text-blue-300 font-medium">
+                        Matching opportunity detected. Project Ref. No., Procuring Entity, Solicitation No., and Date Published are auto-filled and locked.
+                      </p>
+                    )}
                   </div>
 
                   {/* Procuring Entity Details */}
@@ -958,7 +1043,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                           onChange={(e) => setProcuringEntityName(e.target.value)}
                           placeholder="e.g. Department of Information & Communications Technology"
                           required
-                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                          readOnly={projectMetadataLocked}
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-75"
                         />
                       </div>
 
@@ -1045,7 +1131,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                         value={datePublished}
                         onChange={(e) => setDatePublished(e.target.value)}
                         required
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                        readOnly={projectMetadataLocked}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-75"
                       />
                     </div>
                   </div>
@@ -1097,6 +1184,26 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                         <input type="file" accept=".pdf" onChange={handlePdfUpload} className="hidden" />
                       </label>
                     </div>
+
+                    {(pdfFileName || pdfFileDataUrl) && (
+                      <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPdfSlot({ title: 'Official PhilGEPS PDF Notice Document', fileName: pdfFileName || 'PhilGEPS_Notice.pdf', dataUrl: pdfFileDataUrl })}
+                          disabled={!pdfFileDataUrl}
+                          className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          <Eye className="w-3.5 h-3.5 inline-block mr-1" /> View
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => downloadFile(pdfFileName || 'PhilGEPS_Notice.pdf', pdfFileDataUrl, pdfFile)}
+                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold transition"
+                        >
+                          <Download className="w-3.5 h-3.5 inline-block mr-1" /> Download
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* INLINE 4 PDF ATTACHMENT SLOTS DURING CREATION / EDITING */}
@@ -1132,13 +1239,23 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
                             <div className="flex items-center gap-1 shrink-0">
                               {att && (
-                                <button
-                                  type="button"
-                                  onClick={() => setPreviewPdfSlot({ title: s.label, dataUrl: att.fileDataUrl, fileName: att.fileName })}
-                                  className="px-2 py-1 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white text-[10px] font-bold transition flex items-center gap-0.5 border border-blue-500/30"
-                                >
-                                  <Eye className="w-3 h-3" /> View
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewPdfSlot({ title: s.label, dataUrl: att.fileDataUrl, fileName: att.fileName })}
+                                    className="px-2 py-1 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white text-[10px] font-bold transition flex items-center gap-0.5 border border-blue-500/30"
+                                  >
+                                    <Eye className="w-3 h-3" /> View
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => downloadFile(att.fileName, att.fileDataUrl)}
+                                    className="px-2 py-1 rounded bg-slate-800 text-slate-200 hover:bg-slate-700 text-[10px] font-bold transition flex items-center gap-0.5 border border-slate-700/80"
+                                  >
+                                    <Download className="w-3 h-3" /> Download
+                                  </button>
+                                </>
                               )}
 
                               <label className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-bold transition cursor-pointer flex items-center gap-0.5">
@@ -1223,9 +1340,19 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   <FileText className="w-5 h-5 text-blue-400" />
                   <h3 className="text-sm font-bold text-white">{previewPdfSlot.title} — {previewPdfSlot.fileName}</h3>
                 </div>
-                <button onClick={() => setPreviewPdfSlot(null)} className="text-slate-400 hover:text-white p-1">
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => downloadFile(previewPdfSlot.fileName, previewPdfSlot.dataUrl)}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition flex items-center gap-1"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </button>
+                  <button onClick={() => setPreviewPdfSlot(null)} className="text-slate-400 hover:text-white p-1">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               <div className="p-6 overflow-y-auto flex-1 bg-slate-950 text-center">

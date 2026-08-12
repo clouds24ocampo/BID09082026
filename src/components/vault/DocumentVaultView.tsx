@@ -833,6 +833,19 @@ export const DocumentVaultView: React.FC = () => {
     if (!fillingTemplateItem) return;
 
     const itemId = fillingTemplateItem.id;
+    const projectRefToUse = projRefNo || activeProjectRefNo;
+    const projectTitleToUse = projTitle || activeProjectTitle;
+
+    if (projectRefToUse && hasTechnicalDocForActiveProject(fillingTemplateItem.code)) {
+      notifyFailure(
+        'Duplicate Technical Document Detected',
+        'This project already has a completed document for the selected item. No duplicate document was created.',
+        'Duplicate technical item for active project.'
+      );
+      setFillingTemplateItem(null);
+      return;
+    }
+
     if (!techCompletedIds.includes(itemId)) {
       setTechCompletedIds(prev => [...prev, itemId]);
     }
@@ -861,8 +874,8 @@ export const DocumentVaultView: React.FC = () => {
       requiresIssueDate: false,
       requiresExpiryDate: false,
       conditionalRuleNote: 'Completed GPPB Statutory Legal Template',
-      philgepsRefNo: projRefNo || undefined,
-      projectTitle: projTitle || undefined,
+      philgepsRefNo: projectRefToUse || undefined,
+      projectTitle: projectTitleToUse || undefined,
       previousVersions: []
     };
 
@@ -1141,6 +1154,18 @@ export const DocumentVaultView: React.FC = () => {
     !CLASS_A_MASTER_LIST.some(d => d.code === item.documentCode)
   );
 
+  const technicalItemsForActiveProject = vaultItems.filter(item =>
+    item.category === 'TECHNICAL' &&
+    activeProjectRefNo && item.philgepsRefNo === activeProjectRefNo
+  );
+
+  const hasTechnicalDocForActiveProject = (docCode: string) =>
+    !!activeProjectRefNo && vaultItems.some(item =>
+      item.category === 'TECHNICAL' &&
+      item.philgepsRefNo === activeProjectRefNo &&
+      item.documentCode === docCode
+    );
+
   const completedTechVaultItems = vaultItems.filter(item =>
     item.category === 'TECHNICAL' &&
     (selectedTechProjectFilter === 'ALL' || item.philgepsRefNo === selectedTechProjectFilter)
@@ -1287,7 +1312,7 @@ export const DocumentVaultView: React.FC = () => {
               <span>Select All</span>
             </button>
 
-            <div className="relative min-w-[220px]">
+            <div className="relative min-w-55">
               <input
                 type="text"
                 value={searchQuery}
@@ -1654,6 +1679,38 @@ export const DocumentVaultView: React.FC = () => {
             </span>
           </div>
 
+          {oppProjects.length > 0 && (
+            <div className="p-4 rounded-2xl border border-slate-800 bg-slate-950/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <p className="text-[11px] text-slate-400 font-mono">Active Bidding Project Scope</p>
+                <h4 className="text-sm font-bold text-white">
+                  [{activeProjectRefNo}] {activeProjectTitle || 'Select a Project'}
+                </h4>
+                <p className="text-[11px] text-slate-500">{activeProcuringEntity}</p>
+              </div>
+              <div className="min-w-65">
+                <label className="block text-slate-300 text-[11px] font-medium mb-1">Select project for technical documents</label>
+                <select
+                  value={activeProjectRefNo}
+                  onChange={(e) => {
+                    const selectedRef = e.target.value;
+                    const match = oppProjects.find(p => p.refNo === selectedRef);
+                    setActiveProjectRefNo(selectedRef);
+                    setActiveProjectTitle(match?.title || 'Selected Opportunity');
+                    setActiveProcuringEntity(match?.procuringEntity || 'Government Agency');
+                  }}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                >
+                  {oppProjects.map((project) => (
+                    <option key={project.id} value={project.refNo}>
+                      [{project.refNo}] {project.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           {/* SUB-TAB 1: TECHNICAL DOCUMENTS CHECKLIST */}
           {techSubTab === 'CHECKLIST' && (
             <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl space-y-0">
@@ -1669,6 +1726,14 @@ export const DocumentVaultView: React.FC = () => {
                 {TECHNICAL_CHECKLIST_MASTER.map((item) => {
                   const isCompleted = techCompletedIds.includes(item.id);
                   const isExpanded = expandedTechItems.includes(item.id);
+                  const isProjectScoped = !!activeProjectRefNo;
+                  const projectDocExists = isProjectScoped && hasTechnicalDocForActiveProject(item.code);
+                  const canCreateForm = isProjectScoped && !projectDocExists;
+                  const createTooltip = !activeProjectRefNo
+                    ? 'Select or tag a bidding project before generating a technical exhibit.'
+                    : projectDocExists
+                      ? 'A completed technical document for this project already exists.'
+                      : 'Create and save the completed legal template for this item.';
 
                   return (
                     <div key={item.id} className="bg-slate-950/60 hover:bg-slate-900/50 transition">
@@ -1712,28 +1777,34 @@ export const DocumentVaultView: React.FC = () => {
                         {/* Actions */}
                         <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                           <button
-                            onClick={() => setFillingTemplateItem({ id: item.id, code: item.code, name: item.name })}
-                            className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
-                          >
-                            <FileSignature className="w-3.5 h-3.5" />
-                            <span>Create Form</span>
-                          </button>
+                              type="button"
+                              onClick={() => setFillingTemplateItem({ id: item.id, code: item.code, name: item.name })}
+                              disabled={!canCreateForm}
+                              title={createTooltip}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 border transition ${canCreateForm
+                                ? 'bg-blue-600/20 text-blue-400 border-blue-500/30 hover:bg-blue-600 hover:text-white'
+                                : 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
+                              }`}
+                            >
+                              <FileSignature className="w-3.5 h-3.5" />
+                              <span>{projectDocExists ? 'Already Created' : 'Create Form'}</span>
+                            </button>
 
-                          <button
-                            onClick={() => {
-                              resetFormState();
-                              setCustomDocName(`Item ${item.code} — ${item.name}`);
-                              setCustomUploadCategory('TECHNICAL');
-                              setShowCustomUploadModal(true);
-                            }}
-                            className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30"
-                          >
-                            <Upload className="w-3.5 h-3.5" />
-                            <span>Upload PDF</span>
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                resetFormState();
+                                setCustomDocName(`Item ${item.code} — ${item.name}`);
+                                setCustomUploadCategory('TECHNICAL');
+                                setShowCustomUploadModal(true);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>Upload PDF</span>
+                            </button>
+                          </div>
                         </div>
-
-                      </div>
 
                       {/* Expandable Sub-Items Section for Item (f) */}
                       {item.isExpandable && isExpanded && item.subItems && (
@@ -1768,11 +1839,22 @@ export const DocumentVaultView: React.FC = () => {
                                   </div>
 
                                   <button
+                                    type="button"
                                     onClick={() => setFillingTemplateItem({ id: sub.id, code: sub.code, name: sub.name })}
-                                    className="px-2.5 py-1 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-[11px] font-semibold flex items-center gap-1 border border-blue-500/30 shrink-0"
+                                    disabled={!activeProjectRefNo || hasTechnicalDocForActiveProject(sub.code)}
+                                    title={!activeProjectRefNo
+                                      ? 'Select a bidding project before generating this form.'
+                                      : hasTechnicalDocForActiveProject(sub.code)
+                                        ? 'A completed technical document for this project already exists.'
+                                        : 'Create and save the completed legal template for this item.'
+                                    }
+                                    className={`px-2.5 py-1 rounded text-[11px] font-semibold flex items-center gap-1 border transition ${activeProjectRefNo && !hasTechnicalDocForActiveProject(sub.code)
+                                      ? 'bg-blue-600/20 text-blue-400 border-blue-500/30 hover:bg-blue-600 hover:text-white'
+                                      : 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
+                                    } shrink-0`}
                                   >
                                     <FileSignature className="w-3 h-3" />
-                                    <span>Create Form</span>
+                                    <span>{hasTechnicalDocForActiveProject(sub.code) ? 'Already Created' : 'Create Form'}</span>
                                   </button>
                                 </div>
                               );
@@ -2051,7 +2133,7 @@ export const DocumentVaultView: React.FC = () => {
 
           {/* SECTION SEPARATOR BANNER FOR ORGANIZED VIEW */}
           {selectedCategory === 'ALL' && (
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950/40 to-slate-900 border border-blue-500/30 flex items-center justify-between flex-wrap gap-3 shadow-lg">
+            <div className="p-4 rounded-2xl bg-linear-to-r from-slate-900 via-blue-950/40 to-slate-900 border border-blue-500/30 flex items-center justify-between flex-wrap gap-3 shadow-lg">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
                   <Layers className="w-5 h-5" />

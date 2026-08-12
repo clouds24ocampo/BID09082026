@@ -495,9 +495,9 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-white font-mono flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-blue-400" />
-                Target Bidding Project Auto-Fill Settings (Linked to Opportunity Finder)
+                Project Information (Read-Only / Auto-Filled from Opportunity Finder)
               </span>
-              <span className="text-[10px] text-slate-400 font-mono">Changes auto-fill directly onto Legal Template header below</span>
+              <span className="text-[10px] text-slate-400 font-mono">Values below are pulled from the selected project and locked for consistency.</span>
             </div>
 
             {/* Opportunity Finder Project Dropdown */}
@@ -539,60 +539,21 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
               </select>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs pt-1 border-t border-slate-800/80">
-              <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1">1. Project Ref. No</label>
-                <input
-                  type="text"
-                  value={projectRefNo}
-                  onChange={(e) => setProjectRefNo(e.target.value)}
-                  placeholder="Select from Opportunity Finder"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1">2. Solicitation No.</label>
-                <input
-                  type="text"
-                  value={solicitationNumber}
-                  onChange={(e) => setSolicitationNumber(e.target.value)}
-                  placeholder="e.g. SOL-2026-001"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1">3. Name of Project</label>
-                <input
-                  type="text"
-                  value={projectTitle}
-                  onChange={(e) => setProjectTitle(e.target.value)}
-                  placeholder="Select from Opportunity Finder"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-semibold focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1">4. Procuring Entity</label>
-                <input
-                  type="text"
-                  value={procuringEntity}
-                  onChange={(e) => setProcuringEntity(e.target.value)}
-                  placeholder="Select from Opportunity Finder"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1">5. Date & Time of Submission</label>
-                <input
-                  type="datetime-local"
-                  value={dateTimeSubmitted}
-                  onChange={(e) => setDateTimeSubmitted(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono text-[11px] focus:outline-none focus:border-blue-500"
-                />
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 text-xs pt-1 border-t border-slate-800/80">
+              {[
+                { label: '1. Philgeps Ref No.', value: projectRefNo || 'Not selected' },
+                { label: '2. Solicitation No.', value: solicitationNumber || 'N/A' },
+                { label: '3. Name of Project', value: projectTitle || 'Not selected' },
+                { label: '4. Procuring Entity', value: procuringEntity || 'Not selected' },
+                { label: '5. Date & Time of Submission', value: dateTimeSubmitted ? formatDateTimeDisplay(dateTimeSubmitted) : 'N/A' }
+              ].map(item => (
+                <div key={item.label} className="bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-2">
+                  <div className="block text-slate-400 font-mono text-[10px] mb-1">{item.label}</div>
+                  <div className="text-white font-mono font-bold text-[11px] break-words [overflow-wrap:anywhere]">
+                    {item.value}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -659,7 +620,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
               {/* TEMPLATE HEADER: Auto-Populated Fields */}
               <div className="border-b-2 border-slate-900 pb-3 space-y-2">
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
-                  <span>PROJECT REF. NO: <strong className="text-blue-950 font-extrabold">{projectRefNo || 'UNLINKED (Select Project)'}</strong></span>
+                  <span>Philgeps Ref No.: <strong className="text-blue-950 font-extrabold">{projectRefNo || 'UNLINKED (Select Project)'}</strong></span>
                   <span>SOLICITATION NO: <strong className="text-blue-950 font-extrabold">{solicitationNumber || 'N/A'}</strong></span>
                 </div>
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">

@@ -865,32 +865,23 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-2 border-t border-slate-800">
-              <div>
-                <label className="block text-slate-400 font-medium mb-1">Project Ref. No.</label>
-                <input
-                  type="text"
-                  value={projectRefNo}
-                  onChange={(e) => setProjectRefNo(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
-                />
+              <div className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2">
+                <label className="block text-slate-400 font-medium mb-1">Philgeps Ref No.</label>
+                <div className="text-white font-mono font-bold break-words [overflow-wrap:anywhere]">
+                  {projectRefNo || 'Not selected'}
+                </div>
               </div>
-              <div>
+              <div className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2">
                 <label className="block text-slate-400 font-medium mb-1">Project Title</label>
-                <input
-                  type="text"
-                  value={projectTitle}
-                  onChange={(e) => setProjectTitle(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                />
+                <div className="text-white font-bold break-words [overflow-wrap:anywhere]">
+                  {projectTitle || 'Not selected'}
+                </div>
               </div>
-              <div>
+              <div className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2">
                 <label className="block text-slate-400 font-medium mb-1">Procuring Entity</label>
-                <input
-                  type="text"
-                  value={procuringEntity}
-                  onChange={(e) => setProcuringEntity(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                />
+                <div className="text-white font-bold break-words [overflow-wrap:anywhere]">
+                  {procuringEntity || 'Not selected'}
+                </div>
               </div>
             </div>
 
@@ -1008,7 +999,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                   <div className="border-b-2 border-slate-900 pb-3 font-mono text-[11px] text-slate-950 font-bold mb-4 relative">
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1 z-10">
-                        <div>PROJECT REF. NO: <strong className="text-blue-950">{projectRefNo}</strong></div>
+                        <div>Philgeps Ref No.: <strong className="text-blue-950">{projectRefNo}</strong></div>
                         <div>NAME OF PROJECT: <strong className="text-slate-950">{projectTitle}</strong></div>
                         <div>PROCURING ENTITY: <strong className="text-slate-950">{procuringEntity}</strong></div>
                       </div>
@@ -1063,7 +1054,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                   <div className="space-y-4 text-xs font-serif text-slate-900 leading-relaxed font-normal pt-2">
                     <div className="border-b-2 border-slate-900 pb-3 space-y-1 font-mono text-[11px] text-slate-950 font-bold mb-4">
                       <div className="flex items-center justify-between">
-                        <span>PROJECT REF. NO: <strong className="text-blue-950">{projectRefNo}</strong></span>
+                        <span>Philgeps Ref No.: <strong className="text-blue-950">{projectRefNo}</strong></span>
                         <span>DATE: <strong>{todayStr}</strong></span>
                       </div>
                       <div>
@@ -1446,7 +1437,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                     <div className="border-b-2 border-slate-900 pb-3 font-mono text-[11px] text-slate-950 font-bold mb-4 relative flex items-center justify-between">
                       {/* Left Info */}
                       <div className="space-y-1 z-10 text-left max-w-[32%] leading-tight">
-                        <div>PROJECT REF. NO: <strong className="text-blue-950">{projectRefNo}</strong></div>
+                        <div>Philgeps Ref No.: <strong className="text-blue-950">{projectRefNo}</strong></div>
                         <div>NAME OF PROJECT: <strong className="text-slate-950">{projectTitle}</strong></div>
                         <div>PROCURING ENTITY: <strong className="text-slate-950">{procuringEntity}</strong></div>
                       </div>
@@ -1856,7 +1847,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                 <div className="space-y-4 text-xs font-serif text-slate-900 leading-relaxed font-normal pt-2">
                   <div className="border-b-2 border-slate-900 pb-3 space-y-1 font-mono text-[11px] text-slate-950 font-bold mb-4">
                     <div className="flex items-center justify-between">
-                      <span>PROJECT REF. NO: <strong className="text-blue-950">{projectRefNo}</strong></span>
+                      <span>Philgeps Ref No.: <strong className="text-blue-950">{projectRefNo}</strong></span>
                       <span>DATE: <strong>{todayStr}</strong></span>
                     </div>
                     <div>
@@ -1980,7 +1971,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                 <div className="space-y-4 text-xs font-serif text-slate-900 leading-relaxed font-normal pt-2">
                   <div className="border-b-2 border-slate-900 pb-3 space-y-1 font-mono text-[11px] text-slate-950 font-bold mb-4">
                     <div className="flex items-center justify-between">
-                      <span>PROJECT REF. NO: <strong className="text-blue-950">{projectRefNo}</strong></span>
+                      <span>Philgeps Ref No.: <strong className="text-blue-950">{projectRefNo}</strong></span>
                       <span>PAGE 2 OF 2 • DATE: <strong>{todayStr}</strong></span>
                     </div>
                     <div>

@@ -1,5 +1,24 @@
 import { debugLog } from './debugLog';
 
+export const normalizePhilgepsRefNo = (value: string | number | null | undefined): string => {
+  if (value === null || value === undefined) return '';
+  const raw = String(value).trim();
+  if (!raw) return '';
+
+  const digits = raw.match(/\d+/g);
+  return digits ? digits.join('') : '';
+};
+
+export const normalizeProjectTitle = (value: string | null | undefined): string => {
+  if (value === null || value === undefined) return '';
+
+  return String(value)
+    .replace(/\bproject\b/gi, ' ')
+    .replace(/[-–—:]/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
 export interface OpportunityProjectOption {
   id: string;
   refNo: string;
@@ -90,11 +109,16 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
           formattedDateTime = `${today}T14:00`;
         }
 
+        const explicitPhilgepsRefNo = item.philgepsRefNo || item.refNo || '';
+        const projectReferenceValue = item.projectReferenceNumber || item.refNo || `PRJ-${idx + 1}`;
+        const normalizedRefNo = explicitPhilgepsRefNo ? normalizePhilgepsRefNo(explicitPhilgepsRefNo) : projectReferenceValue;
+        const normalizedTitle = normalizeProjectTitle(item.title || item.biddingProjectTitle || 'Untitled Opportunity') || 'Untitled Opportunity';
+
         return {
           id: item.id || `opp-stg-${idx}`,
-          refNo: item.projectReferenceNumber || item.philgepsRefNo || item.refNo || `PRJ-${idx + 1}`,
+          refNo: normalizedRefNo,
           solicitationNo: item.solicitationNumber || item.solicitationNo || 'N/A',
-          title: item.title || item.biddingProjectTitle || 'Untitled Opportunity',
+          title: normalizedTitle,
           procuringEntity: typeof item.procuringEntity === 'string'
             ? item.procuringEntity
             : item.procuringEntity?.name || item.procuringEntityName || 'Government Agency',

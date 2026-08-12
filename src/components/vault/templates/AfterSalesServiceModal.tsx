@@ -312,9 +312,9 @@ export const AfterSalesServiceModal: React.FC<AfterSalesServiceModalProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-white font-mono flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-blue-400" />
-                Target Bidding Project Auto-Fill Settings (Linked to Opportunity Finder)
+                Project Information (Read-Only / Auto-Filled from Opportunity Finder)
               </span>
-              <span className="text-[10px] text-slate-400 font-mono">Changes auto-fill directly onto Legal Template header below</span>
+              <span className="text-[10px] text-slate-400 font-mono">Values are pulled from the selected project and locked for consistency.</span>
             </div>
 
             <div>
@@ -358,50 +358,20 @@ export const AfterSalesServiceModal: React.FC<AfterSalesServiceModalProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs pt-1 border-t border-slate-800/80">
-              <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1 font-bold text-blue-400">Bid Reference No.</label>
-                <input
-                  type="text"
-                  value={bidRefNo}
-                  onChange={(e) => { setBidRefNo(e.target.value); setProjectRefNo(e.target.value); saveState(); }}
-                  placeholder="12795242"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
-                />
-              </div>
+              {[
+                { label: 'Bid Reference No.', value: bidRefNo || projectRefNo || 'Not selected', className: 'text-blue-400' },
+                { label: 'Solicitation No.', value: solicitationNo || 'N/A', className: 'text-purple-400' },
+                { label: 'Document Date', value: docDate || 'N/A', className: 'text-emerald-400' },
+                { label: 'Project Submission Date', value: signatoryDate || 'N/A', className: 'text-amber-400' }
+              ].map((item) => (
+                <div key={item.label} className="bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-2">
+                  <div className={`block text-slate-400 font-mono text-[10px] mb-1 font-bold ${item.className}`}>{item.label}</div>
+                  <div className="text-white font-mono font-bold text-[11px] break-words [overflow-wrap:anywhere]">{item.value}</div>
+                </div>
+              ))}
+            </div>
 
-              <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1 font-bold text-purple-400">Solicitation No.</label>
-                <input
-                  type="text"
-                  value={solicitationNo}
-                  onChange={(e) => { setSolicitationNo(e.target.value); saveState(); }}
-                  placeholder="2025-12-4162-MO"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1 font-bold text-emerald-400">Document Date</label>
-                <input
-                  type="text"
-                  value={docDate}
-                  onChange={(e) => { setDocDate(e.target.value); saveState(); }}
-                  placeholder="March 9, 2026"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 font-mono text-[10px] mb-1 font-bold text-amber-400">Project Submission Date</label>
-                <input
-                  type="text"
-                  value={signatoryDate}
-                  onChange={(e) => { setSignatoryDate(e.target.value); saveState(); }}
-                  placeholder="MARCH 19, 2026"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500 uppercase"
-                />
-              </div>
-
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs pt-1 border-t border-slate-800/80">
               <div>
                 <label className="block text-slate-400 font-mono text-[10px] mb-1">Company Signatory Name</label>
                 <input
@@ -424,19 +394,11 @@ export const AfterSalesServiceModal: React.FC<AfterSalesServiceModalProps> = ({
                 />
               </div>
 
-              <div>
+              <div className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2">
                 <label className="block text-slate-400 font-mono text-[10px] mb-1">Procuring Entity</label>
-                <input
-                  type="text"
-                  value={procuringEntity}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setProcuringEntity(val);
-                    setSalutation(`Dear ${val}:`);
-                    saveState();
-                  }}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-blue-500"
-                />
+                <div className="text-white font-mono font-bold break-words [overflow-wrap:anywhere]">
+                  {procuringEntity || 'Not selected'}
+                </div>
               </div>
 
               <div>

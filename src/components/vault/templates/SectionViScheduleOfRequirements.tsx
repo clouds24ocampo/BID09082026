@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
+import { PDFDocument } from 'pdf-lib';
 import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import html2canvas from 'html2canvas';
@@ -254,6 +255,41 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     }
   };
 
+  const renderSectionViPdfDataUrl = async (templateElem: HTMLElement): Promise<string | undefined> => {
+    const canvas = await html2canvas(templateElem, {
+      scale: 2.5,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      ignoreElements: (element: Element) => {
+        return (
+          element.classList.contains('print:hidden') ||
+          element.classList.contains('no-export') ||
+          element.tagName === 'BUTTON'
+        );
+      }
+    });
+
+    const imgDataUrl = canvas.toDataURL('image/png');
+    const pdfDoc = await PDFDocument.create();
+    const pngImage = await pdfDoc.embedPng(imgDataUrl);
+    const page = pdfDoc.addPage([canvas.width, canvas.height]);
+    page.drawImage(pngImage, {
+      x: 0,
+      y: 0,
+      width: canvas.width,
+      height: canvas.height
+    });
+
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
   const handleExportExcel = () => {
     const cleanProj = (projectRefNo || 'PRJ').replace(/[^a-zA-Z0-9]/g, '_');
     const fileName = `${cleanProj}_Section_VI_Schedule_of_Requirements_${todayStr}.csv`;
@@ -262,7 +298,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     csvContent += `"SECTION VI. SCHEDULE OF REQUIREMENTS"\n`;
     csvContent += `"Company Name:","${companyName.replace(/"/g, '""')}"\n`;
     csvContent += `"Company Address:","${companyAddress.replace(/"/g, '""')}"\n`;
-    csvContent += `"Project Ref. No.:","${projectRefNo.replace(/"/g, '""')}"\n`;
+    csvContent += `"Philgeps Ref No.:","${projectRefNo.replace(/"/g, '""')}"\n`;
     csvContent += `"Solicitation No.:","${solicitationNumber.replace(/"/g, '""')}"\n`;
     csvContent += `"Project Title:","${projectTitle.replace(/"/g, '""')}"\n`;
     csvContent += `"Procuring Entity:","${procuringEntity.replace(/"/g, '""')}"\n`;
@@ -297,24 +333,13 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       const templateElem = document.getElementById('section-vi-paper') as HTMLElement;
       let dataUrl: string | undefined = undefined;
       if (templateElem) {
-        const canvas = await html2canvas(templateElem, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          ignoreElements: (element: Element) => {
-            return (
-              element.classList.contains('print:hidden') ||
-              element.classList.contains('no-export') ||
-              element.tagName === 'BUTTON'
-            );
-          }
-        });
-        dataUrl = canvas.toDataURL('image/png');
+        dataUrl = await renderSectionViPdfDataUrl(templateElem);
       }
       if (onSaveAndComplete) {
         onSaveAndComplete(dataUrl, item.name, projectRefNo, projectTitle);
       }
-    } catch {
+    } catch (error) {
+      console.error('Failed to generate Section VI PDF:', error);
       if (onSaveAndComplete) {
         onSaveAndComplete(undefined, item.name, projectRefNo, projectTitle);
       }
@@ -534,7 +559,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                 <div className="space-y-1.5 text-xs font-serif text-black pt-1">
                   <div className="flex items-center justify-between gap-6">
                     <div>
-                      <span className="font-bold">PROJECT REF. NO: </span>
+                      <span className="font-bold">Philgeps Ref No.: </span>
                       <span className="font-mono font-semibold text-blue-950">{projectRefNo || 'N/A'}</span>
                     </div>
                     <div className="text-right">

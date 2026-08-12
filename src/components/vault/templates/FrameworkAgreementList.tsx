@@ -363,7 +363,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     csvContent += `"FRAMEWORK AGREEMENT LIST & TECHNICAL SPECIFICATIONS (PAGE 1 & PAGE 2)"\n`;
     csvContent += `"Company Name:","${companyName.replace(/"/g, '""')}"\n`;
     csvContent += `"Company Address:","${companyAddress.replace(/"/g, '""')}"\n`;
-    csvContent += `"Project Ref. No.:","${projectRefNo.replace(/"/g, '""')}"\n`;
+    csvContent += `"Philgeps Ref No.:","${projectRefNo.replace(/"/g, '""')}"\n`;
     csvContent += `"Solicitation No.:","${solicitationNumber.replace(/"/g, '""')}"\n`;
     csvContent += `"Project Title:","${projectTitle.replace(/"/g, '""')}"\n`;
     csvContent += `"Procuring Entity:","${procuringEntity.replace(/"/g, '""')}"\n`;
@@ -697,7 +697,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                 <div className="space-y-1.5 text-xs font-serif text-black pt-1">
                   <div className="flex items-center justify-between gap-6">
                     <div>
-                      <span className="font-bold">PROJECT REF. NO: </span>
+                      <span className="font-bold">Philgeps Ref No.: </span>
                       <span className="font-mono font-semibold text-blue-950">{projectRefNo || 'N/A'}</span>
                     </div>
                     <div className="text-right">
@@ -904,7 +904,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                 <div className="space-y-1.5 text-xs font-serif text-black pt-1">
                   <div className="flex items-center justify-between gap-6">
                     <div>
-                      <span className="font-bold">PROJECT REF. NO: </span>
+                      <span className="font-bold">Philgeps Ref No.: </span>
                       <span className="font-mono font-semibold text-blue-950">{projectRefNo || 'N/A'}</span>
                     </div>
                     <div className="text-right">

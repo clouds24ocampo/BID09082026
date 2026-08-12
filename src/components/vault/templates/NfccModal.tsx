@@ -240,10 +240,10 @@ export const NfccModal: React.FC<NfccModalProps> = ({
         {/* ── SETTINGS CONTROL BAR ──────────────────────────────────────────── */}
         <div className="p-4 border-b border-slate-800 bg-slate-900 space-y-3 print:hidden no-export">
 
-          {/* Opportunity Finder Selector */}
+          {/* Project selector */}
           <div>
             <label className="block text-slate-300 font-mono text-[11px] mb-1 font-bold text-emerald-300">
-              Select Project from Opportunity Finder:
+              Select Project from Opportunity Finder (Auto-fills locked project information):
             </label>
             <select
               value={selectedOppId}
@@ -279,31 +279,21 @@ export const NfccModal: React.FC<NfccModalProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs pt-1 border-t border-slate-800/80">
-            <div>
-              <label className="block text-slate-400 font-mono text-[10px] mb-1 font-bold text-emerald-400">Project Reference No.</label>
-              <input type="text" value={projectRefNo} onChange={(e) => { setProjectRefNo(e.target.value); saveState(); }}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-emerald-500" />
-            </div>
-            <div>
-              <label className="block text-slate-400 font-mono text-[10px] mb-1 font-bold text-teal-400">Solicitation No.</label>
-              <input type="text" value={solicitationNo} onChange={(e) => { setSolicitationNo(e.target.value); saveState(); }}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-emerald-500" />
-            </div>
+            {[
+              { label: 'Project Reference No.', value: projectRefNo || 'Not selected', className: 'text-emerald-400' },
+              { label: 'Solicitation No.', value: solicitationNo || 'N/A', className: 'text-teal-400' },
+              { label: 'Signatory / Submission Date', value: signatoryDate || 'N/A', className: 'text-amber-400' },
+              { label: 'Name of Project', value: projectTitle || 'Not selected', className: 'text-cyan-400' }
+            ].map((item) => (
+              <div key={item.label} className="bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-2">
+                <div className={`block text-slate-400 font-mono text-[10px] mb-1 font-bold ${item.className}`}>{item.label}</div>
+                <div className="text-white font-mono font-bold text-[11px] break-words [overflow-wrap:anywhere]">{item.value}</div>
+              </div>
+            ))}
             <div>
               <label className="block text-slate-400 font-mono text-[10px] mb-1">Standard Form No.</label>
               <input type="text" value={standardFormNo} onChange={(e) => { setStandardFormNo(e.target.value); saveState(); }}
                 placeholder="e.g. SF-NFCC-2026"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-emerald-500" />
-            </div>
-            <div>
-              <label className="block text-slate-400 font-mono text-[10px] mb-1 font-bold text-amber-400">Signatory / Submission Date</label>
-              <input type="text" value={signatoryDate} onChange={(e) => { setSignatoryDate(e.target.value); saveState(); }}
-                placeholder="MARCH 19, 2026"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-emerald-500 uppercase" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-slate-400 font-mono text-[10px] mb-1">Name of Project</label>
-              <input type="text" value={projectTitle} onChange={(e) => { setProjectTitle(e.target.value); saveState(); }}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono font-bold focus:outline-none focus:border-emerald-500" />
             </div>
             <div>
