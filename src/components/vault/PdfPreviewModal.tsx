@@ -156,7 +156,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
             <div className="space-y-3 max-w-[850px] mx-auto">
               <div className="inline-flex items-center gap-2 text-xs text-slate-400 bg-slate-900/90 px-3.5 py-1 rounded-full border border-slate-800 font-mono">
                 <FileText className="w-3.5 h-3.5 text-blue-400" />
-                <span>ORIGINAL UPLOADED DOCUMENT CONTENT (Legal 8.5" × 13" Fit-to-Page)</span>
+                <span>ORIGINAL UPLOADED DOCUMENT CONTENT (Legal 13" × 8.5" Fit-to-Page)</span>
               </div>
 
               {effectiveDataUrl ? (
@@ -169,7 +169,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
                     />
                   </div>
                 ) : (
-                  <div className="w-full min-h-[850px] h-[85vh] rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-900 shadow-2xl mx-auto p-1">
+                  <div className="w-full min-h-[760px] h-[82vh] rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-900 shadow-2xl mx-auto p-1">
                     <iframe
                       src={pdfBlobUrl || effectiveDataUrl}
                       title={item.documentName}
@@ -178,7 +178,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
                   </div>
                 )
               ) : (
-                <div className="w-full aspect-[8.5/13] max-w-[850px] min-h-[650px] border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900 text-slate-100 p-8 flex flex-col items-center justify-center space-y-4 shadow-2xl mx-auto">
+                <div className="w-full aspect-[13/8.5] max-w-[1150px] min-h-[760px] border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900 text-slate-100 p-6 flex flex-col items-center justify-center space-y-4 shadow-2xl mx-auto">
                   <FileText className="w-16 h-16 text-blue-400 opacity-90 mx-auto" />
                   <div className="space-y-2 text-center">
                     <h4 className="text-base font-black uppercase text-white">{item.documentName}</h4>

@@ -101,14 +101,14 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({ item, tena
   });
 
   return (
-    <div className="print-document-sheet w-full bg-white text-slate-900 font-legal p-6 sm:p-10 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-6 max-w-[650px] min-h-[950px] aspect-[8.5/13] mx-auto my-4 text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none print:break-inside-avoid print:page-break-inside-avoid">
+    <div className="print-document-sheet w-full bg-white text-slate-900 font-legal p-3 sm:p-5 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1260px] min-h-[740px] aspect-[13/8.5] mx-auto my-4 text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none print:break-inside-avoid print:page-break-inside-avoid">
       
       {/* Outer Border Frame */}
-      <div className="absolute inset-3 border-2 border-blue-950 pointer-events-none rounded-xl" />
+      <div className="absolute inset-2.5 border-2 border-blue-950 pointer-events-none rounded-xl" />
 
       {/* HEADER SECTION: Logo, Company Name, Address, Email, Contact Number */}
-      <div className="space-y-6">
-        <div className="border-b-4 border-blue-900 pb-5 flex items-center justify-between gap-4">
+      <div className="space-y-4">
+        <div className="border-b-4 border-blue-900 pb-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             {/* Company Logo / Brand Badge */}
             <div className="w-14 h-14 rounded-xl bg-blue-950 text-white flex items-center justify-center font-black text-2xl shadow-md shrink-0 overflow-hidden p-1 border border-slate-900">
@@ -153,7 +153,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({ item, tena
         </div>
 
         {/* PROJECT & COMPANY INFORMATION BLOCK */}
-        <div className="p-5 rounded-xl bg-slate-50 border-2 border-slate-300 space-y-3 text-xs">
+        <div className="p-4 rounded-xl bg-slate-50 border-2 border-slate-300 space-y-2 text-xs">
           <div className="flex items-center gap-2 border-b-2 border-slate-300 pb-2 text-blue-950 font-black uppercase text-[11px] tracking-wide">
             <Award className="w-4 h-4 text-blue-950" />
             <span>Project & Company Information</span>
@@ -173,7 +173,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({ item, tena
       </div>
 
       {/* FOOTER SECTION: QR Code & Digital Verification Seal */}
-      <div className="border-t-2 border-slate-950 pt-4 space-y-3">
+      <div className="border-t-2 border-slate-950 pt-3 space-y-2.5">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
           
           {/* Scannable Smartphone QR Code */}

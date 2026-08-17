@@ -510,7 +510,7 @@ export const CashFlowByQuarterModal: React.FC<CashFlowByQuarterModalProps> = ({
           {/* EXACT STATUTORY LEGAL LANDSCAPE PAPER LAYOUT PREVIEW (SF-INFR-56) */}
           <div className="space-y-8 flex flex-col items-center">
 
-            <div className="cashflow-paper single-page-paper w-[13in] min-h-[8.5in] bg-white text-slate-950 p-[0.6in] shadow-2xl font-sans text-[10pt] leading-relaxed flex flex-col justify-between mx-auto border border-slate-300">
+            <div className="cashflow-paper single-page-paper w-[13in] min-h-[8.5in] aspect-[13/8.5] bg-white text-slate-950 p-[0.6in] shadow-2xl font-sans text-[10pt] leading-relaxed flex flex-col justify-between mx-auto border border-slate-300">
               <div className="space-y-6">
                 
                 {/* Top Header Row (Left & Right) */}

@@ -160,7 +160,7 @@ export const BidFormForGoodsModal: React.FC<BidFormForGoodsModalProps> = ({
       <style>{`
         @media print {
           @page {
-            size: 8.5in 13in portrait;
+            size: 13in 8.5in landscape;
             margin: 0mm;
           }
           body {
@@ -197,7 +197,7 @@ export const BidFormForGoodsModal: React.FC<BidFormForGoodsModalProps> = ({
                   Statutory PBDs Form
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-bold">
-                  Legal 8.5" × 13" 1-Page
+                  Legal 13" × 8.5" 1-Page
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5">
@@ -381,7 +381,7 @@ export const BidFormForGoodsModal: React.FC<BidFormForGoodsModalProps> = ({
           {/* EXACT SINGLE PAGE LEGAL PAPER PREVIEW */}
           <div className="space-y-8 flex flex-col items-center">
 
-            <div className="bidform-goods-paper single-page-paper w-[8.5in] min-h-[13in] bg-white text-slate-950 p-[0.5in] shadow-2xl font-serif text-[9pt] leading-snug flex flex-col justify-between mx-auto border border-slate-300">
+            <div className="bidform-goods-paper single-page-paper w-[13in] min-h-[8.5in] aspect-[13/8.5] bg-white text-slate-950 p-[0.5in] shadow-2xl font-serif text-[9pt] leading-snug flex flex-col justify-start mx-auto border border-slate-300">
               <div className="space-y-3">
                 
                 {/* Header Titles */}

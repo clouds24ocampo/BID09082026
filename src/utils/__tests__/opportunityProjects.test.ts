@@ -55,4 +55,22 @@ describe('opportunityProjects - Strict Tenant Data Isolation', () => {
     const resultA = getOpportunityProjects('tenantA');
     expect(resultA).toHaveLength(0);
   });
+
+  it('should prefer PhilGEPS reference number when both refs exist', () => {
+    const oppTenantA = [
+      {
+        id: 'opp-1',
+        projectReferenceNumber: 'PRJ-2026-A1',
+        philgepsRefNo: 'PHILGEPS-2026-0001',
+        title: 'Project A1',
+        procuringEntity: 'Agency A'
+      }
+    ];
+
+    localStorage.setItem('bidocs_opportunities_tenantA', JSON.stringify(oppTenantA));
+
+    const resultA = getOpportunityProjects('tenantA');
+    expect(resultA).toHaveLength(1);
+    expect(resultA[0].refNo).toBe('PHILGEPS-2026-0001');
+  });
 });

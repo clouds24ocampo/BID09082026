@@ -508,7 +508,7 @@ export const PriceSchedule4GoodsModal: React.FC<PriceSchedule4GoodsModalProps> =
           {/* EXACT STATUTORY LEGAL LANDSCAPE PAPER LAYOUT PREVIEW */}
           <div className="space-y-8 flex flex-col items-center">
 
-            <div className="priceschedule-paper single-page-paper w-[13in] min-h-[8.5in] bg-white text-slate-950 p-[0.5in] shadow-2xl font-sans text-[9pt] leading-relaxed flex flex-col justify-between mx-auto border border-slate-300">
+            <div className="priceschedule-paper single-page-paper w-[13in] min-h-[8.5in] aspect-[13/8.5] bg-white text-slate-950 p-[0.5in] shadow-2xl font-sans text-[9pt] leading-relaxed flex flex-col justify-between mx-auto border border-slate-300">
               <div className="space-y-4">
                 
                 {/* Header Title Row 1 */}

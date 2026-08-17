@@ -208,7 +208,7 @@ export const NfccModal: React.FC<NfccModalProps> = ({
                 NFCC — Net Financial Contracting Capacity
               </h2>
               <p className="text-[10px] text-slate-400 font-mono">
-                Financial Documents for Eligibility Check • Legal 8.5" × 13" Portrait Standard
+                Financial Documents for Eligibility Check • Legal 13" × 8.5" Landscape Standard
               </p>
             </div>
           </div>
@@ -385,7 +385,7 @@ export const NfccModal: React.FC<NfccModalProps> = ({
         <div className="p-4 sm:p-6 bg-slate-800/30 overflow-y-auto">
           <div
             id="nfcc-paper"
-            className="single-page-paper print-document-sheet bg-white text-black p-10 sm:p-14 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[850px] font-serif space-y-5 text-left"
+            className="single-page-paper print-document-sheet bg-white text-black p-10 sm:p-14 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1280px] min-h-[760px] aspect-[13/8.5] font-serif space-y-5 text-left flex flex-col justify-between"
           >
 
             {/* ── COMPANY & PROJECT HEADER (Top of Page) ──────────────────── */}
@@ -599,7 +599,7 @@ export const NfccModal: React.FC<NfccModalProps> = ({
         <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900 shrink-0 print:hidden no-export">
           <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Financial Eligibility Document — Legal 8.5" × 13" Portrait Standard</span>
+            <span>Financial Eligibility Document — Legal 13" × 8.5" Landscape Standard</span>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={onClose} className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs transition">

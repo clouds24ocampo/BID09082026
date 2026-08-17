@@ -193,7 +193,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
       <style>{`
         @media print {
           @page {
-            size: 8.5in 13in portrait;
+            size: 13in 8.5in landscape;
             margin: 0mm;
           }
           body {
@@ -233,7 +233,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                   Statutory Financial Form
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                  Legal 8.5" × 13" Portrait
+                  Legal 13" × 8.5" Landscape
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5">
@@ -439,7 +439,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
           {/* EXACT STATUTORY LEGAL PORTRAIT PAPER LAYOUT PREVIEW */}
           <div className="space-y-8 flex flex-col items-center">
 
-            <div className="summarybid-paper single-page-paper w-[8.5in] min-h-[13in] bg-white text-slate-950 p-[0.6in] shadow-2xl font-sans text-[10pt] leading-relaxed flex flex-col justify-between mx-auto border border-slate-300">
+            <div className="summarybid-paper single-page-paper w-[13in] min-h-[8.5in] aspect-[13/8.5] bg-white text-slate-950 p-[0.6in] shadow-2xl font-sans text-[10pt] leading-relaxed flex flex-col justify-start mx-auto border border-slate-300">
               <div className="space-y-6">
                 
                 {/* Header Title Row 1 (Bold, Left-Aligned) */}

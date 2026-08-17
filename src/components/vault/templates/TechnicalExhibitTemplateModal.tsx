@@ -652,8 +652,8 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
       <style>{`
         @media print {
           @page {
-            size: ${item.code === '(f.a)' || item.code === '(f.b)' || item.code === '(f.c)' || item.code === '(f)' ? '13in 8.5in' : '8.5in 13in'};
-            margin: 0.4in;
+            size: 13in 8.5in landscape;
+            margin: 0.2in;
           }
           header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .proof-column, .actions-column, .sticky {
             display: none !important;
@@ -676,8 +676,8 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
             position: relative !important;
             width: 100% !important;
             max-width: 100% !important;
-            margin: 0 auto 0.5in auto !important;
-            padding: 0.25in !important;
+            margin: 0 auto !important;
+            padding: 0.18in !important;
             border: none !important;
             box-shadow: none !important;
             background: #ffffff !important;
@@ -692,7 +692,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
         }
       `}</style>
 
-      <div className={`bg-slate-900 border border-slate-800 rounded-2xl w-full ${item.code === '(f.a)' || item.code === '(f.b)' || item.code === '(f.c)' || item.code === '(f)' ? 'max-w-[96vw]' : 'max-w-5xl'} overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white`}>
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-[96vw] overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white">
 
         {/* Top Controls Header Bar */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0 print:hidden no-export">
@@ -821,7 +821,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
         )}
 
         {/* Body Content */}
-        <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6 print:p-0 print:bg-white">
+        <div className="p-4 overflow-y-auto flex-1 bg-slate-950 space-y-4 print:p-0 print:bg-white">
 
           {/* Editor Form Inputs (Screen Only) */}
           <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
@@ -996,7 +996,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
 
           {/* NON-ITEM (g) AND NON-ITEM (f.b) STANDARD SINGLE PAGE LEGAL PAPER CONTAINER */}
           {item.code !== '(g)' && item.code !== '(f.b)' && item.code !== '(f)' && (
-            <div className={`single-page-paper bg-white text-slate-900 font-legal p-8 sm:p-10 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-6 ${item.code === '(f.a)' || item.code === '(f.c)' ? 'max-w-[1250px]' : 'max-w-[850px]'} h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none`}>
+            <div className={`single-page-paper bg-white text-slate-900 font-legal p-3 sm:p-5 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1280px] min-h-[740px] aspect-[13/8.5] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none`}>
 
               {/* Outer Legal Frame */}
               <div className="absolute inset-4 border-2 border-slate-900 pointer-events-none rounded-xl" />
@@ -1435,7 +1435,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
               {keyPersonnelPages.map((page, pageIdx) => (
                 <div
                   key={page.id}
-                  className="single-page-paper bg-white text-slate-900 font-legal p-8 sm:p-10 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-6 max-w-[1250px] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none mb-8"
+                  className="single-page-paper bg-white text-slate-900 font-legal p-3 sm:p-5 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1280px] min-h-[740px] aspect-[13/8.5] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none mb-8"
                 >
                   {/* Outer Legal Frame */}
                   <div className="absolute inset-4 border-2 border-slate-900 pointer-events-none rounded-xl" />
@@ -1850,7 +1850,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
             <div className="space-y-8">
 
               {/* PAGE 1 OF 2 */}
-              <div className="single-page-paper bg-white text-slate-900 font-legal p-8 sm:p-10 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-6 max-w-[850px] min-h-[1100px] aspect-[8.5/13] mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
+              <div className="single-page-paper bg-white text-slate-900 font-legal p-3 sm:p-5 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1280px] min-h-[740px] aspect-[13/8.5] mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
                 <div className="absolute inset-4 border-2 border-slate-900 pointer-events-none rounded-xl" />
 
                 <div className="space-y-4 text-xs font-serif text-slate-900 leading-relaxed font-normal pt-2">
@@ -1974,7 +1974,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
               </div>
 
               {/* PAGE 2 OF 2 */}
-              <div className="single-page-paper bg-white text-slate-900 font-legal p-8 sm:p-10 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-6 max-w-[850px] min-h-[1100px] aspect-[8.5/13] mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
+              <div className="single-page-paper bg-white text-slate-900 font-legal p-3 sm:p-5 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1280px] min-h-[740px] aspect-[13/8.5] mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
                 <div className="absolute inset-4 border-2 border-slate-900 pointer-events-none rounded-xl" />
 
                 <div className="space-y-4 text-xs font-serif text-slate-900 leading-relaxed font-normal pt-2">

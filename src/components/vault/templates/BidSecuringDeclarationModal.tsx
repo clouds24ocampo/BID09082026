@@ -171,7 +171,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
       <style>{`
         @media print {
           @page {
-            size: 8.5in 13in;
+            size: 13in 8.5in landscape;
             margin: 0mm;
           }
           body {
@@ -209,7 +209,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
                   GPPB-BSD-2025 • Section 27.5
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                  Legal 8.5" × 13"
+                  Legal 13" × 8.5"
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5">
@@ -519,7 +519,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
           <div className="space-y-8 flex flex-col items-center">
             {instrumentType === 'BID_SECURING_DECLARATION' ? (
               /* OPTION 1: OFFICIAL GPPB STATUTORY NOTARIZED BID SECURING DECLARATION */
-              <div className="bsd-legal-paper single-page-paper w-[8.5in] min-h-[13in] bg-white text-slate-950 p-[0.75in] shadow-2xl font-serif text-[10.5pt] leading-relaxed flex flex-col justify-between mx-auto border border-slate-300">
+              <div className="bsd-legal-paper single-page-paper w-[13in] min-h-[8.5in] aspect-[13/8.5] bg-white text-slate-950 p-[0.75in] shadow-2xl font-serif text-[10.5pt] leading-relaxed flex flex-col justify-start mx-auto border border-slate-300">
 
                 <div className="space-y-5">
 
@@ -633,7 +633,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
               </div>
             ) : (
               /* OPTION 2: OFFICIAL GPPB BANK GUARANTEE / DRAFT / IRREVOCABLE LETTER OF CREDIT WITH LOCAL UNIVERSAL/COMMERCIAL BANK CONFIRMATION */
-              <div className="bsd-legal-paper single-page-paper w-[8.5in] min-h-[13in] bg-white text-slate-950 p-[0.75in] shadow-2xl font-serif text-[10.5pt] leading-relaxed flex flex-col justify-between mx-auto border border-slate-300">
+              <div className="bsd-legal-paper single-page-paper w-[13in] min-h-[8.5in] aspect-[13/8.5] bg-white text-slate-950 p-[0.75in] shadow-2xl font-serif text-[10.5pt] leading-relaxed flex flex-col justify-start mx-auto border border-slate-300">
 
                 <div className="space-y-5">
 
@@ -758,7 +758,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
         {/* Footer Bar */}
         <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900/95 sticky bottom-0 z-10 shrink-0 no-print">
           <span className="text-xs text-slate-400 font-mono">
-            RA 12009 Section 27.5 Standard • Legal 8.5" × 13" Printable Output
+            RA 12009 Section 27.5 Standard • Legal 13" × 8.5" Printable Output
           </span>
 
           <div className="flex items-center gap-2">

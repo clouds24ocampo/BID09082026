@@ -181,9 +181,9 @@ export const FormsDirectoryView: React.FC = () => {
             <head>
               <title>Print Legal 8.5"x13" Document - ${form.title}</title>
               <style>
-                @page { size: 8.5in 13in; margin: 0mm; }
+                @page { size: 13in 8.5in landscape; margin: 0.2in; }
                 body { margin: 0; padding: 0; background: white; text-align: center; }
-                img { width: 8.5in; max-width: 100%; height: auto; display: block; margin: 0 auto; page-break-after: always; }
+                img { width: 12.6in; max-width: 100%; max-height: 8.1in; object-fit: contain; display: block; margin: 0 auto; page-break-after: always; }
               </style>
             </head>
             <body>

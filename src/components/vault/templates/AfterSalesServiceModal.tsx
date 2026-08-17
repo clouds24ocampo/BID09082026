@@ -451,10 +451,10 @@ export const AfterSalesServiceModal: React.FC<AfterSalesServiceModalProps> = ({
             </div>
           </div>
 
-          {/* OFFICIAL PRINTABLE PAPER DOCUMENT SHEET (Legal 8.5" x 13" Portrait Standard) */}
+          {/* OFFICIAL PRINTABLE PAPER DOCUMENT SHEET (Legal 13" x 8.5" Landscape Standard) */}
           <div
             id="after-sales-paper"
-            className="single-page-paper print-document-sheet bg-white text-black p-8 sm:p-12 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[850px] font-serif space-y-6 text-left"
+            className="single-page-paper print-document-sheet bg-white text-black p-8 sm:p-12 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1280px] min-h-[760px] aspect-[13/8.5] font-serif space-y-6 text-left flex flex-col justify-between"
           >
             {/* Header Project Metadata Block */}
             <div className="space-y-1 font-serif text-sm text-black">
@@ -614,7 +614,7 @@ export const AfterSalesServiceModal: React.FC<AfterSalesServiceModalProps> = ({
         <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900 shrink-0 print:hidden no-export">
           <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Class A Technical Legal Template — Legal 8.5" × 13" Portrait Standard</span>
+            <span>Class A Technical Legal Template — Legal 13" × 8.5" Landscape Standard</span>
           </div>
 
           <div className="flex items-center gap-3">

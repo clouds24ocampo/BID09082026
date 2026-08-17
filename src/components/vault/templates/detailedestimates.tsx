@@ -958,7 +958,7 @@ export const DetailedEstimatesModal: React.FC<DetailedEstimatesModalProps> = ({
           {/* EXACT LEGAL LANDSCAPE PAPER LAYOUT PREVIEW (SF-INFR / FORM L) */}
           <div className="space-y-8 flex flex-col items-center">
 
-            <div className="detailed-estimates-paper single-page-paper w-[13in] min-h-[8.5in] bg-white text-slate-950 p-[0.4in] shadow-2xl font-sans text-[8.5pt] leading-tight flex flex-col justify-between mx-auto border border-slate-300">
+            <div className="detailed-estimates-paper single-page-paper w-[13in] min-h-[8.5in] aspect-[13/8.5] bg-white text-slate-950 p-[0.4in] shadow-2xl font-sans text-[8.5pt] leading-tight flex flex-col justify-between mx-auto border border-slate-300">
               <div className="space-y-3">
                 
                 {/* Main Statutory Header Box */}

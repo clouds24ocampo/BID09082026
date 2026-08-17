@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
-import { PDFDocument } from 'pdf-lib';
-import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import { buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit, PdfAttachmentSource } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import html2canvas from 'html2canvas';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
   Printer,
   Download,
   FileSignature,
-  Plus,
   Trash2,
   Building2,
   ShieldCheck,
@@ -43,7 +40,7 @@ export interface TechnicalSpecificationsProps {
   activeProjectRefNo?: string;
   activeProjectTitle?: string;
   activeProcuringEntity?: string;
-  onSaveAndComplete?: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string) => void;
+  onSaveAndComplete?: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string, projectId?: string) => void;
   onClose?: () => void;
 }
 
@@ -73,6 +70,55 @@ const formatDateTimeDisplay = (raw: string): string => {
   } catch {
     return raw;
   }
+};
+
+interface RawOpportunityRecord {
+  id?: string;
+  projectReferenceNumber?: string;
+  philgepsRefNo?: string;
+  solicitationNumber?: string;
+  solicitationNo?: string;
+  title?: string;
+  biddingProjectTitle?: string;
+  areaOfDelivery?: string;
+  location?: string;
+  procuringEntity?: string | { name?: string };
+  submissionDeadlineDatetime?: string;
+  submissionDeadlineDate?: string;
+  submissionDeadline?: string;
+  dateSubmitted?: string;
+}
+
+const isRawOpportunityRecord = (value: unknown): value is RawOpportunityRecord => {
+  return typeof value === 'object' && value !== null;
+};
+
+const getStoredOpportunityRecord = (tenantId: string, opportunityId: string): RawOpportunityRecord | null => {
+  const keys = [
+    `bidocs_opportunities_${tenantId}`,
+    'bidocs_opportunities'
+  ];
+
+  for (const key of keys) {
+    const saved = localStorage.getItem(key);
+    if (!saved) continue;
+
+    try {
+      const parsed: unknown = JSON.parse(saved);
+      if (!Array.isArray(parsed)) continue;
+
+      for (const entry of parsed) {
+        if (!isRawOpportunityRecord(entry)) continue;
+        if (entry.id === opportunityId) {
+          return entry;
+        }
+      }
+    } catch {
+      // Ignore malformed legacy data and continue searching other keys.
+    }
+  }
+
+  return null;
 };
 
 const DEFAULT_SECTION_VI_ITEMS: TechSpecItem[] = [
@@ -117,17 +163,22 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
   const todayStr = new Date().toISOString().split('T')[0];
 
   const [isExporting, setIsExporting] = useState(false);
-  const [drawingPdfUrl, setDrawingPdfUrl] = useState<string | null>(null);
+  const [brochurePdfFile, setBrochurePdfFile] = useState<File | null>(null);
+  const [brochurePdfName, setBrochurePdfName] = useState<string>('');
+  const [drawingPdfFile, setDrawingPdfFile] = useState<File | null>(null);
   const [drawingPdfName, setDrawingPdfName] = useState<string>('');
   const [fontSizeMode, setFontSizeMode] = useState<'fine' | 'xs' | 'sm'>('xs');
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo);
+  const [philgepsRefNo, setPhilgepsRefNo] = useState('');
   const [solicitationNumber, setSolicitationNumber] = useState('SOL-2026-001');
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
+  const [areaOfDelivery, setAreaOfDelivery] = useState('');
   const [dateTimeSubmitted, setDateTimeSubmitted] = useState<string>(getNowDateTimeString());
+  const projectScopeKey = selectedOppId || projectRefNo || philgepsRefNo || activeProjectRefNo;
 
   const [companyName] = useState(tenant?.companyName || 'Bidding Entity Corporate Name');
   const [companyAddress] = useState(tenant?.address || 'Metro Manila, Philippines');
@@ -139,26 +190,63 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
-    if (list.length > 0 && !selectedOppId) {
-      const first = list[0];
-      setSelectedOppId(first.id);
-      setProjectRefNo(first.refNo);
-      setSolicitationNumber(first.solicitationNo || 'SOL-2026-001');
-      setProjectTitle(first.title);
-      setProcuringEntity(first.procuringEntity);
-      if (first.dateTimeSubmitted) {
-        setDateTimeSubmitted(first.dateTimeSubmitted);
+    if (list.length > 0) {
+      const preferred = list.find((project) => project.refNo === activeProjectRefNo) || list[0];
+      if (preferred && (preferred.id !== selectedOppId || preferred.refNo !== projectRefNo)) {
+        setSelectedOppId(preferred.id);
+        setProjectRefNo(preferred.refNo);
+        setSolicitationNumber(preferred.solicitationNo || 'SOL-2026-001');
+        setProjectTitle(preferred.title);
+        setProcuringEntity(preferred.procuringEntity);
+        if (preferred.dateTimeSubmitted) {
+          setDateTimeSubmitted(preferred.dateTimeSubmitted);
+        }
       }
+    } else {
+      setSelectedOppId('');
+      setProjectRefNo('');
+      setPhilgepsRefNo('');
+      setSolicitationNumber('');
+      setProjectTitle('');
+      setProcuringEntity('');
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, activeProjectRefNo]);
 
   useEffect(() => {
-    if (!projectRefNo) return;
+    if (!tenant?.id || !selectedOppId) return;
+
+    const record = getStoredOpportunityRecord(tenant.id, selectedOppId);
+    if (!record) return;
+    const selectedProject = oppProjects.find((project) => project.id === selectedOppId);
+
+    const internalProjectRef = record.projectReferenceNumber || record.philgepsRefNo || activeProjectRefNo;
+    const externalPhilgepsRef = record.philgepsRefNo || record.projectReferenceNumber || internalProjectRef;
+    const storageProjectRef = selectedProject?.refNo || externalPhilgepsRef || internalProjectRef || activeProjectRefNo;
+    const projectName = record.title || record.biddingProjectTitle || activeProjectTitle;
+    const procuringEntityValue = typeof record.procuringEntity === 'string'
+      ? record.procuringEntity
+      : record.procuringEntity?.name || activeProcuringEntity;
+    const areaValue = record.areaOfDelivery || record.location || '';
+    const submissionValue = record.submissionDeadlineDatetime || record.submissionDeadlineDate || record.submissionDeadline || record.dateSubmitted || '';
+
+    setProjectRefNo(storageProjectRef);
+    setPhilgepsRefNo(externalPhilgepsRef || '');
+    setSolicitationNumber(record.solicitationNumber || record.solicitationNo || 'SOL-2026-001');
+    setProjectTitle(projectName);
+    setProcuringEntity(procuringEntityValue);
+    setAreaOfDelivery(areaValue);
+    if (submissionValue) {
+      setDateTimeSubmitted(submissionValue.substring(0, 16));
+    }
+  }, [selectedOppId, tenant?.id, oppProjects, activeProjectRefNo, activeProjectTitle, activeProcuringEntity]);
+
+  useEffect(() => {
+    if (!projectScopeKey) return;
     const tenantKey = tenant?.id || 'default';
-    const secViKey = `bidocs_sec_vi_${tenantKey}_${projectRefNo}`;
+    const secViKey = `bidocs_sec_vi_${tenantKey}_${projectScopeKey}`;
     const savedSecVi = localStorage.getItem(secViKey);
 
-    const techSpecsKey = `bidocs_tech_specs_${tenantKey}_${projectRefNo}`;
+    const techSpecsKey = `bidocs_tech_specs_${tenantKey}_${projectScopeKey}`;
     const savedTechSpecs = localStorage.getItem(techSpecsKey);
 
     let baseItems = [...DEFAULT_SECTION_VI_ITEMS];
@@ -184,13 +272,12 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
       try {
         const parsedTech = JSON.parse(savedTechSpecs);
         if (Array.isArray(parsedTech) && parsedTech.length > 0) {
+          const techById = new Map(parsedTech.map((entry: any, idx: number) => [entry.id || String(idx + 1), entry]));
           baseItems = baseItems.map((it, idx) => {
-            const matched = parsedTech[idx];
+            const matched = techById.get(it.id) || parsedTech[idx];
             if (matched) {
               return {
                 ...it,
-                specification: matched.specification || it.specification,
-                quantity: matched.quantity || it.quantity,
                 compliance: matched.compliance || it.compliance,
                 brandModel: matched.brandModel !== undefined ? matched.brandModel : it.brandModel,
                 complianceEvidence: matched.complianceEvidence !== undefined ? matched.complianceEvidence : it.complianceEvidence
@@ -203,12 +290,12 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     }
 
     setItems(baseItems);
-  }, [projectRefNo, tenant?.id]);
+  }, [projectScopeKey, tenant?.id]);
 
   const saveSharedItems = (newItems: TechSpecItem[]) => {
     setItems(newItems);
-    if (projectRefNo) {
-      const storageKey = `bidocs_tech_specs_${tenant?.id || 'default'}_${projectRefNo}`;
+    if (projectScopeKey) {
+      const storageKey = `bidocs_tech_specs_${tenant?.id || 'default'}_${projectScopeKey}`;
       localStorage.setItem(storageKey, JSON.stringify(newItems));
     }
   };
@@ -246,42 +333,25 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     saveSharedItems(updated);
   };
 
-  const handleAddItem = () => {
-    const newItem: TechSpecItem = {
-      id: Date.now().toString(),
-      itemNo: String(items.length + 1),
-      specification: '',
-      quantity: '1 unit',
-      compliance: 'Comply',
-      brandModel: '',
-      complianceEvidence: 'Supported by OEM Technical Data Sheet'
-    };
-    saveSharedItems([...items, newItem]);
-  };
-
-  const handleRemoveItem = (index: number) => {
-    if (items.length <= 1) return;
-    saveSharedItems(items.filter((_, idx) => idx !== index));
-  };
-
   const handleSyncWithSectionVi = () => {
-    if (!projectRefNo) return;
+    if (!projectScopeKey) return;
     const tenantKey = tenant?.id || 'default';
-    const secViKey = `bidocs_sec_vi_${tenantKey}_${projectRefNo}`;
+    const secViKey = `bidocs_sec_vi_${tenantKey}_${projectScopeKey}`;
     const savedSecVi = localStorage.getItem(secViKey);
 
     if (savedSecVi) {
       try {
         const parsedVi = JSON.parse(savedSecVi);
         if (Array.isArray(parsedVi) && parsedVi.length > 0) {
+          const currentById = new Map(items.map((existing, idx) => [existing.id || String(idx + 1), existing]));
           const synced = parsedVi.map((viItem: any, idx: number) => ({
             id: viItem.id || String(idx + 1),
             itemNo: String(idx + 1),
             specification: viItem.description || '',
             quantity: viItem.quantity || '1 unit',
-            compliance: (items[idx]?.compliance === 'Not Comply' ? 'Not Comply' as const : 'Comply' as const),
-            brandModel: items[idx]?.brandModel || '',
-            complianceEvidence: items[idx]?.complianceEvidence || 'Supported by Manufacturer Sales Literature and Technical Data Sheet.'
+            compliance: (currentById.get(viItem.id || String(idx + 1))?.compliance === 'Not Comply' ? 'Not Comply' as const : 'Comply' as const),
+            brandModel: currentById.get(viItem.id || String(idx + 1))?.brandModel || '',
+            complianceEvidence: currentById.get(viItem.id || String(idx + 1))?.complianceEvidence || 'Supported by Manufacturer Sales Literature and Technical Data Sheet.'
           }));
           saveSharedItems(synced);
           return;
@@ -291,25 +361,35 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     saveSharedItems(DEFAULT_SECTION_VI_ITEMS);
   };
 
-  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBrochurePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.type !== 'application/pdf') {
-      alert('Please upload a valid PDF document for technical drawings.');
+      alert('Please upload a valid PDF brochure document.');
+      return;
+    }
+    setBrochurePdfName(file.name);
+    setBrochurePdfFile(file);
+  };
+
+  const handleDrawingPdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      alert('Please upload a valid PDF drawing document.');
       return;
     }
     setDrawingPdfName(file.name);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setDrawingPdfUrl(event.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
+    setDrawingPdfFile(file);
   };
 
-  const handleRemovePdf = () => {
-    setDrawingPdfUrl(null);
+  const handleRemoveBrochurePdf = () => {
+    setBrochurePdfFile(null);
+    setBrochurePdfName('');
+  };
+
+  const handleRemoveDrawingPdf = () => {
+    setDrawingPdfFile(null);
     setDrawingPdfName('');
   };
 
@@ -317,20 +397,19 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     window.print();
   };
 
-  // FIXED EXPORT PDF FUNCTION
   const handleExportPdf = async () => {
     setIsExporting(true);
     await new Promise((r) => setTimeout(r, 200));
     try {
-      const fileName = `${projectRefNo}_Section_VII_Technical_Specifications_${todayStr}.pdf`;
-      const paperElem = document.getElementById('technical-specifications-paper');
-      if (paperElem) {
-        await generateAndDownloadThreeLayerPdf(
-          null,
-          paperElem,
-          drawingPdfUrl || undefined,
-          fileName
-        );
+      const fileName = `${philgepsRefNo || projectRefNo}_Section_VII_Technical_Specifications_${todayStr}.pdf`;
+      const finalPdfDataUrl = await buildFinalPdfDataUrl();
+      if (finalPdfDataUrl) {
+        const link = document.createElement('a');
+        link.href = finalPdfDataUrl;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       }
     } catch (err) {
       console.error('PDF Export Error:', err);
@@ -340,14 +419,14 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
   };
 
   const handleExportExcel = () => {
-    const cleanProj = (projectRefNo || 'PRJ').replace(/[^a-zA-Z0-9]/g, '_');
+    const cleanProj = (philgepsRefNo || projectRefNo || 'PRJ').replace(/[^a-zA-Z0-9]/g, '_');
     const fileName = `${cleanProj}_Technical_Specifications_${todayStr}.csv`;
 
     let csvContent = '\uFEFF';
     csvContent += `"SECTION VII. TECHNICAL SPECIFICATIONS"\n`;
     csvContent += `"Company Name:","${companyName.replace(/"/g, '""')}"\n`;
     csvContent += `"Company Address:","${companyAddress.replace(/"/g, '""')}"\n`;
-    csvContent += `"Project Ref. No.:","${projectRefNo.replace(/"/g, '""')}"\n`;
+    csvContent += `"PhilGEPS Ref. No.:","${(philgepsRefNo || projectRefNo).replace(/"/g, '""')}"\n`;
     csvContent += `"Solicitation No.:","${solicitationNumber.replace(/"/g, '""')}"\n`;
     csvContent += `"Project Title:","${projectTitle.replace(/"/g, '""')}"\n`;
     csvContent += `"Procuring Entity:","${procuringEntity.replace(/"/g, '""')}"\n`;
@@ -378,59 +457,53 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     document.body.removeChild(link);
   };
 
-  const renderTechnicalSpecificationsPdfDataUrl = async (templateElem: HTMLElement): Promise<string | undefined> => {
-    const canvas = await html2canvas(templateElem, {
-      scale: 2.5,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      ignoreElements: (element: Element) => {
-        return (
-          element.classList.contains('print:hidden') ||
-          element.classList.contains('no-export') ||
-          element.classList.contains('proof-column') ||
-          element.classList.contains('actions-column') ||
-          element.tagName === 'BUTTON'
-        );
-      }
-    });
+  const buildFinalPdfDataUrl = async (): Promise<string | undefined> => {
+    const templateElem = document.getElementById('technical-specifications-paper') as HTMLElement;
+    const attachmentSources = [brochurePdfFile, drawingPdfFile].filter((value): value is File => !!value);
+    if (!templateElem && attachmentSources.length === 0) {
+      return undefined;
+    }
 
-    const imgDataUrl = canvas.toDataURL('image/png');
-    const pdfDoc = await PDFDocument.create();
-    const pngImage = await pdfDoc.embedPng(imgDataUrl);
-    const page = pdfDoc.addPage([canvas.width, canvas.height]);
-    page.drawImage(pngImage, {
-      x: 0,
-      y: 0,
-      width: canvas.width,
-      height: canvas.height
-    });
+    const units: ExportDocumentUnit[] = [];
+    if (templateElem) {
+      units.push({
+        title: item.name,
+        formElement: templateElem,
+        fileSource: attachmentSources[0] as PdfAttachmentSource | undefined
+      });
+    } else if (attachmentSources[0]) {
+      units.push({
+        title: item.name,
+        fileSource: attachmentSources[0]
+      });
+    }
 
-    const pdfBytes = await pdfDoc.save();
-    const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    if (attachmentSources[1]) {
+      units.push({
+        title: `${item.name} Attachment`,
+        fileSource: attachmentSources[1]
+      });
+    }
+
+    return await buildMergedThreeLayerPdfDataUrl(
+      units,
+      `${philgepsRefNo || projectRefNo}_Section_VII_Technical_Specifications_${todayStr}.pdf`
+    );
   };
 
   const handleSave = async () => {
     setIsExporting(true);
     await new Promise((r) => setTimeout(r, 200));
+    let dataUrl: string | undefined = undefined;
     try {
-      const templateElem = document.getElementById('technical-specifications-paper') as HTMLElement;
-      let dataUrl: string | undefined = undefined;
-      if (templateElem) {
-        dataUrl = await renderTechnicalSpecificationsPdfDataUrl(templateElem);
-      }
+      dataUrl = await buildFinalPdfDataUrl();
       if (onSaveAndComplete) {
-        onSaveAndComplete(drawingPdfUrl || dataUrl, item.name, projectRefNo, projectTitle);
+        onSaveAndComplete(dataUrl, item.name, philgepsRefNo || projectRefNo, projectTitle, selectedOppId);
       }
     } catch (error) {
       console.error('Failed to generate Technical Specifications PDF:', error);
       if (onSaveAndComplete) {
-        onSaveAndComplete(drawingPdfUrl || undefined, item.name, projectRefNo, projectTitle);
+        onSaveAndComplete(dataUrl, item.name, philgepsRefNo || projectRefNo, projectTitle, selectedOppId);
       }
     } finally {
       setIsExporting(false);
@@ -460,8 +533,8 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
       <style>{`
         @media print {
           @page {
-            size: 13in 8.5in;
-            margin: 0.4in;
+            size: 13in 8.5in landscape;
+            margin: 0.2in;
           }
           header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .proof-column, .actions-column, .sticky {
             display: none !important;
@@ -485,7 +558,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 auto !important;
-            padding: 0.3in !important;
+            padding: 0.18in !important;
             border: none !important;
             box-shadow: none !important;
             background: #ffffff !important;
@@ -495,6 +568,22 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
           .export-text {
             display: block !important;
           }
+        }
+        .single-page-paper,
+        .single-page-paper * {
+          box-sizing: border-box;
+        }
+        .single-page-paper th,
+        .single-page-paper td,
+        .single-page-paper .wrap-fit {
+          overflow-wrap: anywhere;
+          word-break: break-word;
+          hyphens: auto;
+        }
+        .single-page-paper input,
+        .single-page-paper textarea {
+          font-size: 9px;
+          line-height: 1.1;
         }
       `}</style>
 
@@ -551,9 +640,9 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
         </div>
 
         {/* Scrollable Container */}
-        <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6 print:p-0 print:bg-white">
+        <div className="p-4 overflow-y-auto flex-1 bg-slate-950 space-y-4 print:p-0 print:bg-white">
 
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
+          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 print:hidden no-export">
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex-1 space-y-1.5">
@@ -629,13 +718,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                 </div>
 
                 <button
-                  onClick={handleAddItem}
-                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 flex items-center gap-1.5 transition"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Row Item</span>
-                </button>
-                <button
                   onClick={handleSyncWithSectionVi}
                   className="px-3.5 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 flex items-center gap-1.5 transition"
                 >
@@ -653,26 +735,38 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             </div>
 
             <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-200 flex items-center gap-2">
                   <Paperclip className="w-4 h-4 text-purple-400" />
-                  <span>Attach Technical Drawing / Architectural Schematic PDF:</span>
+                  <span>Optional PDF Attachments</span>
                 </label>
                 <p className="text-[11px] text-slate-400">
-                  Upload architectural plans, network diagrams, or engineering drawings (PDF format) to merge into the final exported PDF.
+                  Upload up to two optional PDFs: brochure and drawing. They will be merged into the saved/viewable PDF.
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                {brochurePdfName ? (
+                  <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 px-3 py-1.5 rounded-xl text-xs font-mono text-blue-300">
+                    <FileText className="w-4 h-4 text-blue-400 shrink-0" />
+                    <span className="truncate max-w-[180px] font-semibold">{brochurePdfName}</span>
+                    <button type="button" onClick={handleRemoveBrochurePdf} className="p-1 hover:text-red-400 transition">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 cursor-pointer shadow transition flex items-center gap-2">
+                    <Upload className="w-4 h-4" />
+                    <span>Upload Brochure PDF</span>
+                    <input type="file" accept="application/pdf" onChange={handleBrochurePdfUpload} className="hidden" />
+                  </label>
+                )}
+
                 {drawingPdfName ? (
                   <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 px-3 py-1.5 rounded-xl text-xs font-mono text-purple-300">
                     <FileText className="w-4 h-4 text-purple-400 shrink-0" />
-                    <span className="truncate max-w-[220px] font-semibold">{drawingPdfName}</span>
-                    <button
-                      type="button"
-                      onClick={handleRemovePdf}
-                      className="p-1 hover:text-red-400 transition"
-                    >
+                    <span className="truncate max-w-[180px] font-semibold">{drawingPdfName}</span>
+                    <button type="button" onClick={handleRemoveDrawingPdf} className="p-1 hover:text-red-400 transition">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -680,12 +774,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                   <label className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 cursor-pointer shadow transition flex items-center gap-2">
                     <Upload className="w-4 h-4" />
                     <span>Upload Drawing PDF</span>
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      onChange={handlePdfUpload}
-                      className="hidden"
-                    />
+                    <input type="file" accept="application/pdf" onChange={handleDrawingPdfUpload} className="hidden" />
                   </label>
                 )}
               </div>
@@ -694,7 +783,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
           </div>
 
           {/* DOCUMENT SHEET */}
-          <div id="technical-specifications-paper" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1150px] flex flex-col justify-between font-serif">
+          <div id="technical-specifications-paper" className="single-page-paper print-document-sheet bg-white text-black p-4 sm:p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1280px] min-h-[760px] aspect-[13/8.5] flex flex-col justify-between font-serif">
             <div>
               <div className="border-b-2 border-black pb-3 mb-5 space-y-2 font-serif">
                 <div className="text-center pb-2 border-b border-slate-300">
@@ -702,30 +791,17 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                   <p className="text-xs text-slate-700 font-serif mt-0.5">{companyAddress}</p>
                 </div>
 
-                <div className="space-y-1.5 text-xs font-serif text-black pt-1">
-                  <div className="flex items-center justify-between gap-6">
-                    <div>
-                      <span className="font-bold">PROJECT REF. NO: </span>
-                      <span className="font-mono font-semibold text-blue-950">{projectRefNo || 'N/A'}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-bold">SOLICITATION NO: </span>
-                      <span className="font-mono font-semibold text-blue-950">{solicitationNumber || 'N/A'}</span>
-                    </div>
+                <div className="rounded border border-black px-3 py-2 space-y-1.5 text-[11px] font-serif text-black">
+                  <div className="text-center">
+                    <div className="font-bold uppercase tracking-wide">{item.name}</div>
                   </div>
-                  <div className="flex items-start justify-between gap-6">
-                    <div className="flex-1">
-                      <span className="font-bold">NAME OF PROJECT: </span>
-                      <span className="font-semibold text-black">{projectTitle || 'N/A'}</span>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <span className="font-bold">DATE & TIME OF SUBMISSION: </span>
-                      <span className="font-mono font-semibold text-blue-950">{formatDateTimeDisplay(dateTimeSubmitted)}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-bold">PROCURING ENTITY: </span>
-                    <span className="text-slate-900">{procuringEntity || 'N/A'}</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+                    <div className="wrap-fit"><span className="font-bold uppercase">Project Name:</span> <span>{projectTitle || 'N/A'}</span></div>
+                    <div className="wrap-fit"><span className="font-bold uppercase">Procuring Entity:</span> <span>{procuringEntity || 'N/A'}</span></div>
+                    <div className="wrap-fit"><span className="font-bold uppercase">Area of Delivery:</span> <span>{areaOfDelivery || 'N/A'}</span></div>
+                    <div className="wrap-fit"><span className="font-bold uppercase">PhilGEPS Ref. No.:</span> <span>{philgepsRefNo || 'N/A'}</span></div>
+                    <div className="wrap-fit"><span className="font-bold uppercase">Solicitation No.:</span> <span>{solicitationNumber || 'N/A'}</span></div>
+                    <div className="wrap-fit sm:col-span-2"><span className="font-bold uppercase">Submission Date:</span> <span>{formatDateTimeDisplay(dateTimeSubmitted)}</span></div>
                   </div>
                 </div>
               </div>
@@ -734,9 +810,10 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                 <h1 className="text-2xl sm:text-3xl font-bold font-serif italic text-black tracking-tight">
                   Section VII. Technical Specifications
                 </h1>
-                {drawingPdfName && (
-                  <div className="mt-1 text-xs font-serif italic text-purple-950 font-semibold">
-                    📎 Attached Technical Drawings / Schematics: {drawingPdfName}
+                {(brochurePdfName || drawingPdfName) && (
+                  <div className="mt-1 text-xs font-serif italic text-purple-950 font-semibold space-y-0.5">
+                    {brochurePdfName && <div>📎 Attached Brochure PDF: {brochurePdfName}</div>}
+                    {drawingPdfName && <div>📎 Attached Drawing PDF: {drawingPdfName}</div>}
                   </div>
                 )}
               </div>
@@ -755,7 +832,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                     </th>
                     <th className="border border-black px-3 py-2.5 text-left font-bold italic w-[34%]">
                       <div className="text-center font-bold text-black mb-1">Statement of Compliance</div>
-                      <div className="text-[9px] font-serif leading-tight text-slate-800 font-normal normal-case p-2 bg-amber-50/60 rounded border border-amber-200/80">
+                      <div className="text-[9px] font-serif leading-tight text-slate-800 font-normal normal-case p-2 bg-amber-50/60 rounded border border-amber-200/80 break-words">
                         [Bidders must state here either <strong>"Comply"</strong> or <strong>"Not Comply"</strong> against each of the individual parameters of each Specification stating the corresponding performance parameter of the equipment offered. Statements of "Comply" or "Not Comply" must be supported by evidence in a Bidders Bid and cross-referenced to that evidence. Evidence shall be in the form of manufacturer's un-amended sales literature, unconditional statements of specification and compliance issued by the manufacturer, samples, independent test data etc., as appropriate.]
                       </div>
                     </th>
@@ -765,46 +842,17 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                   {items.map((rowItem, idx) => (
                     <tr key={rowItem.id} className="border-b border-black hover:bg-slate-50/50 transition-colors">
                       <td className="border border-black px-1.5 py-3 text-center font-serif font-bold align-top">
-                        <div className="flex flex-col items-center justify-between h-full">
-                          <span className="block pt-0.5">{idx + 1}</span>
-                          {!isExporting && items.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItem(idx)}
-                              className="text-red-500 hover:text-red-700 mt-2 print:hidden no-export p-1"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
+                        <span className="block pt-0.5">{idx + 1}</span>
                       </td>
 
                       <td className="border border-black px-1.5 py-3 font-serif text-center align-top break-words">
-                        {!isExporting ? (
-                          <input
-                            type="text"
-                            value={rowItem.quantity}
-                            onChange={(e) => handleFieldChange(idx, 'quantity', e.target.value)}
-                            placeholder="Qty"
-                            className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
-                          />
-                        ) : null}
-                        <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
+                        <div className="font-serif text-black text-center pt-0.5 font-normal break-words">
                           {rowItem.quantity || ''}
                         </div>
                       </td>
 
                       <td className="border border-black px-3 py-3 font-serif align-top break-words">
-                        {!isExporting ? (
-                          <textarea
-                            rows={4}
-                            value={rowItem.specification}
-                            onChange={(e) => handleFieldChange(idx, 'specification', e.target.value)}
-                            placeholder="Enter detailed technical specification parameter..."
-                            className={`w-full bg-transparent resize-y outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
-                          />
-                        ) : null}
-                        <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black pt-0.5 whitespace-pre-wrap font-normal break-words ${getTableFontSizeClass()}`}>
+                        <div className="font-serif text-black pt-0.5 whitespace-pre-wrap font-normal break-words">
                           {rowItem.specification || ''}
                         </div>
                       </td>
@@ -844,25 +892,19 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                                 <Tag className="w-3 h-3 text-blue-600" />
                                 <span>Brand & Model Offered (Optional):</span>
                               </label>
-                              <input
-                                type="text"
+                              <textarea
+                                rows={2}
                                 value={rowItem.brandModel || ''}
                                 onChange={(e) => handleFieldChange(idx, 'brandModel', e.target.value)}
                                 placeholder="e.g. Cisco Catalyst 9300 / Dell PowerEdge R750"
-                                className="w-full bg-blue-50/50 text-blue-950 border border-blue-300 rounded p-1 text-xs font-serif outline-none focus:border-blue-500 font-semibold"
+                                className="w-full bg-blue-50/50 text-blue-950 border border-blue-300 rounded p-1 text-xs font-serif outline-none focus:border-blue-500 font-semibold resize-none whitespace-pre-wrap break-words"
                               />
                             </div>
                           )}
 
-                          {!isExporting && (
-                            <textarea
-                              rows={2}
-                              value={rowItem.complianceEvidence || ''}
-                              onChange={(e) => handleFieldChange(idx, 'complianceEvidence', e.target.value)}
-                              placeholder="State cross-reference supporting evidence (e.g. Manufacturer Sales Literature, Brochure Page 4)..."
-                              className="w-full bg-white text-black border border-slate-300 rounded p-1.5 text-xs font-serif outline-none focus:border-blue-500 print:hidden"
-                            />
-                          )}
+                          <div className="w-full bg-white text-black border border-slate-300 rounded p-1.5 text-xs font-serif print:hidden">
+                            {rowItem.complianceEvidence || 'Supported by manufacturer literature or uploaded PDF attachment.'}
+                          </div>
 
                           <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-xs leading-relaxed`}>
                             <div className={`font-bold mb-1 ${rowItem.compliance === 'Comply' ? 'text-emerald-950' : 'text-red-950'}`}>
@@ -898,9 +940,9 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                   details={{
                     companyName: companyName,
                     documentName: 'Section VII. Technical Specifications',
-                    documentNumber: `SEC-VII-${projectRefNo || '2026-901283'}`,
+                    documentNumber: `SEC-VII-${philgepsRefNo || projectRefNo || '2026-901283'}`,
                     projectTitle: projectTitle,
-                    projectRefNo: projectRefNo,
+                    projectRefNo: philgepsRefNo || 'N/A',
                     procuringEntity: procuringEntity,
                     dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
                     documentCategory: 'Technical Eligibility',
@@ -910,7 +952,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                   showCaption={false}
                 />
                 <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
-                  VERIFIED GPPB DOC • {projectRefNo}
+                  VERIFIED GPPB DOC • {philgepsRefNo || 'N/A'}
                 </span>
               </div>
             </div>

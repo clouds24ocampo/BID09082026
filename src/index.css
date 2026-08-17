@@ -152,8 +152,8 @@ body {
 /* GLOBAL STRICT PRINT STYLES — EXPORT PLAIN DOCUMENTS ONLY (NO WEB APP UI) */
 @media print {
   @page {
-    size: 8.5in 13in;
-    margin: 0.4in;
+    size: 13in 8.5in landscape;
+    margin: 0.2in;
   }
 
   /* 1. Hide web app headers, sidebars, buttons, modal headers & toolbars */
@@ -198,7 +198,7 @@ body {
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 auto !important;
-    padding: 0.25in !important;
+    padding: 0.18in !important;
     border: none !important;
     box-shadow: none !important;
     background: #ffffff !important;
@@ -222,4 +222,3 @@ body {
 .single-page-paper {
   font-family: var(--font-legal);
 }
-

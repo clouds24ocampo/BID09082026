@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, degrees } from 'pdf-lib';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import html2canvas from 'html2canvas';
@@ -54,7 +54,7 @@ interface StatementOngoingContractsModalProps {
   activeProjectRefNo?: string;
   activeProjectTitle?: string;
   activeProcuringEntity?: string;
-  onSaveAndComplete: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string) => void;
+  onSaveAndComplete: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string, projectId?: string) => void;
   onClose: () => void;
 }
 
@@ -102,19 +102,25 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
   // Opportunity Finder Project List State (Strictly real user opportunities)
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
+  const projectScopeKey = selectedOppId || projectRefNo || activeProjectRefNo;
 
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
-    if (list.length > 0 && !selectedOppId) {
-      const first = list[0];
-      setSelectedOppId(first.id);
-      setProjectRefNo(first.refNo);
-      setSolicitationNumber(first.solicitationNo || 'N/A');
-      setProjectTitle(first.title);
-      setProcuringEntity(first.procuringEntity);
-      if (first.dateTimeSubmitted) {
-        setDateTimeSubmitted(first.dateTimeSubmitted);
+    if (list.length > 0) {
+      const preferred = list.find((project) => project.refNo === activeProjectRefNo) || list[0];
+      if (preferred && (preferred.id !== selectedOppId || preferred.refNo !== projectRefNo)) {
+        setSelectedOppId(preferred.id);
+        setProjectRefNo(preferred.refNo);
+        setSolicitationNumber(preferred.solicitationNo || 'N/A');
+        setProjectTitle(preferred.title);
+        setProcuringEntity(preferred.procuringEntity);
+        if (preferred.dateTimeSubmitted) {
+          setDateTimeSubmitted(preferred.dateTimeSubmitted);
+        }
+        setEditingRow(null);
+        setIsNoOngoing(false);
+        setIsNoPrivateOngoing(false);
       }
     } else if (list.length === 0) {
       setSelectedOppId('');
@@ -122,8 +128,10 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
       setSolicitationNumber('');
       setProjectTitle('');
       setProcuringEntity('');
+      setEditingRow(null);
+      setContracts([]);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, activeProjectRefNo]);
 
   // Form Editor Modal state for editing or creating a contract row
   const [editingRow, setEditingRow] = useState<OngoingContractRow | null>(null);
@@ -133,11 +141,11 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
 
   // STRICT PROJECT ISOLATION: Load contracts strictly scoped to current projectRefNo & tenantId
   useEffect(() => {
-    if (!projectRefNo || !tenant?.id) {
+    if (!projectScopeKey || !tenant?.id) {
       setContracts([]);
       return;
     }
-    const storageKey = `bidocs_ongoing_${tenant.id}_${projectRefNo}`;
+    const storageKey = `bidocs_ongoing_${tenant.id}_${projectScopeKey}`;
     const saved = localStorage.getItem(storageKey);
     if (saved) {
       try {
@@ -149,13 +157,13 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
       } catch (e) {}
     }
     setContracts([]);
-  }, [tenant?.id, projectRefNo]);
+  }, [tenant?.id, projectScopeKey]);
 
   const updateAndSaveContracts = (updater: (prev: OngoingContractRow[]) => OngoingContractRow[]) => {
     setContracts(prev => {
       const nextContracts = updater(prev);
-      if (projectRefNo && tenant?.id) {
-        const storageKey = `bidocs_ongoing_${tenant.id}_${projectRefNo}`;
+      if (projectScopeKey && tenant?.id) {
+        const storageKey = `bidocs_ongoing_${tenant.id}_${projectScopeKey}`;
         localStorage.setItem(storageKey, JSON.stringify(nextContracts));
       }
       return nextContracts;
@@ -293,7 +301,16 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
             const pdfBytes = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
             const srcPdf = await PDFDocument.load(pdfBytes);
             const copiedPages = await mainPdfDoc.copyPages(srcPdf, srcPdf.getPageIndices());
-            copiedPages.forEach(p => mainPdfDoc.addPage(p));
+            copiedPages.forEach(p => {
+              const width = p.getWidth();
+              const height = p.getHeight();
+              const rotation = p.getRotation().angle;
+              const isPortrait = (rotation === 0 || rotation === 180) ? (width < height) : (height < width);
+              if (isPortrait) {
+                p.setRotation(degrees((rotation + 90) % 360));
+              }
+              mainPdfDoc.addPage(p);
+            });
           } catch (err) {
             console.error(`[PDFMerge] Error appending supporting PDF for ${row.projectName}:`, err);
           }
@@ -302,7 +319,9 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
 
       // 4. Return complete merged PDF DataURL
       const mergedPdfBytes = await mainPdfDoc.save();
-      const blob = new Blob([mergedPdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      const rawPdfBuffer = new ArrayBuffer(mergedPdfBytes.length);
+      new Uint8Array(rawPdfBuffer).set(mergedPdfBytes);
+      const blob = new Blob([rawPdfBuffer], { type: 'application/pdf' });
       return new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -351,14 +370,16 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
         mergedDataUrl,
         'Statement of All Ongoing Government & Private Contracts',
         projectRefNo,
-        projectTitle
+        projectTitle,
+        selectedOppId
       );
     } catch (e) {
       onSaveAndComplete(
         undefined,
         'Statement of All Ongoing Government & Private Contracts',
         projectRefNo,
-        projectTitle
+        projectTitle,
+        selectedOppId
       );
     }
   };
@@ -413,8 +434,8 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
       <style>{`
         @media print {
           @page {
-            size: 13in 8.5in;
-            margin: 0.4in;
+            size: 13in 8.5in landscape;
+            margin: 0.2in;
           }
           header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .proof-column, .actions-column, .sticky {
             display: none !important;
@@ -649,7 +670,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
           </div>
 
           {/* GPPB LEGAL PAPER CONTAINER (Legal 13" x 8.5" LANDSCAPE Printable Layout — EXPANDABLE MULTI-ENTRY FIT) */}
-          <div className="single-page-paper bg-white text-slate-900 font-legal p-6 sm:p-8 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1150px] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
+          <div className="single-page-paper print-document-sheet bg-white text-slate-900 font-legal p-6 sm:p-8 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 w-full max-w-[1280px] min-h-[760px] aspect-[13/8.5] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
 
             {/* Outer Legal Frame */}
             <div className="absolute inset-3 border-2 border-slate-900 pointer-events-none rounded-xl" />

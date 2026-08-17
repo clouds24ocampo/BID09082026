@@ -454,7 +454,7 @@ export const BidPackageBuilderView: React.FC = () => {
             <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <FileText className="w-4 h-4 text-blue-400" />
-                <span>Official Bid Package Front Cover Page (Legal 8.5" × 13")</span>
+                <span>Official Bid Package Front Cover Page (Legal 13" × 8.5")</span>
               </h3>
               <button onClick={() => setShowCoverPageModal(false)} className="text-slate-400 hover:text-white p-1">
                 ✕

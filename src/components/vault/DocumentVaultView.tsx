@@ -324,6 +324,7 @@ export const DocumentVaultView: React.FC = () => {
   const [activeProjectRefNo, setActiveProjectRefNo] = useState<string>('');
   const [activeProjectTitle, setActiveProjectTitle] = useState<string>('');
   const [activeProcuringEntity, setActiveProcuringEntity] = useState<string>('');
+  const activeProjectId = oppProjects.find((project) => project.refNo === activeProjectRefNo)?.id || '';
 
   React.useEffect(() => {
     const list = getOpportunityProjects(activeTenantId);
@@ -375,6 +376,7 @@ export const DocumentVaultView: React.FC = () => {
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
+      projectId: activeProjectId || undefined,
       philgepsRefNo: refNo,
       projectTitle: title
     };
@@ -411,6 +413,7 @@ export const DocumentVaultView: React.FC = () => {
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
+      projectId: activeProjectId || undefined,
       philgepsRefNo: refNo,
       projectTitle: title
     };
@@ -447,6 +450,7 @@ export const DocumentVaultView: React.FC = () => {
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
+      projectId: activeProjectId || undefined,
       philgepsRefNo: refNo,
       projectTitle: title
     };
@@ -485,6 +489,7 @@ export const DocumentVaultView: React.FC = () => {
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
+      projectId: activeProjectId || undefined,
       philgepsRefNo: refNo,
       projectTitle: title
     };
@@ -523,6 +528,7 @@ export const DocumentVaultView: React.FC = () => {
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
+      projectId: activeProjectId || undefined,
       philgepsRefNo: refNo,
       projectTitle: title
     };
@@ -561,6 +567,7 @@ export const DocumentVaultView: React.FC = () => {
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
+      projectId: activeProjectId || undefined,
       philgepsRefNo: refNo,
       projectTitle: title
     };
@@ -599,6 +606,7 @@ export const DocumentVaultView: React.FC = () => {
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
+      projectId: activeProjectId || undefined,
       philgepsRefNo: refNo,
       projectTitle: title
     };
@@ -651,7 +659,8 @@ export const DocumentVaultView: React.FC = () => {
 
   const openRetagModal = (item: DocumentVaultItem) => {
     setRetagTargetItem(item);
-    const initialRef = item.philgepsRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
+    const matchedOpp = item.projectId ? oppProjects.find(p => p.id === item.projectId) : undefined;
+    const initialRef = matchedOpp?.refNo || item.philgepsRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
     const initialTitle = item.projectTitle || activeProjectTitle || (oppProjects[0]?.title || '');
     setRetagProjectRefNo(initialRef);
     setRetagProjectTitle(initialTitle);
@@ -667,8 +676,10 @@ export const DocumentVaultView: React.FC = () => {
 
     setVaultItems(prev => prev.map(item => {
       if (item.id === retagTargetItem.id) {
+        const matchedProject = oppProjects.find(p => p.refNo === updatedRefNo);
         return {
           ...item,
+          projectId: matchedProject?.id || undefined,
           philgepsRefNo: updatedRefNo || undefined,
           projectTitle: updatedTitle || undefined
         };
@@ -829,7 +840,7 @@ export const DocumentVaultView: React.FC = () => {
     );
   };
 
-  const handleCompleteTemplate = async (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
+  const handleCompleteTemplate = async (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string, projId?: string) => {
     if (!fillingTemplateItem) return;
 
     const itemId = fillingTemplateItem.id;
@@ -874,6 +885,7 @@ export const DocumentVaultView: React.FC = () => {
       requiresIssueDate: false,
       requiresExpiryDate: false,
       conditionalRuleNote: 'Completed GPPB Statutory Legal Template',
+      projectId: projId || activeProjectId || undefined,
       philgepsRefNo: projectRefToUse || undefined,
       projectTitle: projectTitleToUse || undefined,
       previousVersions: []
@@ -1156,19 +1168,20 @@ export const DocumentVaultView: React.FC = () => {
 
   const technicalItemsForActiveProject = vaultItems.filter(item =>
     item.category === 'TECHNICAL' &&
-    activeProjectRefNo && item.philgepsRefNo === activeProjectRefNo
+    activeProjectRefNo &&
+    ((item.projectId && item.projectId === activeProjectId) || item.philgepsRefNo === activeProjectRefNo)
   );
 
   const hasTechnicalDocForActiveProject = (docCode: string) =>
     !!activeProjectRefNo && vaultItems.some(item =>
       item.category === 'TECHNICAL' &&
-      item.philgepsRefNo === activeProjectRefNo &&
+      ((item.projectId && item.projectId === activeProjectId) || item.philgepsRefNo === activeProjectRefNo) &&
       item.documentCode === docCode
     );
 
   const completedTechVaultItems = vaultItems.filter(item =>
     item.category === 'TECHNICAL' &&
-    (selectedTechProjectFilter === 'ALL' || item.philgepsRefNo === selectedTechProjectFilter)
+    (selectedTechProjectFilter === 'ALL' || item.philgepsRefNo === selectedTechProjectFilter || item.projectId === selectedTechProjectFilter)
   );
 
   const filteredGridItems = vaultItems.filter(item => {
@@ -2201,7 +2214,7 @@ export const DocumentVaultView: React.FC = () => {
 
                   <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
                     <p className="text-slate-300 font-bold">Ref: Section 30.1</p>
-                    <p className="text-emerald-400">Legal 8.5" × 13"</p>
+                    <p className="text-emerald-400">Legal 13" × 8.5"</p>
                   </div>
                 </div>
 
@@ -2236,7 +2249,7 @@ export const DocumentVaultView: React.FC = () => {
 
                   <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
                     <p className="text-slate-300 font-bold">Ref: Res. 09-2020</p>
-                    <p className="text-amber-400">Legal 8.5" × 13"</p>
+                    <p className="text-amber-400">Legal 13" × 8.5"</p>
                   </div>
                 </div>
 
@@ -2306,7 +2319,7 @@ export const DocumentVaultView: React.FC = () => {
 
                   <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
                     <p className="text-slate-300 font-bold">Ref: Section 32.2.1</p>
-                    <p className="text-blue-400">Legal 8.5" × 13"</p>
+                    <p className="text-blue-400">Legal 13" × 8.5"</p>
                   </div>
                 </div>
 
@@ -2376,7 +2389,7 @@ export const DocumentVaultView: React.FC = () => {
 
                   <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
                     <p className="text-slate-300 font-bold">Ref: Sec. 32.2.1</p>
-                    <p className="text-blue-400">Legal 8.5" × 13"</p>
+                    <p className="text-blue-400">Legal 13" × 8.5"</p>
                   </div>
                 </div>
 

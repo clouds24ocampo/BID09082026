@@ -3,9 +3,61 @@ import { Tenant, User, UserRole } from '../types';
 import { clearAllVaultData } from '../utils/vaultIndexedDB';
 import { debugLog } from '../utils/debugLog';
 
-// Default Initial State (No hardcoded seed data)
-const SEED_TENANTS: Tenant[] = [];
-const SEED_USERS: User[] = [];
+const DEMO_TENANT: Tenant = {
+  id: 'tenant-demo-bidocs',
+  companyName: 'Demo Company',
+  brandCode: 'DEMO',
+  brandColor: '#1e40af',
+  tin: '000-000-000-000',
+  secDtiRegNo: 'DEMO-SEC-0001',
+  philgepsPlatinumNo: 'PHILGEPS-DEMO-0001',
+  address: 'Demo Address, Philippines',
+  authorizedSignatory: {
+    name: 'Demo Signatory',
+    title: 'Authorized Representative',
+    tin: '000-000-000-000'
+  },
+  preferredRegime: 'RA_12009_NGPA',
+  primaryProcurementType: 'Goods & Supply',
+  createdAt: new Date().toISOString()
+};
+
+const DEMO_USER: User = {
+  id: 'user-demo-bidocs',
+  tenantId: DEMO_TENANT.id,
+  email: 'demo@bidocs.local',
+  fullName: 'Demo User',
+  role: 'SYSTEM_ADMIN',
+  password: 'BiDOCS#2026',
+  mustChangePassword: false,
+  lastLoginAt: new Date().toISOString()
+};
+
+const getSavedTenants = (): Tenant[] => {
+  const saved = localStorage.getItem('bidocs_tenants');
+  if (!saved) return [];
+  try {
+    const parsed = JSON.parse(saved);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((t: any) => t && t.companyName && t.id);
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return [];
+};
+
+const getSavedUsers = (): User[] => {
+  const saved = localStorage.getItem('bidocs_users');
+  if (!saved) return [];
+  try {
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    debugLog('AuthContext.tsx:users-init', 'Failed to parse bidocs_users', { error: String(e) }, 'A');
+    return [];
+  }
+};
 
 interface AuthContextType {
   currentUser: User | null;
@@ -25,65 +77,39 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tenants, setTenants] = useState<Tenant[]>(() => {
-    const saved = localStorage.getItem('bidocs_tenants');
-    if (!saved) return [];
-    try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) {
-        return parsed.filter((t: any) => t && t.companyName && t.id);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return [];
+    const saved = getSavedTenants();
+    return saved.length > 0 ? saved : [DEMO_TENANT];
   });
 
   const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('bidocs_users');
-    if (!saved) return [];
-    try {
-      const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      // #region agent log
-      debugLog('AuthContext.tsx:users-init', 'Failed to parse bidocs_users', { error: String(e) }, 'A');
-      // #endregion
-      return [];
-    }
+    const saved = getSavedUsers();
+    return saved.length > 0 ? saved : [DEMO_USER];
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('bidocs_current_user');
-    if (!saved) return null;
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      // #region agent log
-      debugLog('AuthContext.tsx:currentUser-init', 'Failed to parse bidocs_current_user', { error: String(e) }, 'A');
-      // #endregion
-      return null;
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        debugLog('AuthContext.tsx:currentUser-init', 'Failed to parse bidocs_current_user', { error: String(e) }, 'A');
+      }
     }
+    return DEMO_USER;
   });
 
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(() => {
+    const savedTenants = getSavedTenants();
     const savedUserStr = localStorage.getItem('bidocs_current_user');
-    const savedTenantsStr = localStorage.getItem('bidocs_tenants');
-    let activeTenants: Tenant[] = [];
-    if (savedTenantsStr) {
+    if (savedUserStr && savedTenants.length > 0) {
       try {
-        const parsed = JSON.parse(savedTenantsStr);
-        if (Array.isArray(parsed)) {
-          activeTenants = parsed.filter((t: any) => t && t.companyName && t.id);
-        }
+        const u = JSON.parse(savedUserStr);
+        return savedTenants.find((t: Tenant) => t.id === u.tenantId) || savedTenants[0];
       } catch (e) {
-        console.error(e);
+        debugLog('AuthContext.tsx:currentTenant-init', 'Failed to parse bidocs_current_user for tenant lookup', { error: String(e) }, 'A');
       }
     }
-    if (savedUserStr && activeTenants.length > 0) {
-      const u = JSON.parse(savedUserStr);
-      return activeTenants.find((t: Tenant) => t.id === u.tenantId) || activeTenants[0];
-    }
-    return activeTenants[0] || null;
+    return savedTenants[0] || DEMO_TENANT;
   });
 
   // Apply CSS primary brand color whenever active tenant changes
@@ -283,10 +309,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
     clearAllVaultData().catch(e => console.error('Failed to clear vault DB:', e));
-    setTenants([]);
-    setUsers([]);
-    setCurrentUser(null);
-    setCurrentTenant(null);
+    setTenants([DEMO_TENANT]);
+    setUsers([DEMO_USER]);
+    setCurrentUser(DEMO_USER);
+    setCurrentTenant(DEMO_TENANT);
+    localStorage.setItem('bidocs_tenants', JSON.stringify([DEMO_TENANT]));
+    localStorage.setItem('bidocs_users', JSON.stringify([DEMO_USER]));
+    localStorage.setItem('bidocs_current_user', JSON.stringify(DEMO_USER));
+    localStorage.setItem(`bidocs_user_password_${DEMO_USER.email.toLowerCase()}`, DEMO_USER.password || 'BiDOCS#2026');
+    localStorage.setItem(`bidocs_must_change_password_${DEMO_USER.email.toLowerCase()}`, 'false');
   };
 
   return (

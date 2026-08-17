@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
-import { PDFDocument } from 'pdf-lib';
-import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import { generateAndDownloadThreeLayerPdf, generateThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import html2canvas from 'html2canvas';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
@@ -36,7 +34,7 @@ export interface SectionViScheduleOfRequirementsProps {
   activeProjectRefNo?: string;
   activeProjectTitle?: string;
   activeProcuringEntity?: string;
-  onSaveAndComplete?: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string) => void;
+  onSaveAndComplete?: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string, projectId?: string) => void;
   onClose?: () => void;
 }
 
@@ -132,6 +130,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
   const [dateTimeSubmitted, setDateTimeSubmitted] = useState<string>(getNowDateTimeString());
+  const projectScopeKey = selectedOppId || projectRefNo || activeProjectRefNo;
 
   // Company Details State
   const [companyName] = useState(tenant?.companyName || 'Bidding Entity Corporate Name');
@@ -146,23 +145,37 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
-    if (list.length > 0 && !selectedOppId) {
-      const first = list[0];
-      setSelectedOppId(first.id);
-      setProjectRefNo(first.refNo);
-      setSolicitationNumber(first.solicitationNo || 'SOL-2026-001');
-      setProjectTitle(first.title);
-      setProcuringEntity(first.procuringEntity);
-      if (first.dateTimeSubmitted) {
-        setDateTimeSubmitted(first.dateTimeSubmitted);
+    if (list.length > 0) {
+      const preferred = list.find((project) => project.refNo === activeProjectRefNo) || list[0];
+      if (preferred && (preferred.id !== selectedOppId || preferred.refNo !== projectRefNo)) {
+        setSelectedOppId(preferred.id);
+        setProjectRefNo(preferred.refNo);
+        setSolicitationNumber(preferred.solicitationNo || 'SOL-2026-001');
+        setProjectTitle(preferred.title);
+        setProcuringEntity(preferred.procuringEntity);
+        if (preferred.dateTimeSubmitted) {
+          setDateTimeSubmitted(preferred.dateTimeSubmitted);
+        }
+        setItems(DEFAULT_SECTION_VI_ITEMS);
       }
+    } else {
+      setSelectedOppId('');
+      setProjectRefNo('');
+      setSolicitationNumber('');
+      setProjectTitle('');
+      setProcuringEntity('');
+      setItems(DEFAULT_SECTION_VI_ITEMS);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, activeProjectRefNo]);
 
   // Load shared Section VI data for current project
   useEffect(() => {
-    if (!projectRefNo) return;
-    const storageKey = `bidocs_sec_vi_${tenant?.id || 'default'}_${projectRefNo}`;
+    if (!projectScopeKey) {
+      setItems(DEFAULT_SECTION_VI_ITEMS);
+      return;
+    }
+    setItems(DEFAULT_SECTION_VI_ITEMS);
+    const storageKey = `bidocs_sec_vi_${tenant?.id || 'default'}_${projectScopeKey}`;
     const saved = localStorage.getItem(storageKey);
     if (saved) {
       try {
@@ -172,12 +185,12 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
         }
       } catch (e) { }
     }
-  }, [projectRefNo, tenant?.id]);
+  }, [projectScopeKey, tenant?.id]);
 
   const saveSharedItems = (newItems: ScheduleItem[]) => {
     setItems(newItems);
-    if (projectRefNo) {
-      const storageKey = `bidocs_sec_vi_${tenant?.id || 'default'}_${projectRefNo}`;
+    if (projectScopeKey) {
+      const storageKey = `bidocs_sec_vi_${tenant?.id || 'default'}_${projectScopeKey}`;
       localStorage.setItem(storageKey, JSON.stringify(newItems));
     }
   };
@@ -255,41 +268,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     }
   };
 
-  const renderSectionViPdfDataUrl = async (templateElem: HTMLElement): Promise<string | undefined> => {
-    const canvas = await html2canvas(templateElem, {
-      scale: 2.5,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      ignoreElements: (element: Element) => {
-        return (
-          element.classList.contains('print:hidden') ||
-          element.classList.contains('no-export') ||
-          element.tagName === 'BUTTON'
-        );
-      }
-    });
-
-    const imgDataUrl = canvas.toDataURL('image/png');
-    const pdfDoc = await PDFDocument.create();
-    const pngImage = await pdfDoc.embedPng(imgDataUrl);
-    const page = pdfDoc.addPage([canvas.width, canvas.height]);
-    page.drawImage(pngImage, {
-      x: 0,
-      y: 0,
-      width: canvas.width,
-      height: canvas.height
-    });
-
-    const pdfBytes = await pdfDoc.save();
-    const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  };
-
   const handleExportExcel = () => {
     const cleanProj = (projectRefNo || 'PRJ').replace(/[^a-zA-Z0-9]/g, '_');
     const fileName = `${cleanProj}_Section_VI_Schedule_of_Requirements_${todayStr}.csv`;
@@ -298,7 +276,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     csvContent += `"SECTION VI. SCHEDULE OF REQUIREMENTS"\n`;
     csvContent += `"Company Name:","${companyName.replace(/"/g, '""')}"\n`;
     csvContent += `"Company Address:","${companyAddress.replace(/"/g, '""')}"\n`;
-    csvContent += `"Project Ref. No.:","${projectRefNo.replace(/"/g, '""')}"\n`;
+    csvContent += `"PhilGEPS Ref. No.:","${projectRefNo.replace(/"/g, '""')}"\n`;
     csvContent += `"Solicitation No.:","${solicitationNumber.replace(/"/g, '""')}"\n`;
     csvContent += `"Project Title:","${projectTitle.replace(/"/g, '""')}"\n`;
     csvContent += `"Procuring Entity:","${procuringEntity.replace(/"/g, '""')}"\n`;
@@ -333,15 +311,20 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       const templateElem = document.getElementById('section-vi-paper') as HTMLElement;
       let dataUrl: string | undefined = undefined;
       if (templateElem) {
-        dataUrl = await renderSectionViPdfDataUrl(templateElem);
+        dataUrl = await generateThreeLayerPdfDataUrl(
+          null,
+          templateElem,
+          undefined,
+          `${projectRefNo}_Section_VI_Schedule_of_Requirements_${todayStr}.pdf`
+        );
       }
       if (onSaveAndComplete) {
-        onSaveAndComplete(dataUrl, item.name, projectRefNo, projectTitle);
+        onSaveAndComplete(dataUrl, item.name, projectRefNo, projectTitle, selectedOppId);
       }
     } catch (error) {
       console.error('Failed to generate Section VI PDF:', error);
       if (onSaveAndComplete) {
-        onSaveAndComplete(undefined, item.name, projectRefNo, projectTitle);
+        onSaveAndComplete(undefined, item.name, projectRefNo, projectTitle, selectedOppId);
       }
     } finally {
       setIsExporting(false);
@@ -359,8 +342,8 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       <style>{`
         @media print {
           @page {
-            size: 13in 8.5in;
-            margin: 0.4in;
+            size: 13in 8.5in landscape;
+            margin: 0.2in;
           }
           header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .sticky {
             display: none !important;
@@ -382,11 +365,12 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 auto !important;
-            padding: 0.3in !important;
+            padding: 0.18in !important;
             border: none !important;
             box-shadow: none !important;
             background: #ffffff !important;
             color: #000000 !important;
+            overflow: visible !important;
           }
         }
       `}</style>
@@ -445,10 +429,10 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
         </div>
 
         {/* Scrollable Container */}
-        <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6 print:p-0 print:bg-white">
+        <div className="p-4 overflow-y-auto flex-1 bg-slate-950 space-y-4 print:p-0 print:bg-white">
 
           {/* Interactive Screen Controls */}
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
+          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 print:hidden no-export">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex-1 space-y-1.5">
                 <label className="block text-slate-200 font-mono text-xs font-bold flex items-center justify-between">
@@ -547,7 +531,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
           </div>
 
           {/* OFFICIAL PRINTABLE PAPER DOCUMENT SHEET */}
-          <div id="section-vi-paper" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1150px] flex flex-col justify-between font-serif">
+          <div id="section-vi-paper" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1280px] min-h-[760px] aspect-[13/8.5] flex flex-col justify-between font-serif">
             <div>
               {/* COMPANY & PROJECT HEADER BLOCK */}
               <div className="border-b-2 border-black pb-3 mb-5 space-y-2 font-serif">
@@ -559,7 +543,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                 <div className="space-y-1.5 text-xs font-serif text-black pt-1">
                   <div className="flex items-center justify-between gap-6">
                     <div>
-                      <span className="font-bold">PROJECT REF. NO: </span>
+                      <span className="font-bold">PHILGEPS REF. NO: </span>
                       <span className="font-mono font-semibold text-blue-950">{projectRefNo || 'N/A'}</span>
                     </div>
                     <div className="text-right">
@@ -567,19 +551,21 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                       <span className="font-mono font-semibold text-blue-950">{solicitationNumber || 'N/A'}</span>
                     </div>
                   </div>
-                  <div className="flex items-start justify-between gap-6">
-                    <div className="flex-1">
+                  <div className="flex flex-wrap items-start justify-between gap-6">
+                    <div className="flex-1 min-w-[18rem]">
                       <span className="font-bold">NAME OF PROJECT: </span>
                       <span className="font-semibold text-black">{projectTitle || 'N/A'}</span>
                     </div>
-                    <div className="shrink-0 text-right">
-                      <span className="font-bold">DATE & TIME OF SUBMISSION: </span>
-                      <span className="font-mono font-semibold text-blue-950">{formatDateTimeDisplay(dateTimeSubmitted)}</span>
+                    <div className="flex flex-wrap items-start justify-end gap-x-6 gap-y-1 text-right">
+                      <div>
+                        <span className="font-bold">PROCURING ENTITY: </span>
+                        <span className="text-slate-900">{procuringEntity || 'N/A'}</span>
+                      </div>
+                      <div className="shrink-0">
+                        <span className="font-bold">DATE & TIME OF SUBMISSION: </span>
+                        <span className="font-mono font-semibold text-blue-950">{formatDateTimeDisplay(dateTimeSubmitted)}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <span className="font-bold">PROCURING ENTITY: </span>
-                    <span className="text-slate-900">{procuringEntity || 'N/A'}</span>
                   </div>
                 </div>
               </div>

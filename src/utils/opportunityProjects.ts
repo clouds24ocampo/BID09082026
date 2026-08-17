@@ -92,7 +92,7 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
 
         return {
           id: item.id || `opp-stg-${idx}`,
-          refNo: item.projectReferenceNumber || item.philgepsRefNo || item.refNo || `PRJ-${idx + 1}`,
+          refNo: item.philgepsRefNo || item.projectReferenceNumber || item.refNo || `PRJ-${idx + 1}`,
           solicitationNo: item.solicitationNumber || item.solicitationNo || 'N/A',
           title: item.title || item.biddingProjectTitle || 'Untitled Opportunity',
           procuringEntity: typeof item.procuringEntity === 'string'

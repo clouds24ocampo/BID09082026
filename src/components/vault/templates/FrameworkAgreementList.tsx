@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
-import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import { generateAndDownloadThreeLayerPdf, generateThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import html2canvas from 'html2canvas';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
@@ -40,7 +39,7 @@ export interface FrameworkAgreementListProps {
   activeProjectRefNo?: string;
   activeProjectTitle?: string;
   activeProcuringEntity?: string;
-  onSaveAndComplete?: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string) => void;
+  onSaveAndComplete?: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string, projectId?: string) => void;
   onClose?: () => void;
 }
 
@@ -115,7 +114,7 @@ const DEFAULT_FRAMEWORK_ITEMS: FrameworkItem[] = [
 ];
 
 export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
-  item = { id: 'fal-01', code: 'FAL-01', name: 'Framework Agreement List & Technical Specifications' },
+  item = { id: 'fal-01', code: 'FAL-01', name: 'Framework Agreement List' },
   tenant,
   activeProjectRefNo = 'PRJ-2026-901283',
   activeProjectTitle = 'Infrastructure & IT Systems Modernization Project',
@@ -141,6 +140,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
   const [dateTimeSubmitted, setDateTimeSubmitted] = useState<string>(getNowDateTimeString());
+  const projectScopeKey = selectedOppId || projectRefNo || activeProjectRefNo;
 
   // Delivery Timeframe & Remarks State (Page 1)
   const defaultDelivery = '30 Calendar Days upon receipt of NTP';
@@ -153,38 +153,48 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
   const [signatoryName] = useState(tenant?.authorizedSignatory?.name || 'Authorized Signatory Name');
   const [signatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'President / General Manager');
 
-  // Items State (100% Mirrored with Section VI & Section VII)
+  // Items State (mirrors Section VI only)
   const [items, setItems] = useState<FrameworkItem[]>(DEFAULT_FRAMEWORK_ITEMS);
 
   // Load real saved opportunity projects
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
-    if (list.length > 0 && !selectedOppId) {
-      const first = list[0];
-      setSelectedOppId(first.id);
-      setProjectRefNo(first.refNo);
-      setSolicitationNumber(first.solicitationNo || 'SOL-2026-001');
-      setProjectTitle(first.title);
-      setProcuringEntity(first.procuringEntity);
-      if (first.dateTimeSubmitted) {
-        setDateTimeSubmitted(first.dateTimeSubmitted);
+    if (list.length > 0) {
+      const preferred = list.find((project) => project.refNo === activeProjectRefNo) || list[0];
+      if (preferred && (preferred.id !== selectedOppId || preferred.refNo !== projectRefNo)) {
+        setSelectedOppId(preferred.id);
+        setProjectRefNo(preferred.refNo);
+        setSolicitationNumber(preferred.solicitationNo || 'SOL-2026-001');
+        setProjectTitle(preferred.title);
+        setProcuringEntity(preferred.procuringEntity);
+        if (preferred.dateTimeSubmitted) {
+          setDateTimeSubmitted(preferred.dateTimeSubmitted);
+        }
+        setItems(DEFAULT_FRAMEWORK_ITEMS);
+        setExpectedDelivery(defaultDelivery);
+        setRemarks('Prices are inclusive of 12% VAT, delivery, testing, and standard warranty.');
       }
+    } else {
+      setSelectedOppId('');
+      setProjectRefNo('');
+      setSolicitationNumber('');
+      setProjectTitle('');
+      setProcuringEntity('');
+      setItems(DEFAULT_FRAMEWORK_ITEMS);
+      setExpectedDelivery(defaultDelivery);
+      setRemarks('Prices are inclusive of 12% VAT, delivery, testing, and standard warranty.');
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, activeProjectRefNo]);
 
-  // Automatic Shared Synchronization Effect (Mirrors Section VI for Page 1 & Section VII for Page 2)
+  // Automatic Shared Synchronization Effect (mirrors Section VI only)
   useEffect(() => {
-    if (!projectRefNo) return;
+    if (!projectScopeKey) return;
     const tenantKey = tenant?.id || 'default';
 
     // 1. Mirror Section VI (Page 1 data: Unit Cost, Quantity, Total, Delivery)
-    const secViKey = `bidocs_sec_vi_${tenantKey}_${projectRefNo}`;
+    const secViKey = `bidocs_sec_vi_${tenantKey}_${projectScopeKey}`;
     const savedSecVi = localStorage.getItem(secViKey);
-
-    // 2. Mirror Section VII (Page 2 data: Compliance, Brand/Model, Evidence)
-    const techSpecsKey = `bidocs_tech_specs_${tenantKey}_${projectRefNo}`;
-    const savedTechSpecs = localStorage.getItem(techSpecsKey);
 
     let baseItems = [...DEFAULT_FRAMEWORK_ITEMS];
 
@@ -209,34 +219,12 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       } catch (e) { }
     }
 
-    if (savedTechSpecs) {
-      try {
-        const parsedTech = JSON.parse(savedTechSpecs);
-        if (Array.isArray(parsedTech) && parsedTech.length > 0) {
-          baseItems = baseItems.map((it, idx) => {
-            const matched = parsedTech[idx];
-            if (matched) {
-              return {
-                ...it,
-                description: matched.specification || it.description,
-                maxQuantity: matched.quantity || it.maxQuantity,
-                compliance: matched.compliance || it.compliance,
-                brandModel: matched.brandModel !== undefined ? matched.brandModel : it.brandModel,
-                complianceEvidence: matched.complianceEvidence !== undefined ? matched.complianceEvidence : it.complianceEvidence
-              };
-            }
-            return it;
-          });
-        }
-      } catch (e) { }
-    }
-
     setItems(baseItems);
-  }, [projectRefNo, tenant?.id]);
+  }, [projectScopeKey, tenant?.id]);
 
   const saveSharedItems = (newItems: FrameworkItem[]) => {
     setItems(newItems);
-    if (!projectRefNo) return;
+    if (!projectScopeKey) return;
     const tenantKey = tenant?.id || 'default';
 
     // Save back to Section VI storage
@@ -248,19 +236,8 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       total: it.totalCost,
       delivered: expectedDelivery
     }));
-    localStorage.setItem(`bidocs_sec_vi_${tenantKey}_${projectRefNo}`, JSON.stringify(secViPayload));
+    localStorage.setItem(`bidocs_sec_vi_${tenantKey}_${projectScopeKey}`, JSON.stringify(secViPayload));
 
-    // Save back to Section VII storage
-    const techSpecsPayload = newItems.map((it, idx) => ({
-      id: it.id || String(idx + 1),
-      itemNo: String(idx + 1),
-      specification: it.description,
-      quantity: it.maxQuantity,
-      compliance: it.compliance,
-      brandModel: it.brandModel,
-      complianceEvidence: it.complianceEvidence
-    }));
-    localStorage.setItem(`bidocs_tech_specs_${tenantKey}_${projectRefNo}`, JSON.stringify(techSpecsPayload));
   };
 
   const handleFieldChange = (index: number, field: keyof FrameworkItem, value: any) => {
@@ -360,7 +337,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     const fileName = `${cleanProj}_Framework_Agreement_Package_${todayStr}.csv`;
 
     let csvContent = '\uFEFF';
-    csvContent += `"FRAMEWORK AGREEMENT LIST & TECHNICAL SPECIFICATIONS (PAGE 1 & PAGE 2)"\n`;
+    csvContent += `"FRAMEWORK AGREEMENT LIST (PAGE 1)"\n`;
     csvContent += `"Company Name:","${companyName.replace(/"/g, '""')}"\n`;
     csvContent += `"Company Address:","${companyAddress.replace(/"/g, '""')}"\n`;
     csvContent += `"Project Ref. No.:","${projectRefNo.replace(/"/g, '""')}"\n`;
@@ -381,18 +358,6 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       csvContent += `${itemNum},${desc},${unitCost},${qty},${totCost}\n`;
     });
 
-    csvContent += `\n"--- FORM 2: TECHNICAL SPECIFICATIONS & STATEMENT OF COMPLIANCE (PAGE 2) ---"\n`;
-    csvContent += `"Item Number","Maximum Quantity","Technical Specifications / Scope of Work","Brand & Model Offered","Statement of Compliance"\n`;
-
-    items.forEach((it, idx) => {
-      const itemNum = `"${idx + 1}"`;
-      const qty = `"${(it.maxQuantity || '').replace(/"/g, '""')}"`;
-      const spec = `"${(it.description || '').replace(/"/g, '""')}"`;
-      const bm = `"${(it.brandModel || 'N/A').replace(/"/g, '""')}"`;
-      const compText = `"${(formatFullComplianceText(it)).replace(/"/g, '""')}"`;
-      csvContent += `${itemNum},${qty},${spec},${bm},${compText}\n`;
-    });
-
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -411,48 +376,25 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       const page2Elem = document.getElementById('framework-page-2');
       let dataUrl: string | undefined = undefined;
 
-      const opts = {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        ignoreElements: (element: Element) => {
-          return (
-            element.classList.contains('print:hidden') ||
-            element.classList.contains('no-export') ||
-            element.classList.contains('proof-column') ||
-            element.classList.contains('actions-column') ||
-            element.tagName === 'BUTTON'
-          );
-        }
-      };
+      const elementsToSave: HTMLElement[] = [];
+      if (page1Elem) elementsToSave.push(page1Elem);
+      if (page2Elem) elementsToSave.push(page2Elem);
 
-      if (page1Elem && page2Elem) {
-        const canvas1 = await html2canvas(page1Elem, opts);
-        const canvas2 = await html2canvas(page2Elem, opts);
-
-        const combinedCanvas = document.createElement('canvas');
-        combinedCanvas.width = Math.max(canvas1.width, canvas2.width);
-        combinedCanvas.height = canvas1.height + canvas2.height;
-
-        const ctx = combinedCanvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
-          ctx.drawImage(canvas1, 0, 0);
-          ctx.drawImage(canvas2, 0, canvas1.height);
-          dataUrl = combinedCanvas.toDataURL('image/png');
-        }
-      } else if (page1Elem) {
-        const canvas = await html2canvas(page1Elem, opts);
-        dataUrl = canvas.toDataURL('image/png');
+      if (elementsToSave.length > 0) {
+        dataUrl = await generateThreeLayerPdfDataUrl(
+          null,
+          elementsToSave,
+          undefined,
+          `${projectRefNo}_Framework_Agreement_Package_${todayStr}.pdf`
+        );
       }
 
       if (onSaveAndComplete) {
-        onSaveAndComplete(dataUrl, item.name, projectRefNo, projectTitle);
+        onSaveAndComplete(dataUrl, item.name, projectRefNo, projectTitle, selectedOppId);
       }
     } catch {
       if (onSaveAndComplete) {
-        onSaveAndComplete(undefined, item.name, projectRefNo, projectTitle);
+        onSaveAndComplete(undefined, item.name, projectRefNo, projectTitle, selectedOppId);
       }
     } finally {
       setIsExporting(false);
@@ -489,8 +431,8 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       <style>{`
         @media print {
           @page {
-            size: 13in 8.5in;
-            margin: 0.4in;
+            size: 13in 8.5in landscape;
+            margin: 0.2in;
           }
           header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .proof-column, .actions-column, .sticky {
             display: none !important;
@@ -513,8 +455,8 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             position: relative !important;
             width: 100% !important;
             max-width: 100% !important;
-            margin: 0 auto 0.4in auto !important;
-            padding: 0.3in !important;
+            margin: 0 auto !important;
+            padding: 0.18in !important;
             border: none !important;
             box-shadow: none !important;
             background: #ffffff !important;
@@ -538,13 +480,13 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <span>Framework Agreement List & Technical Specifications</span>
+                <span>Framework Agreement List</span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-bold uppercase">
-                  100% Mirrored Package (13" × 8.5")
+                  Page 1 Only (13" × 8.5")
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5 truncate max-w-xl">
-                Page 1: Synced with Section VI • Page 2: Synced 100% with Section VII Technical Specifications
+                Page 1: Synced with Section VI • Technical Specifications removed from this package
               </p>
             </div>
           </div>
@@ -553,7 +495,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             <button
               onClick={handleExportExcel}
               className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-600 transition shadow flex items-center gap-1.5 border border-emerald-500/40"
-              title="Export Page 1 & Page 2 directly to Microsoft Excel CSV"
+              title="Export Page 1 directly to Microsoft Excel CSV"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
               <span>Export to Excel</span>
@@ -564,14 +506,14 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
               className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition shadow flex items-center gap-1.5"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>{isExporting ? 'Exporting PDF...' : 'Export 2-Page PDF'}</span>
+              <span>{isExporting ? 'Exporting PDF...' : 'Export PDF'}</span>
             </button>
             <button
               onClick={handlePrint}
               className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print Both Pages</span>
+              <span>Print Page</span>
             </button>
             {onClose && (
               <button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
@@ -593,7 +535,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                     <Building2 className="w-4 h-4 text-blue-400" />
                     Select Target Project from Opportunity Finder:
                   </span>
-                  <span className="text-[10px] text-emerald-400 font-semibold font-mono">⚡ 100% Auto-mirrored with Section VI & Section VII</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold font-mono">⚡ Auto-mirrored with Section VI only</span>
                 </label>
                 <select
                   value={selectedOppId}
@@ -679,13 +621,13 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[11px] flex items-center gap-2">
               <Sparkles className="w-4 h-4 shrink-0 text-purple-400" />
               <span>
-                <strong>100% Identical & Auto-Mirrored:</strong> Page 1 is identical to Section VI (Price & Delivery Matrix). Page 2 is identical to Section VII Technical Specifications. Zero manual re-editing needed.
+                <strong>Auto-Mirrored:</strong> Page 1 is identical to Section VI (Price & Delivery Matrix). Technical Specifications are no longer included in this package.
               </span>
             </div>
           </div>
 
           {/* PAGE 1: FRAMEWORK AGREEMENT LIST (100% Identical to Section VI) */}
-          <div id="framework-page-1" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1150px] flex flex-col justify-between font-serif">
+          <div id="framework-page-1" className="single-page-paper print-document-sheet bg-white text-black p-4 sm:p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1280px] min-h-[760px] aspect-[13/8.5] flex flex-col justify-between font-serif">
             <div>
               {/* COMPANY & PROJECT HEADER BLOCK */}
               <div className="border-b-2 border-black pb-3 mb-5 space-y-2 font-serif">
@@ -885,212 +827,20 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                   showCaption={false}
                 />
                 <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
-                  PAGE 1 OF 2 • VERIFIED GPPB FORM • {projectRefNo}
+                  PAGE 1 OF 1 • VERIFIED GPPB FORM • {projectRefNo}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* PAGE 2: TECHNICAL SPECIFICATIONS & STATEMENT OF COMPLIANCE (100% Identical to Section VII) */}
-          <div id="framework-page-2" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1150px] flex flex-col justify-between font-serif">
-            <div>
-              {/* PAGE 2 HEADER BLOCK */}
-              <div className="border-b-2 border-black pb-3 mb-5 space-y-2 font-serif">
-                <div className="text-center pb-2 border-b border-slate-300">
-                  <h2 className="text-lg sm:text-xl font-bold text-black uppercase tracking-wide font-serif">{companyName}</h2>
-                  <p className="text-xs text-slate-700 font-serif mt-0.5">{companyAddress}</p>
-                </div>
-
-                <div className="space-y-1.5 text-xs font-serif text-black pt-1">
-                  <div className="flex items-center justify-between gap-6">
-                    <div>
-                      <span className="font-bold">PROJECT REF. NO: </span>
-                      <span className="font-mono font-semibold text-blue-950">{projectRefNo || 'N/A'}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-bold">SOLICITATION NO: </span>
-                      <span className="font-mono font-semibold text-blue-950">{solicitationNumber || 'N/A'}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-start justify-between gap-6">
-                    <div className="flex-1">
-                      <span className="font-bold">NAME OF PROJECT: </span>
-                      <span className="font-semibold text-black">{projectTitle || 'N/A'}</span>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <span className="font-bold">DATE & TIME OF SUBMISSION: </span>
-                      <span className="font-mono font-semibold text-blue-950">{formatDateTimeDisplay(dateTimeSubmitted)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Page 2 Header Title */}
-              <div className="text-center mb-4">
-                <h1 className="text-2xl sm:text-3xl font-bold font-serif italic text-black tracking-tight">
-                  Section VII. Technical Specifications
-                </h1>
-                <p className="text-[11px] font-mono text-slate-600 uppercase mt-0.5 font-bold">
-                  (FORM 2 Use this form for Framework Agreement — TECHNICAL SPECIFICATIONS & STATEMENT OF COMPLIANCE)
-                </p>
-              </div>
-
-              {/* TECHNICAL SPECIFICATIONS & STATEMENT OF COMPLIANCE TABLE (100% Identical 4%, 6%, 56%, 34% ratios) */}
-              <table className={`w-full border-collapse border-2 border-black text-black table-fixed ${getTableFontSizeClass()}`}>
-                <thead>
-                  <tr className="border-b-2 border-black bg-white font-serif">
-                    <th colSpan={4} className="border border-black px-3 py-2 text-center font-bold uppercase italic text-sm sm:text-base">
-                      TECHNICAL SPECIFICATIONS
-                    </th>
-                  </tr>
-                  <tr className="border-b-2 border-black bg-slate-50 font-serif">
-                    <th className="border border-black px-1 py-2 text-center font-bold italic w-[4%]">
-                      Item
-                    </th>
-                    <th className="border border-black px-1 py-2 text-center font-bold italic w-[6%]">
-                      Maximum Quantity
-                    </th>
-                    <th className="border border-black px-3 py-2 text-center font-bold italic w-[56%]">
-                      Technical Specifications / Scope of Work
-                    </th>
-                    <th className="border border-black px-3 py-2 text-left font-bold italic w-[34%]">
-                      <div className="text-center font-bold text-black mb-1">Statement of Compliance</div>
-                      <div className="text-[9px] font-serif leading-tight text-slate-800 font-normal normal-case p-1.5 bg-amber-50/60 rounded border border-amber-200/80">
-                        [Bidders must state here either <strong>"Comply"</strong> or <strong>"Not Comply"</strong> against each of the individual parameters of each Specification stating the corresponding performance parameter of the equipment offered. Statements of "Comply" or "Not Comply" must be supported by evidence in a Bidders Bid and cross-referenced to that evidence. Evidence shall be in the form of manufacturer's un-amended sales literature, unconditional statements of specification and compliance issued by the manufacturer, samples, independent test data etc., as appropriate.]
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((rowItem, idx) => (
-                    <tr key={`p2-${rowItem.id}`} className="border-b border-black hover:bg-slate-50/50 transition-colors">
-                      <td className="border border-black px-1.5 py-3 text-center font-serif font-bold align-top">
-                        <span className="block pt-0.5">{idx + 1}</span>
-                      </td>
-
-                      <td className="border border-black px-1.5 py-3 font-serif text-center align-top break-words">
-                        <div className="font-medium text-black pt-0.5">{rowItem.maxQuantity || 'N/A'}</div>
-                      </td>
-
-                      <td className="border border-black px-3 py-3 font-serif align-top break-words">
-                        <div className="font-serif text-black leading-relaxed whitespace-pre-wrap">{rowItem.description}</div>
-                      </td>
-
-                      <td className="border border-black px-3 py-3 font-serif align-top break-words bg-emerald-50/20">
-                        <div className="space-y-2">
-                          {!isExporting && (
-                            <div className="flex items-center gap-1.5 print:hidden no-export">
-                              <button
-                                type="button"
-                                onClick={() => handleComplyClick(idx)}
-                                className={`px-2.5 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 border ${rowItem.compliance === 'Comply'
-                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow'
-                                  : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
-                                  }`}
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                                <span>Comply</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleNotComplyClick(idx)}
-                                className={`px-2.5 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 border ${rowItem.compliance === 'Not Comply'
-                                  ? 'bg-red-600 text-white border-red-600 shadow'
-                                  : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
-                                  }`}
-                              >
-                                <AlertCircle className="w-3.5 h-3.5" />
-                                <span>Not Comply</span>
-                              </button>
-                            </div>
-                          )}
-
-                          {!isExporting && rowItem.compliance === 'Comply' && (
-                            <div className="space-y-1 print:hidden no-export">
-                              <label className="text-[10px] font-mono font-bold text-slate-700 flex items-center gap-1">
-                                <Tag className="w-3 h-3 text-blue-600" />
-                                <span>Brand & Model Offered (Optional):</span>
-                              </label>
-                              <input
-                                type="text"
-                                value={rowItem.brandModel || ''}
-                                onChange={(e) => handleFieldChange(idx, 'brandModel', e.target.value)}
-                                placeholder="e.g. Cisco Catalyst 9300 / Dell PowerEdge R750"
-                                className="w-full bg-blue-50/50 text-blue-950 border border-blue-300 rounded p-1 text-xs font-serif outline-none focus:border-blue-500 font-semibold"
-                              />
-                            </div>
-                          )}
-
-                          {!isExporting && (
-                            <textarea
-                              rows={2}
-                              value={rowItem.complianceEvidence || ''}
-                              onChange={(e) => handleFieldChange(idx, 'complianceEvidence', e.target.value)}
-                              placeholder="State cross-reference supporting evidence (e.g. Manufacturer Sales Literature, Brochure Page 4)..."
-                              className="w-full bg-white text-black border border-slate-300 rounded p-1.5 text-xs font-serif outline-none focus:border-blue-500 print:hidden"
-                            />
-                          )}
-
-                          <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-xs leading-relaxed`}>
-                            <div className={`font-bold mb-1 ${rowItem.compliance === 'Comply' ? 'text-emerald-950' : 'text-red-950'}`}>
-                              Statement: {rowItem.compliance}
-                            </div>
-                            {rowItem.compliance === 'Comply' && rowItem.brandModel && (
-                              <div className="font-semibold text-blue-950 mb-0.5">
-                                Offered Brand & Model: {rowItem.brandModel}
-                              </div>
-                            )}
-                            <div className="text-slate-900 whitespace-pre-wrap italic">
-                              {formatFullComplianceText(rowItem)}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Page 2 Signatory Block */}
-            <div className="mt-8 pt-4 border-t border-slate-300 flex items-end justify-between text-xs font-serif">
-              <div>
-                <p className="font-bold text-black uppercase">{companyName}</p>
-                <div className="mt-6 border-b border-black w-64"></div>
-                <p className="font-bold text-black mt-1 uppercase">{signatoryName}</p>
-                <p className="text-slate-700">{signatoryTitle}</p>
-              </div>
-
-              <div className="text-right flex flex-col items-end">
-                <DocumentQrCode
-                  details={{
-                    companyName: companyName,
-                    documentName: 'Technical Specifications (Page 2)',
-                    documentNumber: `FAL-02-${projectRefNo || '2026-901283'}`,
-                    projectTitle: projectTitle,
-                    projectRefNo: projectRefNo,
-                    procuringEntity: procuringEntity,
-                    dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
-                    documentCategory: 'Legal Documents',
-                    generatedBy: companyName
-                  }}
-                  size={90}
-                  showCaption={false}
-                />
-                <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
-                  PAGE 2 OF 2 • VERIFIED GPPB FORM • {projectRefNo}
-                </span>
-              </div>
-            </div>
-          </div>
-
+              
         </div>
 
         {/* Bottom Modal Actions */}
         <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900 shrink-0 print:hidden no-export">
           <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Class A Legal Package — Framework Agreement List & Technical Specifications (13" × 8.5")</span>
+            <span>Class A Legal Package — Framework Agreement List (13" × 8.5")</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -1108,7 +858,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
               className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 transition shadow-lg flex items-center gap-2"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>{isExporting ? 'Saving Package...' : 'Save & Complete 2-Page Package'}</span>
+              <span>{isExporting ? 'Saving Package...' : 'Save & Complete Package'}</span>
             </button>
           </div>
         </div>

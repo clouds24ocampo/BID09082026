@@ -24,6 +24,7 @@ export default defineConfig({
   server: {
     port: 3001,
     strictPort: true,
+    host: true,
     open: false,
     watch: {
       ignored: ['**/AntigravitySkills/**', '**/.agents/**']
