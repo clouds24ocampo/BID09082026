@@ -26,7 +26,12 @@ export default defineConfig({
     strictPort: true,
     host: true,
     open: false,
+    hmr: {
+      overlay: true
+    },
     watch: {
+      usePolling: true,
+      interval: 100,
       ignored: ['**/AntigravitySkills/**', '**/.agents/**']
     }
   }
