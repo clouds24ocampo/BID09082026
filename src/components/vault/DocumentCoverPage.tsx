@@ -1,217 +1,295 @@
 import React from 'react';
 import { DocumentVaultItem, Tenant } from '../../types';
-import { ShieldCheck, Building2, FileText, QrCode, Award, Mail, Phone, MapPin } from 'lucide-react';
+import { ShieldCheck, Award } from 'lucide-react';
 import DocumentQrCode from '../common/DocumentQrCode';
 
 interface DocumentCoverPageProps {
-  item: DocumentVaultItem;
+  item: DocumentVaultItem & {
+    procuringEntity?: string;
+    approvedBudget?: number | string;
+    preBidConferenceDate?: string;
+    submissionDeadline?: string;
+  };
   tenant: Tenant | null;
   incrementNumber?: number;
+  folderCopy?: string;
+  envelopeName?: string;
 }
 
-// Clean 25x25 Scannable SVG QR Code generator encoding Company Name + All Project Information
-const generateScannableQrSvg = (text: string) => {
-  let hash = 0;
-  for (let i = 0; i < text.length; i++) {
-    hash = (hash << 5) - hash + text.charCodeAt(i);
-    hash |= 0;
-  }
+export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({ 
+  item, 
+  tenant, 
+  incrementNumber = 1,
+  folderCopy = 'ORIGINAL',
+  envelopeName
+}) => {
+  // Normalize folder copy display
+  const normalizedCopy = (folderCopy || 'ORIGINAL').toUpperCase();
+  const folderClean = normalizedCopy.replace(/\s+/g, '_');
   
-  const size = 25;
-  const rects: React.ReactNode[] = [];
-  
-  const isFinderPattern = (r: number, c: number) => {
-    if (r < 7 && c < 7) return true; // Top-Left
-    if (r < 7 && c >= size - 7) return true; // Top-Right
-    if (r >= size - 7 && c < 7) return true; // Bottom-Left
-    return false;
-  };
-
-  const renderFinder = (startR: number, startC: number) => {
-    return (
-      <g key={`finder-${startR}-${startC}`}>
-        <rect x={startC * 4} y={startR * 4} width={28} height={28} fill="#0f172a" />
-        <rect x={(startC + 1) * 4} y={(startR + 1) * 4} width={20} height={20} fill="#ffffff" />
-        <rect x={(startC + 2) * 4} y={(startR + 2) * 4} width={12} height={12} fill="#0f172a" />
-      </g>
-    );
-  };
-
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      if (!isFinderPattern(r, c)) {
-        const val = Math.abs(Math.sin((r * 31 + c * 17 + hash) * 1234.5678));
-        if (val > 0.45) {
-          rects.push(
-            <rect
-              key={`mod-${r}-${c}`}
-              x={c * 4}
-              y={r * 4}
-              width={4}
-              height={4}
-              fill="#0f172a"
-            />
-          );
-        }
-      }
-    }
-  }
-
-  return (
-    <svg 
-      viewBox="0 0 100 100" 
-      className="w-32 h-32 bg-white p-2 rounded-xl shadow-lg border-2 border-slate-900 shrink-0"
-      aria-label="Scannable QR Verification Code"
-    >
-      <rect width="100" height="100" fill="#ffffff" />
-      {renderFinder(0, 0)}
-      {renderFinder(0, size - 7)}
-      {renderFinder(size - 7, 0)}
-      {rects}
-    </svg>
-  );
-};
-
-export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({ item, tenant, incrementNumber = 1 }) => {
-  // Digital Verification Seal ID: QCC-[INCREMENT_NUMBER]-[PROJECT_NUMBER] Verified
-  const projectNumClean = (item.philgepsRefNo || 'PRJ-2026-901283').replace(/^PhilGEPS-/, '');
+  // Format Project Reference & Increments for Official Digital Seal
+  const projectNumClean = (item.philgepsRefNo || 'PRJ-2026-901283').replace(/^PhilGEPS-?/i, '');
   const formattedInc = String(incrementNumber).padStart(3, '0');
-  const verificationSealId = `QCC-${formattedInc}-${projectNumClean} Verified`;
+  const verificationSealId = `${tenant?.brandCode || 'QCC'}-${folderClean}-${formattedInc}-${projectNumClean} Verified`;
 
-  // QR Payload encoding Company Name + All Project Information
-  const qrPayload = JSON.stringify({
-    company_name: tenant?.companyName || 'Philippine Compliance Enterprise',
-    company_tin: tenant?.tin || '000-000-000-000',
-    company_address: tenant?.address || 'Metro Manila, Philippines',
-    company_email: 'compliance@enterprise.com.ph',
-    company_contact: '+63 917 123 4567',
-    project_information: {
-      project_title: item.projectTitle || 'Infrastructure & IT Systems Modernization Project',
-      philgeps_ref_no: item.philgepsRefNo || 'PhilGEPS-2026-901283',
-      procuring_entity: 'Department of Information & Communications Technology',
-      approved_budget_contract: '₱12,500,000.00',
-      pre_bid_date: '2026-08-15 10:00 AM',
-      submission_deadline: '2026-08-30 02:00 PM'
-    },
-    document_info: {
-      document_name: item.documentName,
-      document_number: item.documentNumber || item.id,
-      category: item.category
-    }
-  });
+  // Determine Envelope, Sub-Component, and Category Badges with 100% precision
+  const rawCategory = ((item.category as string) || '').toUpperCase();
+  const nameLower = (item.documentName || '').toLowerCase();
+
+  const isFinancial = rawCategory === 'FINANCIAL' || 
+                      rawCategory.includes('FINANCIAL') || 
+                      nameLower.includes('bid form') || 
+                      nameLower.includes('price schedule') || 
+                      nameLower.includes('bill of quantities') || 
+                      nameLower.includes('boq') || 
+                      nameLower.includes('detailed estimate') || 
+                      nameLower.includes('summary of bid price') || 
+                      nameLower.includes('cash flow');
+
+  const isLegal = !isFinancial && (
+    rawCategory === 'LEGAL' || 
+    rawCategory === 'CORPORATE_LEGAL' || 
+    rawCategory.includes('ELIGIBILITY') || 
+    rawCategory.includes('LEGAL') || 
+    nameLower.includes('philgeps') || 
+    nameLower.includes('sec') || 
+    nameLower.includes('dti') || 
+    nameLower.includes('mayor') || 
+    nameLower.includes('tax clearance') || 
+    nameLower.includes('audited') || 
+    nameLower.includes('afs') || 
+    nameLower.includes('pcab') || 
+    nameLower.includes('secretary') || 
+    nameLower.includes('board resolution') || 
+    nameLower.includes('special power of attorney') || 
+    nameLower.includes('spa') || 
+    nameLower.includes('joint venture') || 
+    nameLower.includes('jva')
+  );
+
+  const isTechnical = !isFinancial && !isLegal;
+  
+  // Explicit Envelope Name
+  const officialEnvelopeName = isFinancial
+    ? 'ENVELOPE 2: FINANCIAL BID PROPOSAL'
+    : isLegal
+      ? 'ENVELOPE 1: LEGAL & ELIGIBILITY COMPONENT'
+      : 'ENVELOPE 1: TECHNICAL PROPOSAL COMPONENT';
+
+  // Explicit Component Classification inside the Envelope
+  const componentLabel = isFinancial
+    ? 'FINANCIAL PROPOSAL COMPONENT'
+    : isLegal
+      ? 'LEGAL & ELIGIBILITY COMPONENT'
+      : 'TECHNICAL PROPOSAL COMPONENT';
+
+  // Category Tag for Pill Badge (Strictly Specific: LEGAL / TECHNICAL / FINANCIAL)
+  const categoryTag = isFinancial
+    ? 'FINANCIAL DOCUMENT'
+    : isLegal
+      ? 'LEGAL DOCUMENT'
+      : 'TECHNICAL DOCUMENT';
+
+  // Format Dates
+  const issuedDateFormatted = item.issuedDate ? new Date(item.issuedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : null;
+  const expiryDateFormatted = item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : null;
+
+  // Format Approved Budget cleanly from string or number
+  const rawAbc = item.approvedBudget || (item as any).abc;
+  const formattedAbc = typeof rawAbc === 'number'
+    ? `₱${rawAbc.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : (rawAbc ? (String(rawAbc).startsWith('₱') ? String(rawAbc) : `₱${rawAbc}`) : '₱12,500,000.00');
 
   return (
-    <div className="print-document-sheet w-full bg-white text-slate-900 font-legal p-6 sm:p-10 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-6 max-w-[650px] min-h-[950px] aspect-[8.5/13] mx-auto my-4 text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none print:break-inside-avoid print:page-break-inside-avoid">
-      
-      {/* Outer Border Frame */}
-      <div className="absolute inset-3 border-2 border-blue-950 pointer-events-none rounded-xl" />
+    <div 
+      className="print-document-sheet portrait w-full bg-white text-black font-sans p-4 sm:p-5 border-4 border-black rounded-2xl shadow-2xl max-w-[800px] aspect-[8.5/13] mx-auto my-2 text-left relative flex flex-col justify-between print:m-0 print:border-4 print:border-black print:shadow-none print:p-5 print:break-inside-avoid print:page-break-inside-avoid overflow-hidden"
+      style={{ 
+        boxSizing: 'border-box',
+        width: '100%',
+        maxWidth: '800px',
+        aspectRatio: '8.5 / 13'
+      }}
+    >
+      {/* Strict 8.5in x 13in Portrait Print Stylesheet */}
+      <style>{`
+        @media print {
+          @page {
+            size: 8.5in 13in portrait !important;
+            margin: 0mm !important;
+          }
+          html, body, #root {
+            width: 8.5in !important;
+            height: 13in !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            overflow: hidden !important;
+          }
+          .print-document-sheet {
+            width: 8.5in !important;
+            height: 13in !important;
+            max-height: 13in !important;
+            margin: 0 !important;
+            padding: 0.35in 0.4in !important;
+            border: 4px solid #000000 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            page-break-after: avoid !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            overflow: hidden !important;
+          }
+        }
+      `}</style>
 
-      {/* HEADER SECTION: Logo, Company Name, Address, Email, Contact Number */}
-      <div className="space-y-6">
-        <div className="border-b-4 border-blue-900 pb-5 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            {/* Company Logo / Brand Badge */}
-            <div className="w-14 h-14 rounded-xl bg-blue-950 text-white flex items-center justify-center font-black text-2xl shadow-md shrink-0 overflow-hidden p-1 border border-slate-900">
-              {tenant?.logoUrl ? (
-                <img src={tenant.logoUrl} alt="Company Logo" className="w-full h-full object-contain bg-white rounded-lg" />
-              ) : (
-                tenant?.brandCode || 'BD'
-              )}
-            </div>
-            <div className="space-y-0.5">
-              <h1 className="text-base font-black text-blue-950 uppercase tracking-wide leading-snug">
-                {tenant?.companyName || 'Not Set (Register Company in Profile)'}
-              </h1>
-              <p className="text-[11px] text-slate-600 flex items-center gap-2">
-                <span><MapPin className="w-3 h-3 text-blue-900 inline mr-0.5" />{tenant?.address || 'Metro Manila, Philippines'}</span>
-              </p>
-              <p className="text-[11px] text-slate-600 flex items-center gap-3">
-                <span><Mail className="w-3 h-3 text-blue-900 inline mr-0.5" />compliance@enterprise.com.ph</span>
-                <span><Phone className="w-3 h-3 text-blue-900 inline mr-0.5" />+63 917 123 4567</span>
-              </p>
-            </div>
-          </div>
-        </div>
+      {/* Inner Elegant Border Frame */}
+      <div className="absolute inset-2 border-2 border-black rounded-xl pointer-events-none print:inset-2" />
 
-        {/* DOCUMENT INFO BLOCK: Bold Document Name & Document Number */}
-        <div className="text-center bg-slate-50 border-2 border-slate-300 p-6 rounded-xl space-y-2">
-          <span className="text-[10px] font-mono font-extrabold uppercase tracking-widest text-blue-950 bg-blue-100 px-3 py-1 rounded-full border border-blue-200">
-            {item.category?.toLowerCase().includes('financial') || item.documentName.toLowerCase().includes('financial') || item.documentName.toLowerCase().includes('afs') || item.documentName.toLowerCase().includes('nfcc')
-              ? 'FINANCIAL EXHIBIT'
-              : item.category?.toLowerCase().includes('class_b') || item.documentName.toLowerCase().includes('joint venture') || item.documentName.toLowerCase().includes('jva')
-              ? 'CLASS B ELIGIBILITY DOCUMENT'
-              : item.category?.toLowerCase().includes('technical') || item.documentName.toLowerCase().includes('statement') || item.documentName.toLowerCase().includes('omnibus') || item.documentName.toLowerCase().includes('security')
-              ? 'TECHNICAL EXHIBIT'
-              : 'CLASS A ELIGIBILITY DOCUMENT'}
-          </span>
-          <h2 className="text-2xl font-black text-slate-950 mt-1 leading-tight uppercase">
-            {item.documentName}
-          </h2>
-          <p className="text-xs font-mono text-slate-700">
-            Document Number: <strong className="text-sm font-black text-blue-950">{item.documentNumber || 'SEC-REG-2026-901283'}</strong>
-          </p>
-        </div>
-
-        {/* PROJECT & COMPANY INFORMATION BLOCK */}
-        <div className="p-5 rounded-xl bg-slate-50 border-2 border-slate-300 space-y-3 text-xs">
-          <div className="flex items-center gap-2 border-b-2 border-slate-300 pb-2 text-blue-950 font-black uppercase text-[11px] tracking-wide">
-            <Award className="w-4 h-4 text-blue-950" />
-            <span>Project & Company Information</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-slate-800 leading-snug">
-            <p><span className="font-bold text-slate-950">Project Name:</span> {item.projectTitle || 'Infrastructure & IT Systems Modernization Project'}</p>
-            <p><span className="font-bold text-slate-950">PhilGEPS Ref No:</span> <span className="font-mono font-bold text-blue-950">{item.philgepsRefNo || 'PhilGEPS-2026-901283'}</span></p>
-            <p><span className="font-bold text-slate-950">Procuring Entity:</span> Department of Information & Communications Technology</p>
-            <p><span className="font-bold text-slate-950">Approved Budget (ABC):</span> <span className="font-bold text-emerald-800">₱12,500,000.00</span></p>
-            <p><span className="font-bold text-slate-950">Pre-Bid Conference:</span> August 15, 2026 at 10:00 AM</p>
-            <p><span className="font-bold text-slate-950">Submission Deadline:</span> August 30, 2026 at 02:00 PM</p>
-            <p><span className="font-bold text-slate-950">Company Name:</span> {tenant?.companyName || 'Philippine Compliance Enterprise'}</p>
-            <p><span className="font-bold text-slate-950">PhilGEPS Platinum No:</span> <span className="font-mono">{tenant?.philgepsPlatinumNo || '2026-89102-PLAT'}</span></p>
-          </div>
-        </div>
-      </div>
-
-      {/* FOOTER SECTION: QR Code & Digital Verification Seal */}
-      <div className="border-t-2 border-slate-950 pt-4 space-y-3">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-          
-          {/* Scannable Smartphone QR Code */}
-          <DocumentQrCode
-            details={{
-              companyName: tenant?.companyName || 'Bidding Entity Corporate Name',
-              documentName: item.documentName,
-              documentNumber: item.documentNumber || item.id || 'SEC-REG-2026-901283',
-              projectTitle: item.projectTitle || 'Infrastructure & IT Systems Modernization Project',
-              projectRefNo: item.philgepsRefNo || 'PRJ-2026-901283',
-              procuringEntity: 'Department of Information & Communications Technology',
-              dateTimeSubmitted: new Date().toLocaleString(),
-              documentCategory: 'Cover Page',
-              generatedBy: tenant?.companyName
-            }}
-            size={120}
-            className="shrink-0"
-          />
-
-          {/* DIGITAL VERIFICATION SEAL */}
-          <div className="text-right shrink-0 space-y-1.5 border-l-2 border-slate-300 pl-5">
-            <span className="text-[10px] font-mono uppercase text-slate-500 block font-bold">DIGITAL VERIFICATION SEAL</span>
-            
-            <div className="flex items-center gap-2 text-blue-950 bg-emerald-50 border-2 border-emerald-600 px-3.5 py-1.5 rounded-xl shadow-sm">
-              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span className="font-mono font-black text-xs tracking-tight text-emerald-950">
-                {verificationSealId}
+      {/* TOP & MIDDLE SECTIONS */}
+      <div className="space-y-3 relative z-10">
+        
+        {/* 1. Envelope & Section Banner (Clean White with Black Border) */}
+        <div className="flex items-center justify-between gap-2 bg-white text-black px-3.5 py-2 rounded-xl border-2 border-black shadow-sm">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-black" />
+              <span className="text-xs font-black tracking-wider uppercase text-black">
+                {envelopeName || officialEnvelopeName}
               </span>
             </div>
+            <p className="text-[9.5px] font-mono text-neutral-700 font-semibold tracking-wide pl-3.5">
+              SECTION: <strong className="text-black uppercase">{componentLabel}</strong>
+            </p>
           </div>
 
+          <span className="px-3 py-1 rounded-lg font-mono font-black text-xs uppercase tracking-widest bg-neutral-100 text-black border-2 border-black shrink-0">
+            {normalizedCopy.includes('ORIGINAL') ? 'ORIGINAL COPY' : normalizedCopy}
+          </span>
         </div>
 
-        <div className="text-center pt-2 border-t border-slate-200 text-[10px] font-mono text-slate-500 font-bold">
-          BIDOCS AES-256 Verified Official Bidding Document Seal
+        {/* 3. DOCUMENT INFORMATION BLOCK (Centerpiece - Pure B&W) */}
+        <div className="text-center bg-neutral-50 border-2 border-black p-4 sm:p-5 rounded-xl space-y-2.5 shadow-sm">
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-xs sm:text-[13px] font-mono font-black uppercase tracking-wider px-4 py-1 rounded-full border-2 border-black bg-white text-black shadow-sm">
+              {categoryTag}
+            </span>
+          </div>
+
+          <h2 className="text-xl sm:text-2xl md:text-[26px] font-black text-black leading-tight uppercase tracking-tight px-2">
+            {item.documentName}
+          </h2>
+        </div>
+
+        {/* 4. PROJECT & PROCUREMENT INFORMATION BLOCK (Pure B&W) */}
+        <div className="p-2.5 sm:p-3 rounded-xl bg-neutral-50 border-2 border-black space-y-1 text-[9.5px] sm:text-[10px]">
+          <div className="flex items-center gap-1.5 border-b border-black pb-1 text-black font-black uppercase text-[10px] tracking-wide">
+            <Award className="w-3.5 h-3.5 text-black" />
+            <span>Project & Procurement Information</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-black leading-snug">
+            <p>
+              <span className="font-bold">Project Title:</span>{' '}
+              <span className="font-semibold">{item.projectTitle || 'Target Bidding Project'}</span>
+            </p>
+            <p>
+              <span className="font-bold">PhilGEPS Ref No:</span>{' '}
+              <span className="font-mono font-bold">{item.philgepsRefNo || 'PhilGEPS-13200679'}</span>
+            </p>
+            <p>
+              <span className="font-bold">Procuring Entity:</span>{' '}
+              <span>{item.procuringEntity || 'Procuring Agency'}</span>
+            </p>
+            <p>
+              <span className="font-bold">Approved Budget (ABC):</span>{' '}
+              <span className="font-mono font-bold">{formattedAbc}</span>
+            </p>
+            <p>
+              <span className="font-bold">Pre-Bid Conference:</span>{' '}
+              <span>{item.preBidConferenceDate || 'August 15, 2026 at 10:00 AM'}</span>
+            </p>
+            <p>
+              <span className="font-bold">Submission Deadline:</span>{' '}
+              <span>{item.submissionDeadline || 'August 30, 2026 at 02:00 PM'}</span>
+            </p>
+            <p>
+              <span className="font-bold">Bidding Company:</span>{' '}
+              <span className="font-semibold">{tenant?.companyName || 'Quantum Cloud Corporation'}</span>
+            </p>
+            <p>
+              <span className="font-bold">PhilGEPS Platinum No:</span>{' '}
+              <span className="font-mono font-bold">{tenant?.philgepsPlatinumNo || '63a5sd1a3s168af47asd6f4'}</span>
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      {/* FOOTER SECTION: Copy Identity Bar + QR Code & Official Verification Seal (Pure B&W) */}
+      <div className="space-y-1.5 pt-1.5 relative z-10">
+        
+        {/* PROMINENT COPY IDENTITY BAR AT THE TOP OF FOOTER */}
+        <div className="flex items-center justify-between bg-white text-black px-3 py-1 rounded-lg border-2 border-black shadow-sm">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-black" />
+            <span className="text-[10px] font-mono uppercase font-black tracking-wider text-black">
+              DOCUMENT COPY DESIGNATION:
+            </span>
+          </div>
+          <span className="px-2 py-0.5 rounded font-mono font-black text-[10.5px] uppercase tracking-widest bg-neutral-100 text-black border border-black">
+            {normalizedCopy.includes('ORIGINAL') ? 'ORIGINAL COPY' : normalizedCopy}
+          </span>
+        </div>
+
+        {/* QR Code & Digital Verification Seal Box */}
+        <div className="border-t border-black pt-2 flex flex-row items-center justify-between gap-4">
+          
+          {/* Scannable Smartphone QR Code */}
+          <div className="flex items-center gap-2 shrink-0">
+            <DocumentQrCode
+              details={{
+                companyName: tenant?.companyName || 'Quantum Cloud Corporation',
+                documentName: item.documentName,
+                documentNumber: item.documentNumber || item.id || 'REF-STATUTORY-001',
+                folderCopy: normalizedCopy,
+                projectTitle: item.projectTitle || 'Target Bidding Project',
+                projectRefNo: item.philgepsRefNo || 'PhilGEPS-13200679',
+                procuringEntity: item.procuringEntity || 'Procuring Agency',
+                dateTimeSubmitted: item.submissionDeadline || item.preBidConferenceDate || issuedDateFormatted || 'August 30, 2026 at 02:00 PM',
+                submissionDate: item.submissionDeadline || 'August 30, 2026 at 02:00 PM',
+                documentCategory: `${normalizedCopy} Document Cover Page`,
+                generatedBy: tenant?.companyName
+              }}
+              size={64}
+              showCaption={false}
+              className="shrink-0"
+            />
+            <div className="text-[8px] font-mono font-bold text-neutral-700 leading-tight hidden sm:block">
+              <span>SCAN TO</span><br />
+              <span>VERIFY</span>
+            </div>
+          </div>
+
+          {/* FILE COPY & DOCUMENT NUMBER IDENTIFIER (Pure B&W - Clean & Simple) */}
+          <div className="text-right flex-1 min-w-0 space-y-1 border-l-2 border-black pl-3 flex flex-col items-end justify-center">
+            <div className="inline-flex items-center gap-1.5 text-black bg-neutral-100 border-2 border-black px-3 py-1 rounded-lg shadow-sm">
+              <span className="font-mono font-black text-xs uppercase tracking-wider text-black">
+                {normalizedCopy.includes('ORIGINAL') ? 'ORIGINAL FILE' : normalizedCopy.includes('COPY_1') || normalizedCopy === 'COPY 1' ? 'COPY 1 FILE' : normalizedCopy.includes('COPY_2') || normalizedCopy === 'COPY 2' ? 'COPY 2 FILE' : `${normalizedCopy} FILE`}
+              </span>
+            </div>
+            <div className="text-[10px] sm:text-[11px] font-mono text-black font-black uppercase tracking-wide">
+              DOC NO: <span>{item.documentNumber || item.philgepsRefNo || '214263'}</span>
+            </div>
+          </div>
+
         </div>
       </div>
 
     </div>
   );
 };
+
+export default DocumentCoverPage;

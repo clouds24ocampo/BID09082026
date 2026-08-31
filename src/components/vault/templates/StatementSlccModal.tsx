@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
-import { PDFDocument } from 'pdf-lib';
+import { savePdfData, loadPdfData } from '../../../utils/vaultIndexedDB';
+import { PDFDocument, degrees } from 'pdf-lib';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import html2canvas from 'html2canvas';
@@ -32,6 +33,7 @@ export interface SlccContractRow {
   ownerName: string;
   ownerAddress: string;
   ownerTelephone: string;
+  ownerEmail?: string;
   natureOfWork: string;
   bidderRole: string;
   amountAward: string;
@@ -54,7 +56,7 @@ interface StatementSlccModalProps {
   activeProjectRefNo?: string;
   activeProjectTitle?: string;
   activeProcuringEntity?: string;
-  onSaveAndComplete: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string) => void;
+  onSaveAndComplete: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string, projectId?: string) => void;
   onClose: () => void;
 }
 
@@ -102,19 +104,25 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
   // Opportunity Finder Project List State (Strictly real user opportunities)
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
+  const projectScopeKey = selectedOppId || projectRefNo || activeProjectRefNo;
 
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
-    if (list.length > 0 && !selectedOppId) {
-      const first = list[0];
-      setSelectedOppId(first.id);
-      setProjectRefNo(first.refNo);
-      setSolicitationNumber(first.solicitationNo || 'N/A');
-      setProjectTitle(first.title);
-      setProcuringEntity(first.procuringEntity);
-      if (first.dateTimeSubmitted) {
-        setDateTimeSubmitted(first.dateTimeSubmitted);
+    if (list.length > 0) {
+      const preferred = list.find((project) => project.refNo === activeProjectRefNo) || list[0];
+      if (preferred && (preferred.id !== selectedOppId || preferred.refNo !== projectRefNo)) {
+        setSelectedOppId(preferred.id);
+        setProjectRefNo(preferred.refNo);
+        setSolicitationNumber(preferred.solicitationNo || 'N/A');
+        setProjectTitle(preferred.title);
+        setProcuringEntity(preferred.procuringEntity);
+        if (preferred.dateTimeSubmitted) {
+          setDateTimeSubmitted(preferred.dateTimeSubmitted);
+        }
+        setEditingRow(null);
+        setIsNoSlcc(false);
+        setIsNoPrivateSlcc(false);
       }
     } else if (list.length === 0) {
       setSelectedOppId('');
@@ -122,8 +130,10 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
       setSolicitationNumber('');
       setProjectTitle('');
       setProcuringEntity('');
+      setEditingRow(null);
+      setContracts([]);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, activeProjectRefNo]);
 
   // Form Editor Modal state for editing or creating an SLCC contract row
   const [editingRow, setEditingRow] = useState<SlccContractRow | null>(null);
@@ -131,32 +141,66 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
   // CLEAN SLATE: Initial state has zero dummy contracts (Project-scoped)
   const [contracts, setContracts] = useState<SlccContractRow[]>([]);
 
-  // STRICT PROJECT ISOLATION: Load contracts strictly scoped to current projectRefNo & tenantId
+  // STRICT PROJECT ISOLATION & ZERO-CACHE FRESH SLATE: Load contracts strictly scoped to current projectRefNo & tenantId
   useEffect(() => {
-    if (!projectRefNo || !tenant?.id) {
-      setContracts([]);
+    // ALWAYS start with a fresh slate - purge transient state
+    setContracts([]);
+    setEditingRow(null);
+    if (!projectScopeKey || !tenant?.id) {
       return;
     }
-    const storageKey = `bidocs_slcc_${tenant.id}_${projectRefNo}`;
+    let cancelled = false;
+    const storageKey = `bidocs_slcc_${tenant.id}_${projectScopeKey}`;
     const saved = localStorage.getItem(storageKey);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setContracts(parsed);
+        const parsed: SlccContractRow[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Asynchronously hydrate PDF data URLs from IndexedDB (supports 200MB+)
+          Promise.all(parsed.map(async (row) => {
+            if (row.pdfFile && !row.pdfFile.fileDataUrl) {
+              try {
+                const pdfData = await loadPdfData(`slcc_row_pdf_${tenant.id}_${row.id}`);
+                if (pdfData) {
+                  return {
+                    ...row,
+                    pdfFile: { ...row.pdfFile, fileDataUrl: pdfData }
+                  };
+                }
+              } catch (e) {}
+            }
+            return row;
+          })).then(hydratedRows => {
+            if (!cancelled) setContracts(hydratedRows);
+          });
           return;
         }
       } catch (e) {}
     }
-    setContracts([]);
-  }, [tenant?.id, projectRefNo]);
+    if (!cancelled) setContracts([]);
+    return () => { cancelled = true; };
+  }, [tenant?.id, projectScopeKey]);
 
   const updateAndSaveContracts = (updater: (prev: SlccContractRow[]) => SlccContractRow[]) => {
     setContracts(prev => {
       const nextContracts = updater(prev);
-      if (projectRefNo && tenant?.id) {
-        const storageKey = `bidocs_slcc_${tenant.id}_${projectRefNo}`;
-        localStorage.setItem(storageKey, JSON.stringify(nextContracts));
+      if (projectScopeKey && tenant?.id) {
+        const storageKey = `bidocs_slcc_${tenant.id}_${projectScopeKey}`;
+        if (nextContracts.length === 0) {
+          localStorage.removeItem(storageKey);
+        } else {
+          // Strip heavy base64 fileDataUrl from localStorage payload to keep metadata under 1KB
+          const sanitized = nextContracts.map(row => {
+            if (!row.pdfFile) return row;
+            const { fileDataUrl, ...meta } = row.pdfFile;
+            return { ...row, pdfFile: meta };
+          });
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(sanitized));
+          } catch (e) {
+            console.error('[SLCC] Error saving sanitized metadata to localStorage:', e);
+          }
+        }
       }
       return nextContracts;
     });
@@ -173,8 +217,9 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
         ownerName: '',
         ownerAddress: '',
         ownerTelephone: '',
+        ownerEmail: '',
         natureOfWork: '',
-        bidderRole: 'Sole Prime Contractor',
+        bidderRole: 'Main Contractor',
         amountAward: '',
         amountCompletion: '',
         duration: '',
@@ -228,30 +273,33 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
     }
 
     const reader = new FileReader();
-    reader.onload = () => {
-      setContracts(prev => prev.map(c => {
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      
+      // 1. Offload heavy PDF binary to IndexedDB (supports 200MB+)
+      if (tenant?.id) {
+        try {
+          await savePdfData(`slcc_row_pdf_${tenant.id}_${id}`, dataUrl);
+        } catch (e) {
+          console.error('[SLCC] Error saving row PDF to IndexedDB:', e);
+        }
+      }
+
+      const pdfMeta = {
+        fileName: file.name,
+        fileSizeBytes: file.size,
+        fileDataUrl: dataUrl
+      };
+
+      updateAndSaveContracts(prev => prev.map(c => {
         if (c.id === id) {
-          return {
-            ...c,
-            pdfFile: {
-              fileName: file.name,
-              fileSizeBytes: file.size,
-              fileDataUrl: reader.result as string
-            }
-          };
+          return { ...c, pdfFile: pdfMeta };
         }
         return c;
       }));
 
       if (editingRow && editingRow.id === id) {
-        setEditingRow(prev => prev ? {
-          ...prev,
-          pdfFile: {
-            fileName: file.name,
-            fileSizeBytes: file.size,
-            fileDataUrl: reader.result as string
-          }
-        } : null);
+        setEditingRow(prev => prev ? { ...prev, pdfFile: pdfMeta } : null);
       }
     };
     reader.readAsDataURL(file);
@@ -287,13 +335,22 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
 
       // 3. Append all uploaded supporting PDF documents attached to SLCC contract rows
       for (const row of contracts) {
-        if (row.pdfFile?.fileDataUrl && row.pdfFile.fileDataUrl.startsWith('data:application/pdf')) {
+        let pdfData = row.pdfFile?.fileDataUrl;
+        if (!pdfData && tenant?.id && row.id) {
           try {
-            const base64Str = row.pdfFile.fileDataUrl.split(',')[1] || row.pdfFile.fileDataUrl;
+            pdfData = await loadPdfData(`slcc_row_pdf_${tenant.id}_${row.id}`);
+          } catch (e) {}
+        }
+
+        if (pdfData && pdfData.startsWith('data:application/pdf')) {
+          try {
+            const base64Str = pdfData.split(',')[1] || pdfData;
             const pdfBytes = Uint8Array.from(atob(base64Str), c => c.charCodeAt(0));
             const srcPdf = await PDFDocument.load(pdfBytes);
             const copiedPages = await mainPdfDoc.copyPages(srcPdf, srcPdf.getPageIndices());
-            copiedPages.forEach(p => mainPdfDoc.addPage(p));
+            copiedPages.forEach(p => {
+              mainPdfDoc.addPage(p);
+            });
           } catch (err) {
             console.error(`[PDFMerge] Error appending supporting PDF for ${row.projectName}:`, err);
           }
@@ -302,7 +359,9 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
 
       // 4. Return complete merged PDF DataURL
       const mergedPdfBytes = await mainPdfDoc.save();
-      const blob = new Blob([mergedPdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      const rawPdfBuffer = new ArrayBuffer(mergedPdfBytes.length);
+      new Uint8Array(rawPdfBuffer).set(mergedPdfBytes);
+      const blob = new Blob([rawPdfBuffer], { type: 'application/pdf' });
       return new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
@@ -351,14 +410,16 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
         mergedDataUrl,
         'Statement of Single Largest Completed Contract (SLCC)',
         projectRefNo,
-        projectTitle
+        projectTitle,
+        selectedOppId
       );
     } catch (e) {
       onSaveAndComplete(
         undefined,
         'Statement of Single Largest Completed Contract (SLCC)',
         projectRefNo,
-        projectTitle
+        projectTitle,
+        selectedOppId
       );
     }
   };
@@ -413,8 +474,8 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
       <style>{`
         @media print {
           @page {
-            size: 13in 8.5in;
-            margin: 0.4in;
+            size: 13in 8.5in landscape;
+            margin: 0mm;
           }
           header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .proof-column, .actions-column, .sticky {
             display: none !important;
@@ -426,7 +487,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
             margin: 0 !important;
             padding: 0 !important;
             width: 100% !important;
-            height: auto !important;
+            height: 100% !important;
             max-height: none !important;
             overflow: visible !important;
             border: none !important;
@@ -435,20 +496,22 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
           .single-page-paper {
             display: block !important;
             position: relative !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 auto !important;
-            padding: 0.25in !important;
+            width: 100vw !important;
+            max-width: 100vw !important;
+            min-height: 100vh !important;
+            margin: 0 !important;
+            padding: 0.12in 0.18in !important;
             border: none !important;
             box-shadow: none !important;
             background: #ffffff !important;
             color: #000000 !important;
             overflow: visible !important;
+            box-sizing: border-box !important;
           }
         }
       `}</style>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-7xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-[99vw] overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[98vh] flex flex-col">
 
         {/* Top Header Bar */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
@@ -495,9 +558,9 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-white font-mono flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-blue-400" />
-                Project Information (Read-Only / Auto-Filled from Opportunity Finder)
+                Target Bidding Project Auto-Fill Settings (Linked to Opportunity Finder)
               </span>
-              <span className="text-[10px] text-slate-400 font-mono">Values below are pulled from the selected project and locked for consistency.</span>
+              <span className="text-[10px] text-slate-400 font-mono">Changes auto-fill directly onto Legal Template header below</span>
             </div>
 
             {/* Opportunity Finder Project Dropdown */}
@@ -511,6 +574,10 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                 onChange={(e) => {
                   const val = e.target.value;
                   setSelectedOppId(val);
+                  setContracts([]);
+                  setEditingRow(null);
+                  setIsNoSlcc(false);
+                  setIsNoPrivateSlcc(false);
                   const found = oppProjects.find(p => p.id === val || p.refNo === val);
                   if (found) {
                     setProjectRefNo(found.refNo);
@@ -537,23 +604,6 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   </>
                 )}
               </select>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3 text-xs pt-1 border-t border-slate-800/80">
-              {[
-                { label: '1. Philgeps Ref No.', value: projectRefNo || 'Not selected' },
-                { label: '2. Solicitation No.', value: solicitationNumber || 'N/A' },
-                { label: '3. Name of Project', value: projectTitle || 'Not selected' },
-                { label: '4. Procuring Entity', value: procuringEntity || 'Not selected' },
-                { label: '5. Date & Time of Submission', value: dateTimeSubmitted ? formatDateTimeDisplay(dateTimeSubmitted) : 'N/A' }
-              ].map(item => (
-                <div key={item.label} className="bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-2">
-                  <div className="block text-slate-400 font-mono text-[10px] mb-1">{item.label}</div>
-                  <div className="text-white font-mono font-bold text-[11px] break-words [overflow-wrap:anywhere]">
-                    {item.value}
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
 
@@ -610,17 +660,14 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
           </div>
 
           {/* GPPB LEGAL PAPER CONTAINER (Legal 13" x 8.5" LANDSCAPE Printable Layout — EXPANDABLE MULTI-ENTRY FIT) */}
-          <div className="single-page-paper bg-white text-slate-900 font-legal p-6 sm:p-8 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1150px] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
-
-            {/* Outer Legal Frame */}
-            <div className="absolute inset-3 border-2 border-slate-900 pointer-events-none rounded-xl" />
+          <div className="single-page-paper print-document-sheet bg-white text-slate-900 font-legal p-4 sm:p-5 border-2 border-slate-900 space-y-3 w-full max-w-full min-h-[780px] h-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none print:w-full print:max-w-full">
 
             <div className="space-y-4">
 
               {/* TEMPLATE HEADER: Auto-Populated Fields */}
               <div className="border-b-2 border-slate-900 pb-3 space-y-2">
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
-                  <span>Philgeps Ref No.: <strong className="text-blue-950 font-extrabold">{projectRefNo || 'UNLINKED (Select Project)'}</strong></span>
+                  <span>PROJECT REF. NO: <strong className="text-blue-950 font-extrabold">{projectRefNo || 'UNLINKED (Select Project)'}</strong></span>
                   <span>SOLICITATION NO: <strong className="text-blue-950 font-extrabold">{solicitationNumber || 'N/A'}</strong></span>
                 </div>
                 <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-950">
@@ -636,7 +683,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                     STATEMENT OF SINGLE LARGEST COMPLETED CONTRACT (SLCC)
                   </h2>
                   <p className="text-[10px] font-mono text-slate-600">
-                    SIMILAR TO THE CONTRACT TO BE BID WITHIN THE LAST 5 YEARS (LEGAL LANDSCAPE STANDARD)
+                    SIMILAR TO THE CONTRACT TO BE BID WITHIN THE LAST 5 YEARS
                   </p>
                 </div>
 
@@ -680,18 +727,18 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                       <thead className="bg-slate-100 text-slate-950 font-mono text-[9px] uppercase border-b border-slate-400">
                         <tr>
                           <th className="p-1.5 border-r border-slate-300 w-[3%] text-center">#</th>
-                          <th className="p-1.5 border-r border-slate-300 w-[22%]">Project Name & Owner</th>
-                          <th className="p-1.5 border-r border-slate-300 w-[18%]">Owner Address & Tel</th>
-                          <th className="p-1.5 border-r border-slate-300 w-[15%]">Nature of Work</th>
-                          <th className="p-1.5 border-r border-slate-300 w-[16%]">
+                          <th className="p-1.5 border-r border-slate-300 w-[30%]">Project Name</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[15%]">Owner Name, Address, Tel & Email</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[5%]">Nature of Work</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[7%]">
                             <div className="font-bold">VALUE AT AWARD, COMPLETION & DURATION</div>
                             <div className="text-[8px] font-normal text-slate-600">a. Award / b. Completion / c. Duration</div>
                           </th>
-                          <th className="p-1.5 border-r border-slate-300 w-[13%]">
+                          <th className="p-1.5 border-r border-slate-300 w-[5%]">
                             <div className="font-bold">DATES</div>
                             <div className="text-[8px] font-normal text-slate-600">a. Started / b. Awarded / c. Completion</div>
                           </th>
-                          <th className="p-1.5 border-r border-slate-300 w-[8%] text-center">Accomplishment %</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[5%] text-center">Accomplishment %</th>
                           <th className="p-1.5 text-right actions-column w-[5%]">Contract Role</th>
                         </tr>
                       </thead>
@@ -714,11 +761,14 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                               <td className="p-1.5 border-r border-slate-300 font-mono font-bold text-center align-top">{idx + 1}</td>
                               <td className="p-1.5 border-r border-slate-300 align-top break-words [overflow-wrap:anywhere]">
                                 <div className="font-bold text-slate-950 leading-tight break-words [overflow-wrap:anywhere]">{row.projectName || 'Untitled Project'}</div>
-                                <div className="text-[10px] text-slate-600 font-medium mt-0.5 break-words [overflow-wrap:anywhere]">{row.ownerName}</div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-[10px] text-slate-700 align-top break-words [overflow-wrap:anywhere]">
-                                <div className="leading-tight break-words [overflow-wrap:anywhere]">{row.ownerAddress}</div>
-                                <div className="font-mono text-slate-500 mt-0.5 leading-tight break-words [overflow-wrap:anywhere]">{row.ownerTelephone}</div>
+                                <div className="font-bold text-slate-950 uppercase leading-tight mb-1 break-words [overflow-wrap:anywhere]">{row.ownerName || 'N/A'}</div>
+                                <div className="space-y-0.5 font-mono text-[9.5px]">
+                                  <div className="break-words [overflow-wrap:anywhere]"><span className="font-semibold text-slate-700 font-sans">Address:</span> {row.ownerAddress || 'N/A'}</div>
+                                  <div className="break-words [overflow-wrap:anywhere]"><span className="font-semibold text-slate-700 font-sans">Tel/Mobile:</span> {row.ownerTelephone || 'N/A'}</div>
+                                  <div className="break-words [overflow-wrap:anywhere]"><span className="font-semibold text-slate-700 font-sans">Email:</span> {row.ownerEmail || 'N/A'}</div>
+                                </div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-[10px] align-top break-words [overflow-wrap:anywhere]">
                                 <div className="font-medium text-slate-900 leading-tight break-words [overflow-wrap:anywhere]">{row.natureOfWork}</div>
@@ -801,18 +851,18 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                       <thead className="bg-slate-100 text-slate-950 font-mono text-[9px] uppercase border-b border-slate-400">
                         <tr>
                           <th className="p-1.5 border-r border-slate-300 w-[3%] text-center">#</th>
-                          <th className="p-1.5 border-r border-slate-300 w-[22%]">Project Name & Owner</th>
-                          <th className="p-1.5 border-r border-slate-300 w-[18%]">Owner Address & Tel</th>
-                          <th className="p-1.5 border-r border-slate-300 w-[15%]">Nature of Work</th>
-                          <th className="p-1.5 border-r border-slate-300 w-[16%]">
+                          <th className="p-1.5 border-r border-slate-300 w-[30%]">Project Name</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[15%]">Owner Name, Address, Tel & Email</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[5%]">Nature of Work</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[7%]">
                             <div className="font-bold">VALUE AT AWARD, COMPLETION & DURATION</div>
                             <div className="text-[8px] font-normal text-slate-600">a. Award / b. Completion / c. Duration</div>
                           </th>
-                          <th className="p-1.5 border-r border-slate-300 w-[13%]">
+                          <th className="p-1.5 border-r border-slate-300 w-[5%]">
                             <div className="font-bold">DATES</div>
                             <div className="text-[8px] font-normal text-slate-600">a. Started / b. Awarded / c. Completion</div>
                           </th>
-                          <th className="p-1.5 border-r border-slate-300 w-[8%] text-center">Accomplishment %</th>
+                          <th className="p-1.5 border-r border-slate-300 w-[5%] text-center">Accomplishment %</th>
                           <th className="p-1.5 text-right actions-column w-[5%]">Contract Role</th>
                         </tr>
                       </thead>
@@ -835,11 +885,14 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                               <td className="p-1.5 border-r border-slate-300 font-mono font-bold text-center align-top">{idx + 1}</td>
                               <td className="p-1.5 border-r border-slate-300 align-top break-words [overflow-wrap:anywhere]">
                                 <div className="font-bold text-slate-950 leading-tight break-words [overflow-wrap:anywhere]">{row.projectName || 'Untitled Project'}</div>
-                                <div className="text-[10px] text-slate-600 font-medium mt-0.5 break-words [overflow-wrap:anywhere]">{row.ownerName}</div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-[10px] text-slate-700 align-top break-words [overflow-wrap:anywhere]">
-                                <div className="leading-tight break-words [overflow-wrap:anywhere]">{row.ownerAddress}</div>
-                                <div className="font-mono text-slate-500 mt-0.5 leading-tight break-words [overflow-wrap:anywhere]">{row.ownerTelephone}</div>
+                                <div className="font-bold text-slate-950 uppercase leading-tight mb-1 break-words [overflow-wrap:anywhere]">{row.ownerName || 'N/A'}</div>
+                                <div className="space-y-0.5 font-mono text-[9.5px]">
+                                  <div className="break-words [overflow-wrap:anywhere]"><span className="font-semibold text-slate-700 font-sans">Address:</span> {row.ownerAddress || 'N/A'}</div>
+                                  <div className="break-words [overflow-wrap:anywhere]"><span className="font-semibold text-slate-700 font-sans">Tel/Mobile:</span> {row.ownerTelephone || 'N/A'}</div>
+                                  <div className="break-words [overflow-wrap:anywhere]"><span className="font-semibold text-slate-700 font-sans">Email:</span> {row.ownerEmail || 'N/A'}</div>
+                                </div>
                               </td>
                               <td className="p-1.5 border-r border-slate-300 text-[10px] align-top break-words [overflow-wrap:anywhere]">
                                 <div className="font-medium text-slate-900 leading-tight break-words [overflow-wrap:anywhere]">{row.natureOfWork}</div>
@@ -1032,7 +1085,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   Owner / Client Information
                 </h4>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
                     <label className="block text-slate-400 mb-1">Owner Name <span className="text-red-400">*</span></label>
                     <input
@@ -1065,6 +1118,17 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                       onChange={(e) => setEditingRow({ ...editingRow, ownerTelephone: e.target.value })}
                       placeholder="+63 2 8924 0000"
                       required
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1">Owner Email Address</label>
+                    <input
+                      type="email"
+                      value={editingRow.ownerEmail || ''}
+                      onChange={(e) => setEditingRow({ ...editingRow, ownerEmail: e.target.value })}
+                      placeholder="owner@procuring.gov.ph"
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono"
                     />
                   </div>

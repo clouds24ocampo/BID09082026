@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
-import { PDFDocument } from 'pdf-lib';
-import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import { generateAndDownloadThreeLayerPdf, generateThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import html2canvas from 'html2canvas';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
@@ -36,7 +34,7 @@ export interface SectionViScheduleOfRequirementsProps {
   activeProjectRefNo?: string;
   activeProjectTitle?: string;
   activeProcuringEntity?: string;
-  onSaveAndComplete?: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string) => void;
+  onSaveAndComplete?: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string, projectId?: string) => void;
   onClose?: () => void;
 }
 
@@ -77,6 +75,110 @@ const computeTotalAmount = (unitStr: string, qtyStr: string): string => {
   return `PHP ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
+export const computeTotalQuantity = (itemList: ScheduleItem[]): string => {
+  let totalQty = 0;
+  let hasValid = false;
+  let detectedUnit = '';
+
+  (itemList || []).forEach((it) => {
+    if (!it.quantity) return;
+    const match = it.quantity.trim().match(/^([0-9.,]+)\s*(.*)$/);
+    if (match) {
+      const num = parseFloat(match[1].replace(/,/g, ''));
+      if (!isNaN(num)) {
+        totalQty += num;
+        hasValid = true;
+        if (!detectedUnit && match[2]) {
+          detectedUnit = match[2].trim();
+        }
+      }
+    }
+  });
+
+  if (!hasValid) return '0';
+  return detectedUnit ? `${totalQty.toLocaleString('en-US')} ${detectedUnit}` : `${totalQty.toLocaleString('en-US')}`;
+};
+
+export const computeTotalUnitAmount = (itemList: ScheduleItem[]): string => {
+  let totalUnit = 0;
+  let hasValid = false;
+  (itemList || []).forEach((it) => {
+    if (!it.unitAmount) return;
+    const clean = parseFloat(it.unitAmount.replace(/[^0-9.]/g, ''));
+    if (!isNaN(clean) && clean > 0) {
+      totalUnit += clean;
+      hasValid = true;
+    }
+  });
+  if (!hasValid && totalUnit === 0) return 'PHP 0.00';
+  return `PHP ${totalUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+export const computeGrandTotalMaterials = (itemList: ScheduleItem[]): string => {
+  let grandTotal = 0;
+  let hasValid = false;
+  (itemList || []).forEach((it) => {
+    let amtNum = 0;
+    const computedStr = computeTotalAmount(it.unitAmount, it.quantity);
+    const targetStr = computedStr || it.total || '';
+    if (targetStr) {
+      const clean = parseFloat(targetStr.replace(/[^0-9.]/g, ''));
+      if (!isNaN(clean) && clean > 0) {
+        amtNum = clean;
+        hasValid = true;
+      }
+    }
+    grandTotal += amtNum;
+  });
+  if (!hasValid && grandTotal === 0) return 'PHP 0.00';
+  return `PHP ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+export const getNumericGrandTotalMaterials = (itemList: ScheduleItem[]): number => {
+  let grandTotal = 0;
+  (itemList || []).forEach((it) => {
+    let amtNum = 0;
+    const computedStr = computeTotalAmount(it.unitAmount, it.quantity);
+    const targetStr = computedStr || it.total || '';
+    if (targetStr) {
+      const clean = parseFloat(targetStr.replace(/[^0-9.]/g, ''));
+      if (!isNaN(clean) && clean > 0) {
+        amtNum = clean;
+      }
+    }
+    grandTotal += amtNum;
+  });
+  return grandTotal;
+};
+
+export const DEFAULT_SERVICES_DESCRIPTION = 'Logistic, Delivery, Labor, Installation, Cable Pulling, Rough-ins, Cloud Service, Mobile Configuration and User Restriction, Commissioning, CCTV System (35% of Materials Cost) - All kinds of taxes included';
+
+export const getServicesCostAmount = (itemList: ScheduleItem[], percentage: number = 35, customAmountStr?: string): number => {
+  if (customAmountStr && customAmountStr.trim()) {
+    const clean = parseFloat(customAmountStr.replace(/[^0-9.]/g, ''));
+    if (!isNaN(clean) && clean >= 0) return clean;
+  }
+  const materialsCost = getNumericGrandTotalMaterials(itemList);
+  return materialsCost * ((percentage || 0) / 100);
+};
+
+export const formatDescriptionText = (text: string): string => {
+  if (!text) return '';
+  return text.replace(/([a-zA-Z0-9])&([a-zA-Z0-9])/g, '$1 & $2');
+};
+
+export const getServicesCostDisplay = (itemList: ScheduleItem[], percentage: number = 35, customAmountStr?: string): string => {
+  const amount = getServicesCostAmount(itemList, percentage, customAmountStr);
+  return `PHP ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+export const getGrandTotalWithServicesDisplay = (itemList: ScheduleItem[], percentage: number = 35, customAmountStr?: string): string => {
+  const materials = getNumericGrandTotalMaterials(itemList);
+  const services = getServicesCostAmount(itemList, percentage, customAmountStr);
+  const grandTotal = materials + services;
+  return `PHP ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 const defaultDelivery = '30 Calendar Days upon receipt of NTP';
 const DEFAULT_SECTION_VI_ITEMS: ScheduleItem[] = [
   {
@@ -105,6 +207,11 @@ const DEFAULT_SECTION_VI_ITEMS: ScheduleItem[] = [
   }
 ];
 
+interface PageRow {
+  item: ScheduleItem;
+  index: number;
+}
+
 export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequirementsProps> = ({
   item = { id: 'sec-6', code: 'SEC-VI', name: 'Section VI. Schedule of Requirements' },
   tenant,
@@ -132,6 +239,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
   const [dateTimeSubmitted, setDateTimeSubmitted] = useState<string>(getNowDateTimeString());
+  const projectScopeKey = selectedOppId || projectRefNo || activeProjectRefNo;
 
   // Company Details State
   const [companyName] = useState(tenant?.companyName || 'Bidding Entity Corporate Name');
@@ -142,27 +250,49 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   // Items State (Shared & Mirrored with Framework Agreement Page 1)
   const [items, setItems] = useState<ScheduleItem[]>(DEFAULT_SECTION_VI_ITEMS);
 
+  // Editable Services / Logistics Layer State (Tax Inclusive)
+  const [servicesDescription, setServicesDescription] = useState<string>(DEFAULT_SERVICES_DESCRIPTION);
+  const [servicesPercentage, setServicesPercentage] = useState<number>(35);
+  const [servicesCustomAmount, setServicesCustomAmount] = useState<string>('');
+
   // Load real saved opportunity projects from Opportunity Finder
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
-    if (list.length > 0 && !selectedOppId) {
-      const first = list[0];
-      setSelectedOppId(first.id);
-      setProjectRefNo(first.refNo);
-      setSolicitationNumber(first.solicitationNo || 'SOL-2026-001');
-      setProjectTitle(first.title);
-      setProcuringEntity(first.procuringEntity);
-      if (first.dateTimeSubmitted) {
-        setDateTimeSubmitted(first.dateTimeSubmitted);
+    if (list.length > 0) {
+      const preferred = list.find((project) => project.refNo === activeProjectRefNo) || list[0];
+      if (preferred && (preferred.id !== selectedOppId || preferred.refNo !== projectRefNo)) {
+        setSelectedOppId(preferred.id);
+        setProjectRefNo(preferred.refNo);
+        setSolicitationNumber(preferred.solicitationNo || 'SOL-2026-001');
+        setProjectTitle(preferred.title);
+        setProcuringEntity(preferred.procuringEntity);
+        if (preferred.dateTimeSubmitted) {
+          setDateTimeSubmitted(preferred.dateTimeSubmitted);
+        }
+        setItems(DEFAULT_SECTION_VI_ITEMS);
       }
+    } else {
+      setSelectedOppId('');
+      setProjectRefNo('');
+      setSolicitationNumber('');
+      setProjectTitle('');
+      setProcuringEntity('');
+      setItems(DEFAULT_SECTION_VI_ITEMS);
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, activeProjectRefNo]);
 
   // Load shared Section VI data for current project
   useEffect(() => {
-    if (!projectRefNo) return;
-    const storageKey = `bidocs_sec_vi_${tenant?.id || 'default'}_${projectRefNo}`;
+    if (!projectScopeKey) {
+      setItems(DEFAULT_SECTION_VI_ITEMS);
+      setServicesDescription(DEFAULT_SERVICES_DESCRIPTION);
+      setServicesPercentage(35);
+      setServicesCustomAmount('');
+      return;
+    }
+    setItems(DEFAULT_SECTION_VI_ITEMS);
+    const storageKey = `bidocs_sec_vi_${tenant?.id || 'default'}_${projectScopeKey}`;
     const saved = localStorage.getItem(storageKey);
     if (saved) {
       try {
@@ -172,12 +302,43 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
         }
       } catch (e) { }
     }
-  }, [projectRefNo, tenant?.id]);
+
+    const servicesKey = `bidocs_sec_vi_services_${tenant?.id || 'default'}_${projectScopeKey}`;
+    const savedServices = localStorage.getItem(servicesKey);
+    if (savedServices) {
+      try {
+        const parsedSvc = JSON.parse(savedServices);
+        if (parsedSvc) {
+          if (parsedSvc.description !== undefined) setServicesDescription(parsedSvc.description);
+          if (parsedSvc.percentage !== undefined) setServicesPercentage(parsedSvc.percentage);
+          if (parsedSvc.customAmount !== undefined) setServicesCustomAmount(parsedSvc.customAmount);
+        }
+      } catch (e) {}
+    } else {
+      setServicesDescription(DEFAULT_SERVICES_DESCRIPTION);
+      setServicesPercentage(35);
+      setServicesCustomAmount('');
+    }
+  }, [projectScopeKey, tenant?.id]);
+
+  const saveServicesData = (desc: string, pct: number, customAmt: string) => {
+    setServicesDescription(desc);
+    setServicesPercentage(pct);
+    setServicesCustomAmount(customAmt);
+    if (projectScopeKey) {
+      const servicesKey = `bidocs_sec_vi_services_${tenant?.id || 'default'}_${projectScopeKey}`;
+      localStorage.setItem(servicesKey, JSON.stringify({
+        description: desc,
+        percentage: pct,
+        customAmount: customAmt
+      }));
+    }
+  };
 
   const saveSharedItems = (newItems: ScheduleItem[]) => {
     setItems(newItems);
-    if (projectRefNo) {
-      const storageKey = `bidocs_sec_vi_${tenant?.id || 'default'}_${projectRefNo}`;
+    if (projectScopeKey) {
+      const storageKey = `bidocs_sec_vi_${tenant?.id || 'default'}_${projectScopeKey}`;
       localStorage.setItem(storageKey, JSON.stringify(newItems));
     }
   };
@@ -244,50 +405,15 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     await new Promise((r) => setTimeout(r, 200));
     try {
       const fileName = `${projectRefNo}_Section_VI_Schedule_of_Requirements_${todayStr}.pdf`;
-      const paperElem = document.getElementById('section-vi-paper');
-      if (paperElem) {
-        await generateAndDownloadThreeLayerPdf(null, paperElem, undefined, fileName);
+      const containerElem = document.getElementById('section-vi-pages-container') || document.getElementById('section-vi-paper');
+      if (containerElem) {
+        await generateAndDownloadThreeLayerPdf(null, containerElem, undefined, fileName);
       }
     } catch (err) {
       console.error('PDF export error:', err);
     } finally {
       setIsExporting(false);
     }
-  };
-
-  const renderSectionViPdfDataUrl = async (templateElem: HTMLElement): Promise<string | undefined> => {
-    const canvas = await html2canvas(templateElem, {
-      scale: 2.5,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      ignoreElements: (element: Element) => {
-        return (
-          element.classList.contains('print:hidden') ||
-          element.classList.contains('no-export') ||
-          element.tagName === 'BUTTON'
-        );
-      }
-    });
-
-    const imgDataUrl = canvas.toDataURL('image/png');
-    const pdfDoc = await PDFDocument.create();
-    const pngImage = await pdfDoc.embedPng(imgDataUrl);
-    const page = pdfDoc.addPage([canvas.width, canvas.height]);
-    page.drawImage(pngImage, {
-      x: 0,
-      y: 0,
-      width: canvas.width,
-      height: canvas.height
-    });
-
-    const pdfBytes = await pdfDoc.save();
-    const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
   };
 
   const handleExportExcel = () => {
@@ -298,7 +424,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     csvContent += `"SECTION VI. SCHEDULE OF REQUIREMENTS"\n`;
     csvContent += `"Company Name:","${companyName.replace(/"/g, '""')}"\n`;
     csvContent += `"Company Address:","${companyAddress.replace(/"/g, '""')}"\n`;
-    csvContent += `"Philgeps Ref No.:","${projectRefNo.replace(/"/g, '""')}"\n`;
+    csvContent += `"PhilGEPS Ref. No.:","${projectRefNo.replace(/"/g, '""')}"\n`;
     csvContent += `"Solicitation No.:","${solicitationNumber.replace(/"/g, '""')}"\n`;
     csvContent += `"Project Title:","${projectTitle.replace(/"/g, '""')}"\n`;
     csvContent += `"Procuring Entity:","${procuringEntity.replace(/"/g, '""')}"\n`;
@@ -316,6 +442,15 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       csvContent += `${itemNum},${desc},${qty},${unitAmt},${tot},${del}\n`;
     });
 
+    const totalQtyStr = computeTotalQuantity(items);
+    const grandTotalStr = computeGrandTotalMaterials(items);
+    const servicesCostStr = getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount);
+    const overallGrandTotalStr = getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount);
+
+    csvContent += `"","TOTAL MATERIALS:","${totalQtyStr}","","${grandTotalStr}",""\n`;
+    csvContent += `"","${servicesDescription.replace(/"/g, '""')}","1 Lot","","${servicesCostStr}",""\n`;
+    csvContent += `"","GRAND TOTAL REQUIREMENTS (MATERIALS + SERVICES):","","","${overallGrandTotalStr}",""\n`;
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -330,18 +465,23 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     setIsExporting(true);
     await new Promise((r) => setTimeout(r, 200));
     try {
-      const templateElem = document.getElementById('section-vi-paper') as HTMLElement;
+      const containerElem = (document.getElementById('section-vi-pages-container') || document.getElementById('section-vi-paper')) as HTMLElement;
       let dataUrl: string | undefined = undefined;
-      if (templateElem) {
-        dataUrl = await renderSectionViPdfDataUrl(templateElem);
+      if (containerElem) {
+        dataUrl = await generateThreeLayerPdfDataUrl(
+          null,
+          containerElem,
+          undefined,
+          `${projectRefNo}_Section_VI_Schedule_of_Requirements_${todayStr}.pdf`
+        );
       }
       if (onSaveAndComplete) {
-        onSaveAndComplete(dataUrl, item.name, projectRefNo, projectTitle);
+        onSaveAndComplete(dataUrl, item.name, projectRefNo, projectTitle, selectedOppId);
       }
     } catch (error) {
       console.error('Failed to generate Section VI PDF:', error);
       if (onSaveAndComplete) {
-        onSaveAndComplete(undefined, item.name, projectRefNo, projectTitle);
+        onSaveAndComplete(undefined, item.name, projectRefNo, projectTitle, selectedOppId);
       }
     } finally {
       setIsExporting(false);
@@ -354,13 +494,448 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     return 'text-sm leading-relaxed';
   };
 
+  // --- CONTENT-AWARE ACCURATE PRINT-CALIBRATED CHUNKING ---
+  // Calculates exact row heights based on multiline text to fill each page to maximum capacity without overflowing or splitting
+  const pageChunks = useMemo<PageRow[][]>(() => {
+    if (items.length === 0) return [[]];
+
+    const getRowHeight = (item: ScheduleItem) => {
+      const desc = item.description || '';
+      const paragraphs = desc.split('\n');
+      let lines = 0;
+      for (const para of paragraphs) {
+        lines += Math.max(1, Math.ceil((para.length || 1) / 85));
+      }
+      return Math.max(32, 16 + lines * 13);
+    };
+
+    const rowHeights = items.map((it) => getRowHeight(it));
+    const totalContentHeight = rowHeights.reduce((sum, h) => sum + h, 0);
+
+    // Single-page check: if all content fits in 680px alongside header, summary & signatory in Portrait
+    if (totalContentHeight <= 680) {
+      return [items.map((it, idx) => ({ item: it, index: idx }))];
+    }
+
+    const pages: PageRow[][] = [];
+    let currentChunk: PageRow[] = [];
+    let currentHeight = 0;
+    let pageIdx = 0;
+
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
+      const rHeight = rowHeights[idx];
+      const isPage1 = pageIdx === 0;
+
+      // Calculate remaining height of items from idx to end
+      let remainingHeight = 0;
+      for (let r = idx; r < items.length; r++) {
+        remainingHeight += rowHeights[r];
+      }
+
+      const finalPageLimit = isPage1 ? 680 : 850;
+      const continuationPageLimit = isPage1 ? 920 : 1100;
+
+      // If all remaining items fit in final page limit, include them on current page
+      if (currentHeight + remainingHeight <= finalPageLimit) {
+        currentChunk.push({ item, index: idx });
+        currentHeight += rHeight;
+        continue;
+      }
+
+      // If adding this item exceeds the continuation limit, finalize current page
+      if (currentHeight + rHeight > continuationPageLimit && currentChunk.length > 0) {
+        pages.push(currentChunk);
+        pageIdx++;
+        currentChunk = [{ item, index: idx }];
+        currentHeight = rHeight;
+      } else {
+        currentChunk.push({ item, index: idx });
+        currentHeight += rHeight;
+      }
+    }
+
+    if (currentChunk.length > 0) {
+      pages.push(currentChunk);
+    }
+
+    return pages;
+  }, [items]);
+
+  const totalPages = pageChunks.length;
+
+  const pagesList = pageChunks.map((chunk, pIdx) => (
+    <div
+      key={`sec-6-page-${pIdx}`}
+      id={pIdx === 0 ? 'section-vi-paper' : `section-vi-paper-p${pIdx + 1}`}
+      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 sm:p-8 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
+    >
+      <div>
+        {/* COMPANY & PROJECT HEADER BLOCK (PAGE 1 ONLY) */}
+        {pIdx === 0 ? (
+          <div className="mb-3 pb-2.5 border-b-2 border-slate-900 font-serif">
+            {/* Centered Company Name Header */}
+            <div className="text-center pb-2 border-b border-slate-300">
+              <h1 className="text-lg font-bold uppercase tracking-wider text-black font-serif">
+                {companyName}
+              </h1>
+              <p className="text-xs text-slate-700 font-serif font-semibold mt-0.5 uppercase tracking-wide">
+                
+              </p>
+            </div>
+
+            {/* 4-Field Project Information Grid */}
+            <div className="mt-2.5 grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs font-serif text-black">
+              <div>
+                <span className="font-bold">Project Name: </span>
+                <span className="font-semibold text-slate-900">{projectTitle || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="font-bold">Project REF No.: </span>
+                <span className="font-mono font-semibold text-blue-950">{projectRefNo || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="font-bold">Procuring Entity: </span>
+                <span className="text-slate-900">{procuringEntity || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="font-bold">Submission Date & Time: </span>
+                <span className="font-mono font-semibold text-blue-950">{formatDateTimeDisplay(dateTimeSubmitted)}</span>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* FORM TITLE (PAGE 1 ONLY) */}
+        {pIdx === 0 ? (
+          <div className="mb-3 text-center">
+            <h2 className="text-lg font-bold uppercase tracking-wide text-black border-b border-black inline-block pb-0.5 font-serif">
+              Section VI. Schedule of Requirements
+            </h2>
+          </div>
+        ) : null}
+
+        {/* ITEMS TABLE */}
+        <div className="w-full overflow-x-auto">
+          <table className="w-full border-collapse border border-black text-xs font-serif table-fixed">
+            <colgroup>
+              <col className="w-[5%]" />
+              <col className="w-[40%]" />
+              <col className="w-[10%]" />
+              <col className="w-[14%]" />
+              <col className="w-[16%]" />
+              <col className="w-[15%]" />
+            </colgroup>
+            {pIdx === 0 ? (
+              <thead>
+                <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[11px]">
+                  <th className="border border-black px-1.5 py-1.5 w-[5%]">Item No.</th>
+                  <th className="border border-black px-2 py-1.5 text-left w-[40%]">Description</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[10%]">Qty</th>
+                  <th className="border border-black px-2 py-1.5 w-[14%]">Unit Cost</th>
+                  <th className="border border-black px-2 py-1.5 w-[16%]">Total Cost</th>
+                  <th className="border border-black px-2 py-1.5 w-[15%]">Delivered Weeks/Months</th>
+                </tr>
+              </thead>
+            ) : null}
+            <tbody>
+              {chunk.map(({ item: rowItem, index: itemIdx }) => (
+                <tr key={rowItem.id} className="border-b border-black hover:bg-amber-50/20 even:bg-slate-50/30 transition-colors">
+                  {/* 1. Item # */}
+                  <td className="border border-black px-1.5 py-2 text-center font-serif font-bold align-top text-slate-950">
+                    <div className="flex flex-col items-center justify-between h-full">
+                      <span className="block pt-0.5 font-bold text-xs">{itemIdx + 1}</span>
+                      {!isExporting && items.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(itemIdx)}
+                          className="text-red-500 hover:text-red-700 mt-2 print:hidden no-export p-1"
+                          title="Delete row"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* 2. Description */}
+                  <td className="border border-black px-3.5 py-2 font-serif align-top break-words">
+                    {!isExporting ? (
+                      <textarea
+                        rows={Math.max(2, Math.ceil((rowItem.description || '').length / 90))}
+                        value={rowItem.description}
+                        onChange={(e) => handleFieldChange(itemIdx, 'description', e.target.value)}
+                        placeholder="Enter detailed technical specification..."
+                        className={`w-full bg-transparent resize-y outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 font-normal leading-relaxed text-justify ${getTableFontSizeClass()}`}
+                      />
+                    ) : null}
+                    <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-slate-950 pt-0.5 whitespace-pre-wrap font-normal break-words [overflow-wrap:break-word] leading-relaxed text-justify ${getTableFontSizeClass()}`}>
+                      {formatDescriptionText(rowItem.description)}
+                    </div>
+                  </td>
+
+                  {/* 3. Quantity */}
+                  <td className="border border-black px-1.5 py-2 font-serif text-center align-top">
+                    {!isExporting ? (
+                      <input
+                        type="text"
+                        value={rowItem.quantity}
+                        onChange={(e) => handleFieldChange(itemIdx, 'quantity', e.target.value)}
+                        placeholder="Qty"
+                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
+                      />
+                    ) : null}
+                    <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
+                      {rowItem.quantity || ''}
+                    </div>
+                  </td>
+
+                  {/* 4. Unit Amount */}
+                  <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
+                    {!isExporting ? (
+                      <input
+                        type="text"
+                        value={rowItem.unitAmount}
+                        onChange={(e) => handleFieldChange(itemIdx, 'unitAmount', e.target.value)}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          if (val) {
+                            const clean = parseFloat(val.replace(/[^0-9.]/g, ''));
+                            if (!isNaN(clean)) {
+                              handleFieldChange(
+                                itemIdx,
+                                'unitAmount',
+                                `PHP ${clean.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                              );
+                            }
+                          }
+                        }}
+                        placeholder="Unit Amount"
+                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
+                      />
+                    ) : null}
+                    <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
+                      {rowItem.unitAmount
+                        ? rowItem.unitAmount.startsWith('PHP')
+                          ? rowItem.unitAmount
+                          : (() => {
+                              const clean = parseFloat(rowItem.unitAmount.replace(/[^0-9.]/g, ''));
+                              return !isNaN(clean)
+                                ? `PHP ${clean.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                : rowItem.unitAmount;
+                            })()
+                        : ''}
+                    </div>
+                  </td>
+
+                  {/* 5. Total Amount */}
+                  <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
+                    {!isExporting ? (
+                      <input
+                        type="text"
+                        value={computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total}
+                        onChange={(e) => handleFieldChange(itemIdx, 'total', e.target.value)}
+                        placeholder="Total Amount"
+                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 font-semibold ${getTableFontSizeClass()}`}
+                      />
+                    ) : null}
+                    <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-semibold break-words ${getTableFontSizeClass()}`}>
+                      {computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total || ''}
+                    </div>
+                  </td>
+
+                  {/* 6. Delivered */}
+                  <td className="border border-black px-2.5 py-2 font-serif text-center align-top break-words">
+                    {!isExporting ? (
+                      <input
+                        type="text"
+                        value={rowItem.delivered}
+                        onChange={(e) => handleFieldChange(itemIdx, 'delivered', e.target.value)}
+                        placeholder="e.g. 30 Days"
+                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${itemIdx === 0 ? 'font-semibold text-blue-950' : ''
+                          } ${getTableFontSizeClass()}`}
+                      />
+                    ) : null}
+                    <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
+                      {rowItem.delivered || ''}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+
+            {/* SUMMARY ROWS (TOTAL MATERIALS, SERVICES, GRAND TOTAL) ONLY ON FINAL PAGE */}
+            {pIdx === totalPages - 1 && (
+              <tfoot className="border-t-2 border-black font-serif font-bold bg-slate-100/90">
+                {/* 1. Subtotal Materials Row */}
+                <tr className="border-b border-black">
+                  <td colSpan={2} className="border border-black px-3 py-1.5 font-serif text-xs">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        {!isExporting && (
+                          <button
+                            type="button"
+                            onClick={handleAddItem}
+                            className="no-export print:hidden inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-sans font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-400 rounded shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95"
+                            title="Add a new row item to the requirements table"
+                          >
+                            <Plus className="w-3.5 h-3.5 text-emerald-700" />
+                            <span>Add Row Item</span>
+                          </button>
+                        )}
+                      </div>
+                      <span className="uppercase tracking-wider text-black font-bold font-serif text-xs">
+                        TOTAL MATERIALS:
+                      </span>
+                    </div>
+                  </td>
+                  <td className="border border-black px-1.5 py-1.5 text-center font-bold text-black text-xs font-mono break-words bg-amber-50/70">
+                    {computeTotalQuantity(items)}
+                  </td>
+                  <td className="border border-black px-2 py-1.5 text-center text-xs font-serif text-slate-500">
+                    —
+                  </td>
+                  <td className="border border-black px-2 py-1.5 text-center font-bold text-black text-xs font-mono break-words bg-amber-50/90">
+                    {computeGrandTotalMaterials(items)}
+                  </td>
+                  <td className="border border-black px-2.5 py-1.5 text-center text-xs font-serif text-slate-500">
+                    —
+                  </td>
+                </tr>
+
+                {/* 2. Services & Logistics Layer Row (Editable Description & Percentage / Custom Amount) */}
+                <tr className="border-b border-black bg-blue-50/40">
+                  <td className="border border-black px-1.5 py-2 text-center font-serif font-bold text-xs text-slate-950 align-top">
+                    {items.length + 1}
+                  </td>
+                  <td className="border border-black px-3 py-2 text-left font-serif text-xs text-black align-top">
+                    {!isExporting ? (
+                      <textarea
+                        rows={2}
+                        value={servicesDescription}
+                        onChange={(e) => saveServicesData(e.target.value, servicesPercentage, servicesCustomAmount)}
+                        className="w-full bg-transparent resize-y outline-none font-serif text-black text-[11px] leading-snug focus:bg-amber-50/40 p-1 rounded border border-slate-300 print:hidden"
+                        placeholder="Edit logistics, installation & service details..."
+                      />
+                    ) : null}
+                    <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-[11px] leading-snug whitespace-pre-wrap`}>
+                      {servicesDescription}
+                    </div>
+                  </td>
+                  <td className="border border-black px-1.5 py-2 text-center font-serif text-xs text-black font-bold">
+                    1 Lot
+                  </td>
+                  <td className="border border-black px-2 py-2 text-center text-xs font-serif text-slate-500">
+                    —
+                  </td>
+                  <td className="border border-black px-2 py-2 text-center font-bold text-blue-950 text-xs font-mono break-words bg-blue-50/80">
+                    {!isExporting ? (
+                      <div className="flex flex-col items-center gap-1 print:hidden no-export">
+                        <input
+                          type="text"
+                          value={servicesCustomAmount || (servicesPercentage ? `${servicesPercentage}%` : '')}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val.includes('%')) {
+                              const num = parseFloat(val.replace('%', ''));
+                              saveServicesData(servicesDescription, !isNaN(num) ? num : 35, '');
+                            } else {
+                              saveServicesData(servicesDescription, servicesPercentage, val);
+                            }
+                          }}
+                          className="w-full bg-transparent text-center outline-none font-mono text-xs text-blue-950 font-bold p-0.5 border border-slate-300 rounded hover:border-slate-500"
+                          title="Enter percentage (e.g. 35%) or custom amount"
+                        />
+                        <span className="text-[9.5px] text-slate-600 font-mono font-semibold">
+                          {getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount)}
+                        </span>
+                      </div>
+                    ) : null}
+                    <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-mono text-blue-950 text-xs font-bold`}>
+                      {getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount)}
+                    </div>
+                  </td>
+                  <td className="border border-black px-2.5 py-2 text-center text-xs font-serif text-slate-500">
+                    —
+                  </td>
+                </tr>
+
+                {/* 3. Grand Total Requirements Row */}
+                <tr className="border-b-2 border-black bg-amber-100/90 text-black">
+                  <td colSpan={2} className="border border-black px-3 py-2 text-right uppercase tracking-wider text-black font-bold font-serif text-xs">
+                    GRAND TOTAL REQUIREMENTS (MATERIALS + SERVICES):
+                  </td>
+                  <td className="border border-black px-1.5 py-2 text-center text-xs font-serif text-slate-600">
+                    —
+                  </td>
+                  <td className="border border-black px-2 py-2 text-center text-xs font-serif text-slate-600">
+                    —
+                  </td>
+                  <td className="border border-black px-2 py-2 text-center font-extrabold text-black text-sm font-mono break-words bg-amber-200">
+                    {getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount)}
+                  </td>
+                  <td className="border border-black px-2.5 py-2 text-center text-xs font-serif text-slate-600">
+                    —
+                  </td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
+
+      {/* Document Footer: Signatory Block (Final Page Only) + Running Page Footer on EVERY Page */}
+      <div>
+        {/* Signatory Block & GPPB QR Code (Final Page Only) */}
+        {pIdx === totalPages - 1 && (
+          <div className="mt-6 pt-3 border-t border-slate-300 flex items-end justify-between text-xs font-serif signatory-block mb-3">
+            <div>
+              <p className="font-bold text-black uppercase">{companyName}</p>
+              <div className="mt-6 border-b border-black w-64"></div>
+              <p className="font-bold text-black mt-1 uppercase">{signatoryName}</p>
+              <p className="text-slate-700">{signatoryTitle}</p>
+            </div>
+
+            <div className="text-right flex flex-col items-end">
+              <DocumentQrCode
+                details={{
+                  companyName: companyName,
+                  documentName: 'Section VI. Schedule of Requirements',
+                  documentNumber: `SEC-VI-${projectRefNo || '2026-901283'}`,
+                  projectTitle: projectTitle,
+                  projectRefNo: projectRefNo,
+                  procuringEntity: procuringEntity,
+                  dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
+                  documentCategory: 'Bid Forms',
+                  generatedBy: companyName
+                }}
+                size={80}
+                showCaption={false}
+              />
+              <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
+                VERIFIED GPPB DOC • {projectRefNo}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Running Page Footer (Rendered on EVERY Page) */}
+        <div className="mt-4 pt-2 border-t-2 border-black flex items-center justify-between text-[8.5pt] font-mono text-black shrink-0">
+          <div className="font-bold uppercase">{companyName}</div>
+          <div>SECTION VI SCHEDULE OF REQUIREMENTS • REF: {projectRefNo || 'N/A'}</div>
+          <div className="font-bold">PAGE {pIdx + 1} OF {totalPages}</div>
+        </div>
+      </div>
+    </div>
+  ));
+
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static">
       <style>{`
         @media print {
           @page {
-            size: 13in 8.5in;
-            margin: 0.4in;
+            size: 8.5in 13in portrait;
+            margin: 0.3in;
           }
           header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .sticky {
             display: none !important;
@@ -378,15 +953,29 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
             box-shadow: none !important;
           }
           .single-page-paper {
-            display: block !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 auto !important;
-            padding: 0.3in !important;
-            border: none !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            position: relative !important;
+            width: 8.5in !important;
+            max-width: 8.5in !important;
+            min-height: 13in !important;
+            height: auto !important;
+            margin: 0 auto 0.5in auto !important;
+            padding: 0.3in 0.4in !important;
+            border: 2px solid #000000 !important;
             box-shadow: none !important;
             background: #ffffff !important;
             color: #000000 !important;
+            overflow: visible !important;
+            box-sizing: border-box !important;
+            page-break-after: always !important;
+            break-after: page !important;
+          }
+          .single-page-paper:last-child {
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            margin-bottom: 0 !important;
           }
         }
       `}</style>
@@ -403,7 +992,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <span>Section VI. Schedule of Requirements</span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase">
-                  100% Mirrored with Framework Agreement
+                  Legal Portrait Form (8.5" × 13")
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5 truncate max-w-xl">
@@ -415,7 +1004,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
           <div className="flex items-center gap-2">
             <button
               onClick={handleExportExcel}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-600 transition shadow flex items-center gap-1.5 border border-emerald-500/40"
+              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-600 transition shadow flex items-center gap-1.5 border border-emerald-500/40 cursor-pointer"
               title="Export table data directly to Microsoft Excel CSV"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -424,20 +1013,20 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
             <button
               onClick={handleExportPdf}
               disabled={isExporting}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition shadow flex items-center gap-1.5"
+              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition shadow flex items-center gap-1.5 cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>{isExporting ? 'Exporting PDF...' : 'Export to PDF'}</span>
             </button>
             <button
               onClick={handlePrint}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5 cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print Legal Landscape</span>
+              <span>Print Pages</span>
             </button>
             {onClose && (
-              <button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
+              <button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             )}
@@ -445,10 +1034,10 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
         </div>
 
         {/* Scrollable Container */}
-        <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6 print:p-0 print:bg-white">
+        <div className="p-4 overflow-y-auto flex-1 bg-slate-950 space-y-4 print:p-0 print:bg-white">
 
           {/* Interactive Screen Controls */}
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
+          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 print:hidden no-export">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex-1 space-y-1.5">
                 <label className="block text-slate-200 font-mono text-xs font-bold flex items-center justify-between">
@@ -546,195 +1135,9 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
             </div>
           </div>
 
-          {/* OFFICIAL PRINTABLE PAPER DOCUMENT SHEET */}
-          <div id="section-vi-paper" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1150px] flex flex-col justify-between font-serif">
-            <div>
-              {/* COMPANY & PROJECT HEADER BLOCK */}
-              <div className="border-b-2 border-black pb-3 mb-5 space-y-2 font-serif">
-                <div className="text-center pb-2 border-b border-slate-300">
-                  <h2 className="text-lg sm:text-xl font-bold text-black uppercase tracking-wide font-serif">{companyName}</h2>
-                  <p className="text-xs text-slate-700 font-serif mt-0.5">{companyAddress}</p>
-                </div>
-
-                <div className="space-y-1.5 text-xs font-serif text-black pt-1">
-                  <div className="flex items-center justify-between gap-6">
-                    <div>
-                      <span className="font-bold">Philgeps Ref No.: </span>
-                      <span className="font-mono font-semibold text-blue-950">{projectRefNo || 'N/A'}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-bold">SOLICITATION NO: </span>
-                      <span className="font-mono font-semibold text-blue-950">{solicitationNumber || 'N/A'}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-start justify-between gap-6">
-                    <div className="flex-1">
-                      <span className="font-bold">NAME OF PROJECT: </span>
-                      <span className="font-semibold text-black">{projectTitle || 'N/A'}</span>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <span className="font-bold">DATE & TIME OF SUBMISSION: </span>
-                      <span className="font-mono font-semibold text-blue-950">{formatDateTimeDisplay(dateTimeSubmitted)}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-bold">PROCURING ENTITY: </span>
-                    <span className="text-slate-900">{procuringEntity || 'N/A'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Document Header Title */}
-              <div className="text-center mb-4">
-                <h1 className="text-xl sm:text-2xl font-bold font-serif italic text-black tracking-tight mb-2">
-                  Section VI. Schedule of Requirements
-                </h1>
-                <p className="text-xs sm:text-sm text-black font-serif leading-relaxed text-left">
-                  The delivery schedule expressed as weeks/months stipulates hereafter a delivery date which is the date of delivery to the project site.
-                </p>
-              </div>
-
-              {/* Requirements Grid Table */}
-              <table className={`w-full border-collapse border-2 border-black text-black table-fixed ${getTableFontSizeClass()}`}>
-                <thead>
-                  <tr className="border-b-2 border-black bg-slate-50 font-serif">
-                    <th className="border border-black px-1.5 py-2 text-center font-bold w-[6%]">Item<br />Number</th>
-                    <th className="border border-black px-3 py-2 text-center font-bold w-[44%]">Description</th>
-                    <th className="border border-black px-1.5 py-2 text-center font-bold w-[9%]">Quantity</th>
-                    <th className="border border-black px-2 py-2 text-center font-bold w-[13%]">Unit Amount</th>
-                    <th className="border border-black px-2 py-2 text-center font-bold w-[14%]">Total</th>
-                    <th className="border border-black px-2.5 py-2 text-center font-bold w-[14%]">Delivered,<br />Weeks/Months</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((rowItem, idx) => (
-                    <tr key={rowItem.id} className="border-b border-black hover:bg-slate-50/50 transition-colors">
-                      <td className="border border-black px-1.5 py-2 text-center font-serif font-medium align-top">
-                        <div className="flex flex-col items-center justify-between h-full">
-                          <span className="block pt-0.5 font-bold">{idx + 1}</span>
-                          {!isExporting && items.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItem(idx)}
-                              className="text-red-500 hover:text-red-700 mt-2 print:hidden no-export p-1"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="border border-black px-3 py-2 font-serif align-top break-words">
-                        {!isExporting ? (
-                          <textarea
-                            rows={3}
-                            value={rowItem.description}
-                            onChange={(e) => handleFieldChange(idx, 'description', e.target.value)}
-                            placeholder="Enter detailed technical specification..."
-                            className={`w-full bg-transparent resize-y outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
-                          />
-                        ) : null}
-                        <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black pt-0.5 whitespace-pre-wrap font-normal break-words ${getTableFontSizeClass()}`}>
-                          {rowItem.description || ''}
-                        </div>
-                      </td>
-
-                      <td className="border border-black px-1.5 py-2 font-serif text-center align-top">
-                        {!isExporting ? (
-                          <input
-                            type="text"
-                            value={rowItem.quantity}
-                            onChange={(e) => handleFieldChange(idx, 'quantity', e.target.value)}
-                            placeholder="Qty"
-                            className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
-                          />
-                        ) : null}
-                        <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
-                          {rowItem.quantity || ''}
-                        </div>
-                      </td>
-
-                      <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
-                        {!isExporting ? (
-                          <input
-                            type="text"
-                            value={rowItem.unitAmount}
-                            onChange={(e) => handleFieldChange(idx, 'unitAmount', e.target.value)}
-                            placeholder="Unit Amount"
-                            className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
-                          />
-                        ) : null}
-                        <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
-                          {rowItem.unitAmount || ''}
-                        </div>
-                      </td>
-
-                      <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
-                        {!isExporting ? (
-                          <input
-                            type="text"
-                            value={computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total}
-                            onChange={(e) => handleFieldChange(idx, 'total', e.target.value)}
-                            placeholder="Total Amount"
-                            className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 font-semibold ${getTableFontSizeClass()}`}
-                          />
-                        ) : null}
-                        <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-semibold break-words ${getTableFontSizeClass()}`}>
-                          {computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total || ''}
-                        </div>
-                      </td>
-
-                      <td className="border border-black px-2.5 py-2 font-serif text-center align-top break-words">
-                        {!isExporting ? (
-                          <input
-                            type="text"
-                            value={rowItem.delivered}
-                            onChange={(e) => handleFieldChange(idx, 'delivered', e.target.value)}
-                            placeholder="e.g. 30 Days"
-                            className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${idx === 0 ? 'font-semibold text-blue-950' : ''
-                              } ${getTableFontSizeClass()}`}
-                          />
-                        ) : null}
-                        <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
-                          {rowItem.delivered || ''}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Document Footer */}
-            <div className="mt-8 pt-4 border-t border-slate-300 flex items-end justify-between text-xs font-serif signatory-block">
-              <div>
-                <p className="font-bold text-black uppercase">{companyName}</p>
-                <div className="mt-8 border-b border-black w-64"></div>
-                <p className="font-bold text-black mt-1 uppercase">{signatoryName}</p>
-                <p className="text-slate-700">{signatoryTitle}</p>
-              </div>
-
-              <div className="text-right flex flex-col items-end">
-                <DocumentQrCode
-                  details={{
-                    companyName: companyName,
-                    documentName: 'Section VI. Schedule of Requirements',
-                    documentNumber: `SEC-VI-${projectRefNo || '2026-901283'}`,
-                    projectTitle: projectTitle,
-                    projectRefNo: projectRefNo,
-                    procuringEntity: procuringEntity,
-                    dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
-                    documentCategory: 'Bid Forms',
-                    generatedBy: companyName
-                  }}
-                  size={90}
-                  showCaption={false}
-                />
-                <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
-                  VERIFIED GPPB DOC • {projectRefNo}
-                </span>
-              </div>
-            </div>
+          {/* OFFICIAL PRINTABLE PAPER DOCUMENT SHEETS */}
+          <div id="section-vi-pages-container" className="space-y-6">
+            {pagesList}
           </div>
 
         </div>

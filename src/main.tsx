@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
+import { GlobalErrorBoundary } from './components/common/GlobalErrorBoundary'
 import { debugLog } from './utils/debugLog'
 
 // #region agent log
@@ -28,6 +29,9 @@ debugLog('main.tsx:boot', 'Application bootstrap started', {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <GlobalErrorBoundary>
+      <App />
+    </GlobalErrorBoundary>
   </React.StrictMode>,
 )
+

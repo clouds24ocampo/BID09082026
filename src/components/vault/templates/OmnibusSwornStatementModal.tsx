@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
-import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import html2canvas from 'html2canvas';
@@ -49,6 +49,7 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
   // Opportunity Projects Auto-Fill Integration
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
+  const [dateTimeSubmitted, setDateTimeSubmitted] = useState('March 19, 2026');
 
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
@@ -61,6 +62,7 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
         setProjectRefNo(match.refNo);
         setProjectTitle(match.title);
         setProcuringEntity(match.procuringEntity);
+        if (match.dateTimeSubmitted) setDateTimeSubmitted(match.dateTimeSubmitted);
       } else {
         setProjectRefNo(activeProjectRefNo);
         if (activeProjectTitle) setProjectTitle(activeProjectTitle);
@@ -72,6 +74,7 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
       setProjectRefNo(first.refNo);
       setProjectTitle(first.title);
       setProcuringEntity(first.procuringEntity);
+      if (first.dateTimeSubmitted) setDateTimeSubmitted(first.dateTimeSubmitted);
     }
   }, [tenant?.id, activeProjectRefNo, activeProjectTitle, activeProcuringEntity]);
 
@@ -91,6 +94,7 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
       setProjectRefNo(found.refNo);
       setProjectTitle(found.title);
       setProcuringEntity(found.procuringEntity);
+      if (found.dateTimeSubmitted) setDateTimeSubmitted(found.dateTimeSubmitted);
     }
   };
 
@@ -114,32 +118,12 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
       let dataUrl: string | undefined = undefined;
       if (templateElems.length > 0) {
         const elemArray = Array.from(templateElems) as HTMLElement[];
-        const canvases = await Promise.all(
-          elemArray.map(el => html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }))
-        );
-
-        if (canvases.length === 1) {
-          dataUrl = canvases[0].toDataURL('image/png');
-        } else {
-          const totalWidth = Math.max(...canvases.map(c => c.width));
-          const totalHeight = canvases.reduce((sum, c) => sum + c.height + 20, 0);
-          const combinedCanvas = document.createElement('canvas');
-          combinedCanvas.width = totalWidth;
-          combinedCanvas.height = totalHeight;
-          const ctx = combinedCanvas.getContext('2d');
-          if (ctx) {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, totalWidth, totalHeight);
-            let currentY = 0;
-            canvases.forEach(c => {
-              ctx.drawImage(c, 0, currentY);
-              currentY += c.height + 20;
-            });
-            dataUrl = combinedCanvas.toDataURL('image/png');
-          } else {
-            dataUrl = canvases[0].toDataURL('image/png');
+        dataUrl = await buildMergedThreeLayerPdfDataUrl([
+          {
+            title: 'Omnibus Sworn Statement',
+            formElement: elemArray
           }
-        }
+        ], `${projectRefNo}_Omnibus_Sworn_Statement.pdf`);
       }
       onSaveAndComplete(dataUrl, 'Omnibus Sworn Statement (Notarized OSS)', projectRefNo, projectTitle);
     } catch {
@@ -152,7 +136,7 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
       <style>{`
         @media print {
           @page {
-            size: 8.5in 13in;
+            size: 8.5in 13in portrait;
             margin: 0mm;
           }
           body {
@@ -190,7 +174,7 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
                   GPPB-OSS-2025 • RA 12009 Standard
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                  Legal 8.5" × 13"
+                  Legal 8.5" × 13" Portrait
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5">
@@ -397,34 +381,34 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
             </div>
           </div>
 
-          {/* Legal 8.5" x 13" Printable Pages Preview */}
+          {/* Legal 8.5" x 13" Portrait Printable Pages Preview */}
           <div className="space-y-8 flex flex-col items-center">
 
             {/* PAGE 1 */}
-            <div className="oss-legal-paper single-page-paper w-[8.5in] min-h-[13in] bg-white text-slate-950 p-[0.75in] shadow-2xl font-serif text-[11pt] leading-relaxed flex flex-col justify-between mx-auto border border-slate-300">
+            <div className="oss-legal-paper single-page-paper w-[8.5in] min-h-[13in] max-w-[850px] aspect-[8.5/13] bg-white text-slate-950 p-[0.6in] sm:p-[0.75in] shadow-2xl font-serif text-[10pt] leading-normal flex flex-col justify-between mx-auto border border-slate-300 print:shadow-none print:border-none print:p-6 print:m-0 print:break-inside-avoid print:page-break-inside-avoid">
 
-              <div className="space-y-5">
+              <div className="space-y-3.5">
 
-                <div className="text-sm font-serif">
+                <div className="text-xs font-serif">
                   REPUBLIC OF THE PHILIPPINES)<br />
                   {jurisdictionType === 'CITY' ? 'CITY OF ' : jurisdictionType === 'MUNICIPALITY' ? 'MUNICIPALITY OF ' : 'CITY/MUNICIPALITY OF '}
                   <u>{notaryPlace || '____________________'}</u> ) S.S.
                 </div>
 
-                <div className="text-center my-4 font-serif">
-                  <h2 className="text-base font-bold uppercase tracking-wider">OMNIBUS SWORN STATEMENT</h2>
-                  <p className="text-[10pt] italic text-slate-700 mt-1 font-semibold">
+                <div className="text-center my-2 font-serif">
+                  <h2 className="text-sm font-bold uppercase tracking-wider">OMNIBUS SWORN STATEMENT</h2>
+                  <p className="text-[9pt] italic text-slate-700 mt-0.5 font-semibold">
                     {entityType === 'ALL'
                       ? '(SOLE PROPRIETORSHIP / CORPORATION / PARTNERSHIP / JOINT VENTURE)'
                       : `(${entityType})`}
                   </p>
                 </div>
 
-                <p className="font-serif text-justify leading-relaxed">
+                <p className="font-serif text-justify leading-relaxed text-[10pt]">
                   I, <strong><u>{signatoryName}</u></strong>, of legal age, <u>{maritalStatus}</u>, <u>{affiantNationality}</u>, and with residence at <strong><u>{companyAddress}</u></strong>, after having been duly sworn in accordance with law, do hereby depose and state that:
                 </p>
 
-                <ol className="list-decimal pl-6 space-y-4 font-serif text-justify">
+                <ol className="list-decimal pl-5 space-y-2.5 font-serif text-justify text-[9.5pt]">
                   <li>
                     I am the duly authorized and designated representative of <strong><u>{companyName}</u></strong> with office address at <strong><u>{companyAddress}</u></strong>;
                   </li>
@@ -458,8 +442,8 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
               </div>
 
               {/* Page 1 Footer */}
-              <div className="pt-4 border-t border-slate-300 flex items-center justify-between text-[9pt] font-mono text-slate-700">
-                <div className="flex items-center gap-3">
+              <div className="pt-2 border-t border-slate-300 flex items-center justify-between text-[8.5pt] font-mono text-slate-700">
+                <div className="flex items-center gap-2">
                   <DocumentQrCode
                     details={{
                       companyName: companyName,
@@ -468,18 +452,14 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
                       projectTitle: projectTitle,
                       projectRefNo: projectRefNo,
                       procuringEntity: procuringEntity,
-                      dateTimeSubmitted: new Date().toLocaleString(),
+                      dateTimeSubmitted: dateTimeSubmitted || 'March 19, 2026',
                       documentCategory: 'Notarized Documents',
                       generatedBy: companyName
                     }}
-                    size={50}
+                    size={42}
                     showCaption={false}
                   />
-                  <div className="space-y-0.5 text-[8.5pt]">
-                    <p className="font-bold text-slate-950 uppercase">{companyName}</p>
-                    <p>PROJECT: <strong>{projectTitle}</strong></p>
-                    <p>REF NO: <strong>{projectRefNo}</strong> • ENTITY: <strong>{procuringEntity}</strong></p>
-                  </div>
+                  <span className="text-[7.5pt] text-slate-500 font-sans uppercase tracking-wider font-semibold">Official Verification QR</span>
                 </div>
                 <span className="font-bold font-mono">Page 1 of 2</span>
               </div>
@@ -487,17 +467,17 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
             </div>
 
             {/* PAGE 2 */}
-            <div className="oss-legal-paper single-page-paper w-[8.5in] min-h-[13in] bg-white text-slate-950 p-[0.75in] shadow-2xl font-serif text-[11pt] leading-relaxed flex flex-col justify-between mx-auto border border-slate-300">
+            <div className="oss-legal-paper single-page-paper w-[8.5in] min-h-[13in] max-w-[850px] aspect-[8.5/13] bg-white text-slate-950 p-[0.6in] sm:p-[0.75in] shadow-2xl font-serif text-[10pt] leading-normal flex flex-col justify-between mx-auto border border-slate-300 print:shadow-none print:border-none print:p-6 print:m-0 print:break-inside-avoid print:page-break-inside-avoid">
 
-              <div className="space-y-6">
-                <ol start={8} className="list-decimal pl-6 space-y-5 font-serif text-justify">
+              <div className="space-y-4">
+                <ol start={8} className="list-decimal pl-5 space-y-3 font-serif text-justify text-[9.5pt]">
                   <li>
                     <strong><u>{companyName}</u></strong> complies with existing labor laws and standards; and
                   </li>
 
                   <li>
                     <strong><u>{companyName}</u></strong> is aware of and has undertaken the responsibilities as a Bidder:
-                    <ol className="list-[lower-alpha] pl-6 space-y-1.5 mt-1.5">
+                    <ol className="list-[lower-alpha] pl-5 space-y-1 mt-1">
                       <li>Carefully examine all of the Bidding Documents;</li>
                       <li>Acknowledge all conditions, local or otherwise, affecting the implementation of the Contract;</li>
                       <li>Made an estimate of the facilities available and needed for the contract to be bid, if any; and</li>
@@ -510,41 +490,41 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
                   </li>
                 </ol>
 
-                <p className="pt-4 font-serif">
-                  IN WITNESS WHEREOF, I have hereunto set my hand this _____ day of ____________, 20___ at <u>{notaryPlace}</u>, Philippines.
+                <p className="pt-2 font-serif text-[9.5pt]">
+                  IN WITNESS WHEREOF, I have hereunto set my hand this _____ day of ____________, 20___ at <u>{notaryPlace || '____________________'}</u>, Philippines.
                 </p>
 
                 {/* Signatory Box */}
-                <div className="pt-8 flex flex-col items-end">
-                  <div className="w-80 text-center space-y-1">
-                    <p className="text-[10pt] font-semibold">Duly authorized to sign for and on behalf of:</p>
-                    <p className="font-bold text-slate-950 uppercase border-b border-black pb-1">{companyName}</p>
-                    <div className="pt-8">
-                      <p className="font-bold text-slate-950 uppercase text-base">{signatoryName}</p>
-                      <p className="text-[10pt] font-semibold text-slate-800">{signatoryTitle}</p>
+                <div className="pt-4 flex flex-col items-end">
+                  <div className="w-72 text-center space-y-0.5">
+                    <p className="text-[9pt] font-semibold">Duly authorized to sign for and on behalf of:</p>
+                    <p className="font-bold text-slate-950 uppercase border-b border-black pb-0.5 text-[9.5pt]">{companyName}</p>
+                    <div className="pt-6">
+                      <p className="font-bold text-slate-950 uppercase text-[10.5pt]">{signatoryName}</p>
+                      <p className="text-[9pt] font-semibold text-slate-800">{signatoryTitle}</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Notary Jurat Block */}
-                <div className="pt-8 border-t border-slate-300 font-serif space-y-3">
-                  <p className="text-[10pt] font-serif leading-relaxed text-justify">
-                    SUBSCRIBED AND SWORN to before me this _____ day of __________________ 20___ at <u>{notaryPlace}</u>, Philippines. Affiant/s is/are personally known to me and was/were identified by me through competent evidence of identity as defined in the 2004 Rules on Notarial Practice (A.M. No. 02-8-13-SC). Affiant/s exhibited to me his/her <u>{govIdType}</u> with no. <u>{govIdNumber}</u>, with his/her photograph and signature appearing thereon.
+                <div className="pt-4 border-t border-slate-300 font-serif space-y-2">
+                  <p className="text-[9.5pt] font-serif leading-relaxed text-justify">
+                    SUBSCRIBED AND SWORN to before me this _____ day of __________________ 20___ at <u>{notaryPlace || '____________________'}</u>, Philippines. Affiant/s is/are personally known to me and was/were identified by me through competent evidence of identity as defined in the 2004 Rules on Notarial Practice (A.M. No. 02-8-13-SC). Affiant/s exhibited to me his/her <u>{govIdType}</u> with no. <u>{govIdNumber}</u>, with his/her photograph and signature appearing thereon.
                   </p>
 
-                  <p className="text-[10pt] font-serif pt-1">
+                  <p className="text-[9.5pt] font-serif pt-0.5">
                     WITNESS MY HAND AND SEAL this _____ day of __________________ 20___.
                   </p>
 
-                  <div className="pt-4 flex items-start justify-between text-[9.5pt] font-mono text-slate-800">
+                  <div className="pt-3 flex items-start justify-between text-[9pt] font-mono text-slate-800">
                     <div className="space-y-0.5">
                       <p>Doc. No. _________;</p>
                       <p>Page No. _________;</p>
                       <p>Book No. _________;</p>
                       <p>Series of 2026.</p>
                     </div>
-                    <div className="text-right space-y-1">
-                      <p className="font-bold text-slate-950 uppercase">NOTARY PUBLIC</p>
+                    <div className="text-right space-y-0.5">
+                      <p className="font-bold text-slate-950 uppercase text-[10pt]">NOTARY PUBLIC</p>
                     </div>
                   </div>
                 </div>
@@ -552,8 +532,8 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
               </div>
 
               {/* Page 2 Footer */}
-              <div className="pt-4 border-t border-slate-300 flex items-center justify-between text-[9pt] font-mono text-slate-700">
-                <div className="flex items-center gap-3">
+              <div className="pt-2 border-t border-slate-300 flex items-center justify-between text-[8.5pt] font-mono text-slate-700">
+                <div className="flex items-center gap-2">
                   <DocumentQrCode
                     details={{
                       companyName: companyName,
@@ -562,18 +542,14 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
                       projectTitle: projectTitle,
                       projectRefNo: projectRefNo,
                       procuringEntity: procuringEntity,
-                      dateTimeSubmitted: new Date().toLocaleString(),
+                      dateTimeSubmitted: dateTimeSubmitted || 'March 19, 2026',
                       documentCategory: 'Notarized Documents',
                       generatedBy: companyName
                     }}
-                    size={50}
+                    size={42}
                     showCaption={false}
                   />
-                  <div className="space-y-0.5 text-[8.5pt]">
-                    <p className="font-bold text-slate-950 uppercase">{companyName}</p>
-                    <p>PROJECT: <strong>{projectTitle}</strong></p>
-                    <p>REF NO: <strong>{projectRefNo}</strong> • ENTITY: <strong>{procuringEntity}</strong></p>
-                  </div>
+                  <span className="text-[7.5pt] text-slate-500 font-sans uppercase tracking-wider font-semibold">Official Verification QR</span>
                 </div>
                 <span className="font-bold font-mono">Page 2 of 2</span>
               </div>
@@ -586,7 +562,7 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
         {/* Footer Bar */}
         <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900/95 sticky bottom-0 z-10 shrink-0 no-print">
           <span className="text-xs text-slate-400 font-mono">
-            GPPB Resolution No. 02-2025 Standard • Legal 8.5" × 13" Printable Output
+            GPPB Resolution No. 02-2025 Standard • Legal 8.5" × 13" Portrait Printable Output
           </span>
 
           <div className="flex items-center gap-2">

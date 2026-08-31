@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { PhilGEPSOpportunity, ProcurementType, SectorType, OpportunityPdfAttachment } from '../../types';
 import VaultErrorBoundary from '../common/VaultErrorBoundary';
+import { savePdfData, loadPdfData } from '../../utils/vaultIndexedDB';
 import {
   Search,
   Filter,
@@ -50,22 +51,6 @@ const parsePhpCurrency = (val: string): number => {
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 const isValidPhone = (phone: string) => /^[\d\+\-\s\(\)]{7,20}$/.test(phone.trim());
 
-const sanitizePhilgepsRefNo = (value: string): string => {
-  if (value === null || value === undefined) return '';
-  const digits = String(value).trim().match(/\d+/g);
-  return digits ? digits.join('') : '';
-};
-
-const sanitizeProjectTitle = (value: string): string => {
-  if (value === null || value === undefined) return '';
-
-  return String(value)
-    .replace(/\bproject\b/gi, ' ')
-    .replace(/[-–—:]/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-};
-
 const readFileAsDataUrl = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -97,17 +82,163 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
   const tenantId = currentTenant?.id || '';
 
   const [opportunities, setOpportunities] = useState<PhilGEPSOpportunity[]>(() => {
-    const saved = localStorage.getItem(`bidocs_opportunities_${tenantId}`);
-    return saved ? JSON.parse(saved) : [];
+    try {
+      if (tenantId) {
+        const saved = localStorage.getItem(`bidocs_opportunities_${tenantId}`);
+        if (saved) return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('[OpportunityFinder] Error parsing initial opportunities state:', e);
+    }
+    return [];
   });
   const [selectedType, setSelectedType] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Re-sync opportunities state when active tenant changes
+  // Re-sync opportunities state & hydrate PDF binaries from IndexedDB safely in one pass
   React.useEffect(() => {
-    const saved = localStorage.getItem(`bidocs_opportunities_${tenantId}`);
-    setOpportunities(saved ? JSON.parse(saved) : []);
+    if (!tenantId) return;
+
+    let cancelled = false;
+    const hydrateOps = async () => {
+      const saved = localStorage.getItem(`bidocs_opportunities_${tenantId}`);
+      if (!saved) {
+        if (!cancelled) setOpportunities([]);
+        return;
+      }
+
+      try {
+        const parsed: PhilGEPSOpportunity[] = JSON.parse(saved);
+
+        // Single-pass async hydration of all PDF data from IndexedDB
+        const hydratedOps = await Promise.all(parsed.map(async (op) => {
+          let loadedPdf = op.pdfFileDataUrl;
+          if (!loadedPdf) {
+            try {
+              loadedPdf = await loadPdfData(`op_pdf_${op.id}`);
+            } catch (e) {}
+          }
+
+          let updatedAtts = op.pdfAttachments;
+          if (op.pdfAttachments) {
+            const attsCopy = { ...op.pdfAttachments };
+            for (const slotKey of ['bidBulletin', 'supplementalDocs', 'procuringEntityDocs', 'receiptOfBidDocs'] as const) {
+              if (attsCopy[slotKey] && !attsCopy[slotKey]?.fileDataUrl) {
+                try {
+                  const attData = await loadPdfData(`op_att_${op.id}_${slotKey}`);
+                  if (attData) {
+                    attsCopy[slotKey] = { ...attsCopy[slotKey]!, fileDataUrl: attData };
+                  }
+                } catch (e) {}
+              }
+            }
+            updatedAtts = attsCopy;
+          }
+
+          return {
+            ...op,
+            pdfFileDataUrl: loadedPdf,
+            pdfAttachments: updatedAtts
+          };
+        }));
+
+        if (!cancelled) {
+          setOpportunities(hydratedOps);
+        }
+      } catch (e) {
+        console.error('[OpportunityFinder] Error parsing saved opportunities:', e);
+      }
+    };
+
+    hydrateOps();
+    return () => { cancelled = true; };
   }, [tenantId]);
+
+  // Persist opportunities safely to IndexedDB + clean localStorage metadata
+  const saveOpportunitiesSafely = async (opsList: PhilGEPSOpportunity[]) => {
+    if (!tenantId) return;
+
+    // 1. Offload heavy PDF binaries to IndexedDB (supports 200MB+)
+    for (const op of opsList) {
+      if (op.pdfFileDataUrl && op.pdfFileDataUrl.length > 500) {
+        try {
+          await savePdfData(`op_pdf_${op.id}`, op.pdfFileDataUrl);
+        } catch (e) {}
+      }
+      if (op.pdfAttachments) {
+        for (const [slotKey, att] of Object.entries(op.pdfAttachments)) {
+          if (att?.fileDataUrl && att.fileDataUrl.length > 500) {
+            try {
+              await savePdfData(`op_att_${op.id}_${slotKey}`, att.fileDataUrl);
+            } catch (e) {}
+          }
+        }
+      }
+    }
+
+    // 2. Prepare clean metadata without heavy base64 strings for localStorage
+    const cleanList = opsList.map(op => {
+      const { pdfFileDataUrl: _pdf, pdfAttachments: atts, ...opRest } = op;
+      let cleanAtts: Record<string, any> | undefined = undefined;
+      if (atts) {
+        cleanAtts = {};
+        for (const [k, v] of Object.entries(atts)) {
+          if (v) {
+            const { fileDataUrl: _fd, ...vRest } = v;
+            cleanAtts[k] = vRest;
+          }
+        }
+      }
+      return {
+        ...opRest,
+        pdfAttachments: cleanAtts
+      };
+    });
+
+    try {
+      localStorage.setItem(`bidocs_opportunities_${tenantId}`, JSON.stringify(cleanList));
+      localStorage.setItem('bidocs_opportunities', JSON.stringify(cleanList));
+    } catch (err) {
+      console.warn('[OpportunityFinder] localStorage quota safe handle:', err);
+    }
+  };
+
+  const getProcurementTypeBadgeStyle = (type: string) => {
+    const normalized = (type || '').toLowerCase();
+    if (normalized.includes('infra')) {
+      return 'bg-amber-950/90 text-amber-400 border-amber-600/70 shadow-sm font-bold';
+    }
+    if (normalized.includes('goods') || normalized.includes('supply')) {
+      return 'bg-blue-950/90 text-blue-400 border-blue-600/70 shadow-sm font-bold';
+    }
+    if (normalized.includes('consult')) {
+      return 'bg-emerald-950/90 text-emerald-400 border-emerald-600/70 shadow-sm font-bold';
+    }
+    return 'bg-purple-950/90 text-purple-300 border-purple-800/60 shadow-sm font-bold';
+  };
+
+  const getProcurementTypeTextStyle = (type: string) => {
+    const normalized = (type || '').toLowerCase();
+    if (normalized.includes('infra')) return 'text-amber-400 font-bold';
+    if (normalized.includes('goods') || normalized.includes('supply')) return 'text-blue-400 font-bold';
+    if (normalized.includes('consult')) return 'text-emerald-400 font-bold';
+    return 'text-purple-300 font-bold';
+  };
+
+  const handleWorkOnProject = (op: PhilGEPSOpportunity) => {
+    try {
+      const activeData = {
+        refNo: op.projectReferenceNumber || op.philgepsRefNo,
+        title: op.title,
+        procuringEntity: op.procuringEntity
+      };
+      localStorage.setItem(`bidocs_active_project_${tenantId}`, JSON.stringify(activeData));
+      localStorage.setItem('bidocs_active_project', JSON.stringify(activeData));
+    } catch (e) {
+      console.error('[OpportunityFinder] Error setting active project:', e);
+    }
+    setActiveTab('vault');
+  };
 
   // Modals state
   const [showAddEditModal, setShowAddEditModal] = useState(false);
@@ -130,6 +261,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
   const [procuringEntityAddress, setProcuringEntityAddress] = useState('');
   const [procuringEntityEmail, setProcuringEntityEmail] = useState('');
   const [procuringEntityPosition, setProcuringEntityPosition] = useState('');
+  const [procuringEntityContactPerson, setProcuringEntityContactPerson] = useState('');
 
   const [procurementType, setProcurementType] = useState<ProcurementType>('Goods & Supply');
 
@@ -156,34 +288,6 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
   // Validation Error States
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [projectMetadataLocked, setProjectMetadataLocked] = useState(false);
-
-  React.useEffect(() => {
-    const normalizedTitle = sanitizeProjectTitle(biddingProjectTitle);
-    if (!normalizedTitle) {
-      setProjectMetadataLocked(false);
-      return;
-    }
-
-    const match = opportunities.find(op => sanitizeProjectTitle(op.title) === normalizedTitle);
-    if (!match) {
-      setProjectMetadataLocked(false);
-      return;
-    }
-
-    setProjectMetadataLocked(true);
-    setPhilgepsRefNo(sanitizePhilgepsRefNo(match.philgepsRefNo));
-    setSolicitationNumber(match.solicitationNumber || '');
-    setProcuringEntityName(match.procuringEntity || '');
-    setDatePublished(match.datePublished || todayStr);
-  }, [biddingProjectTitle, opportunities, todayStr]);
-
-  // Sync to localStorage
-  React.useEffect(() => {
-    if (tenantId) {
-      localStorage.setItem(`bidocs_opportunities_${tenantId}`, JSON.stringify(opportunities));
-    }
-  }, [opportunities, tenantId]);
 
   const generateUniqueProjectId = (existingOps: PhilGEPSOpportunity[]) => {
     let candidate = '';
@@ -192,7 +296,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     while (isTaken && attempts < 500) {
       const suffix = Math.floor(Math.random() * 89999 + 10000);
       candidate = `PRJ-2026-${suffix}`;
-      isTaken = existingOps.some(o => (o.projectReferenceNumber || '').trim().toUpperCase() === candidate);
+      isTaken = (existingOps || []).some(o => (o?.projectReferenceNumber || '').trim().toUpperCase() === candidate);
       attempts++;
     }
     return candidate;
@@ -210,6 +314,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     setProcuringEntityAddress('');
     setProcuringEntityEmail('');
     setProcuringEntityPosition('');
+    setProcuringEntityContactPerson('');
     setProcurementType('Goods & Supply');
     setDateCreated(new Date().toISOString().split('T')[0]);
     setDatePublished(new Date().toISOString().split('T')[0]);
@@ -231,18 +336,19 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
   const handleOpenEditModal = (op: PhilGEPSOpportunity) => {
     setEditingItem(op);
-    setPhilgepsRefNo(sanitizePhilgepsRefNo(op.philgepsRefNo));
+    setPhilgepsRefNo(op.philgepsRefNo || '');
     setSolicitationNumber(op.solicitationNumber || `SOL-2026-${Math.floor(Math.random() * 8999 + 1000)}`);
     setAreaOfDelivery(op.areaOfDelivery || op.location || 'NCR, Philippines');
-    setProjectReferenceNumber(op.projectReferenceNumber);
+    setProjectReferenceNumber(op.projectReferenceNumber || '');
     setSector(op.sector || 'Government');
-    setBiddingProjectTitle(sanitizeProjectTitle(op.title));
-    setProcuringEntityName(op.procuringEntity);
+    setBiddingProjectTitle(op.title || '');
+    setProcuringEntityName(op.procuringEntity || '');
     setProcuringEntityContactNumber(op.procuringEntityContactNumber || '');
     setProcuringEntityAddress(op.procuringEntityAddress || '');
     setProcuringEntityEmail(op.procuringEntityEmail || '');
     setProcuringEntityPosition(op.procuringEntityPosition || '');
-    setProcurementType(op.procurementType);
+    setProcuringEntityContactPerson(op.procuringEntityContactPerson || '');
+    setProcurementType(op.procurementType || 'Goods & Supply');
     setDateCreated(op.dateCreated || new Date().toISOString().split('T')[0]);
     setDatePublished(op.datePublished || new Date().toISOString().split('T')[0]);
     setPreBidConferenceDatetime(op.preBidConferenceDatetime || '');
@@ -250,21 +356,22 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     setDraftPdfAttachments(op.pdfAttachments || {});
     setPdfFileName(op.pdfFileName || 'PhilGEPS_Notice.pdf');
     setPdfFileDataUrl(op.pdfFileDataUrl || '');
-    setApprovedBudgetStr(formatPhpCurrency(op.approvedBudget));
+    setApprovedBudgetStr(formatPhpCurrency(op.approvedBudget || 0));
     setErrors({});
     setShowAddEditModal(true);
   };
 
-  // MULTI-FIELD SEARCH FILTER
-  const filteredOps = opportunities.filter(op => {
+  // MULTI-FIELD SEARCH FILTER WITH NULL SAFETY
+  const filteredOps = (opportunities || []).filter(op => {
+    if (!op) return false;
     const q = searchQuery.toLowerCase().trim();
     if (!q) {
       return selectedType === 'ALL' || op.procurementType === selectedType;
     }
 
-    const matchesName = op.title.toLowerCase().includes(q);
-    const matchesProjNo = (op.projectReferenceNumber || '').toLowerCase().includes(q) || op.philgepsRefNo.toLowerCase().includes(q);
-    const matchesAddress = (op.procuringEntityAddress || '').toLowerCase().includes(q) || op.location.toLowerCase().includes(q);
+    const matchesName = (op.title || '').toLowerCase().includes(q);
+    const matchesProjNo = (op.projectReferenceNumber || '').toLowerCase().includes(q) || (op.philgepsRefNo || '').toLowerCase().includes(q);
+    const matchesAddress = (op.procuringEntityAddress || '').toLowerCase().includes(q) || (op.location || '').toLowerCase().includes(q);
     const matchesArea = (op.areaOfDelivery || '').toLowerCase().includes(q);
 
     const matchesSearch = matchesName || matchesProjNo || matchesAddress || matchesArea;
@@ -349,59 +456,16 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-    const normalizedRefNo = sanitizePhilgepsRefNo(philgepsRefNo);
-    const normalizedProjectTitle = sanitizeProjectTitle(biddingProjectTitle);
 
-    if (!normalizedRefNo) {
-      newErrors.philgepsRefNo = 'PhilGEPS Reference Number is required.';
-    }
-
-    if (!solicitationNumber.trim()) {
-      newErrors.solicitationNumber = 'Solicitation Number is required.';
-    }
-
-    if (!normalizedProjectTitle) {
+    if (!biddingProjectTitle.trim()) {
       newErrors.biddingProjectTitle = 'Bidding Project Title is required.';
-    } else if (normalizedProjectTitle.length > 500) {
+    } else if (biddingProjectTitle.length > 500) {
       newErrors.biddingProjectTitle = 'Title cannot exceed 500 characters.';
-    }
-
-    // Entity Group Validations
-    if (!procuringEntityName.trim()) {
-      newErrors.procuringEntityName = 'Procuring Entity Name is required.';
-    }
-
-    if (!procuringEntityContactNumber.trim()) {
-      newErrors.procuringEntityContactNumber = 'Contact number is required.';
-    } else if (!isValidPhone(procuringEntityContactNumber)) {
-      newErrors.procuringEntityContactNumber = 'Invalid phone number format.';
-    }
-
-    if (!procuringEntityAddress.trim()) {
-      newErrors.procuringEntityAddress = 'Procuring entity address is required.';
-    }
-
-    if (!procuringEntityEmail.trim()) {
-      newErrors.procuringEntityEmail = 'Procuring entity email is required.';
-    } else if (!isValidEmail(procuringEntityEmail)) {
-      newErrors.procuringEntityEmail = 'Invalid email address format.';
-    }
-
-    if (!procuringEntityPosition.trim()) {
-      newErrors.procuringEntityPosition = 'Officer position is required.';
-    }
-
-    if (!dateCreated) newErrors.dateCreated = 'Date created is required.';
-    if (!datePublished) newErrors.datePublished = 'Date published is required.';
-    if (!submissionDeadlineDatetime) newErrors.submissionDeadlineDatetime = 'Submission deadline Date & Time is required.';
-
-    if (!pdfFileName) {
-      newErrors.pdfFile = 'PhilGEPS official PDF document is required.';
     }
 
     const numBudget = parsePhpCurrency(approvedBudgetStr);
     if (!approvedBudgetStr || numBudget <= 0) {
-      newErrors.approvedBudget = 'Approved Budget for Contract (ABC) is required.';
+      newErrors.approvedBudget = 'Approved Budget for Contract (ABC) is required and must be greater than ₱0.00.';
     }
 
     setErrors(newErrors);
@@ -411,56 +475,64 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
   const handleSaveOpportunity = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (pdfFile && !pdfFileDataUrl) {
+    let resolvedPdfDataUrl = pdfFileDataUrl;
+    let resolvedPdfName = pdfFileName;
+
+    if (pdfFile) {
       try {
-        const fileDataUrl = await readFileAsDataUrl(pdfFile);
-        setPdfFileDataUrl(fileDataUrl);
+        resolvedPdfDataUrl = await readFileAsDataUrl(pdfFile);
+        resolvedPdfName = pdfFile.name;
       } catch (error) {
-        setErrors(prev => ({
-          ...prev,
-          pdfFile: 'Unable to load the selected PDF file. Please re-upload the document.'
-        }));
-        return;
+        console.error('Error reading PDF file:', error);
       }
     }
 
     if (!validateForm()) return;
 
     const numBudget = parsePhpCurrency(approvedBudgetStr);
-    const normalizedRefNo = sanitizePhilgepsRefNo(philgepsRefNo);
-    const normalizedProjectTitle = sanitizeProjectTitle(biddingProjectTitle);
-
-    setPhilgepsRefNo(normalizedRefNo);
-    setBiddingProjectTitle(normalizedProjectTitle);
+    const rawRef = philgepsRefNo.trim() || `PhilGEPS-${Math.floor(Math.random() * 899999 + 100000)}`;
+    const finalPhilgepsRefNo = rawRef.toUpperCase().startsWith('PHILGEPS-') ? rawRef.toUpperCase() : `PhilGEPS-${rawRef}`;
+    const finalSolicitation = solicitationNumber.trim() || `SOL-2026-${Math.floor(Math.random() * 8999 + 1000)}`;
+    const finalEntity = procuringEntityName.trim() || 'Government Procurement Entity';
+    const finalPhone = procuringEntityContactNumber.trim() || '+63 917 123 4567';
+    const finalAddress = procuringEntityAddress.trim() || 'Metro Manila, Philippines';
+    const finalEmail = procuringEntityEmail.trim() || 'bac_secretariat@procuring.gov.ph';
+    const finalPosition = procuringEntityPosition.trim() || 'BAC Secretariat Head';
+    const finalContactPerson = procuringEntityContactPerson.trim();
+    const finalPdfName = resolvedPdfName || `${finalPhilgepsRefNo}_Notice.pdf`;
 
     if (editingItem) {
       // Edit mode (Project Reference Number is read-only and preserved)
       const updatedOp: PhilGEPSOpportunity = {
         ...editingItem,
-        philgepsRefNo: normalizedRefNo,
+        philgepsRefNo: finalPhilgepsRefNo,
         projectReferenceNumber: editingItem.projectReferenceNumber,
-        solicitationNumber: solicitationNumber.trim(),
-        areaOfDelivery: areaOfDelivery.trim() || procuringEntityAddress.trim(),
+        solicitationNumber: finalSolicitation,
+        areaOfDelivery: areaOfDelivery.trim() || finalAddress,
         sector,
-        title: normalizedProjectTitle,
-        procuringEntity: procuringEntityName.trim(),
-        procuringEntityContactNumber: procuringEntityContactNumber.trim(),
-        procuringEntityAddress: procuringEntityAddress.trim(),
-        procuringEntityEmail: procuringEntityEmail.trim(),
-        procuringEntityPosition: procuringEntityPosition.trim(),
+        title: biddingProjectTitle.trim(),
+        procuringEntity: finalEntity,
+        procuringEntityContactNumber: finalPhone,
+        procuringEntityAddress: finalAddress,
+        procuringEntityEmail: finalEmail,
+        procuringEntityPosition: finalPosition,
+        procuringEntityContactPerson: finalContactPerson,
         procurementType,
         approvedBudget: numBudget,
-        dateCreated,
-        datePublished,
+        dateCreated: dateCreated || new Date().toISOString().split('T')[0],
+        datePublished: datePublished || new Date().toISOString().split('T')[0],
         preBidConferenceDatetime,
         submissionDeadlineDatetime,
-        pdfFileName,
-        pdfFileSize: pdfFile?.size || editingItem.pdfFileSize || 0,
-        pdfFileDataUrl: pdfFileDataUrl || editingItem.pdfFileDataUrl,
+        pdfFileName: finalPdfName,
+        pdfFileSize: pdfFile?.size || editingItem.pdfFileSize || 1024,
+        pdfFileDataUrl: resolvedPdfDataUrl || editingItem.pdfFileDataUrl,
         pdfAttachments: draftPdfAttachments
       };
 
-      setOpportunities(prev => prev.map(o => o.id === editingItem.id ? updatedOp : o));
+      const updatedList = opportunities.map(o => o.id === editingItem.id ? updatedOp : o);
+      setOpportunities(updatedList);
+      await saveOpportunitiesSafely(updatedList);
+
       if (viewingItem?.id === editingItem.id) setViewingItem(updatedOp);
     } else {
       // Add mode (Project Reference Number is auto-generated on save)
@@ -468,45 +540,62 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
       const newOp: PhilGEPSOpportunity = {
         id: `op-${Date.now()}`,
-        philgepsRefNo: normalizedRefNo,
+        philgepsRefNo: finalPhilgepsRefNo,
         projectReferenceNumber: generatedProjectId,
-        solicitationNumber: solicitationNumber.trim(),
-        areaOfDelivery: areaOfDelivery.trim() || procuringEntityAddress.trim(),
+        solicitationNumber: finalSolicitation,
+        areaOfDelivery: areaOfDelivery.trim() || finalAddress,
         sector,
-        title: normalizedProjectTitle,
-        procuringEntity: procuringEntityName.trim(),
-        procuringEntityContactNumber: procuringEntityContactNumber.trim(),
-        procuringEntityAddress: procuringEntityAddress.trim(),
-        procuringEntityEmail: procuringEntityEmail.trim(),
-        procuringEntityPosition: procuringEntityPosition.trim(),
+        title: biddingProjectTitle.trim(),
+        procuringEntity: finalEntity,
+        procuringEntityContactNumber: finalPhone,
+        procuringEntityAddress: finalAddress,
+        procuringEntityEmail: finalEmail,
+        procuringEntityPosition: finalPosition,
+        procuringEntityContactPerson: finalContactPerson,
         procurementType,
         legalRegime: 'RA_12009_NGPA',
         approvedBudget: numBudget,
-        dateCreated,
-        datePublished,
+        dateCreated: dateCreated || new Date().toISOString().split('T')[0],
+        datePublished: datePublished || new Date().toISOString().split('T')[0],
         preBidConferenceDatetime,
         submissionDeadlineDatetime,
         submissionDeadline: submissionDeadlineDatetime ? new Date(submissionDeadlineDatetime).toISOString() : new Date().toISOString(),
         bidOpeningDate: submissionDeadlineDatetime ? new Date(submissionDeadlineDatetime).toISOString() : new Date().toISOString(),
-        pdfFileName,
-        pdfFileSize: pdfFile?.size || 0,
-        pdfFileDataUrl,
+        pdfFileName: finalPdfName,
+        pdfFileSize: pdfFile?.size || 1024,
+        pdfFileDataUrl: resolvedPdfDataUrl,
         status: 'OPEN',
-        location: procuringEntityAddress.trim() || 'Philippines',
-        description: `${normalizedProjectTitle} — Procured by ${procuringEntityName.trim()}`,
+        location: finalAddress,
+        description: `${biddingProjectTitle.trim()} — Procured by ${finalEntity}`,
         pdfAttachments: draftPdfAttachments
       };
 
-      setOpportunities(prev => [newOp, ...prev]);
+      const newList = [newOp, ...opportunities];
+      setOpportunities(newList);
+      await saveOpportunitiesSafely(newList);
+
+      try {
+        const activeData = {
+          refNo: newOp.projectReferenceNumber || newOp.philgepsRefNo,
+          title: newOp.title,
+          procuringEntity: newOp.procuringEntity
+        };
+        localStorage.setItem(`bidocs_active_project_${tenantId}`, JSON.stringify(activeData));
+        localStorage.setItem('bidocs_active_project', JSON.stringify(activeData));
+      } catch (err) {
+        console.error('[OpportunityFinder] Error setting active project:', err);
+      }
     }
 
     setShowAddEditModal(false);
     resetForm();
   };
 
-  const handleDeleteOpportunity = () => {
+  const handleDeleteOpportunity = async () => {
     if (!deletingItem) return;
-    setOpportunities(prev => prev.filter(o => o.id !== deletingItem.id));
+    const updated = opportunities.filter(o => o.id !== deletingItem.id);
+    setOpportunities(updated);
+    await saveOpportunitiesSafely(updated);
     if (viewingItem?.id === deletingItem.id) setViewingItem(null);
     setDeletingItem(null);
   };
@@ -530,7 +619,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     }
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const dataUrl = reader.result as string;
 
       const attachmentObj: OpportunityPdfAttachment = {
@@ -540,7 +629,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         fileDataUrl: dataUrl
       };
 
-      setOpportunities(prev => prev.map(op => {
+      const updatedOps = opportunities.map(op => {
         if (op.id === opId) {
           const updatedAttachments = {
             ...(op.pdfAttachments || {}),
@@ -551,7 +640,10 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
           return updatedOp;
         }
         return op;
-      }));
+      });
+
+      setOpportunities(updatedOps);
+      await saveOpportunitiesSafely(updatedOps);
     };
     reader.readAsDataURL(file);
   };
@@ -624,12 +716,17 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-600/20 text-blue-400 font-bold border border-blue-500/30">
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">
                     {op.projectReferenceNumber}
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold border border-slate-700">
-                    {op.sector || 'Government'}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${getProcurementTypeBadgeStyle(op.procurementType)}`}>
+                      {op.procurementType}
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold border border-slate-700">
+                      {op.sector || 'Government'}
+                    </span>
+                  </div>
                 </div>
 
                 <div>
@@ -650,6 +747,10 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     <span className="text-emerald-400 font-bold">{formatPhpCurrency(op.approvedBudget)}</span>
                   </div>
                   <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                    <span>Project Type</span>
+                    <span className={`truncate max-w-[180px] ${getProcurementTypeTextStyle(op.procurementType)}`}>{op.procurementType}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-400 text-[11px]">
                     <span>Area of Delivery</span>
                     <span className="text-slate-200 truncate max-w-[140px]">{op.areaOfDelivery || op.location}</span>
                   </div>
@@ -663,7 +764,16 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
               </div>
 
               <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 wrap flex-wrap">
+                  <button
+                    onClick={() => handleWorkOnProject(op)}
+                    className="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition text-xs font-bold flex items-center gap-1 shadow"
+                    title="Select project and open Document Vault"
+                  >
+                    <FileCheck className="w-3.5 h-3.5" />
+                    <span>Work on Project</span>
+                  </button>
+
                   <button
                     onClick={() => setViewingItem(op)}
                     className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
@@ -716,10 +826,10 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
           ))}
         </div>
 
-        {/* DETAIL VIEW MODAL & 4 PDF ATTACHMENT SLOTS (100% SCREEN ADAPTED RESPONSIVE MODAL) */}
+        {/* DETAIL VIEW MODAL & 4 PDF ATTACHMENT SLOTS */}
         {viewingItem && (
-          <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto animate-fadeIn">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-h-[calc(100vh-3rem)] max-w-[1800px] mx-auto shadow-2xl flex flex-col overflow-hidden">
+          <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[92vh] flex flex-col">
 
               {/* Modal Header Bar */}
               <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
@@ -734,18 +844,24 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     </p>
                   </div>
                 </div>
-                <button onClick={() => setViewingItem(null)} className="text-slate-400 hover:text-white p-1">
+                <button onClick={() => setViewingItem(null)} className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <div className="p-6 space-y-6 text-xs overflow-y-auto flex-1">
+              <div className="p-6 sm:p-8 space-y-6 text-xs overflow-y-auto flex-1 max-h-[calc(92vh-90px)]">
 
                 {/* Grid 1: Stored Fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
                     <span className="text-slate-400 text-[10px] uppercase font-mono block">Procuring Entity</span>
                     <p className="font-bold text-white">{viewingItem.procuringEntity}</p>
+                    {viewingItem.procuringEntityContactPerson && (
+                      <p className="text-[11px] text-cyan-400 font-semibold flex items-center gap-1 mt-0.5">
+                        <span className="text-slate-400">Contact:</span>
+                        <strong className="text-white">{viewingItem.procuringEntityContactPerson}</strong>
+                      </p>
+                    )}
                     <p className="text-[11px] text-slate-400">{viewingItem.procuringEntityPosition || 'Procurement Officer'}</p>
                   </div>
 
@@ -917,13 +1033,13 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
           </div>
         )}
 
-        {/* ADD / EDIT OPPORTUNITY MODAL (100% SCREEN ADAPTED RESPONSIVE MODAL) */}
+        {/* ADD / EDIT OPPORTUNITY MODAL (BEAUTIFUL SPACIOUS RESPONSIVE DIALOG) */}
         {showAddEditModal && (
-          <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col p-2 sm:p-4 md:p-6 overflow-hidden animate-fadeIn">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full h-full max-w-[1800px] mx-auto shadow-2xl flex flex-col overflow-hidden">
+          <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[92vh] flex flex-col">
 
               {/* Modal Fixed Header */}
-              <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900 shrink-0">
+              <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-10 shrink-0">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <Plus className="w-4 h-4 text-blue-400" />
                   {editingItem ? 'Edit Bidding Opportunity' : 'Add Bidding Opportunity'}
@@ -931,7 +1047,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                 <button
                   type="button"
                   onClick={() => setShowAddEditModal(false)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                  className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -941,7 +1057,21 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
               <form onSubmit={handleSaveOpportunity} className="flex-1 flex flex-col overflow-hidden min-h-0">
 
                 {/* Scrollable Form Body */}
-                <div className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1 min-h-0">
+                <div className="p-5 sm:p-7 space-y-5 text-xs overflow-y-auto flex-1 min-h-0 max-h-[calc(92vh-140px)]">
+
+                  {Object.keys(errors).length > 0 && (
+                    <div className="p-3.5 rounded-xl bg-red-950/90 border border-red-500/60 flex items-start gap-3 text-red-200 shadow-lg">
+                      <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-bold text-xs text-white">Please check the required fields below:</h4>
+                        <ul className="list-disc list-inside mt-1 text-[11px] space-y-0.5">
+                          {Object.values(errors).map((err, i) => (
+                            <li key={i}>{err}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
 
                   {/* If Editing, display Project Reference Number as PERMANENTLY LOCKED / READ-ONLY */}
                   {editingItem && (
@@ -956,29 +1086,25 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">PhilGEPS Ref. No. <span className="text-red-400">*</span></label>
+                      <label className="block text-slate-300 font-medium mb-1">PhilGEPS Ref. No. <span className="text-slate-500 font-mono text-[11px]">(Auto-generated if blank)</span></label>
                       <input
                         type="text"
                         value={philgepsRefNo}
                         onChange={(e) => setPhilgepsRefNo(e.target.value)}
                         placeholder="e.g. 10928371"
-                        required
-                        readOnly={projectMetadataLocked}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-75"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
                       />
                       {errors.philgepsRefNo && <p className="text-[11px] text-red-400 mt-1">{errors.philgepsRefNo}</p>}
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">Solicitation No. <span className="text-red-400">*</span></label>
+                      <label className="block text-slate-300 font-medium mb-1">Solicitation No. <span className="text-slate-500 font-mono text-[11px]">(Auto-generated if blank)</span></label>
                       <input
                         type="text"
                         value={solicitationNumber}
                         onChange={(e) => setSolicitationNumber(e.target.value)}
                         placeholder="e.g. SOL-2026-0912"
-                        required
-                        readOnly={projectMetadataLocked}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-75"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
                       />
                       {errors.solicitationNumber && <p className="text-[11px] text-red-400 mt-1">{errors.solicitationNumber}</p>}
                     </div>
@@ -1021,11 +1147,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                       maxLength={500}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                     />
-                    {projectMetadataLocked && (
-                      <p className="mt-1 text-[11px] text-blue-300 font-medium">
-                        Matching opportunity detected. Project Ref. No., Procuring Entity, Solicitation No., and Date Published are auto-filled and locked.
-                      </p>
-                    )}
+                    {errors.biddingProjectTitle && <p className="text-[11px] text-red-400 mt-1">{errors.biddingProjectTitle}</p>}
                   </div>
 
                   {/* Procuring Entity Details */}
@@ -1036,26 +1158,23 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">Entity Name <span className="text-red-400">*</span></label>
+                        <label className="block text-slate-300 font-medium mb-1">Entity Name</label>
                         <input
                           type="text"
                           value={procuringEntityName}
                           onChange={(e) => setProcuringEntityName(e.target.value)}
                           placeholder="e.g. Department of Information & Communications Technology"
-                          required
-                          readOnly={projectMetadataLocked}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-75"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">Contact Number <span className="text-red-400">*</span></label>
+                        <label className="block text-slate-300 font-medium mb-1">Contact Number</label>
                         <input
                           type="text"
                           value={procuringEntityContactNumber}
                           onChange={(e) => setProcuringEntityContactNumber(e.target.value)}
                           placeholder="+63 917 123 4567"
-                          required
                           className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
                         />
                       </div>
@@ -1063,13 +1182,12 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">Email Address <span className="text-red-400">*</span></label>
+                        <label className="block text-slate-300 font-medium mb-1">Email Address</label>
                         <input
                           type="email"
                           value={procuringEntityEmail}
                           onChange={(e) => setProcuringEntityEmail(e.target.value)}
                           placeholder="bac_secretariat@dict.gov.ph"
-                          required
                           className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                         />
                       </div>
@@ -1086,26 +1204,37 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-slate-300 font-medium mb-1">Officer Position <span className="text-red-400">*</span></label>
-                      <input
-                        type="text"
-                        value={procuringEntityPosition}
-                        onChange={(e) => setProcuringEntityPosition(e.target.value)}
-                        placeholder="BAC Secretariat Head"
-                        required
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-300 font-medium mb-1">Name of Contact Person</label>
+                        <input
+                          type="text"
+                          value={procuringEntityContactPerson}
+                          onChange={(e) => setProcuringEntityContactPerson(e.target.value)}
+                          placeholder="e.g. Engr. Maria A. Santos"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-medium mb-1">Officer Position</label>
+                        <input
+                          type="text"
+                          value={procuringEntityPosition}
+                          onChange={(e) => setProcuringEntityPosition(e.target.value)}
+                          placeholder="BAC Secretariat Head"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">Address <span className="text-red-400">*</span></label>
-                      <textarea
+                      <label className="block text-slate-300 font-medium mb-1">Address</label>
+                      <input
+                        type="text"
                         value={procuringEntityAddress}
                         onChange={(e) => setProcuringEntityAddress(e.target.value)}
                         placeholder="DICT Building, C.P. Garcia Ave., Diliman, Quezon City"
-                        required
-                        rows={2}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                       />
                     </div>
@@ -1114,25 +1243,22 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   {/* Restored Dates: Created & Published */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">Date Created <span className="text-red-400">*</span></label>
+                      <label className="block text-slate-300 font-medium mb-1">Date Created</label>
                       <input
                         type="date"
                         value={dateCreated}
                         onChange={(e) => setDateCreated(e.target.value)}
-                        required
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">Date Published <span className="text-red-400">*</span></label>
+                      <label className="block text-slate-300 font-medium mb-1">Date Published</label>
                       <input
                         type="date"
                         value={datePublished}
                         onChange={(e) => setDatePublished(e.target.value)}
-                        required
-                        readOnly={projectMetadataLocked}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-75"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                       />
                     </div>
                   </div>
@@ -1150,12 +1276,11 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">Submission Deadline Date & Time <span className="text-red-400">*</span></label>
+                      <label className="block text-slate-300 font-medium mb-1">Submission Deadline Date & Time</label>
                       <input
                         type="datetime-local"
                         value={submissionDeadlineDatetime}
                         onChange={(e) => setSubmissionDeadlineDatetime(e.target.value)}
-                        required
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                       />
                     </div>
@@ -1172,11 +1297,12 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                       required
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-blue-500"
                     />
+                    {errors.approvedBudget && <p className="text-[11px] text-red-400 mt-1">{errors.approvedBudget}</p>}
                   </div>
 
                   {/* Main Notice PDF Upload */}
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Official PhilGEPS PDF Notice Document (Max 100 MB) <span className="text-red-400">*</span></label>
+                    <label className="block text-slate-300 font-medium mb-1">Official PhilGEPS PDF Notice Document (Max 100 MB) <span className="text-slate-500 font-mono text-[11px]">(Optional)</span></label>
                     <div className="border-2 border-dashed border-slate-800 rounded-xl p-4 text-center hover:border-blue-500 transition cursor-pointer bg-slate-950">
                       <label className="cursor-pointer block space-y-1">
                         <FileText className="w-6 h-6 text-blue-400 mx-auto" />
@@ -1304,7 +1430,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
         {/* CONFIRM DELETE MODAL */}
         {deletingItem && (
-          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+          <div className="fixed inset-0 z-[150] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
             <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl animate-scaleIn">
               <div className="flex items-center gap-3 text-red-400">
                 <AlertCircle className="w-6 h-6 shrink-0" />
@@ -1331,36 +1457,40 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
           </div>
         )}
 
-        {/* INLINE SLOT PDF PREVIEW MODAL (100% SCREEN ADAPTED RESPONSIVE MODAL) */}
+        {/* INLINE SLOT PDF PREVIEW MODAL (100% FULL SCREEN EDGE-TO-EDGE MODAL) */}
         {previewPdfSlot && (
-          <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto animate-fadeIn">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-h-[calc(100vh-3rem)] max-w-[1800px] mx-auto shadow-2xl flex flex-col overflow-hidden">
-              <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
+          <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col p-0 overflow-hidden animate-fadeIn">
+            <div className="bg-slate-900 border-none rounded-none w-full h-full shadow-none flex flex-col overflow-hidden">
+              <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900 shrink-0 z-30 shadow-md">
                 <div className="flex items-center gap-2">
                   <FileText className="w-5 h-5 text-blue-400" />
                   <h3 className="text-sm font-bold text-white">{previewPdfSlot.title} — {previewPdfSlot.fileName}</h3>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
                     onClick={() => downloadFile(previewPdfSlot.fileName, previewPdfSlot.dataUrl)}
-                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition flex items-center gap-1"
+                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow"
                   >
                     <Download className="w-4 h-4" />
-                    Download
+                    <span>Download PDF</span>
                   </button>
-                  <button onClick={() => setPreviewPdfSlot(null)} className="text-slate-400 hover:text-white p-1">
-                    <X className="w-5 h-5" />
+                  <button
+                    onClick={() => setPreviewPdfSlot(null)}
+                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-red-600 text-slate-200 hover:text-white text-xs font-semibold transition flex items-center gap-1 border border-slate-700"
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Close Preview</span>
                   </button>
                 </div>
               </div>
 
-              <div className="p-6 overflow-y-auto flex-1 bg-slate-950 text-center">
+              <div className="p-4 overflow-hidden flex-1 bg-slate-950 flex flex-col items-center justify-center">
                 {previewPdfSlot.dataUrl ? (
                   <iframe
                     src={previewPdfSlot.dataUrl}
                     title={previewPdfSlot.fileName}
-                    className="w-full h-[700px] border-none rounded-xl bg-slate-900"
+                    className="w-full h-full border-none rounded-xl bg-slate-900"
                   />
                 ) : (
                   <div className="p-12 text-center text-slate-400 space-y-2">

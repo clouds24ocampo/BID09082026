@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
-import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import html2canvas from 'html2canvas';
@@ -62,6 +62,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
   // Opportunity Projects Auto-Fill Integration
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
+  const [dateTimeSubmitted, setDateTimeSubmitted] = useState('March 19, 2026');
 
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
@@ -74,6 +75,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
         setProjectRefNo(match.refNo);
         setProjectTitle(match.title);
         setProcuringEntity(match.procuringEntity);
+        if (match.dateTimeSubmitted) setDateTimeSubmitted(match.dateTimeSubmitted);
       } else {
         setProjectRefNo(activeProjectRefNo);
         if (activeProjectTitle) setProjectTitle(activeProjectTitle);
@@ -85,6 +87,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
       setProjectRefNo(first.refNo);
       setProjectTitle(first.title);
       setProcuringEntity(first.procuringEntity);
+      if (first.dateTimeSubmitted) setDateTimeSubmitted(first.dateTimeSubmitted);
     }
   }, [tenant?.id, activeProjectRefNo, activeProjectTitle, activeProcuringEntity]);
 
@@ -104,6 +107,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
       setProjectRefNo(found.refNo);
       setProjectTitle(found.title);
       setProcuringEntity(found.procuringEntity);
+      if (found.dateTimeSubmitted) setDateTimeSubmitted(found.dateTimeSubmitted);
     }
   };
 
@@ -127,32 +131,12 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
       let dataUrl: string | undefined = undefined;
       if (templateElems.length > 0) {
         const elemArray = Array.from(templateElems) as HTMLElement[];
-        const canvases = await Promise.all(
-          elemArray.map(el => html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }))
-        );
-
-        if (canvases.length === 1) {
-          dataUrl = canvases[0].toDataURL('image/png');
-        } else {
-          const totalWidth = Math.max(...canvases.map(c => c.width));
-          const totalHeight = canvases.reduce((sum, c) => sum + c.height + 20, 0);
-          const combinedCanvas = document.createElement('canvas');
-          combinedCanvas.width = totalWidth;
-          combinedCanvas.height = totalHeight;
-          const ctx = combinedCanvas.getContext('2d');
-          if (ctx) {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, totalWidth, totalHeight);
-            let currentY = 0;
-            canvases.forEach(c => {
-              ctx.drawImage(c, 0, currentY);
-              currentY += c.height + 20;
-            });
-            dataUrl = combinedCanvas.toDataURL('image/png');
-          } else {
-            dataUrl = canvases[0].toDataURL('image/png');
+        dataUrl = await buildMergedThreeLayerPdfDataUrl([
+          {
+            title: 'Bid Securing Declaration',
+            formElement: elemArray
           }
-        }
+        ], `${projectRefNo}_Bid_Securing_Declaration.pdf`);
       }
       const customDocName = instrumentType === 'BID_SECURING_DECLARATION'
         ? 'Bid Securing Declaration (Duly Notarized)'
@@ -171,7 +155,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
       <style>{`
         @media print {
           @page {
-            size: 8.5in 13in;
+            size: 8.5in 13in portrait;
             margin: 0mm;
           }
           body {
@@ -209,7 +193,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
                   GPPB-BSD-2025 • Section 27.5
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                  Legal 8.5" × 13"
+                  Legal 8.5" × 13" Portrait
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5">
@@ -519,31 +503,31 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
           <div className="space-y-8 flex flex-col items-center">
             {instrumentType === 'BID_SECURING_DECLARATION' ? (
               /* OPTION 1: OFFICIAL GPPB STATUTORY NOTARIZED BID SECURING DECLARATION */
-              <div className="bsd-legal-paper single-page-paper w-[8.5in] min-h-[13in] bg-white text-slate-950 p-[0.75in] shadow-2xl font-serif text-[10.5pt] leading-relaxed flex flex-col justify-between mx-auto border border-slate-300">
+              <div className="bsd-legal-paper single-page-paper w-[8.5in] min-h-[13in] max-w-[850px] aspect-[8.5/13] bg-white text-slate-950 p-[0.6in] sm:p-[0.75in] shadow-2xl font-serif text-[10pt] leading-normal flex flex-col justify-between mx-auto border border-slate-300 print:shadow-none print:border-none print:p-6 print:m-0 print:break-inside-avoid print:page-break-inside-avoid">
 
-                <div className="space-y-5">
+                <div className="space-y-3.5">
 
-                  <div className="text-sm font-serif">
+                  <div className="text-xs font-serif">
                     REPUBLIC OF THE PHILIPPINES)<br />
                     {jurisdictionType === 'CITY' ? 'CITY OF ' : jurisdictionType === 'MUNICIPALITY' ? 'MUNICIPALITY OF ' : 'CITY/MUNICIPALITY OF '}
                     <u>{notaryPlace || '____________________'}</u> ) S.S.
                   </div>
 
-                  <div className="text-center my-4 font-serif">
-                    <h2 className="text-base font-bold uppercase tracking-wider font-sans text-slate-950">BID SECURING DECLARATION</h2>
-                    <p className="text-[10pt] font-mono text-slate-700 mt-1">Project Reference No.: <strong><u>{projectRefNo}</u></strong></p>
+                  <div className="text-center my-2 font-serif">
+                    <h2 className="text-sm font-bold uppercase tracking-wider font-sans text-slate-950">BID SECURING DECLARATION</h2>
+                    <p className="text-[9pt] font-mono text-slate-700 mt-0.5">Project Reference No.: <strong><u>{projectRefNo}</u></strong></p>
                   </div>
 
-                  <p className="font-serif text-justify leading-relaxed">
+                  <p className="font-serif text-justify leading-relaxed text-[9.5pt]">
                     To: <strong><u>{procuringEntity}</u></strong><br />
                     Address: Metro Manila, Philippines
                   </p>
 
-                  <p className="font-serif text-justify leading-relaxed">
+                  <p className="font-serif text-justify leading-relaxed text-[9.5pt]">
                     I/We, the undersigned, declare that:
                   </p>
 
-                  <ol className="list-decimal pl-6 space-y-3 font-serif text-justify">
+                  <ol className="list-decimal pl-5 space-y-2.5 font-serif text-justify text-[9.5pt]">
                     <li>
                       I/We understand that, according to your conditions, bids must be supported by a Bid Security, which may be in the form of a Bid Securing Declaration.
                     </li>
@@ -554,7 +538,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
 
                     <li>
                       I/We understand that this Bid Securing Declaration shall cease to be valid on the expiration of the bid validity period indicated above, or upon the occurrence of any of the following events:
-                      <ol className="list-[lower-alpha] pl-6 space-y-1 mt-1">
+                      <ol className="list-[lower-alpha] pl-5 space-y-1 mt-1">
                         <li>Upon expiration of the bid validity period (<u>{validityDays}</u>), or any extension thereof;</li>
                         <li>I am/we are declared ineligible or post-disqualified upon receipt of your notice to such effect, and (i) I/we failed to file a request for reconsideration; or (ii) I/we filed a waiver to avail of said right; or</li>
                         <li>I am/we are declared the bidder with the Lowest Calculated Responsive Bid / Highest Rated Responsive Bid, and I/we have furnished the performance security and signed the Contract.</li>
@@ -562,41 +546,41 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
                     </li>
                   </ol>
 
-                  <p className="pt-2 font-serif text-justify leading-relaxed">
+                  <p className="pt-2 font-serif text-justify leading-relaxed text-[9.5pt]">
                     IN WITNESS WHEREOF, I/We have hereunto set my/our hand/s this _____ day of __________________, 20___ at <u>{notaryPlace || '____________________'}</u>, Philippines.
                   </p>
 
                   {/* Signatory Box */}
-                  <div className="pt-6 flex flex-col items-end">
-                    <div className="w-80 text-center space-y-1">
-                      <p className="text-[10pt] font-semibold">Duly authorized to sign the Bid for and on behalf of:</p>
-                      <p className="font-bold text-slate-950 uppercase border-b border-black pb-1">{companyName}</p>
+                  <div className="pt-4 flex flex-col items-end">
+                    <div className="w-72 text-center space-y-0.5">
+                      <p className="text-[9pt] font-semibold">Duly authorized to sign the Bid for and on behalf of:</p>
+                      <p className="font-bold text-slate-950 uppercase border-b border-black pb-0.5 text-[9.5pt]">{companyName}</p>
                       <div className="pt-6">
-                        <p className="font-bold text-slate-950 uppercase text-base">{signatoryName}</p>
-                        <p className="text-[10pt] font-semibold text-slate-800">{signatoryTitle}</p>
+                        <p className="font-bold text-slate-950 uppercase text-[10.5pt]">{signatoryName}</p>
+                        <p className="text-[9pt] font-semibold text-slate-800">{signatoryTitle}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Notary Jurat Block */}
-                  <div className="pt-6 border-t border-slate-300 font-serif space-y-3">
-                    <p className="text-[10pt] font-serif leading-relaxed text-justify">
+                  <div className="pt-4 border-t border-slate-300 font-serif space-y-2">
+                    <p className="text-[9.5pt] font-serif leading-relaxed text-justify">
                       SUBSCRIBED AND SWORN to before me this _____ day of __________________ 20___ at <u>{notaryPlace || '____________________'}</u>, Philippines. Affiant/s is/are personally known to me and was/were identified by me through competent evidence of identity as defined in the 2004 Rules on Notarial Practice (A.M. No. 02-8-13-SC). Affiant/s exhibited to me his/her <u>{govIdType}</u> with no. <u>{govIdNumber}</u>, with his/her photograph and signature appearing thereon.
                     </p>
 
-                    <p className="text-[10pt] font-serif pt-1">
+                    <p className="text-[9.5pt] font-serif pt-0.5">
                       WITNESS MY HAND AND SEAL this _____ day of __________________ 20___.
                     </p>
 
-                    <div className="pt-4 flex items-start justify-between text-[9.5pt] font-mono text-slate-800">
+                    <div className="pt-3 flex items-start justify-between text-[9pt] font-mono text-slate-800">
                       <div className="space-y-0.5">
                         <p>Doc. No. _________;</p>
                         <p>Page No. _________;</p>
                         <p>Book No. _________;</p>
                         <p>Series of 2026.</p>
                       </div>
-                      <div className="text-right space-y-1">
-                        <p className="font-bold text-slate-950 uppercase">NOTARY PUBLIC</p>
+                      <div className="text-right space-y-0.5">
+                        <p className="font-bold text-slate-950 uppercase text-[10pt]">NOTARY PUBLIC</p>
                       </div>
                     </div>
                   </div>
@@ -604,8 +588,8 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
                 </div>
 
                 {/* Page Footer */}
-                <div className="pt-4 border-t border-slate-300 flex items-center justify-between text-[9pt] font-mono text-slate-700">
-                  <div className="flex items-center gap-3">
+                <div className="pt-2 border-t border-slate-300 flex items-center justify-between text-[8.5pt] font-mono text-slate-700">
+                  <div className="flex items-center gap-2">
                     <DocumentQrCode
                       details={{
                         companyName: companyName,
@@ -614,18 +598,14 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
                         projectTitle: projectTitle,
                         projectRefNo: projectRefNo,
                         procuringEntity: procuringEntity,
-                        dateTimeSubmitted: new Date().toLocaleString(),
+                        dateTimeSubmitted: dateTimeSubmitted || 'March 19, 2026',
                         documentCategory: 'Notarized Documents',
                         generatedBy: companyName
                       }}
-                      size={50}
+                      size={42}
                       showCaption={false}
                     />
-                    <div className="space-y-0.5 text-[8.5pt]">
-                      <p className="font-bold text-slate-950 uppercase">{companyName}</p>
-                      <p>PROJECT: <strong>{projectTitle}</strong></p>
-                      <p>REF NO: <strong>{projectRefNo}</strong> • ENTITY: <strong>{procuringEntity}</strong></p>
-                    </div>
+                    <span className="text-[7.5pt] text-slate-500 font-sans uppercase tracking-wider font-semibold">Official Verification QR</span>
                   </div>
                   <span className="font-bold font-mono">Page 1 of 1</span>
                 </div>
@@ -633,89 +613,89 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
               </div>
             ) : (
               /* OPTION 2: OFFICIAL GPPB BANK GUARANTEE / DRAFT / IRREVOCABLE LETTER OF CREDIT WITH LOCAL UNIVERSAL/COMMERCIAL BANK CONFIRMATION */
-              <div className="bsd-legal-paper single-page-paper w-[8.5in] min-h-[13in] bg-white text-slate-950 p-[0.75in] shadow-2xl font-serif text-[10.5pt] leading-relaxed flex flex-col justify-between mx-auto border border-slate-300">
+              <div className="bsd-legal-paper single-page-paper w-[8.5in] min-h-[13in] max-w-[850px] aspect-[8.5/13] bg-white text-slate-950 p-[0.6in] sm:p-[0.75in] shadow-2xl font-serif text-[9.5pt] leading-normal flex flex-col justify-between mx-auto border border-slate-300 print:shadow-none print:border-none print:p-6 print:m-0 print:break-inside-avoid print:page-break-inside-avoid">
 
-                <div className="space-y-5">
+                <div className="space-y-3.5">
 
                   {/* Header / Issuing Foreign Bank Info */}
-                  <div className="border-b-2 border-slate-900 pb-3 flex items-start justify-between">
+                  <div className="border-b-2 border-slate-900 pb-2.5 flex items-start justify-between">
                     <div>
-                      <h2 className="text-sm font-bold uppercase font-sans text-slate-950">{issuingForeignBank}</h2>
-                      <p className="text-[9pt] font-mono text-slate-700">{foreignBankAddress}</p>
-                      <p className="text-[9pt] font-mono text-slate-800 font-bold mt-0.5">REF NO: {guaranteeRefNumber}</p>
+                      <h2 className="text-xs font-bold uppercase font-sans text-slate-950">{issuingForeignBank}</h2>
+                      <p className="text-[8.5pt] font-mono text-slate-700">{foreignBankAddress}</p>
+                      <p className="text-[8.5pt] font-mono text-slate-800 font-bold mt-0.5">REF NO: {guaranteeRefNumber}</p>
                     </div>
-                    <div className="text-right font-mono text-[9pt]">
+                    <div className="text-right font-mono text-[8.5pt]">
                       <p className="font-bold">FORM OF BID SECURITY</p>
                       <p className="text-slate-700">Bank Draft / Guarantee / ILC</p>
                       <p className="text-slate-700">Date: {new Date().toLocaleDateString()}</p>
                     </div>
                   </div>
 
-                  <div className="text-center my-4 font-serif">
-                    <h2 className="text-sm font-bold uppercase tracking-wider">BANK GUARANTEE / IRREVOCABLE LETTER OF CREDIT FORM FOR BID SECURITY</h2>
-                    <p className="text-[9.5pt] font-mono text-slate-700 mt-0.5">Project Reference No.: <strong><u>{projectRefNo}</u></strong></p>
+                  <div className="text-center my-2 font-serif">
+                    <h2 className="text-xs font-bold uppercase tracking-wider">BANK GUARANTEE / IRREVOCABLE LETTER OF CREDIT FORM FOR BID SECURITY</h2>
+                    <p className="text-[8.5pt] font-mono text-slate-700 mt-0.5">Project Reference No.: <strong><u>{projectRefNo}</u></strong></p>
                   </div>
 
-                  <p className="font-serif text-[10pt]">
+                  <p className="font-serif text-[9pt]">
                     To: <strong><u>{procuringEntity}</u></strong><br />
                     Address: Metro Manila, Philippines
                   </p>
 
-                  <p className="font-serif text-justify text-[10pt] leading-relaxed">
+                  <p className="font-serif text-justify text-[9pt] leading-relaxed">
                     WHEREAS, <strong><u>{companyName}</u></strong> (hereinafter called "the Bidder") has submitted its bid dated <u>{new Date().toLocaleDateString()}</u> for the execution of <strong><u>{projectTitle}</u></strong> under Project Reference No. <strong><u>{projectRefNo}</u></strong> (hereinafter called "the Bid").
                   </p>
 
-                  <p className="font-serif text-justify text-[10pt] leading-relaxed">
+                  <p className="font-serif text-justify text-[9pt] leading-relaxed">
                     KNOW ALL MEN by these presents that WE, <strong><u>{issuingForeignBank}</u></strong>, having our registered office at <u>{foreignBankAddress}</u>, are bound unto <strong><u>{procuringEntity}</u></strong> (hereinafter called "the Procuring Entity") in the sum of <strong><u>{guaranteeAmount}</u></strong>, for which payment well and truly to be made to the said Procuring Entity, the Bank binds itself, its successors and assigns by these presents.
                   </p>
 
-                  <p className="font-serif text-justify text-[10pt] leading-relaxed">
+                  <p className="font-serif text-justify text-[9pt] leading-relaxed">
                     THE CONDITIONS of this obligation are:
                   </p>
-                  <ol className="list-decimal pl-6 space-y-1.5 font-serif text-[9.5pt] text-justify">
+                  <ol className="list-decimal pl-5 space-y-1 font-serif text-[8.5pt] text-justify">
                     <li>If the Bidder withdraws its Bid during the period of bid validity specified in the Form of Bid; or</li>
                     <li>If the Bidder having been notified of the acceptance of its bid by the Procuring Entity during the period of bid validity: (a) fails or refuses to execute the Contract Form; or (b) fails or refuses to furnish the Performance Security in accordance with the Instructions to Bidders.</li>
                   </ol>
 
-                  <p className="font-serif text-justify text-[9.5pt] leading-relaxed">
+                  <p className="font-serif text-justify text-[8.5pt] leading-relaxed">
                     We undertake to pay to the Procuring Entity up to the above amount upon receipt of its first written demand, without the Procuring Entity having to substantiate its demand, provided that in its demand the Procuring Entity will note that the amount claimed by it is due to it owing to the occurrence of one or both of the two conditions, specifying the occurred condition or conditions.
                   </p>
 
                   {/* Foreign Issuing Bank Signature */}
-                  <div className="pt-2 flex justify-end font-serif">
-                    <div className="w-72 text-center border-t border-slate-800 pt-1">
-                      <p className="font-bold text-slate-950 uppercase text-[9.5pt]">{foreignBankOfficer}</p>
-                      <p className="text-[8.5pt] text-slate-700 font-sans">{foreignBankOfficerTitle}</p>
-                      <p className="text-[8pt] font-mono text-slate-600 uppercase mt-0.5">{issuingForeignBank}</p>
+                  <div className="pt-1 flex justify-end font-serif">
+                    <div className="w-64 text-center border-t border-slate-800 pt-1">
+                      <p className="font-bold text-slate-950 uppercase text-[9pt]">{foreignBankOfficer}</p>
+                      <p className="text-[8pt] text-slate-700 font-sans">{foreignBankOfficerTitle}</p>
+                      <p className="text-[7.5pt] font-mono text-slate-600 uppercase mt-0.5">{issuingForeignBank}</p>
                     </div>
                   </div>
 
                   {/* MANDATORY LOCAL UNIVERSAL / COMMERCIAL BANK CONFIRMATION BLOCK */}
-                  <div className="pt-3 border-t-2 border-dashed border-slate-400 font-serif space-y-2">
-                    <div className="bg-slate-100 p-2 rounded border border-slate-300 text-center">
-                      <h3 className="text-[9.5pt] font-bold uppercase tracking-wider text-slate-950 font-sans">
+                  <div className="pt-2 border-t-2 border-dashed border-slate-400 font-serif space-y-1.5">
+                    <div className="bg-slate-100 p-1.5 rounded border border-slate-300 text-center">
+                      <h3 className="text-[9pt] font-bold uppercase tracking-wider text-slate-950 font-sans">
                         CONFIRMATION & AUTHENTICATION BY PHILIPPINE UNIVERSAL / COMMERCIAL BANK
                       </h3>
-                      <p className="text-[8.5pt] font-mono text-slate-700">Required pursuant to Section 27.2 of the IRR of RA 12009 / RA 9184 for Foreign Bank Securities</p>
+                      <p className="text-[8pt] font-mono text-slate-700">Required pursuant to Section 27.2 of the IRR of RA 12009 / RA 9184 for Foreign Bank Securities</p>
                     </div>
 
-                    <p className="text-[9.5pt] font-serif leading-relaxed text-justify">
+                    <p className="text-[8.5pt] font-serif leading-relaxed text-justify">
                       WE, <strong><u>{localConfirmingBank}</u></strong>, a Universal/Commercial Bank duly organized and licensed under the laws of the Republic of the Philippines with principal office at <u>{localBankAddress}</u>, HEREBY CONFIRM AND AUTHENTICATE the foregoing Bank Guarantee / Irrevocable Letter of Credit No. <strong><u>{guaranteeRefNumber}</u></strong> issued by <u>{issuingForeignBank}</u> in favor of <u>{procuringEntity}</u>.
                     </p>
 
-                    <p className="text-[9.5pt] font-serif leading-relaxed text-justify">
+                    <p className="text-[8.5pt] font-serif leading-relaxed text-justify">
                       We hereby confirm that this financial instrument is valid, binding, and fully enforceable in the Republic of the Philippines, and that our bank guarantees prompt payment upon written demand by the Procuring Entity in accordance with the terms herein.
                     </p>
 
-                    <div className="pt-4 flex justify-between items-end">
-                      <div className="text-[8.5pt] font-mono text-slate-700">
+                    <div className="pt-2 flex justify-between items-end">
+                      <div className="text-[8pt] font-mono text-slate-700">
                         <p>Date Confirmed: <strong>{new Date().toLocaleDateString()}</strong></p>
                         <p>BSP License Ref: <strong>BSP-UAP-2026-CONFIRM</strong></p>
                       </div>
-                      <div className="w-72 text-center border-t border-slate-800 pt-1">
-                        <p className="font-bold text-slate-950 uppercase text-[9.5pt]">{localBankOfficer}</p>
-                        <p className="text-[8.5pt] text-slate-700 font-sans">{localBankOfficerTitle}</p>
-                        <p className="text-[8pt] font-mono text-slate-900 font-bold uppercase mt-0.5">{localConfirmingBank}</p>
+                      <div className="w-64 text-center border-t border-slate-800 pt-1">
+                        <p className="font-bold text-slate-950 uppercase text-[9pt]">{localBankOfficer}</p>
+                        <p className="text-[8pt] text-slate-700 font-sans">{localBankOfficerTitle}</p>
+                        <p className="text-[7.5pt] font-mono text-slate-900 font-bold uppercase mt-0.5">{localConfirmingBank}</p>
                       </div>
                     </div>
                   </div>
@@ -723,8 +703,8 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
                 </div>
 
                 {/* Page Footer */}
-                <div className="pt-3 border-t border-slate-300 flex items-center justify-between text-[9pt] font-mono text-slate-700">
-                  <div className="flex items-center gap-3">
+                <div className="pt-2 border-t border-slate-300 flex items-center justify-between text-[8.5pt] font-mono text-slate-700">
+                  <div className="flex items-center gap-2">
                     <DocumentQrCode
                       details={{
                         companyName: companyName,
@@ -733,18 +713,14 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
                         projectTitle: projectTitle,
                         projectRefNo: projectRefNo,
                         procuringEntity: procuringEntity,
-                        dateTimeSubmitted: new Date().toLocaleString(),
+                        dateTimeSubmitted: dateTimeSubmitted || 'March 19, 2026',
                         documentCategory: 'Notarized Documents',
                         generatedBy: companyName
                       }}
-                      size={50}
+                      size={42}
                       showCaption={false}
                     />
-                    <div className="space-y-0.5 text-[8.5pt]">
-                      <p className="font-bold text-slate-950 uppercase">{companyName}</p>
-                      <p>FOREIGN BANK: <strong>{issuingForeignBank}</strong> • CONFIRMING BANK: <strong>{localConfirmingBank}</strong></p>
-                      <p>REF NO: <strong>{projectRefNo}</strong> • ENTITY: <strong>{procuringEntity}</strong></p>
-                    </div>
+                    <span className="text-[7.5pt] text-slate-500 font-sans uppercase tracking-wider font-semibold">Official Verification QR</span>
                   </div>
                   <span className="font-bold font-mono">Page 1 of 1</span>
                 </div>
@@ -758,7 +734,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
         {/* Footer Bar */}
         <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900/95 sticky bottom-0 z-10 shrink-0 no-print">
           <span className="text-xs text-slate-400 font-mono">
-            RA 12009 Section 27.5 Standard • Legal 8.5" × 13" Printable Output
+            RA 12009 Section 27.5 Standard • Legal 8.5" × 13" Portrait Printable Output
           </span>
 
           <div className="flex items-center gap-2">

@@ -44,8 +44,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
     if (!currentUser) return false;
     const userEmail = currentUser.email.toLowerCase();
     const flag = localStorage.getItem(`bidocs_must_change_password_${userEmail}`);
-    const pw = localStorage.getItem(`bidocs_user_password_${userEmail}`);
-    return flag === 'true' || pw === 'BiDOCS#2026' || currentUser.mustChangePassword === true || currentUser.password === 'BiDOCS#2026';
+    return flag === 'true' || currentUser.mustChangePassword === true;
   });
 
   const [newPassword, setNewPassword] = useState('');

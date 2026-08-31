@@ -33,13 +33,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
       setVaultItems(items || []);
     }).catch(() => {
       const saved = localStorage.getItem(`bidocs_vault_items_${activeTenantId}`);
-      setVaultItems(saved ? JSON.parse(saved) : []);
+      if (saved) {
+        try {
+          setVaultItems(JSON.parse(saved));
+        } catch (_) {
+          setVaultItems([]);
+        }
+      } else {
+        setVaultItems([]);
+      }
     });
   }, [activeTenantId]);
 
   const opportunities = React.useMemo(() => {
     const saved = localStorage.getItem(`bidocs_opportunities_${activeTenantId}`);
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (_) {
+        return [];
+      }
+    }
+    return [];
   }, [activeTenantId]);
 
   const totalAbc = React.useMemo(() => {

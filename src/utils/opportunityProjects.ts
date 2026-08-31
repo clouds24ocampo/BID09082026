@@ -1,31 +1,15 @@
 import { debugLog } from './debugLog';
 
-export const normalizePhilgepsRefNo = (value: string | number | null | undefined): string => {
-  if (value === null || value === undefined) return '';
-  const raw = String(value).trim();
-  if (!raw) return '';
-
-  const digits = raw.match(/\d+/g);
-  return digits ? digits.join('') : '';
-};
-
-export const normalizeProjectTitle = (value: string | null | undefined): string => {
-  if (value === null || value === undefined) return '';
-
-  return String(value)
-    .replace(/\bproject\b/gi, ' ')
-    .replace(/[-–—:]/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-};
-
 export interface OpportunityProjectOption {
   id: string;
   refNo: string;
   solicitationNo: string;
   title: string;
   procuringEntity: string;
+  procuringEntityAddress?: string;
+  location?: string;
   abc: string;
+  category?: 'Goods' | 'Infrastructure' | string;
   dateTimeSubmitted: string;
 }
 
@@ -109,20 +93,31 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
           formattedDateTime = `${today}T14:00`;
         }
 
-        const explicitPhilgepsRefNo = item.philgepsRefNo || item.refNo || '';
-        const projectReferenceValue = item.projectReferenceNumber || item.refNo || `PRJ-${idx + 1}`;
-        const normalizedRefNo = explicitPhilgepsRefNo ? normalizePhilgepsRefNo(explicitPhilgepsRefNo) : projectReferenceValue;
-        const normalizedTitle = normalizeProjectTitle(item.title || item.biddingProjectTitle || 'Untitled Opportunity') || 'Untitled Opportunity';
+        const projectAddress = item.deliveryLocation || item.location || item.areaOfDelivery || item.procuringEntityAddress || item.clientAddress || (typeof item.procuringEntity === 'string' ? item.procuringEntity : item.procuringEntity?.address) || '';
 
         return {
           id: item.id || `opp-stg-${idx}`,
-          refNo: normalizedRefNo,
+          refNo: item.philgepsRefNo || item.projectReferenceNumber || item.refNo || `PRJ-${idx + 1}`,
           solicitationNo: item.solicitationNumber || item.solicitationNo || 'N/A',
-          title: normalizedTitle,
+          title: item.title || item.biddingProjectTitle || 'Untitled Opportunity',
           procuringEntity: typeof item.procuringEntity === 'string'
             ? item.procuringEntity
             : item.procuringEntity?.name || item.procuringEntityName || 'Government Agency',
+          procuringEntityAddress: projectAddress,
+          location: projectAddress,
           abc: item.approvedBudgetStr || (item.approvedBudgetValue ? `₱${Number(item.approvedBudgetValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : (item.approvedBudget ? `₱${Number(item.approvedBudget).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '₱0.00')),
+          category: (() => {
+            const rawCat = (item.procurementType || item.projectType || item.category || item.classification || '').toString().toUpperCase();
+            const titleLower = (item.title || '').toLowerCase();
+            const refUpper = (item.philgepsRefNo || item.refNo || '').toUpperCase();
+            if (rawCat.includes('INFRA') || refUpper.includes('INFRA') || titleLower.includes('infra') || titleLower.includes('construction') || titleLower.includes('civil') || titleLower.includes('building') || titleLower.includes('road')) {
+              return 'Infrastructure';
+            }
+            if (rawCat.includes('CONSULT') || titleLower.includes('consult')) {
+              return 'Consulting';
+            }
+            return 'Goods';
+          })(),
           dateTimeSubmitted: formattedDateTime
         };
       });

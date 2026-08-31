@@ -103,9 +103,18 @@ export const FormsDirectoryView: React.FC = () => {
     const list = getOpportunityProjects(currentTenant?.id);
     setOppProjects(list);
     if (list.length > 0) {
-      const first = list[0];
-      setSelectedOppId(first.id);
-      setActiveProject(first);
+      let storedRef = '';
+      try {
+        const rawStored = localStorage.getItem(`bidocs_active_project_${currentTenant?.id}`) || localStorage.getItem('bidocs_active_project');
+        if (rawStored) {
+          const parsed = JSON.parse(rawStored);
+          storedRef = parsed.refNo || '';
+        }
+      } catch (e) {}
+
+      const preferred = list.find((p) => p.refNo === storedRef || p.id === storedRef) || list[0];
+      setSelectedOppId(preferred.id);
+      setActiveProject(preferred);
     }
 
     const tenantId = currentTenant?.id || 'default';
@@ -181,9 +190,9 @@ export const FormsDirectoryView: React.FC = () => {
             <head>
               <title>Print Legal 8.5"x13" Document - ${form.title}</title>
               <style>
-                @page { size: 8.5in 13in; margin: 0mm; }
+                @page { size: 13in 8.5in landscape; margin: 0.2in; }
                 body { margin: 0; padding: 0; background: white; text-align: center; }
-                img { width: 8.5in; max-width: 100%; height: auto; display: block; margin: 0 auto; page-break-after: always; }
+                img { width: 12.6in; max-width: 100%; max-height: 8.1in; object-fit: contain; display: block; margin: 0 auto; page-break-after: always; }
               </style>
             </head>
             <body>
@@ -591,6 +600,22 @@ export const FormsDirectoryView: React.FC = () => {
             activeProjectRefNo={activeProject?.refNo}
             activeProjectTitle={activeProject?.title}
             activeProcuringEntity={activeProject?.procuringEntity}
+            onSaveAndComplete={(dataUrl, customName, projRef, projTitle) => {
+              const newCompleted: CompletedNotarizedForm = {
+                id: `completed-secvi-${Date.now()}`,
+                formCode: 'SEC-VI',
+                title: customName || 'Section VI: Schedule of Requirements & Delivery Timeline',
+                projectRefNo: projRef || activeProject?.refNo || 'PRJ-2026-901283',
+                projectTitle: projTitle || activeProject?.title || 'Bidding Opportunity',
+                procuringEntity: activeProject?.procuringEntity || 'Procuring Agency',
+                fileDataUrl: dataUrl,
+                completedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                versionNumber: 1
+              };
+              saveCompletedForm(newCompleted);
+              setActiveTemplateModal(null);
+              setFormsSubTab('COMPLETED');
+            }}
             onClose={() => setActiveTemplateModal(null)}
           />
         )}
@@ -601,6 +626,22 @@ export const FormsDirectoryView: React.FC = () => {
             activeProjectRefNo={activeProject?.refNo}
             activeProjectTitle={activeProject?.title}
             activeProcuringEntity={activeProject?.procuringEntity}
+            onSaveAndComplete={(dataUrl, customName, projRef, projTitle) => {
+              const newCompleted: CompletedNotarizedForm = {
+                id: `completed-techspecs-${Date.now()}`,
+                formCode: 'SEC-VII',
+                title: customName || 'Section VII: Technical Specifications Statement of Compliance',
+                projectRefNo: projRef || activeProject?.refNo || 'PRJ-2026-901283',
+                projectTitle: projTitle || activeProject?.title || 'Bidding Opportunity',
+                procuringEntity: activeProject?.procuringEntity || 'Procuring Agency',
+                fileDataUrl: dataUrl,
+                completedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                versionNumber: 1
+              };
+              saveCompletedForm(newCompleted);
+              setActiveTemplateModal(null);
+              setFormsSubTab('COMPLETED');
+            }}
             onClose={() => setActiveTemplateModal(null)}
           />
         )}
@@ -611,6 +652,22 @@ export const FormsDirectoryView: React.FC = () => {
             activeProjectRefNo={activeProject?.refNo}
             activeProjectTitle={activeProject?.title}
             activeProcuringEntity={activeProject?.procuringEntity}
+            onSaveAndComplete={(dataUrl, customName, projRef, projTitle) => {
+              const newCompleted: CompletedNotarizedForm = {
+                id: `completed-fal-${Date.now()}`,
+                formCode: 'FAL-01',
+                title: customName || 'Framework Agreement List & Compliance',
+                projectRefNo: projRef || activeProject?.refNo || 'PRJ-2026-901283',
+                projectTitle: projTitle || activeProject?.title || 'Bidding Opportunity',
+                procuringEntity: activeProject?.procuringEntity || 'Procuring Agency',
+                fileDataUrl: dataUrl,
+                completedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                versionNumber: 1
+              };
+              saveCompletedForm(newCompleted);
+              setActiveTemplateModal(null);
+              setFormsSubTab('COMPLETED');
+            }}
             onClose={() => setActiveTemplateModal(null)}
           />
         )}

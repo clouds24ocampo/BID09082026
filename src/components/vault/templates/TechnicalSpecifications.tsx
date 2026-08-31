@@ -1,17 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
-import { PDFDocument } from 'pdf-lib';
-import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import { buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit, PdfAttachmentSource, generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import html2canvas from 'html2canvas';
+import { savePdfData } from '../../../utils/vaultIndexedDB';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
   Printer,
   Download,
   FileSignature,
-  Plus,
-  Trash2,
   Building2,
   ShieldCheck,
   CheckCircle2,
@@ -24,7 +21,8 @@ import {
   Upload,
   RefreshCw,
   Tag,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react';
 
 export interface TechSpecItem {
@@ -34,7 +32,6 @@ export interface TechSpecItem {
   quantity: string;
   compliance: 'Comply' | 'Not Comply';
   brandModel?: string;
-  complianceEvidence?: string;
 }
 
 export interface TechnicalSpecificationsProps {
@@ -43,7 +40,7 @@ export interface TechnicalSpecificationsProps {
   activeProjectRefNo?: string;
   activeProjectTitle?: string;
   activeProcuringEntity?: string;
-  onSaveAndComplete?: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string) => void;
+  onSaveAndComplete?: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string, projectId?: string) => void;
   onClose?: () => void;
 }
 
@@ -75,141 +72,232 @@ const formatDateTimeDisplay = (raw: string): string => {
   }
 };
 
-const DEFAULT_SECTION_VI_ITEMS: TechSpecItem[] = [
-  {
-    id: '1',
-    itemNo: '1',
-    specification: 'Enterprise Server Rack Systems with High-Availability Redundancy, Dual Hot-Swappable 1200W Power Supplies, Rail Kits, and 5-Year OEM On-Site Warranty Support',
-    quantity: '5 units',
-    compliance: 'Comply',
-    brandModel: 'Dell PowerEdge R750 / Rack Enclosure 42U',
-    complianceEvidence: 'Supported by Manufacturer Un-amended Sales Brochure & Technical Data Sheet (Attachment A-1)'
-  },
-  {
-    id: '2',
-    itemNo: '2',
-    specification: 'Managed Layer 3 Core Network Switches (48-Port PoE+ 740W, 4x 10G SFP+ Uplinks, Stacking Module, Redundant Power Module, Advanced L3 Routing License)',
-    quantity: '10 units',
-    compliance: 'Comply',
-    brandModel: 'Cisco Catalyst 9300-48P-A',
-    complianceEvidence: 'Cross-referenced to ISO 9001 Compliance Certificate & OEM Spec Sheet (Attachment A-2)'
-  },
-  {
-    id: '3',
-    itemNo: '3',
-    specification: 'Uninterruptible Power Supply (UPS) 10kVA Online Double Conversion Tower/Rack Mountable with Extended Battery Module (EBM) and Network Management Card',
-    quantity: '4 units',
-    compliance: 'Comply',
-    brandModel: 'APC Smart-UPS SRT 10000VA 230V',
-    complianceEvidence: 'Supported by Independent Test Data & Factory Acceptance Certificate (Attachment A-3)'
+interface RawOpportunityRecord {
+  id?: string;
+  projectReferenceNumber?: string;
+  philgepsRefNo?: string;
+  solicitationNumber?: string;
+  solicitationNo?: string;
+  title?: string;
+  biddingProjectTitle?: string;
+  areaOfDelivery?: string;
+  location?: string;
+  procuringEntity?: string | { name?: string };
+  submissionDeadlineDatetime?: string;
+  submissionDeadlineDate?: string;
+  submissionDeadline?: string;
+  dateSubmitted?: string;
+}
+
+const isRawOpportunityRecord = (value: unknown): value is RawOpportunityRecord => {
+  return typeof value === 'object' && value !== null;
+};
+
+const getStoredOpportunityRecord = (tenantId: string, opportunityId: string): RawOpportunityRecord | null => {
+  const keys = [
+    `bidocs_opportunities_${tenantId}`,
+    'bidocs_opportunities'
+  ];
+
+  for (const key of keys) {
+    const saved = localStorage.getItem(key);
+    if (!saved) continue;
+
+    try {
+      const parsed: unknown = JSON.parse(saved);
+      if (!Array.isArray(parsed)) continue;
+
+      for (const entry of parsed) {
+        if (!isRawOpportunityRecord(entry)) continue;
+        if (entry.id === opportunityId) {
+          return entry;
+        }
+      }
+    } catch {
+      // Ignore malformed legacy data and continue searching other keys.
+    }
   }
-];
+
+  return null;
+};
+
+const DEFAULT_SECTION_VI_ITEMS: TechSpecItem[] = [];
+
+interface PageRow {
+  item: TechSpecItem;
+  index: number;
+}
 
 export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = ({
   item = { id: 'sec-7', code: 'SEC-VII', name: 'Section VII. Technical Specifications' },
   tenant,
-  activeProjectRefNo = 'PRJ-2026-901283',
-  activeProjectTitle = 'Infrastructure & IT Systems Modernization Project',
-  activeProcuringEntity = 'Department of Information & Communications Technology',
+  activeProjectRefNo = '',
+  activeProjectTitle = '',
+  activeProcuringEntity = '',
   onSaveAndComplete,
   onClose
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
 
   const [isExporting, setIsExporting] = useState(false);
-  const [drawingPdfUrl, setDrawingPdfUrl] = useState<string | null>(null);
+  const [brochurePdfFile, setBrochurePdfFile] = useState<File | null>(null);
+  const [brochurePdfName, setBrochurePdfName] = useState<string>('');
+  const [drawingPdfFile, setDrawingPdfFile] = useState<File | null>(null);
   const [drawingPdfName, setDrawingPdfName] = useState<string>('');
   const [fontSizeMode, setFontSizeMode] = useState<'fine' | 'xs' | 'sm'>('xs');
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo);
-  const [solicitationNumber, setSolicitationNumber] = useState('SOL-2026-001');
+  const [philgepsRefNo, setPhilgepsRefNo] = useState('');
+  const [solicitationNumber, setSolicitationNumber] = useState('');
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
+  const [areaOfDelivery, setAreaOfDelivery] = useState('');
   const [dateTimeSubmitted, setDateTimeSubmitted] = useState<string>(getNowDateTimeString());
+  const projectScopeKey = projectRefNo || selectedOppId || philgepsRefNo || activeProjectRefNo;
 
   const [companyName] = useState(tenant?.companyName || 'Bidding Entity Corporate Name');
   const [companyAddress] = useState(tenant?.address || 'Metro Manila, Philippines');
   const [signatoryName] = useState(tenant?.authorizedSignatory?.name || 'Authorized Signatory Name');
   const [signatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'President / General Manager');
 
-  const [items, setItems] = useState<TechSpecItem[]>(DEFAULT_SECTION_VI_ITEMS);
+  const [items, setItems] = useState<TechSpecItem[]>([]);
 
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
-    if (list.length > 0 && !selectedOppId) {
-      const first = list[0];
-      setSelectedOppId(first.id);
-      setProjectRefNo(first.refNo);
-      setSolicitationNumber(first.solicitationNo || 'SOL-2026-001');
-      setProjectTitle(first.title);
-      setProcuringEntity(first.procuringEntity);
-      if (first.dateTimeSubmitted) {
-        setDateTimeSubmitted(first.dateTimeSubmitted);
+    if (list.length > 0) {
+      const preferred = list.find((project) => project.refNo === activeProjectRefNo) || list[0];
+      if (preferred && (preferred.id !== selectedOppId || preferred.refNo !== projectRefNo)) {
+        setSelectedOppId(preferred.id);
+        setProjectRefNo(preferred.refNo);
+        setSolicitationNumber(preferred.solicitationNo || 'SOL-2026-001');
+        setProjectTitle(preferred.title);
+        setProcuringEntity(preferred.procuringEntity);
+        if (preferred.dateTimeSubmitted) {
+          setDateTimeSubmitted(preferred.dateTimeSubmitted);
+        }
       }
+    } else {
+      setSelectedOppId('');
+      setProjectRefNo('');
+      setPhilgepsRefNo('');
+      setSolicitationNumber('');
+      setProjectTitle('');
+      setProcuringEntity('');
     }
-  }, [tenant?.id]);
+  }, [tenant?.id, activeProjectRefNo]);
 
   useEffect(() => {
-    if (!projectRefNo) return;
+    if (!tenant?.id || !selectedOppId) return;
+
+    const record = getStoredOpportunityRecord(tenant.id, selectedOppId);
+    if (!record) return;
+    const selectedProject = oppProjects.find((project) => project.id === selectedOppId);
+
+    const internalProjectRef = record.projectReferenceNumber || record.philgepsRefNo || activeProjectRefNo;
+    const externalPhilgepsRef = record.philgepsRefNo || record.projectReferenceNumber || internalProjectRef;
+    const storageProjectRef = selectedProject?.refNo || externalPhilgepsRef || internalProjectRef || activeProjectRefNo;
+    const projectName = record.title || record.biddingProjectTitle || activeProjectTitle;
+    const procuringEntityValue = typeof record.procuringEntity === 'string'
+      ? record.procuringEntity
+      : record.procuringEntity?.name || activeProcuringEntity;
+    const areaValue = record.areaOfDelivery || record.location || '';
+    const submissionValue = record.submissionDeadlineDatetime || record.submissionDeadlineDate || record.submissionDeadline || record.dateSubmitted || '';
+
+    setProjectRefNo(storageProjectRef);
+    setPhilgepsRefNo(externalPhilgepsRef || '');
+    setSolicitationNumber(record.solicitationNumber || record.solicitationNo || 'SOL-2026-001');
+    setProjectTitle(projectName);
+    setProcuringEntity(procuringEntityValue);
+    setAreaOfDelivery(areaValue);
+    if (submissionValue) {
+      setDateTimeSubmitted(submissionValue.substring(0, 16));
+    }
+  }, [selectedOppId, tenant?.id, oppProjects, activeProjectRefNo, activeProjectTitle, activeProcuringEntity]);
+
+  useEffect(() => {
+    if (!projectScopeKey) {
+      setItems([]);
+      return;
+    }
     const tenantKey = tenant?.id || 'default';
-    const secViKey = `bidocs_sec_vi_${tenantKey}_${projectRefNo}`;
-    const savedSecVi = localStorage.getItem(secViKey);
+    
+    const candidateSecViKeys = [
+      `bidocs_sec_vi_${tenantKey}_${projectScopeKey}`,
+      selectedOppId ? `bidocs_sec_vi_${tenantKey}_${selectedOppId}` : '',
+      projectRefNo ? `bidocs_sec_vi_${tenantKey}_${projectRefNo}` : ''
+    ].filter(Boolean);
 
-    const techSpecsKey = `bidocs_tech_specs_${tenantKey}_${projectRefNo}`;
-    const savedTechSpecs = localStorage.getItem(techSpecsKey);
+    const candidateTechKeys = [
+      `bidocs_tech_specs_${tenantKey}_${projectScopeKey}`,
+      selectedOppId ? `bidocs_tech_specs_${tenantKey}_${selectedOppId}` : '',
+      projectRefNo ? `bidocs_tech_specs_${tenantKey}_${projectRefNo}` : ''
+    ].filter(Boolean);
 
-    let baseItems = [...DEFAULT_SECTION_VI_ITEMS];
+    let baseItems: TechSpecItem[] = [];
 
-    if (savedSecVi) {
-      try {
-        const parsedVi = JSON.parse(savedSecVi);
-        if (Array.isArray(parsedVi) && parsedVi.length > 0) {
-          baseItems = parsedVi.map((viItem: any, idx: number) => ({
-            id: viItem.id || String(idx + 1),
-            itemNo: String(idx + 1),
-            specification: viItem.description || '',
-            quantity: viItem.quantity || '1 unit',
-            compliance: 'Comply' as const,
-            brandModel: '',
-            complianceEvidence: 'Supported by Manufacturer Sales Literature and Technical Data Sheet.'
-          }));
-        }
-      } catch (e) { }
+    for (const key of candidateSecViKeys) {
+      const savedSecVi = localStorage.getItem(key);
+      if (savedSecVi) {
+        try {
+          const parsedVi = JSON.parse(savedSecVi);
+          if (Array.isArray(parsedVi) && parsedVi.length > 0) {
+            baseItems = parsedVi.map((viItem: any, idx: number) => ({
+              id: viItem.id || String(idx + 1),
+              itemNo: String(idx + 1),
+              specification: viItem.description || '',
+              quantity: viItem.quantity || '1 unit',
+              compliance: 'Comply' as const,
+              brandModel: ''
+            }));
+            break;
+          }
+        } catch (e) { }
+      }
     }
 
-    if (savedTechSpecs) {
-      try {
-        const parsedTech = JSON.parse(savedTechSpecs);
-        if (Array.isArray(parsedTech) && parsedTech.length > 0) {
-          baseItems = baseItems.map((it, idx) => {
-            const matched = parsedTech[idx];
-            if (matched) {
-              return {
-                ...it,
-                specification: matched.specification || it.specification,
-                quantity: matched.quantity || it.quantity,
-                compliance: matched.compliance || it.compliance,
-                brandModel: matched.brandModel !== undefined ? matched.brandModel : it.brandModel,
-                complianceEvidence: matched.complianceEvidence !== undefined ? matched.complianceEvidence : it.complianceEvidence
-              };
+    for (const key of candidateTechKeys) {
+      const savedTechSpecs = localStorage.getItem(key);
+      if (savedTechSpecs) {
+        try {
+          const parsedTech = JSON.parse(savedTechSpecs);
+          if (Array.isArray(parsedTech) && parsedTech.length > 0) {
+            if (baseItems.length === 0) {
+              baseItems = parsedTech;
+            } else {
+              const techById = new Map(parsedTech.map((entry: any, idx: number) => [entry.id || String(idx + 1), entry]));
+              baseItems = baseItems.map((it, idx) => {
+                const matched = techById.get(it.id) || parsedTech[idx];
+                if (matched) {
+                  return {
+                    ...it,
+                    compliance: matched.compliance || it.compliance,
+                    brandModel: matched.brandModel !== undefined ? matched.brandModel : it.brandModel
+                  };
+                }
+                return it;
+              });
             }
-            return it;
-          });
-        }
-      } catch (e) { }
+            break;
+          }
+        } catch (e) { }
+      }
     }
 
     setItems(baseItems);
-  }, [projectRefNo, tenant?.id]);
+  }, [projectScopeKey, tenant?.id]);
 
   const saveSharedItems = (newItems: TechSpecItem[]) => {
     setItems(newItems);
-    if (projectRefNo) {
-      const storageKey = `bidocs_tech_specs_${tenant?.id || 'default'}_${projectRefNo}`;
-      localStorage.setItem(storageKey, JSON.stringify(newItems));
+    if (projectScopeKey) {
+      const storageKey = `bidocs_tech_specs_${tenant?.id || 'default'}_${projectScopeKey}`;
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(newItems));
+      } catch (err) {
+        console.warn('localStorage write failed:', err);
+      }
     }
   };
 
@@ -218,70 +306,39 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     saveSharedItems(updated);
   };
 
-  const handleComplyClick = (index: number) => {
-    const currentEv = items[index]?.complianceEvidence || '';
-    const cleanEv = currentEv.replace(/Not Comply/gi, '').trim();
-    const finalEv = cleanEv.startsWith('Comply')
-      ? cleanEv
-      : (cleanEv ? `Supported by ${cleanEv.replace(/^[-—:]*\s*/, '')}` : 'Supported by Manufacturer Sales Literature and Technical Data Sheet.');
 
+  const handleComplyClick = (index: number) => {
     const updated = items.map((it, idx) =>
-      idx === index
-        ? { ...it, compliance: 'Comply' as const, complianceEvidence: finalEv }
-        : it
+      idx === index ? { ...it, compliance: 'Comply' as const } : it
     );
     saveSharedItems(updated);
   };
 
   const handleNotComplyClick = (index: number) => {
     const updated = items.map((it, idx) =>
-      idx === index
-        ? {
-          ...it,
-          compliance: 'Not Comply' as const,
-          complianceEvidence: 'Specification parameter does not meet mandatory requirement.'
-        }
-        : it
+      idx === index ? { ...it, compliance: 'Not Comply' as const } : it
     );
     saveSharedItems(updated);
   };
 
-  const handleAddItem = () => {
-    const newItem: TechSpecItem = {
-      id: Date.now().toString(),
-      itemNo: String(items.length + 1),
-      specification: '',
-      quantity: '1 unit',
-      compliance: 'Comply',
-      brandModel: '',
-      complianceEvidence: 'Supported by OEM Technical Data Sheet'
-    };
-    saveSharedItems([...items, newItem]);
-  };
-
-  const handleRemoveItem = (index: number) => {
-    if (items.length <= 1) return;
-    saveSharedItems(items.filter((_, idx) => idx !== index));
-  };
-
   const handleSyncWithSectionVi = () => {
-    if (!projectRefNo) return;
+    if (!projectScopeKey) return;
     const tenantKey = tenant?.id || 'default';
-    const secViKey = `bidocs_sec_vi_${tenantKey}_${projectRefNo}`;
+    const secViKey = `bidocs_sec_vi_${tenantKey}_${projectScopeKey}`;
     const savedSecVi = localStorage.getItem(secViKey);
 
     if (savedSecVi) {
       try {
         const parsedVi = JSON.parse(savedSecVi);
         if (Array.isArray(parsedVi) && parsedVi.length > 0) {
+          const currentById = new Map(items.map((existing, idx) => [existing.id || String(idx + 1), existing]));
           const synced = parsedVi.map((viItem: any, idx: number) => ({
             id: viItem.id || String(idx + 1),
             itemNo: String(idx + 1),
             specification: viItem.description || '',
             quantity: viItem.quantity || '1 unit',
-            compliance: (items[idx]?.compliance === 'Not Comply' ? 'Not Comply' as const : 'Comply' as const),
-            brandModel: items[idx]?.brandModel || '',
-            complianceEvidence: items[idx]?.complianceEvidence || 'Supported by Manufacturer Sales Literature and Technical Data Sheet.'
+            compliance: (currentById.get(viItem.id || String(idx + 1))?.compliance === 'Not Comply' ? 'Not Comply' as const : 'Comply' as const),
+            brandModel: currentById.get(viItem.id || String(idx + 1))?.brandModel || ''
           }));
           saveSharedItems(synced);
           return;
@@ -291,25 +348,35 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     saveSharedItems(DEFAULT_SECTION_VI_ITEMS);
   };
 
-  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBrochurePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.type !== 'application/pdf') {
-      alert('Please upload a valid PDF document for technical drawings.');
+      alert('Please upload a valid PDF brochure document.');
+      return;
+    }
+    setBrochurePdfName(file.name);
+    setBrochurePdfFile(file);
+  };
+
+  const handleDrawingPdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      alert('Please upload a valid PDF drawing document.');
       return;
     }
     setDrawingPdfName(file.name);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        setDrawingPdfUrl(event.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
+    setDrawingPdfFile(file);
   };
 
-  const handleRemovePdf = () => {
-    setDrawingPdfUrl(null);
+  const handleRemoveBrochurePdf = () => {
+    setBrochurePdfFile(null);
+    setBrochurePdfName('');
+  };
+
+  const handleRemoveDrawingPdf = () => {
+    setDrawingPdfFile(null);
     setDrawingPdfName('');
   };
 
@@ -317,20 +384,53 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     window.print();
   };
 
-  // FIXED EXPORT PDF FUNCTION
+  const buildFinalPdfDataUrl = async (): Promise<string | undefined> => {
+    const containerElem = document.getElementById('section-vii-pages-container') || document.getElementById('section-vii-paper');
+    const attachmentSources = [brochurePdfFile, drawingPdfFile].filter((value): value is File => !!value);
+    if (!containerElem && attachmentSources.length === 0) {
+      return undefined;
+    }
+
+    const units: ExportDocumentUnit[] = [];
+    if (containerElem) {
+      units.push({
+        title: item.name,
+        formElement: containerElem,
+        fileSource: attachmentSources[0] as PdfAttachmentSource | undefined
+      });
+    } else if (attachmentSources[0]) {
+      units.push({
+        title: item.name,
+        fileSource: attachmentSources[0]
+      });
+    }
+
+    if (attachmentSources[1]) {
+      units.push({
+        title: `${item.name} Attachment`,
+        fileSource: attachmentSources[1]
+      });
+    }
+
+    return await buildMergedThreeLayerPdfDataUrl(
+      units,
+      `${philgepsRefNo || projectRefNo}_Section_VII_Technical_Specifications_${todayStr}.pdf`
+    );
+  };
+
   const handleExportPdf = async () => {
     setIsExporting(true);
     await new Promise((r) => setTimeout(r, 200));
     try {
-      const fileName = `${projectRefNo}_Section_VII_Technical_Specifications_${todayStr}.pdf`;
-      const paperElem = document.getElementById('technical-specifications-paper');
-      if (paperElem) {
-        await generateAndDownloadThreeLayerPdf(
-          null,
-          paperElem,
-          drawingPdfUrl || undefined,
-          fileName
-        );
+      const fileName = `${philgepsRefNo || projectRefNo}_Section_VII_Technical_Specifications_${todayStr}.pdf`;
+      const finalPdfDataUrl = await buildFinalPdfDataUrl();
+      if (finalPdfDataUrl) {
+        const link = document.createElement('a');
+        link.href = finalPdfDataUrl;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       }
     } catch (err) {
       console.error('PDF Export Error:', err);
@@ -340,14 +440,14 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
   };
 
   const handleExportExcel = () => {
-    const cleanProj = (projectRefNo || 'PRJ').replace(/[^a-zA-Z0-9]/g, '_');
+    const cleanProj = (philgepsRefNo || projectRefNo || 'PRJ').replace(/[^a-zA-Z0-9]/g, '_');
     const fileName = `${cleanProj}_Technical_Specifications_${todayStr}.csv`;
 
     let csvContent = '\uFEFF';
     csvContent += `"SECTION VII. TECHNICAL SPECIFICATIONS"\n`;
     csvContent += `"Company Name:","${companyName.replace(/"/g, '""')}"\n`;
     csvContent += `"Company Address:","${companyAddress.replace(/"/g, '""')}"\n`;
-    csvContent += `"Philgeps Ref No.:","${projectRefNo.replace(/"/g, '""')}"\n`;
+    csvContent += `"PhilGEPS Ref. No.:","${(philgepsRefNo || projectRefNo).replace(/"/g, '""')}"\n`;
     csvContent += `"Solicitation No.:","${solicitationNumber.replace(/"/g, '""')}"\n`;
     csvContent += `"Project Title:","${projectTitle.replace(/"/g, '""')}"\n`;
     csvContent += `"Procuring Entity:","${procuringEntity.replace(/"/g, '""')}"\n`;
@@ -378,59 +478,29 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     document.body.removeChild(link);
   };
 
-  const renderTechnicalSpecificationsPdfDataUrl = async (templateElem: HTMLElement): Promise<string | undefined> => {
-    const canvas = await html2canvas(templateElem, {
-      scale: 2.5,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      ignoreElements: (element: Element) => {
-        return (
-          element.classList.contains('print:hidden') ||
-          element.classList.contains('no-export') ||
-          element.classList.contains('proof-column') ||
-          element.classList.contains('actions-column') ||
-          element.tagName === 'BUTTON'
-        );
-      }
-    });
-
-    const imgDataUrl = canvas.toDataURL('image/png');
-    const pdfDoc = await PDFDocument.create();
-    const pngImage = await pdfDoc.embedPng(imgDataUrl);
-    const page = pdfDoc.addPage([canvas.width, canvas.height]);
-    page.drawImage(pngImage, {
-      x: 0,
-      y: 0,
-      width: canvas.width,
-      height: canvas.height
-    });
-
-    const pdfBytes = await pdfDoc.save();
-    const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  };
-
   const handleSave = async () => {
     setIsExporting(true);
     await new Promise((r) => setTimeout(r, 200));
+    let dataUrl: string | undefined = undefined;
     try {
-      const templateElem = document.getElementById('technical-specifications-paper') as HTMLElement;
-      let dataUrl: string | undefined = undefined;
-      if (templateElem) {
-        dataUrl = await renderTechnicalSpecificationsPdfDataUrl(templateElem);
+      dataUrl = await buildFinalPdfDataUrl();
+      if (dataUrl) {
+        const tenantKey = tenant?.id || 'default';
+        try {
+          await savePdfData(`tech_specs_${tenantKey}_${projectScopeKey}`, dataUrl);
+          if (selectedOppId) await savePdfData(`tech_specs_${tenantKey}_${selectedOppId}`, dataUrl);
+          if (projectRefNo) await savePdfData(`tech_specs_${tenantKey}_${projectRefNo}`, dataUrl);
+        } catch (dbErr) {
+          console.warn('Failed to cache Section VII in IndexedDB:', dbErr);
+        }
       }
       if (onSaveAndComplete) {
-        onSaveAndComplete(drawingPdfUrl || dataUrl, item.name, projectRefNo, projectTitle);
+        onSaveAndComplete(dataUrl, item.name, philgepsRefNo || projectRefNo, projectTitle, selectedOppId);
       }
     } catch (error) {
       console.error('Failed to generate Technical Specifications PDF:', error);
       if (onSaveAndComplete) {
-        onSaveAndComplete(drawingPdfUrl || undefined, item.name, projectRefNo, projectTitle);
+        onSaveAndComplete(dataUrl, item.name, philgepsRefNo || projectRefNo, projectTitle, selectedOppId);
       }
     } finally {
       setIsExporting(false);
@@ -438,15 +508,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
   };
 
   const formatFullComplianceText = (it: TechSpecItem): string => {
-    if (it.compliance === 'Comply') {
-      const cleanEvidence = (it.complianceEvidence || '').replace(/Not Comply/gi, '').replace(/^Comply\s*[-—:]*\s*/i, '').trim();
-      const brandModelPart = it.brandModel ? ` (Offered Brand/Model: ${it.brandModel})` : '';
-      const body = cleanEvidence || 'Supported by Manufacturer Sales Literature and Technical Data Sheet.';
-      return `Comply${brandModelPart} — ${body}`;
-    } else {
-      const cleanEvidence = (it.complianceEvidence || '').replace(/Comply/gi, '').replace(/^Not Comply\s*[-—:]*\s*/i, '').trim();
-      return `Not Comply — ${cleanEvidence || 'Specification parameter does not meet mandatory requirement.'}`;
-    }
+    return it.compliance;
   };
 
   const getTableFontSizeClass = () => {
@@ -455,13 +517,313 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     return 'text-sm leading-relaxed';
   };
 
+  // --- CONTENT-AWARE ACCURATE PRINT-CALIBRATED CHUNKING ---
+  // Calculates exact row heights based on multiline text to fill each page to maximum capacity without overflowing or splitting
+  const pageChunks = useMemo<PageRow[][]>(() => {
+    if (items.length === 0) return [[]];
+
+    const getRowLines = (it: TechSpecItem): number => {
+      const specDesc = it.specification || '';
+      const paragraphs = specDesc.split('\n');
+      let lines = 0;
+      for (const para of paragraphs) {
+        lines += Math.max(1, Math.ceil((para.length || 1) / 135));
+      }
+      const bmLines = it.brandModel ? Math.ceil(it.brandModel.length / 25) : 0;
+      return Math.max(lines, 1 + bmLines);
+    };
+
+    const rowLines = items.map(getRowLines);
+    const totalLines = rowLines.reduce((sum, l) => sum + l, 0);
+
+    // Single-page check: if all content fits alongside header, summary & signatory (<= 32 lines in Portrait)
+    if (totalLines <= 32) {
+      return [items.map((it, idx) => ({ item: it, index: idx }))];
+    }
+
+    const pages: PageRow[][] = [];
+    let currentChunk: PageRow[] = [];
+    let currentLines = 0;
+    let pageIdx = 0;
+
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
+      const lines = rowLines[idx];
+      const isPage1 = pageIdx === 0;
+
+      // Calculate remaining lines of items from idx to end
+      let remainingLines = 0;
+      for (let r = idx; r < items.length; r++) {
+        remainingLines += rowLines[r];
+      }
+
+      const finalPageLimit = isPage1 ? 32 : 42;
+      const continuationPageLimit = isPage1 ? 44 : 56;
+
+      // If all remaining items fit in final page limit (with signatory), include them on current page
+      if (currentLines + remainingLines <= finalPageLimit) {
+        currentChunk.push({ item, index: idx });
+        currentLines += lines;
+        continue;
+      }
+
+      // If adding this item exceeds the continuation limit, finalize current page
+      if (currentLines + lines > continuationPageLimit && currentChunk.length > 0) {
+        pages.push(currentChunk);
+        pageIdx++;
+        currentChunk = [{ item, index: idx }];
+        currentLines = lines;
+      } else {
+        currentChunk.push({ item, index: idx });
+        currentLines += lines;
+      }
+    }
+
+    if (currentChunk.length > 0) {
+      pages.push(currentChunk);
+    }
+
+    return pages;
+  }, [items]);
+
+  const totalPages = pageChunks.length;
+
+  const pagesList = pageChunks.map((chunk, pIdx) => (
+    <div
+      key={`sec-7-page-${pIdx}`}
+      id={pIdx === 0 ? 'section-vii-paper' : `section-vii-paper-p${pIdx + 1}`}
+      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 sm:p-8 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
+    >
+      <div>
+        {/* COMPANY & PROJECT HEADER BLOCK (PAGE 1 ONLY) */}
+        {pIdx === 0 ? (
+          <div className="mb-3 pb-2.5 border-b-2 border-slate-900 font-serif">
+            {/* Centered Company Name Header */}
+            <div className="text-center pb-2 border-b border-slate-300">
+              <h1 className="text-lg font-bold uppercase tracking-wider text-black font-serif">
+                {companyName}
+              </h1>
+              <p className="text-xs text-slate-700 font-serif font-semibold mt-0.5 uppercase tracking-wide">
+                
+              </p>
+            </div>
+
+            {/* 4-Field Project Information Grid */}
+            <div className="mt-2.5 grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs font-serif text-black">
+              <div>
+                <span className="font-bold">Project Name: </span>
+                <span className="font-semibold text-slate-900">{projectTitle || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="font-bold">Project REF No.: </span>
+                <span className="font-mono font-semibold text-blue-950">{philgepsRefNo || projectRefNo || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="font-bold">Procuring Entity: </span>
+                <span className="text-slate-900">{procuringEntity || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="font-bold">Submission Date & Time: </span>
+                <span className="font-mono font-semibold text-blue-950">{formatDateTimeDisplay(dateTimeSubmitted)}</span>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* FORM TITLE (PAGE 1 ONLY) */}
+        {pIdx === 0 ? (
+          <div className="mb-3 text-center">
+            <h2 className="text-lg font-bold uppercase tracking-wide text-black border-b border-black inline-block pb-0.5 font-serif">
+              Section VII. Technical Specifications
+            </h2>
+            <p className="text-[10px] font-mono text-slate-700 uppercase mt-0.5 font-bold">
+              (MANDATORY TECHNICAL SPECIFICATIONS & STATEMENT OF COMPLIANCE)
+            </p>
+            {(brochurePdfName || drawingPdfName) && (
+              <div className="mt-1 text-xs font-serif italic text-purple-950 font-semibold space-y-0.5">
+                {brochurePdfName && <div>📎 Attached Brochure PDF: {brochurePdfName}</div>}
+                {drawingPdfName && <div>📎 Attached Drawing PDF: {drawingPdfName}</div>}
+              </div>
+            )}
+          </div>
+        ) : null}
+
+        {/* ITEMS TABLE */}
+        <div className="w-full overflow-x-auto">
+          <table className="w-full border-collapse border border-black text-xs font-serif table-fixed">
+            <colgroup>
+              <col className="w-[6%]" />
+              <col className="w-[8%]" />
+              <col className="w-[58%]" />
+              <col className="w-[28%]" />
+            </colgroup>
+            {pIdx === 0 ? (
+              <thead>
+                <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[11px]">
+                  <th className="border border-black px-1 py-1 w-[6%]">Item No.</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[8%]">Qty</th>
+                  <th className="border border-black px-3 py-1.5 text-center w-[58%]">Technical Specifications / Scope of Work</th>
+                  <th className="border border-black px-3 py-1.5 text-left w-[28%]">
+                    <div className="font-bold text-black">Statement of Compliance</div>
+                    <div className="text-[8.5px] font-serif leading-tight text-slate-800 font-normal normal-case mt-0.5 p-1 bg-amber-50/70 rounded border border-amber-200/80 break-words">
+                      [Bidders must state <strong>"Comply"</strong> or <strong>"Not Comply"</strong> against each individual parameter supported by evidence.]
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+            ) : null}
+            <tbody>
+              {chunk.map(({ item: rowItem, index: itemIdx }) => (
+                <tr key={rowItem.id || `tech-spec-${itemIdx}`} className="border-b border-black hover:bg-slate-50/50 transition-colors">
+                  {/* 1. Item No. (Read-Only) */}
+                  <td className="border border-black px-1.5 py-1.5 text-center font-serif font-bold align-top">
+                    <span className="block pt-0.5">{itemIdx + 1}</span>
+                  </td>
+
+                  {/* 2. Maximum Quantity (Strictly Mirrored from Section VI - Read-Only) */}
+                  <td className="border border-black px-1.5 py-1.5 font-serif text-center align-top break-words">
+                    <div className={`font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
+                      {rowItem.quantity || ''}
+                    </div>
+                  </td>
+
+                  {/* 3. Technical Specifications (Strictly Mirrored from Section VI - Read-Only) */}
+                  <td className="border border-black px-3 py-1.5 font-serif align-top break-words">
+                    <div className={`font-serif text-black pt-0.5 whitespace-pre-wrap font-normal break-words [overflow-wrap:break-word] leading-snug ${getTableFontSizeClass()}`}>
+                      {rowItem.specification || ''}
+                    </div>
+                  </td>
+
+                  {/* 4. Statement of Compliance (Editable: Brand/Model & Comply Toggle) */}
+                  <td className="border border-black px-3 py-1.5 font-serif align-top break-words bg-emerald-50/15">
+                    <div className="space-y-1.5">
+                      {!isExporting && (
+                        <div className="flex items-center gap-1.5 print:hidden no-export">
+                          <button
+                            type="button"
+                            onClick={() => handleComplyClick(itemIdx)}
+                            className={`px-2.5 py-0.5 rounded text-xs font-bold transition flex items-center gap-1 border cursor-pointer ${rowItem.compliance === 'Comply'
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                              }`}
+                          >
+                            <Check className="w-3 h-3 stroke-[3]" />
+                            <span>Comply</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleNotComplyClick(itemIdx)}
+                            className={`px-2.5 py-0.5 rounded text-xs font-bold transition flex items-center gap-1 border cursor-pointer ${rowItem.compliance === 'Not Comply'
+                                ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                              }`}
+                          >
+                            <AlertCircle className="w-3 h-3 stroke-[3]" />
+                            <span>Not Comply</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {!isExporting && rowItem.compliance === 'Comply' && (
+                        <div className="space-y-0.5 print:hidden no-export">
+                          <label className="text-[9.5px] font-mono font-bold text-slate-700 flex items-center gap-1">
+                            <Tag className="w-2.5 h-2.5 text-blue-600" />
+                            <span>Brand & Model Offered (Optional):</span>
+                          </label>
+                          <textarea
+                            rows={1}
+                            value={rowItem.brandModel || ''}
+                            onChange={(e) => handleFieldChange(itemIdx, 'brandModel', e.target.value)}
+                            placeholder="e.g. Cisco Catalyst 9300 / Dell PowerEdge R750"
+                            className="w-full bg-blue-50/50 text-blue-950 border border-blue-300 rounded p-1 text-xs font-serif outline-none focus:border-blue-500 font-semibold resize-none whitespace-pre-wrap break-words"
+                          />
+                        </div>
+                      )}
+
+                      <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-xs leading-relaxed`}>
+                        <div className={`font-bold ${rowItem.compliance === 'Comply' ? 'text-emerald-950' : 'text-red-950'}`}>
+                          Statement: {rowItem.compliance}
+                        </div>
+                        {rowItem.compliance === 'Comply' && rowItem.brandModel && (
+                          <div className="text-slate-900 mt-0.5 whitespace-pre-wrap break-words font-medium">
+                            {rowItem.brandModel}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+
+            {/* SUMMARY ROW (FINAL PAGE ONLY) */}
+            {pIdx === totalPages - 1 && (
+              <tfoot className="border-t-2 border-black font-serif bg-slate-100/90">
+                <tr className="border-b border-black">
+                  <td colSpan={4} className="border border-black px-3 py-1.5 font-serif text-xs text-right">
+                    <span className="uppercase tracking-wider text-black font-bold font-serif text-xs">
+                      TOTAL SPECIFICATION ITEMS: {items.length}
+                    </span>
+                  </td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
+
+      {/* Document Footer: Signatory Block (Final Page Only) + Running Page Footer on EVERY Page */}
+      <div>
+        {/* Signatory Block & GPPB QR Code (Final Page Only) */}
+        {pIdx === totalPages - 1 && (
+          <div className="mt-6 pt-3 border-t border-slate-300 flex items-end justify-between text-xs font-serif signatory-block mb-3">
+            <div>
+              <p className="font-bold text-black uppercase">{companyName}</p>
+              <div className="mt-6 border-b border-black w-64"></div>
+              <p className="font-bold text-black mt-1 uppercase">{signatoryName}</p>
+              <p className="text-slate-700">{signatoryTitle}</p>
+            </div>
+
+            <div className="text-right flex flex-col items-end">
+              <DocumentQrCode
+                details={{
+                  companyName: companyName,
+                  documentName: 'Section VII. Technical Specifications',
+                  documentNumber: `SEC-VII-${philgepsRefNo || projectRefNo || '2026-901283'}`,
+                  projectTitle: projectTitle,
+                  projectRefNo: philgepsRefNo || projectRefNo || 'N/A',
+                  procuringEntity: procuringEntity,
+                  dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
+                  documentCategory: 'Technical Eligibility',
+                  generatedBy: companyName
+                }}
+                size={80}
+                showCaption={false}
+              />
+              <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
+                VERIFIED GPPB DOC • {philgepsRefNo || projectRefNo || 'N/A'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Running Page Footer (Rendered on EVERY Page) */}
+        <div className="mt-4 pt-2 border-t-2 border-black flex items-center justify-between text-[8.5pt] font-mono text-black shrink-0">
+          <div className="font-bold uppercase">{companyName}</div>
+          <div>SECTION VII TECHNICAL SPECIFICATIONS • REF: {philgepsRefNo || projectRefNo || 'N/A'}</div>
+          <div className="font-bold">PAGE {pIdx + 1} OF {totalPages}</div>
+        </div>
+      </div>
+    </div>
+  ));
+
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static">
       <style>{`
         @media print {
           @page {
-            size: 13in 8.5in;
-            margin: 0.4in;
+            size: 8.5in 13in portrait;
+            margin: 0.3in;
           }
           header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .proof-column, .actions-column, .sticky {
             display: none !important;
@@ -474,27 +836,39 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             padding: 0 !important;
             width: 100% !important;
             height: auto !important;
-            max-height: none !important;
             overflow: visible !important;
             border: none !important;
             box-shadow: none !important;
           }
           .single-page-paper {
-            display: block !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
             position: relative !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 auto !important;
-            padding: 0.3in !important;
-            border: none !important;
+            width: 8.5in !important;
+            max-width: 8.5in !important;
+            min-height: 13in !important;
+            height: auto !important;
+            margin: 0 auto 0.5in auto !important;
+            padding: 0.3in 0.4in !important;
+            border: 2px solid #000000 !important;
             box-shadow: none !important;
             background: #ffffff !important;
             color: #000000 !important;
             overflow: visible !important;
+            box-sizing: border-box !important;
+            page-break-after: always !important;
+            break-after: page !important;
           }
-          .export-text {
-            display: block !important;
+          .single-page-paper:last-child {
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+            margin-bottom: 0 !important;
           }
+        }
+        .single-page-paper,
+        .single-page-paper * {
+          box-sizing: border-box;
         }
       `}</style>
 
@@ -510,11 +884,11 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <span>Section VII. Technical Specifications</span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase">
-                  100% Synced with Section VI
+                  Legal Portrait Form (8.5" × 13")
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5 truncate max-w-xl">
-                Specification (56% width) • Statement of Compliance (34% width) • Drawing Attachment PDF
+                100% Synced with Section VI • Up to 300MB Brochure & Drawing Support
               </p>
             </div>
           </div>
@@ -522,7 +896,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
           <div className="flex items-center gap-2">
             <button
               onClick={handleExportExcel}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-600 transition shadow flex items-center gap-1.5 border border-emerald-500/40"
+              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-600 transition shadow flex items-center gap-1.5 border border-emerald-500/40 cursor-pointer"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
               <span>Export to Excel</span>
@@ -530,20 +904,20 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             <button
               onClick={handleExportPdf}
               disabled={isExporting}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition shadow flex items-center gap-1.5"
+              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition shadow flex items-center gap-1.5 cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>{isExporting ? 'Exporting PDF...' : 'Export to PDF'}</span>
             </button>
             <button
               onClick={handlePrint}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5 cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print Legal Landscape</span>
+              <span>Print Pages</span>
             </button>
             {onClose && (
-              <button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
+              <button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             )}
@@ -551,9 +925,9 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
         </div>
 
         {/* Scrollable Container */}
-        <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6 print:p-0 print:bg-white">
+        <div className="p-4 overflow-y-auto flex-1 bg-slate-950 space-y-4 print:p-0 print:bg-white">
 
-          <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
+          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 print:hidden no-export">
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex-1 space-y-1.5">
@@ -605,7 +979,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                   <button
                     type="button"
                     onClick={() => setFontSizeMode('fine')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${fontSizeMode === 'fine' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${fontSizeMode === 'fine' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
                       }`}
                   >
                     9pt
@@ -613,7 +987,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                   <button
                     type="button"
                     onClick={() => setFontSizeMode('xs')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${fontSizeMode === 'xs' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${fontSizeMode === 'xs' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
                       }`}
                   >
                     10pt
@@ -621,7 +995,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                   <button
                     type="button"
                     onClick={() => setFontSizeMode('sm')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${fontSizeMode === 'sm' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${fontSizeMode === 'sm' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
                       }`}
                   >
                     11pt
@@ -629,15 +1003,8 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                 </div>
 
                 <button
-                  onClick={handleAddItem}
-                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 flex items-center gap-1.5 transition"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Row Item</span>
-                </button>
-                <button
                   onClick={handleSyncWithSectionVi}
-                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 flex items-center gap-1.5 transition"
+                  className="px-3.5 py-2 rounded-xl text-xs font-semibold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <RefreshCw className="w-4 h-4" />
                   <span>Sync with Section VI</span>
@@ -653,26 +1020,38 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             </div>
 
             <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-200 flex items-center gap-2">
                   <Paperclip className="w-4 h-4 text-purple-400" />
-                  <span>Attach Technical Drawing / Architectural Schematic PDF:</span>
+                  <span>Optional PDF Attachments (Up to 300MB Native Vector PDFs)</span>
                 </label>
                 <p className="text-[11px] text-slate-400">
-                  Upload architectural plans, network diagrams, or engineering drawings (PDF format) to merge into the final exported PDF.
+                  Upload brochure and drawing PDFs. They are preserved losslessly as native vector pages and appended directly in the exported PDF.
                 </p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                {brochurePdfName ? (
+                  <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 px-3 py-1.5 rounded-xl text-xs font-mono text-blue-300">
+                    <FileText className="w-4 h-4 text-blue-400 shrink-0" />
+                    <span className="truncate max-w-[180px] font-semibold">{brochurePdfName}</span>
+                    <button type="button" onClick={handleRemoveBrochurePdf} className="p-1 hover:text-red-400 transition cursor-pointer">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 cursor-pointer shadow transition flex items-center gap-2">
+                    <Upload className="w-4 h-4" />
+                    <span>Upload Brochure PDF</span>
+                    <input type="file" accept="application/pdf" onChange={handleBrochurePdfUpload} className="hidden" />
+                  </label>
+                )}
+
                 {drawingPdfName ? (
                   <div className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 px-3 py-1.5 rounded-xl text-xs font-mono text-purple-300">
                     <FileText className="w-4 h-4 text-purple-400 shrink-0" />
-                    <span className="truncate max-w-[220px] font-semibold">{drawingPdfName}</span>
-                    <button
-                      type="button"
-                      onClick={handleRemovePdf}
-                      className="p-1 hover:text-red-400 transition"
-                    >
+                    <span className="truncate max-w-[180px] font-semibold">{drawingPdfName}</span>
+                    <button type="button" onClick={handleRemoveDrawingPdf} className="p-1 hover:text-red-400 transition cursor-pointer">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -680,12 +1059,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                   <label className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 cursor-pointer shadow transition flex items-center gap-2">
                     <Upload className="w-4 h-4" />
                     <span>Upload Drawing PDF</span>
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      onChange={handlePdfUpload}
-                      className="hidden"
-                    />
+                    <input type="file" accept="application/pdf" onChange={handleDrawingPdfUpload} className="hidden" />
                   </label>
                 )}
               </div>
@@ -693,227 +1067,9 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
           </div>
 
-          {/* DOCUMENT SHEET */}
-          <div id="technical-specifications-paper" className="single-page-paper print-document-sheet bg-white text-black p-6 sm:p-10 border-2 border-slate-900 shadow-2xl mx-auto rounded-md w-full max-w-[1150px] flex flex-col justify-between font-serif">
-            <div>
-              <div className="border-b-2 border-black pb-3 mb-5 space-y-2 font-serif">
-                <div className="text-center pb-2 border-b border-slate-300">
-                  <h2 className="text-lg sm:text-xl font-bold text-black uppercase tracking-wide font-serif">{companyName}</h2>
-                  <p className="text-xs text-slate-700 font-serif mt-0.5">{companyAddress}</p>
-                </div>
-
-                <div className="space-y-1.5 text-xs font-serif text-black pt-1">
-                  <div className="flex items-center justify-between gap-6">
-                    <div>
-                      <span className="font-bold">Philgeps Ref No.: </span>
-                      <span className="font-mono font-semibold text-blue-950">{projectRefNo || 'N/A'}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-bold">SOLICITATION NO: </span>
-                      <span className="font-mono font-semibold text-blue-950">{solicitationNumber || 'N/A'}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-start justify-between gap-6">
-                    <div className="flex-1">
-                      <span className="font-bold">NAME OF PROJECT: </span>
-                      <span className="font-semibold text-black">{projectTitle || 'N/A'}</span>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <span className="font-bold">DATE & TIME OF SUBMISSION: </span>
-                      <span className="font-mono font-semibold text-blue-950">{formatDateTimeDisplay(dateTimeSubmitted)}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="font-bold">PROCURING ENTITY: </span>
-                    <span className="text-slate-900">{procuringEntity || 'N/A'}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-center mb-4">
-                <h1 className="text-2xl sm:text-3xl font-bold font-serif italic text-black tracking-tight">
-                  Section VII. Technical Specifications
-                </h1>
-                {drawingPdfName && (
-                  <div className="mt-1 text-xs font-serif italic text-purple-950 font-semibold">
-                    📎 Attached Technical Drawings / Schematics: {drawingPdfName}
-                  </div>
-                )}
-              </div>
-
-              <table className={`w-full border-collapse border-2 border-black text-black table-fixed ${getTableFontSizeClass()}`}>
-                <thead>
-                  <tr className="border-b-2 border-black bg-slate-50 font-serif">
-                    <th className="border border-black px-1.5 py-2.5 text-center font-bold italic w-[4%]">
-                      Item
-                    </th>
-                    <th className="border border-black px-1.5 py-2.5 text-center font-bold italic w-[6%]">
-                      Maximum Quantity
-                    </th>
-                    <th className="border border-black px-3 py-2.5 text-center font-bold italic w-[56%]">
-                      Technical Specifications / Scope of Work
-                    </th>
-                    <th className="border border-black px-3 py-2.5 text-left font-bold italic w-[34%]">
-                      <div className="text-center font-bold text-black mb-1">Statement of Compliance</div>
-                      <div className="text-[9px] font-serif leading-tight text-slate-800 font-normal normal-case p-2 bg-amber-50/60 rounded border border-amber-200/80">
-                        [Bidders must state here either <strong>"Comply"</strong> or <strong>"Not Comply"</strong> against each of the individual parameters of each Specification stating the corresponding performance parameter of the equipment offered. Statements of "Comply" or "Not Comply" must be supported by evidence in a Bidders Bid and cross-referenced to that evidence. Evidence shall be in the form of manufacturer's un-amended sales literature, unconditional statements of specification and compliance issued by the manufacturer, samples, independent test data etc., as appropriate.]
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((rowItem, idx) => (
-                    <tr key={rowItem.id} className="border-b border-black hover:bg-slate-50/50 transition-colors">
-                      <td className="border border-black px-1.5 py-3 text-center font-serif font-bold align-top">
-                        <div className="flex flex-col items-center justify-between h-full">
-                          <span className="block pt-0.5">{idx + 1}</span>
-                          {!isExporting && items.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItem(idx)}
-                              className="text-red-500 hover:text-red-700 mt-2 print:hidden no-export p-1"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="border border-black px-1.5 py-3 font-serif text-center align-top break-words">
-                        {!isExporting ? (
-                          <input
-                            type="text"
-                            value={rowItem.quantity}
-                            onChange={(e) => handleFieldChange(idx, 'quantity', e.target.value)}
-                            placeholder="Qty"
-                            className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
-                          />
-                        ) : null}
-                        <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
-                          {rowItem.quantity || ''}
-                        </div>
-                      </td>
-
-                      <td className="border border-black px-3 py-3 font-serif align-top break-words">
-                        {!isExporting ? (
-                          <textarea
-                            rows={4}
-                            value={rowItem.specification}
-                            onChange={(e) => handleFieldChange(idx, 'specification', e.target.value)}
-                            placeholder="Enter detailed technical specification parameter..."
-                            className={`w-full bg-transparent resize-y outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
-                          />
-                        ) : null}
-                        <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black pt-0.5 whitespace-pre-wrap font-normal break-words ${getTableFontSizeClass()}`}>
-                          {rowItem.specification || ''}
-                        </div>
-                      </td>
-
-                      <td className="border border-black px-3 py-3 font-serif align-top break-words bg-emerald-50/20">
-                        <div className="space-y-2">
-                          {!isExporting && (
-                            <div className="flex items-center gap-1.5 print:hidden no-export">
-                              <button
-                                type="button"
-                                onClick={() => handleComplyClick(idx)}
-                                className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer ${rowItem.compliance === 'Comply'
-                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-400'
-                                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                                  }`}
-                              >
-                                <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                <span>Comply</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleNotComplyClick(idx)}
-                                className={`px-3 py-1 rounded-md text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer ${rowItem.compliance === 'Not Comply'
-                                    ? 'bg-red-600 text-white border-red-600 shadow-md ring-2 ring-red-400'
-                                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                                  }`}
-                              >
-                                <AlertCircle className="w-3.5 h-3.5 stroke-[3]" />
-                                <span>Not Comply</span>
-                              </button>
-                            </div>
-                          )}
-
-                          {!isExporting && rowItem.compliance === 'Comply' && (
-                            <div className="space-y-1 print:hidden no-export">
-                              <label className="text-[10px] font-mono font-bold text-slate-700 flex items-center gap-1">
-                                <Tag className="w-3 h-3 text-blue-600" />
-                                <span>Brand & Model Offered (Optional):</span>
-                              </label>
-                              <input
-                                type="text"
-                                value={rowItem.brandModel || ''}
-                                onChange={(e) => handleFieldChange(idx, 'brandModel', e.target.value)}
-                                placeholder="e.g. Cisco Catalyst 9300 / Dell PowerEdge R750"
-                                className="w-full bg-blue-50/50 text-blue-950 border border-blue-300 rounded p-1 text-xs font-serif outline-none focus:border-blue-500 font-semibold"
-                              />
-                            </div>
-                          )}
-
-                          {!isExporting && (
-                            <textarea
-                              rows={2}
-                              value={rowItem.complianceEvidence || ''}
-                              onChange={(e) => handleFieldChange(idx, 'complianceEvidence', e.target.value)}
-                              placeholder="State cross-reference supporting evidence (e.g. Manufacturer Sales Literature, Brochure Page 4)..."
-                              className="w-full bg-white text-black border border-slate-300 rounded p-1.5 text-xs font-serif outline-none focus:border-blue-500 print:hidden"
-                            />
-                          )}
-
-                          <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-xs leading-relaxed`}>
-                            <div className={`font-bold mb-1 ${rowItem.compliance === 'Comply' ? 'text-emerald-950' : 'text-red-950'}`}>
-                              Statement: {rowItem.compliance}
-                            </div>
-                            {rowItem.compliance === 'Comply' && rowItem.brandModel && (
-                              <div className="font-semibold text-blue-950 mb-0.5">
-                                Offered Brand & Model: {rowItem.brandModel}
-                              </div>
-                            )}
-                            <div className="text-slate-900 whitespace-pre-wrap italic">
-                              {formatFullComplianceText(rowItem)}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-8 pt-4 border-t border-slate-300 flex items-end justify-between text-xs font-serif signatory-block">
-              <div>
-                <p className="font-bold text-black uppercase">{companyName}</p>
-                <div className="mt-8 border-b border-black w-64"></div>
-                <p className="font-bold text-black mt-1 uppercase">{signatoryName}</p>
-                <p className="text-slate-700">{signatoryTitle}</p>
-              </div>
-
-              <div className="text-right flex flex-col items-end">
-                <DocumentQrCode
-                  details={{
-                    companyName: companyName,
-                    documentName: 'Section VII. Technical Specifications',
-                    documentNumber: `SEC-VII-${projectRefNo || '2026-901283'}`,
-                    projectTitle: projectTitle,
-                    projectRefNo: projectRefNo,
-                    procuringEntity: procuringEntity,
-                    dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
-                    documentCategory: 'Technical Eligibility',
-                    generatedBy: companyName
-                  }}
-                  size={90}
-                  showCaption={false}
-                />
-                <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
-                  VERIFIED GPPB DOC • {projectRefNo}
-                </span>
-              </div>
-            </div>
+          {/* PAGES CONTAINER (LEGAL LANDSCAPE 13" x 8.5") */}
+          <div id="section-vii-pages-container" className="flex flex-col items-center gap-8 print:gap-0">
+            {pagesList}
           </div>
 
         </div>
@@ -929,7 +1085,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             {onClose && (
               <button
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 transition"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-slate-800 transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -937,7 +1093,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             <button
               onClick={handleSave}
               disabled={isExporting}
-              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 transition shadow-lg flex items-center gap-2"
+              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:from-blue-500 disabled:opacity-50 transition shadow-lg flex items-center gap-2 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{isExporting ? 'Saving PDF...' : 'Save & Complete Technical Specifications'}</span>

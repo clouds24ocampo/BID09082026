@@ -125,6 +125,7 @@ export interface PhilGEPSOpportunity {
   procuringEntityAddress?: string;
   procuringEntityEmail?: string;
   procuringEntityPosition?: string;
+  procuringEntityContactPerson?: string;
   procurementType: ProcurementType;
   legalRegime: LegalRegime;
   approvedBudget: number;

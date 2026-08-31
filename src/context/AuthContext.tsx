@@ -3,9 +3,58 @@ import { Tenant, User, UserRole } from '../types';
 import { clearAllVaultData } from '../utils/vaultIndexedDB';
 import { debugLog } from '../utils/debugLog';
 
-// Default Initial State (No hardcoded seed data)
-const SEED_TENANTS: Tenant[] = [];
-const SEED_USERS: User[] = [];
+
+
+const DEFAULT_TENANTS: Tenant[] = [];
+
+const DEFAULT_USERS: User[] = [];
+
+// Automatic one-time clean flush for pristine real corporation onboarding
+const purgeLegacyMockData = () => {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const isFlushedForNewCorp = localStorage.getItem('bidocs_flushed_for_new_corp_v2');
+    if (!isFlushedForNewCorp) {
+      localStorage.clear();
+      if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
+      clearAllVaultData().catch(() => {});
+      localStorage.setItem('bidocs_flushed_for_new_corp_v2', 'true');
+    }
+  } catch (e) {
+    console.error('[AuthContext] Error flushing legacy mock data:', e);
+  }
+};
+
+purgeLegacyMockData();
+
+const getSavedTenants = (): Tenant[] => {
+  const saved = localStorage.getItem('bidocs_tenants');
+  if (!saved) return DEFAULT_TENANTS;
+  try {
+    const parsed = JSON.parse(saved);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const valid = parsed.filter((t: any) => t && t.companyName && t.id && t.id !== 'tenant-default-001');
+      return valid;
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return DEFAULT_TENANTS;
+};
+
+const getSavedUsers = (): User[] => {
+  const saved = localStorage.getItem('bidocs_users');
+  if (!saved) return DEFAULT_USERS;
+  try {
+    const parsed = JSON.parse(saved);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.filter((u: any) => u && u.id !== 'user-default-001' && u.email !== 'admin@metrobuilders.ph');
+    }
+  } catch (e) {
+    debugLog('AuthContext.tsx:users-init', 'Failed to parse bidocs_users', { error: String(e) }, 'A');
+  }
+  return DEFAULT_USERS;
+};
 
 interface AuthContextType {
   currentUser: User | null;
@@ -25,65 +74,46 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tenants, setTenants] = useState<Tenant[]>(() => {
-    const saved = localStorage.getItem('bidocs_tenants');
-    if (!saved) return [];
-    try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) {
-        return parsed.filter((t: any) => t && t.companyName && t.id);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return [];
+    return getSavedTenants();
   });
 
   const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('bidocs_users');
-    if (!saved) return [];
-    try {
-      const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      // #region agent log
-      debugLog('AuthContext.tsx:users-init', 'Failed to parse bidocs_users', { error: String(e) }, 'A');
-      // #endregion
-      return [];
-    }
+    return getSavedUsers();
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const savedTenants = getSavedTenants();
+    if (savedTenants.length === 0) return null;
     const saved = localStorage.getItem('bidocs_current_user');
-    if (!saved) return null;
-    try {
-      return JSON.parse(saved);
-    } catch (e) {
-      // #region agent log
-      debugLog('AuthContext.tsx:currentUser-init', 'Failed to parse bidocs_current_user', { error: String(e) }, 'A');
-      // #endregion
-      return null;
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        if (u && u.id && savedTenants.some(t => t.id === u.tenantId)) {
+          return u;
+        }
+      } catch (e) {
+        debugLog('AuthContext.tsx:currentUser-init', 'Failed to parse bidocs_current_user', { error: String(e) }, 'A');
+      }
     }
+    return null;
   });
 
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(() => {
+    const savedTenants = getSavedTenants();
+    if (savedTenants.length === 0) return null;
     const savedUserStr = localStorage.getItem('bidocs_current_user');
-    const savedTenantsStr = localStorage.getItem('bidocs_tenants');
-    let activeTenants: Tenant[] = [];
-    if (savedTenantsStr) {
+    if (savedUserStr) {
       try {
-        const parsed = JSON.parse(savedTenantsStr);
-        if (Array.isArray(parsed)) {
-          activeTenants = parsed.filter((t: any) => t && t.companyName && t.id);
+        const u = JSON.parse(savedUserStr);
+        if (u && u.tenantId) {
+          const matched = savedTenants.find((t: Tenant) => t.id === u.tenantId);
+          if (matched) return matched;
         }
       } catch (e) {
-        console.error(e);
+        debugLog('AuthContext.tsx:currentTenant-init', 'Failed to parse bidocs_current_user for tenant lookup', { error: String(e) }, 'A');
       }
     }
-    if (savedUserStr && activeTenants.length > 0) {
-      const u = JSON.parse(savedUserStr);
-      return activeTenants.find((t: Tenant) => t.id === u.tenantId) || activeTenants[0];
-    }
-    return activeTenants[0] || null;
+    return savedTenants[0] || null;
   });
 
   // Apply CSS primary brand color whenever active tenant changes
@@ -277,12 +307,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetAllData = () => {
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('bidocs_')) {
-        localStorage.removeItem(key);
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      if (typeof caches !== 'undefined') {
+        caches.keys().then((names) => {
+          names.forEach((name) => caches.delete(name));
+        });
       }
-    });
-    clearAllVaultData().catch(e => console.error('Failed to clear vault DB:', e));
+    } catch (e) {
+      console.error('Failed to clear browser storage:', e);
+    }
+    clearAllVaultData().catch((e) => console.error('Failed to clear vault DB:', e));
     setTenants([]);
     setUsers([]);
     setCurrentUser(null);

@@ -147,7 +147,7 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({ sele
               className="px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5"
             >
               <Printer className="w-4 h-4" />
-              <span>Print {activeBundle} (Legal 8.5" × 13")</span>
+              <span>Print {activeBundle} (Legal 13" × 8.5")</span>
             </button>
 
             <button onClick={onClose} className="p-2 text-slate-400 hover:text-white">
@@ -293,21 +293,21 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({ sele
         {activeTab === 'PREVIEW' && (
           <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-12 text-center">
             {currentBundleItems.map((doc, idx) => (
-              <div key={doc.id} className="space-y-6 max-w-[650px] mx-auto border-b-2 border-slate-800 pb-12">
+              <div key={doc.id} className="space-y-6 max-w-[1180px] mx-auto border-b-2 border-slate-800 pb-12">
                 <div className="inline-flex items-center gap-2 text-xs font-mono font-bold text-blue-400 bg-blue-900/40 px-4 py-1.5 rounded-full border border-blue-500/30">
                   <span>{activeBundle.toUpperCase()} — DOCUMENT #{idx + 1}: {doc.documentName}</span>
                 </div>
                 
-                {/* Page 1: Front Cover Page (Legal 8.5" x 13") */}
+                {/* Page 1: Front Cover Page (Legal 13" x 8.5") */}
                 <DocumentCoverPage item={doc} tenant={tenant} incrementNumber={idx + 1} />
 
-                {/* Page 2+: Content Page (Legal 8.5" x 13" Fit-to-Page) */}
+                {/* Page 2+: Content Page (Legal 13" x 8.5" Fit-to-Page) */}
                 <div className="space-y-2 pt-2">
                   <div className="text-[11px] font-mono text-slate-400">
                     <span>DOCUMENT CONTENT STREAM — Legal (8.5" × 13") Fit-to-Page</span>
                   </div>
                   {doc.fileDataUrl ? (
-                    <div className="single-page-paper w-full min-h-[950px] aspect-[8.5/13] rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-900 shadow-2xl mx-auto p-2">
+                    <div className="single-page-paper w-full min-h-[760px] aspect-[13/8.5] rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-900 shadow-2xl mx-auto p-2">
                       <iframe
                         src={doc.fileDataUrl}
                         title={doc.documentName}
@@ -315,12 +315,12 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({ sele
                       />
                     </div>
                   ) : (
-                    <div className="single-page-paper w-full aspect-[8.5/13] min-h-[950px] border-2 border-dashed border-slate-800 rounded-2xl bg-white text-slate-900 p-8 flex flex-col items-center justify-center space-y-4 shadow-2xl mx-auto">
+                    <div className="single-page-paper w-full aspect-[13/8.5] min-h-[760px] border-2 border-dashed border-slate-800 rounded-2xl bg-white text-slate-900 p-8 flex flex-col items-center justify-center space-y-4 shadow-2xl mx-auto">
                       <FileText className="w-16 h-16 text-blue-900 opacity-90 mx-auto" />
                       <div className="space-y-2 text-center">
                         <h4 className="text-base font-black uppercase text-slate-950">{doc.documentName} Content Active</h4>
                         <p className="text-xs font-mono text-slate-700 leading-relaxed max-w-md mx-auto">
-                          Document content auto-scaled to Legal size (8.5" × 13") portrait without margin cut-offs or grid shifting.
+                          Document content auto-scaled to Legal size (13" × 8.5") landscape without margin cut-offs or grid shifting.
                         </p>
                       </div>
                     </div>

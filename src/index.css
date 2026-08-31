@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-hover: var(--brand-primary-hover);
+  --color-semantic-success: var(--color-success);
+  --color-semantic-warning: var(--color-warning);
+  --color-semantic-danger: var(--color-danger);
+  --color-semantic-info: var(--color-info);
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-legal: 'Cambria', 'Georgia', 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
 :root {
   /* Default Tenant Theme */
   --brand-primary: #1e40af;
@@ -152,8 +164,8 @@ body {
 /* GLOBAL STRICT PRINT STYLES — EXPORT PLAIN DOCUMENTS ONLY (NO WEB APP UI) */
 @media print {
   @page {
-    size: 8.5in 13in;
-    margin: 0.4in;
+    size: 13in 8.5in landscape;
+    margin: 0mm;
   }
 
   /* 1. Hide web app headers, sidebars, buttons, modal headers & toolbars */
@@ -179,7 +191,7 @@ body {
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
-    height: auto !important;
+    height: 100% !important;
     min-height: 0 !important;
     max-height: none !important;
     overflow: visible !important;
@@ -197,8 +209,10 @@ body {
     font-family: var(--font-legal) !important;
     width: 100% !important;
     max-width: 100% !important;
-    margin: 0 auto !important;
-    padding: 0.25in !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0.12in 0.18in !important;
+    box-sizing: border-box !important;
     border: none !important;
     box-shadow: none !important;
     background: #ffffff !important;
@@ -222,4 +236,3 @@ body {
 .single-page-paper {
   font-family: var(--font-legal);
 }
-

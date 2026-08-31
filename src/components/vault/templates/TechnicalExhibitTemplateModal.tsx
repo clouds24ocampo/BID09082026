@@ -3,6 +3,9 @@ import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import DocumentQrCode from '../../common/DocumentQrCode';
+import KeyPersonnelModal from './KeyPersonnelModal';
+import EquipmentListModal from './EquipmentListModal';
+import OrganizationalChartModal from './organizationchart';
 import html2canvas from 'html2canvas';
 import {
   X,
@@ -250,6 +253,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo);
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
+  const [dateTimeSubmitted, setDateTimeSubmitted] = useState('March 19, 2026');
   const [companyName, setCompanyName] = useState(tenant?.companyName || 'Bidding Entity Corporate Name');
   const [companyAddress, setCompanyAddress] = useState(tenant?.address || 'Metro Manila, Philippines');
   const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || 'Authorized Signatory Name');
@@ -278,7 +282,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
       location: 'Metro Manila',
       level: 1,
       x: 390,
-      y: 10
+      y: 15
     },
     {
       id: '2',
@@ -290,7 +294,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
       level: 2,
       parentId: '1',
       x: 30,
-      y: 150
+      y: 180
     },
     {
       id: '3',
@@ -302,7 +306,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
       level: 2,
       parentId: '1',
       x: 390,
-      y: 150
+      y: 180
     },
     {
       id: '4',
@@ -314,7 +318,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
       level: 2,
       parentId: '1',
       x: 750,
-      y: 150
+      y: 180
     },
     {
       id: '5',
@@ -326,7 +330,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
       level: 3,
       parentId: '2',
       x: 30,
-      y: 330
+      y: 365
     },
     {
       id: '6',
@@ -338,7 +342,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
       level: 3,
       parentId: '3',
       x: 390,
-      y: 330
+      y: 365
     },
     {
       id: '7',
@@ -350,7 +354,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
       level: 3,
       parentId: '4',
       x: 750,
-      y: 330
+      y: 365
     }
   ]);
 
@@ -414,7 +418,19 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
       if (templateElems.length > 0) {
         const elemArray = Array.from(templateElems) as HTMLElement[];
         const canvases = await Promise.all(
-          elemArray.map(el => html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' }))
+          elemArray.map(el => html2canvas(el, {
+            scale: 2.5,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            ignoreElements: (element: Element) => {
+              return (
+                element.classList.contains('print:hidden') ||
+                element.classList.contains('no-export') ||
+                element.tagName === 'BUTTON' ||
+                element.getAttribute('role') === 'button'
+              );
+            }
+          }))
         );
 
         if (canvases.length === 1) {
@@ -477,13 +493,13 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
 
   const resetOrgChartLayout = () => {
     setOrgNodes([
-      { id: '1', name: tenant?.authorizedSignatory?.name || 'Engr. Noel Azutea', position: 'Project Director / Chief Executive', email: 'noel.azutea@company.com', phone: '0917-123-4567', location: 'Metro Manila', level: 1, x: 390, y: 10 },
-      { id: '2', name: 'Engr. Juan Dela Cruz', position: 'Project Manager', email: 'juan.delacruz@company.com', phone: '0918-987-6543', location: 'PRC: 0091823', level: 2, parentId: '1', x: 30, y: 150 },
-      { id: '3', name: 'Engr. Maria Santos', position: 'Chief Technical Architect', email: 'maria.santos@company.com', phone: '0919-876-5432', location: 'PRC: 0102938', level: 2, parentId: '1', x: 390, y: 150 },
-      { id: '4', name: 'Engr. Roberto Tan', position: 'Quality & Safety Director', email: 'roberto.tan@company.com', phone: '0920-765-4321', location: 'PRC: 0083921', level: 2, parentId: '1', x: 750, y: 150 },
-      { id: '5', name: 'Engr. Carlos Reyes', position: 'Lead Site Engineer', email: 'carlos.reyes@company.com', phone: '0921-654-3210', location: 'PRC: 0071234', level: 3, parentId: '2', x: 30, y: 330 },
-      { id: '6', name: 'Engr. Liza Mendoza', position: 'Systems Engineer', email: 'liza.mendoza@company.com', phone: '0922-543-2109', location: 'PRC: 0062345', level: 3, parentId: '3', x: 390, y: 330 },
-      { id: '7', name: 'Engr. Pedro Santos', position: 'Safety Inspector', email: 'pedro.santos@company.com', phone: '0923-432-1098', location: 'PRC: 0053456', level: 3, parentId: '4', x: 750, y: 330 }
+      { id: '1', name: tenant?.authorizedSignatory?.name || 'Engr. Noel Azutea', position: 'Project Director / Chief Executive', email: 'noel.azutea@company.com', phone: '0917-123-4567', location: 'Metro Manila', level: 1, x: 390, y: 15 },
+      { id: '2', name: 'Engr. Juan Dela Cruz', position: 'Project Manager', email: 'juan.delacruz@company.com', phone: '0918-987-6543', location: 'PRC: 0091823', level: 2, parentId: '1', x: 30, y: 180 },
+      { id: '3', name: 'Engr. Maria Santos', position: 'Chief Technical Architect', email: 'maria.santos@company.com', phone: '0919-876-5432', location: 'PRC: 0102938', level: 2, parentId: '1', x: 390, y: 180 },
+      { id: '4', name: 'Engr. Roberto Tan', position: 'Quality & Safety Director', email: 'roberto.tan@company.com', phone: '0920-765-4321', location: 'PRC: 0083921', level: 2, parentId: '1', x: 750, y: 180 },
+      { id: '5', name: 'Engr. Carlos Reyes', position: 'Lead Site Engineer', email: 'carlos.reyes@company.com', phone: '0921-654-3210', location: 'PRC: 0071234', level: 3, parentId: '2', x: 30, y: 365 },
+      { id: '6', name: 'Engr. Liza Mendoza', position: 'Systems Engineer', email: 'liza.mendoza@company.com', phone: '0922-543-2109', location: 'PRC: 0062345', level: 3, parentId: '3', x: 390, y: 365 },
+      { id: '7', name: 'Engr. Pedro Santos', position: 'Safety Inspector', email: 'pedro.santos@company.com', phone: '0923-432-1098', location: 'PRC: 0053456', level: 3, parentId: '4', x: 750, y: 365 }
     ]);
   };
 
@@ -516,12 +532,17 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
   };
 
   const addKeyPersonnelPage = () => {
-    const newPageId = `page-${Date.now()}`;
+    if (keyPersonnelPages.length >= 50) {
+      alert('Maximum 50 pages allowed.');
+      return;
+    }
+    const newPageNum = keyPersonnelPages.length + 1;
+    const newPageId = `page-${Date.now()}-${newPageNum}`;
     const newPageCols: KeyPersonnelMatrixCol[] = [
       {
         id: `col-${Date.now()}-1`,
-        position: 'PROJECT MANAGER',
-        name: 'Engr. Additional Key Personnel',
+        position: 'PROJECT ENGINEER / SPECIALIST',
+        name: `Engr. Personnel ${newPageNum}`,
         address: 'Metro Manila',
         dob: '01/01/1990',
         citizenship: 'Filipino',
@@ -538,27 +559,6 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
           seminars: ''
         },
         prcLicenseNo: '00-00000'
-      },
-      {
-        id: `col-${Date.now()}-2`,
-        position: 'SITE ENGINEER',
-        name: 'Engr. Additional Specialist',
-        address: 'Laguna',
-        dob: '05/15/1992',
-        citizenship: 'Filipino',
-        civilStatus: 'Married',
-        education: {
-          elementarySchool: '',
-          elementaryYear: '',
-          highSchool: '',
-          highSchoolYear: '',
-          collegeSchool: 'P.U.P Manila',
-          collegeYear: '2014',
-          postGradSchool: '',
-          postGradYear: '',
-          seminars: ''
-        },
-        prcLicenseNo: '00-11111'
       }
     ];
     setKeyPersonnelPages(prev => [...prev, { id: newPageId, cols: newPageCols }]);
@@ -641,9 +641,48 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
     ]);
   };
 
-  const removeEquipment = (id: string) => {
-    setEquipmentList(prev => prev.filter(e => e.id !== id));
-  };
+  // Standalone dedicated modals for Organizational Chart (f.a), Key Personnel (f.b) & Equipment List (f.c)
+  if (item.code === '(f.a)') {
+    return (
+      <OrganizationalChartModal
+        item={item}
+        tenant={tenant}
+        activeProjectRefNo={activeProjectRefNo}
+        activeProjectTitle={activeProjectTitle}
+        activeProcuringEntity={activeProcuringEntity}
+        onSaveAndComplete={onSaveAndComplete}
+        onClose={onClose}
+      />
+    );
+  }
+
+  if (item.code === '(f.b)' || item.code === '(f)' || item.code === '(b)') {
+    return (
+      <KeyPersonnelModal
+        item={item}
+        tenant={tenant}
+        activeProjectRefNo={activeProjectRefNo}
+        activeProjectTitle={activeProjectTitle}
+        activeProcuringEntity={activeProcuringEntity}
+        onSaveAndComplete={onSaveAndComplete}
+        onClose={onClose}
+      />
+    );
+  }
+
+  if (item.code === '(f.c)') {
+    return (
+      <EquipmentListModal
+        item={item}
+        tenant={tenant}
+        activeProjectRefNo={activeProjectRefNo}
+        activeProjectTitle={activeProjectTitle}
+        activeProcuringEntity={activeProcuringEntity}
+        onSaveAndComplete={onSaveAndComplete}
+        onClose={onClose}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static">
@@ -652,8 +691,8 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
       <style>{`
         @media print {
           @page {
-            size: ${item.code === '(f.a)' || item.code === '(f.b)' || item.code === '(f.c)' || item.code === '(f)' ? '13in 8.5in' : '8.5in 13in'};
-            margin: 0.4in;
+            size: 13in 8.5in landscape;
+            margin: 0.2in;
           }
           header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .proof-column, .actions-column, .sticky {
             display: none !important;
@@ -676,8 +715,8 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
             position: relative !important;
             width: 100% !important;
             max-width: 100% !important;
-            margin: 0 auto 0.5in auto !important;
-            padding: 0.25in !important;
+            margin: 0 auto !important;
+            padding: 0.18in !important;
             border: none !important;
             box-shadow: none !important;
             background: #ffffff !important;
@@ -692,7 +731,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
         }
       `}</style>
 
-      <div className={`bg-slate-900 border border-slate-800 rounded-2xl w-full ${item.code === '(f.a)' || item.code === '(f.b)' || item.code === '(f.c)' || item.code === '(f)' ? 'max-w-[96vw]' : 'max-w-5xl'} overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white`}>
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-[96vw] overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white">
 
         {/* Top Controls Header Bar */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0 print:hidden no-export">
@@ -821,7 +860,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
         )}
 
         {/* Body Content */}
-        <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6 print:p-0 print:bg-white">
+        <div className="p-4 overflow-y-auto flex-1 bg-slate-950 space-y-4 print:p-0 print:bg-white">
 
           {/* Editor Form Inputs (Screen Only) */}
           <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
@@ -865,23 +904,32 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-2 border-t border-slate-800">
-              <div className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2">
-                <label className="block text-slate-400 font-medium mb-1">Philgeps Ref No.</label>
-                <div className="text-white font-mono font-bold break-words [overflow-wrap:anywhere]">
-                  {projectRefNo || 'Not selected'}
-                </div>
+              <div>
+                <label className="block text-slate-400 font-medium mb-1">Project Ref. No.</label>
+                <input
+                  type="text"
+                  value={projectRefNo}
+                  onChange={(e) => setProjectRefNo(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                />
               </div>
-              <div className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2">
+              <div>
                 <label className="block text-slate-400 font-medium mb-1">Project Title</label>
-                <div className="text-white font-bold break-words [overflow-wrap:anywhere]">
-                  {projectTitle || 'Not selected'}
-                </div>
+                <input
+                  type="text"
+                  value={projectTitle}
+                  onChange={(e) => setProjectTitle(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                />
               </div>
-              <div className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2">
+              <div>
                 <label className="block text-slate-400 font-medium mb-1">Procuring Entity</label>
-                <div className="text-white font-bold break-words [overflow-wrap:anywhere]">
-                  {procuringEntity || 'Not selected'}
-                </div>
+                <input
+                  type="text"
+                  value={procuringEntity}
+                  onChange={(e) => setProcuringEntity(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                />
               </div>
             </div>
 
@@ -985,9 +1033,9 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
 
           </div>
 
-          {/* NON-ITEM (g) AND NON-ITEM (f.b) STANDARD SINGLE PAGE LEGAL PAPER CONTAINER */}
-          {item.code !== '(g)' && item.code !== '(f.b)' && item.code !== '(f)' && (
-            <div className={`single-page-paper bg-white text-slate-900 font-legal p-8 sm:p-10 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-6 ${item.code === '(f.a)' || item.code === '(f.c)' ? 'max-w-[1250px]' : 'max-w-[850px]'} h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none`}>
+          {/* NON-ITEM (g), NON-ITEM (f.b) AND NON-ITEM (f.c) STANDARD SINGLE PAGE LEGAL PAPER CONTAINER */}
+          {item.code !== '(g)' && item.code !== '(f.b)' && item.code !== '(f)' && item.code !== '(f.c)' && (
+            <div className={`single-page-paper bg-white text-slate-900 font-legal p-6 sm:p-7 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-3 max-w-[1280px] min-h-[740px] aspect-[13/8.5] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none`}>
 
               {/* Outer Legal Frame */}
               <div className="absolute inset-4 border-2 border-slate-900 pointer-events-none rounded-xl" />
@@ -999,7 +1047,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                   <div className="border-b-2 border-slate-900 pb-3 font-mono text-[11px] text-slate-950 font-bold mb-4 relative">
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1 z-10">
-                        <div>Philgeps Ref No.: <strong className="text-blue-950">{projectRefNo}</strong></div>
+                        <div>PROJECT REF. NO: <strong className="text-blue-950">{projectRefNo}</strong></div>
                         <div>NAME OF PROJECT: <strong className="text-slate-950">{projectTitle}</strong></div>
                         <div>PROCURING ENTITY: <strong className="text-slate-950">{procuringEntity}</strong></div>
                       </div>
@@ -1054,7 +1102,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                   <div className="space-y-4 text-xs font-serif text-slate-900 leading-relaxed font-normal pt-2">
                     <div className="border-b-2 border-slate-900 pb-3 space-y-1 font-mono text-[11px] text-slate-950 font-bold mb-4">
                       <div className="flex items-center justify-between">
-                        <span>Philgeps Ref No.: <strong className="text-blue-950">{projectRefNo}</strong></span>
+                        <span>PROJECT REF. NO: <strong className="text-blue-950">{projectRefNo}</strong></span>
                         <span>DATE: <strong>{todayStr}</strong></span>
                       </div>
                       <div>
@@ -1166,7 +1214,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
 
                 {/* ITEM (f.a): OFFICIAL FREE DRAG-AND-PLACE ORGANIZATIONAL CHART WITH DYNAMIC SVG CONNECTING LINES */}
                 {item.code === '(f.a)' && (
-                  <div className="space-y-4 text-xs font-sans">
+                  <div className="space-y-2 text-xs font-sans flex-1 flex flex-col justify-between">
                     {/* CANVAS TOOLBAR */}
                     <div className="flex flex-wrap items-center justify-between bg-slate-100 p-2 rounded-xl border border-slate-300 print:hidden no-export gap-2">
                       <div className="flex items-center gap-2">
@@ -1204,7 +1252,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                     <div
                       onPointerMove={handlePointerMove}
                       onPointerUp={handlePointerUp}
-                      className="relative w-full h-[460px] bg-slate-50/50 border border-dashed border-slate-300 rounded-xl overflow-hidden select-none"
+                      className="relative w-full flex-1 min-h-[500px] h-[530px] sm:h-[550px] bg-slate-50/50 border border-dashed border-slate-300 rounded-xl overflow-hidden select-none print:h-[580px] print:border-none print:bg-transparent"
                     >
                       {/* DYNAMIC SVG CONNECTING LINES OVERLAY */}
                       <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
@@ -1353,47 +1401,13 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
 
 
 
-                {item.code === '(f.c)' && (
-                  <div className="space-y-4 text-xs font-sans">
-                    <table className="w-full border-collapse border border-slate-900 text-[11px]">
-                      <thead>
-                        <tr className="bg-slate-100 font-mono text-slate-900 font-bold border-b border-slate-900">
-                          <th className="p-1.5 border-r border-slate-900">#</th>
-                          <th className="p-1.5 border-r border-slate-900">Equipment Description</th>
-                          <th className="p-1.5 border-r border-slate-900">Model / Serial No</th>
-                          <th className="p-1.5 border-r border-slate-900">Status</th>
-                          <th className="p-1.5 border-r border-slate-900">Proof Document Ref</th>
-                          <th className="p-1.5 print:hidden no-export text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-400">
-                        {equipmentList.map((eq, idx) => (
-                          <tr key={eq.id}>
-                            <td className="p-1.5 border-r border-slate-400 font-mono font-bold">{idx + 1}</td>
-                            <td className="p-1.5 border-r border-slate-400 font-bold text-slate-950">{eq.description}</td>
-                            <td className="p-1.5 border-r border-slate-400 font-mono text-[10px]">
-                              <div>{eq.model}</div>
-                              <div className="text-slate-500">{eq.serialNo}</div>
-                            </td>
-                            <td className="p-1.5 border-r border-slate-400 font-mono font-bold text-blue-900">{eq.status}</td>
-                            <td className="p-1.5 border-r border-slate-400 font-mono text-[10px]">{eq.proofRef}</td>
-                            <td className="p-1.5 print:hidden no-export text-right">
-                              <button onClick={() => removeEquipment(eq.id)} className="p-1 text-red-600 hover:bg-red-50 rounded">
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+
 
               </div>
 
               {/* Verification Footer Seal with Smartphone Scannable QR Code */}
-              <div className="pt-4 border-t border-slate-300 flex items-center justify-between text-[9px] font-mono text-slate-700">
-                <div className="flex items-center gap-3">
+              <div className="pt-2 border-t border-slate-300 flex items-center justify-between text-[9px] font-mono text-slate-700 relative z-10 px-2 pb-1">
+                <div className="flex items-center gap-2.5">
                   <DocumentQrCode
                     details={{
                       companyName: companyName,
@@ -1402,14 +1416,14 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                       projectTitle: projectTitle,
                       projectRefNo: projectRefNo,
                       procuringEntity: procuringEntity,
-                      dateTimeSubmitted: new Date().toLocaleString(),
+                      dateTimeSubmitted: dateTimeSubmitted || 'March 19, 2026',
                       documentCategory: 'Technical Eligibility',
                       generatedBy: companyName
                     }}
-                    size={65}
+                    size={48}
                     showCaption={false}
                   />
-                  <div className="space-y-0.5 font-mono text-[9px] text-slate-800">
+                  <div className="space-y-0.5 font-mono text-[8.5px] text-slate-800">
                     <p className="font-bold text-slate-950 uppercase">{companyName}</p>
                     <p>PROJECT: <strong>{projectTitle}</strong></p>
                     <p>REF NO: <strong>{projectRefNo}</strong> • PROCURING ENTITY: <strong>{procuringEntity}</strong></p>
@@ -1420,434 +1434,20 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
             </div>
           )}
 
-          {/* ITEM (f.b): MULTI-PAGE GPPB KEY PERSONNEL QUALIFICATIONS & EXPERIENCE MATRIX */}
-          {(item.code === '(f.b)' || item.code === '(f)') && (
-            <div className="space-y-8">
-              {keyPersonnelPages.map((page, pageIdx) => (
-                <div
-                  key={page.id}
-                  className="single-page-paper bg-white text-slate-900 font-legal p-8 sm:p-10 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-6 max-w-[1250px] h-auto mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none mb-8"
-                >
-                  {/* Outer Legal Frame */}
-                  <div className="absolute inset-4 border-2 border-slate-900 pointer-events-none rounded-xl" />
 
-                  <div className="space-y-4">
-
-                    {/* TOP CENTER HEADER: QR CODE + NAME OF THE PAPER */}
-                    <div className="border-b-2 border-slate-900 pb-3 font-mono text-[11px] text-slate-950 font-bold mb-4 relative flex items-center justify-between">
-                      {/* Left Info */}
-                      <div className="space-y-1 z-10 text-left max-w-[32%] leading-tight">
-                        <div>Philgeps Ref No.: <strong className="text-blue-950">{projectRefNo}</strong></div>
-                        <div>NAME OF PROJECT: <strong className="text-slate-950">{projectTitle}</strong></div>
-                        <div>PROCURING ENTITY: <strong className="text-slate-950">{procuringEntity}</strong></div>
-                      </div>
-
-                      {/* TOP CENTER: QR CODE & NAME OF PAPER */}
-                      <div className="flex flex-col items-center justify-center text-center z-10 space-y-1">
-                        <DocumentQrCode
-                          details={{
-                            companyName: companyName,
-                            documentName: `Item ${item.code} — KEY PERSONNEL (Page ${pageIdx + 1})`,
-                            documentNumber: `EXHIBIT-${item.code.replace(/[^a-zA-Z0-9]/g, '')}-${projectRefNo || '2026-901283'}`,
-                            projectTitle: projectTitle,
-                            projectRefNo: projectRefNo,
-                            procuringEntity: procuringEntity,
-                            dateTimeSubmitted: new Date().toLocaleString(),
-                            documentCategory: 'Technical Eligibility',
-                            generatedBy: companyName
-                          }}
-                          size={55}
-                          showCaption={false}
-                        />
-                        <h3 className="text-sm sm:text-base md:text-lg font-black uppercase tracking-wider text-slate-950 font-serif border-b-2 border-slate-950 pb-0.5 leading-none">
-                          KEY PERSONNEL
-                        </h3>
-                        <p className="text-[8.5px] font-sans font-bold uppercase tracking-tight text-slate-700">
-                          MINIMUM REQUIRED APPLICANT FIRM'S KEY PERSONNEL PROPOSED TO BE ASSIGNED IN THE PROJECT
-                        </p>
-                      </div>
-
-                      {/* Right Info */}
-                      <div className="text-right z-10 space-y-1 min-w-[120px] leading-tight">
-                        <div>DATE: <strong>{todayStr}</strong></div>
-                        <div className="text-blue-950">PAGE: <strong>{pageIdx + 1} OF {keyPersonnelPages.length}</strong></div>
-                        {keyPersonnelPages.length > 1 && (
-                          <button
-                            onClick={() => removeKeyPersonnelPage(page.id)}
-                            className="px-2 py-0.5 bg-red-100 hover:bg-red-200 text-red-700 text-[10px] font-bold rounded print:hidden no-export mt-1"
-                          >
-                            Delete Page {pageIdx + 1}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* OFFICIAL GPPB MATRIX TABLE */}
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse border-2 border-slate-900 text-[10px] table-fixed">
-                        <thead>
-                          {/* Main Title Row */}
-                          <tr>
-                            <th colSpan={page.cols.length + 2} className="border border-slate-900 bg-white p-2 text-center text-[12px] font-bold font-serif uppercase tracking-wide">
-                              MINIMUM REQUIRED APPLICANT FIRM'S KEY PERSONNEL PROPOSED TO BE ASSIGNED IN THE PROJECT
-                            </th>
-                          </tr>
-
-                          {/* Position Title Column Headers */}
-                          <tr className="bg-slate-50 font-serif text-slate-900 font-bold border-b-2 border-slate-900 text-center uppercase">
-                            <th className="p-1 border border-slate-900 w-[24px]"></th>
-                            <th className="p-1 border border-slate-900 w-[140px] text-left"></th>
-                            {page.cols.map((col) => (
-                              <th key={col.id} className="p-1.5 border border-slate-900 align-top relative group">
-                                <input
-                                  type="text"
-                                  value={col.position}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'position', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center font-bold text-[10px] uppercase focus:outline-none focus:bg-blue-50 leading-tight"
-                                />
-                                {page.cols.length > 1 && (
-                                  <button
-                                    onClick={() => removeKeyPersonnelColFromPage(page.id, col.id)}
-                                    className="absolute top-0.5 right-0.5 p-0.5 text-red-600 hover:bg-red-100 rounded print:hidden no-export opacity-80 hover:opacity-100"
-                                    title="Remove Column"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-900 text-center font-serif text-[9.5px]">
-
-                          {/* Row 1: Name */}
-                          <tr>
-                            <td className="p-1 border border-slate-900 font-bold">1</td>
-                            <td className="p-1.5 border border-slate-900 font-bold text-left">Name:</td>
-                            {page.cols.map((col) => {
-                              if (col.isSpecialColumn) {
-                                return (
-                                  <td key={col.id} rowSpan={16} className="p-2 border border-slate-900 align-middle font-bold text-[10px] text-center bg-slate-50/50">
-                                    <textarea
-                                      value={col.specialNote || ''}
-                                      onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'specialNote', e.target.value)}
-                                      className="w-full h-full bg-transparent border-none text-center font-bold text-[10.5px] uppercase focus:outline-none resize-none leading-normal"
-                                      rows={12}
-                                    />
-                                  </td>
-                                );
-                              }
-                              return (
-                                <td key={col.id} className="p-1 border border-slate-900 font-bold text-slate-950">
-                                  <input
-                                    type="text"
-                                    value={col.name}
-                                    onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'name', e.target.value)}
-                                    className="w-full bg-transparent border-none text-center font-bold focus:outline-none focus:bg-blue-50"
-                                  />
-                                </td>
-                              );
-                            })}
-                          </tr>
-
-                          {/* Row 2: Address */}
-                          <tr>
-                            <td className="p-1 border border-slate-900 font-bold">2</td>
-                            <td className="p-1.5 border border-slate-900 font-bold text-left">Address</td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900">
-                                <input
-                                  type="text"
-                                  value={col.address}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'address', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center focus:outline-none focus:bg-blue-50"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                          {/* Row 3: Date of Birth */}
-                          <tr>
-                            <td className="p-1 border border-slate-900 font-bold">3</td>
-                            <td className="p-1.5 border border-slate-900 font-bold text-left">Date of Birth</td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900 font-mono text-[9px]">
-                                <input
-                                  type="text"
-                                  value={col.dob}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'dob', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center font-mono focus:outline-none focus:bg-blue-50"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                          {/* Row 4: Citizenship */}
-                          <tr>
-                            <td className="p-1 border border-slate-900 font-bold">4</td>
-                            <td className="p-1.5 border border-slate-900 font-bold text-left">Citizenship</td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900">
-                                <input
-                                  type="text"
-                                  value={col.citizenship}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'citizenship', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center focus:outline-none focus:bg-blue-50"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                          {/* Row 5: Civil Status */}
-                          <tr>
-                            <td className="p-1 border border-slate-900 font-bold">5</td>
-                            <td className="p-1.5 border border-slate-900 font-bold text-left">Civil Status</td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900">
-                                <input
-                                  type="text"
-                                  value={col.civilStatus}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'civilStatus', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center focus:outline-none focus:bg-blue-50"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                          {/* Row 6: Education Header Row */}
-                          <tr>
-                            <td className="p-1 border border-slate-900 font-bold">6</td>
-                            <td colSpan={page.cols.length + 1} className="p-1 border border-slate-900 font-bold text-left bg-slate-50 uppercase text-[9.5px]">
-                              Education
-                            </td>
-                          </tr>
-
-                          {/* Elementary - Name & Location */}
-                          <tr>
-                            <td className="p-1 border border-slate-900"></td>
-                            <td className="p-1 border border-slate-900 text-left pl-3 italic text-[8.5px]">
-                              <div>Elementary</div>
-                              <div className="text-[7.5px] not-italic text-slate-600">Name and location of School</div>
-                            </td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900">
-                                <input
-                                  type="text"
-                                  value={col.education.elementarySchool}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'edu.elementarySchool', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center focus:outline-none focus:bg-blue-50 text-[9px]"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                          {/* Elementary - Year Graduated */}
-                          <tr>
-                            <td className="p-1 border border-slate-900"></td>
-                            <td className="p-1 border border-slate-900 text-left pl-5 text-[8px] text-slate-700">Year graduated</td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900 font-mono text-[9px]">
-                                <input
-                                  type="text"
-                                  value={col.education.elementaryYear}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'edu.elementaryYear', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center font-mono focus:outline-none focus:bg-blue-50"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                          {/* High School - Name & Location */}
-                          <tr>
-                            <td className="p-1 border border-slate-900"></td>
-                            <td className="p-1 border border-slate-900 text-left pl-3 italic text-[8.5px]">
-                              <div>High School</div>
-                              <div className="text-[7.5px] not-italic text-slate-600">Name and location of School</div>
-                            </td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900">
-                                <input
-                                  type="text"
-                                  value={col.education.highSchool}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'edu.highSchool', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center focus:outline-none focus:bg-blue-50 text-[9px]"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                          {/* High School - Year Graduated */}
-                          <tr>
-                            <td className="p-1 border border-slate-900"></td>
-                            <td className="p-1 border border-slate-900 text-left pl-5 text-[8px] text-slate-700">Year graduated</td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900 font-mono text-[9px]">
-                                <input
-                                  type="text"
-                                  value={col.education.highSchoolYear}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'edu.highSchoolYear', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center font-mono focus:outline-none focus:bg-blue-50"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                          {/* College - Name & Location */}
-                          <tr>
-                            <td className="p-1 border border-slate-900"></td>
-                            <td className="p-1 border border-slate-900 text-left pl-3 italic text-[8.5px]">
-                              <div>College</div>
-                              <div className="text-[7.5px] not-italic text-slate-600">Name and location of School</div>
-                            </td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900">
-                                <input
-                                  type="text"
-                                  value={col.education.collegeSchool}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'edu.collegeSchool', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center focus:outline-none focus:bg-blue-50 text-[9px] font-semibold"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                          {/* College - Year Graduated */}
-                          <tr>
-                            <td className="p-1 border border-slate-900"></td>
-                            <td className="p-1 border border-slate-900 text-left pl-5 text-[8px] text-slate-700">Year graduated</td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900 font-mono text-[9px]">
-                                <input
-                                  type="text"
-                                  value={col.education.collegeYear}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'edu.collegeYear', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center font-mono focus:outline-none focus:bg-blue-50"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                          {/* Post-Graduate - Name & Location */}
-                          <tr>
-                            <td className="p-1 border border-slate-900"></td>
-                            <td className="p-1 border border-slate-900 text-left pl-3 italic text-[8.5px]">
-                              <div>Post-Graduate</div>
-                              <div className="text-[7.5px] not-italic text-slate-600">Name and location of School</div>
-                            </td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900">
-                                <input
-                                  type="text"
-                                  value={col.education.postGradSchool}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'edu.postGradSchool', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center focus:outline-none focus:bg-blue-50 text-[9px]"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                          {/* Post-Graduate - Year Graduated */}
-                          <tr>
-                            <td className="p-1 border border-slate-900"></td>
-                            <td className="p-1 border border-slate-900 text-left pl-5 text-[8px] text-slate-700">Year graduated</td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900 font-mono text-[9px]">
-                                <input
-                                  type="text"
-                                  value={col.education.postGradYear}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'edu.postGradYear', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center font-mono focus:outline-none focus:bg-blue-50"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                          {/* Technical Seminars */}
-                          <tr>
-                            <td className="p-1 border border-slate-900"></td>
-                            <td className="p-1 border border-slate-900 text-left pl-3 italic text-[8.5px]">
-                              <div>Technical Seminars</div>
-                              <div className="text-[7px] not-italic text-slate-600">(Use extra sheets, if necessary)</div>
-                            </td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900">
-                                <input
-                                  type="text"
-                                  value={col.education.seminars}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'edu.seminars', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center focus:outline-none focus:bg-blue-50 text-[8.5px]"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                          {/* Row 7: PRC License No. */}
-                          <tr>
-                            <td className="p-1 border border-slate-900 font-bold">7</td>
-                            <td className="p-1.5 border border-slate-900 font-bold text-left uppercase">PRC LICENSE No.</td>
-                            {page.cols.filter(c => !c.isSpecialColumn).map((col) => (
-                              <td key={col.id} className="p-1 border border-slate-900 font-mono font-bold text-[9px]">
-                                <input
-                                  type="text"
-                                  value={col.prcLicenseNo}
-                                  onChange={(e) => updateKeyPersonnelColInPage(page.id, col.id, 'prcLicenseNo', e.target.value)}
-                                  className="w-full bg-transparent border-none text-center font-mono font-bold focus:outline-none focus:bg-blue-50"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-
-                        </tbody>
-                      </table>
-                    </div>
-
-                  </div>
-
-                  {/* Footer Signature & Seal Block */}
-                  <div className="pt-3 flex items-start justify-between font-serif text-slate-950 border-t border-slate-300 mt-4">
-                    <div className="text-[9.5px]">
-                      <p><strong>Notes:</strong> Minimum qualification requirement:</p>
-                    </div>
-
-                    <div className="text-center space-y-1 font-serif text-slate-950 pr-8">
-                      <input
-                        type="text"
-                        value={signatoryName}
-                        onChange={(e) => setSignatoryName(e.target.value)}
-                        className="w-full bg-transparent border-none text-center font-bold text-[12px] uppercase focus:outline-none focus:bg-blue-50 border-b border-black"
-                      />
-                      <input
-                        type="text"
-                        value={signatoryTitle}
-                        onChange={(e) => setSignatoryTitle(e.target.value)}
-                        className="w-full bg-transparent border-none text-center text-[10.5px] focus:outline-none focus:bg-blue-50"
-                      />
-                      <input
-                        type="text"
-                        value={companyName}
-                        onChange={(e) => setCompanyName(e.target.value)}
-                        className="w-full bg-transparent border-none text-center font-bold text-[10.5px] uppercase focus:outline-none focus:bg-blue-50"
-                      />
-                    </div>
-                  </div>
-
-                </div>
-              ))}
-            </div>
-          )}
 
           {/* ITEM (g): OFFICIAL 2-PAGE RA 12009 / GPPB OMNIBUS SWORN STATEMENT FORM */}
           {item.code === '(g)' && (
             <div className="space-y-8">
 
               {/* PAGE 1 OF 2 */}
-              <div className="single-page-paper bg-white text-slate-900 font-legal p-8 sm:p-10 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-6 max-w-[850px] min-h-[1100px] aspect-[8.5/13] mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
+              <div className="single-page-paper bg-white text-slate-900 font-legal p-3 sm:p-5 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1280px] min-h-[740px] aspect-[13/8.5] mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
                 <div className="absolute inset-4 border-2 border-slate-900 pointer-events-none rounded-xl" />
 
                 <div className="space-y-4 text-xs font-serif text-slate-900 leading-relaxed font-normal pt-2">
                   <div className="border-b-2 border-slate-900 pb-3 space-y-1 font-mono text-[11px] text-slate-950 font-bold mb-4">
                     <div className="flex items-center justify-between">
-                      <span>Philgeps Ref No.: <strong className="text-blue-950">{projectRefNo}</strong></span>
+                      <span>PROJECT REF. NO: <strong className="text-blue-950">{projectRefNo}</strong></span>
                       <span>DATE: <strong>{todayStr}</strong></span>
                     </div>
                     <div>
@@ -1947,7 +1547,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                         projectTitle: projectTitle,
                         projectRefNo: projectRefNo,
                         procuringEntity: procuringEntity,
-                        dateTimeSubmitted: new Date().toLocaleString(),
+                        dateTimeSubmitted: dateTimeSubmitted || 'March 19, 2026',
                         documentCategory: 'Technical Eligibility',
                         generatedBy: companyName
                       }}
@@ -1965,13 +1565,13 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
               </div>
 
               {/* PAGE 2 OF 2 */}
-              <div className="single-page-paper bg-white text-slate-900 font-legal p-8 sm:p-10 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-6 max-w-[850px] min-h-[1100px] aspect-[8.5/13] mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
+              <div className="single-page-paper bg-white text-slate-900 font-legal p-3 sm:p-5 border-2 border-slate-900 rounded-2xl shadow-2xl space-y-4 max-w-[1280px] min-h-[740px] aspect-[13/8.5] mx-auto text-left relative flex flex-col justify-between print:m-0 print:border-none print:shadow-none">
                 <div className="absolute inset-4 border-2 border-slate-900 pointer-events-none rounded-xl" />
 
                 <div className="space-y-4 text-xs font-serif text-slate-900 leading-relaxed font-normal pt-2">
                   <div className="border-b-2 border-slate-900 pb-3 space-y-1 font-mono text-[11px] text-slate-950 font-bold mb-4">
                     <div className="flex items-center justify-between">
-                      <span>Philgeps Ref No.: <strong className="text-blue-950">{projectRefNo}</strong></span>
+                      <span>PROJECT REF. NO: <strong className="text-blue-950">{projectRefNo}</strong></span>
                       <span>PAGE 2 OF 2 • DATE: <strong>{todayStr}</strong></span>
                     </div>
                     <div>
@@ -2044,7 +1644,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                         projectTitle: projectTitle,
                         projectRefNo: projectRefNo,
                         procuringEntity: procuringEntity,
-                        dateTimeSubmitted: new Date().toLocaleString(),
+                        dateTimeSubmitted: dateTimeSubmitted || 'March 19, 2026',
                         documentCategory: 'Technical Eligibility',
                         generatedBy: companyName
                       }}

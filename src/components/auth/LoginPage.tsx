@@ -85,34 +85,34 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
 
       {/* 1. Warp Speed Travelling Stars (Moving Toward Screen) */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        {Array.from({ length: 45 }).map((_, i) => {
-          const startX = Math.random() * 100 - 50;
-          const startY = Math.random() * 100 - 50;
-          const duration = Math.random() * 3 + 2;
-          const delay = Math.random() * 4;
+        {Array.from({ length: 30 }).map((_, i) => {
+          const leftPct = (i * 13) % 100;
+          const topPct = (i * 17) % 100;
+          const duration = 2 + (i % 3);
+          const delay = (i * 0.2) % 3;
 
           return (
             <motion.div
               key={i}
               initial={{
-                x: `${startX}vw`,
-                y: `${startY}vh`,
-                scale: 0.1,
+                scale: 0.2,
                 opacity: 0
               }}
               animate={{
-                x: `${startX * 3.5}vw`,
-                y: `${startY * 3.5}vh`,
-                scale: [0.1, 1.2, 2.5],
-                opacity: [0, 1, 0]
+                scale: [0.2, 1.5, 0.2],
+                opacity: [0, 0.9, 0]
               }}
               transition={{
                 duration: duration,
                 repeat: Infinity,
-                ease: 'easeIn',
+                ease: 'easeInOut',
                 delay: delay
               }}
-              className="absolute top-1/2 left-1/2 w-1 h-1 bg-cyan-200 rounded-full shadow-[0_0_10px_#38bdf8]"
+              style={{
+                left: `${leftPct}%`,
+                top: `${topPct}%`
+              }}
+              className="absolute w-1.5 h-1.5 bg-cyan-200 rounded-full shadow-[0_0_8px_#38bdf8]"
             />
           );
         })}
@@ -121,33 +121,32 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
       {/* 2. Panning Deep Space Nebula Glow */}
       <motion.div
         animate={{
-          x: [-60, 60, -60],
-          y: [-40, 40, -40],
-          scale: [1, 1.2, 1],
-          opacity: [0.2, 0.4, 0.2]
+          x: [-40, 40, -40],
+          y: [-30, 30, -30],
+          scale: [1, 1.15, 1],
+          opacity: [0.2, 0.35, 0.2]
         }}
         transition={{
-          duration: 25,
+          duration: 20,
           repeat: Infinity,
           ease: 'easeInOut'
         }}
-        className="absolute w-[50rem] h-[50rem] rounded-full blur-[180px] pointer-events-none z-0"
+        className="absolute w-[45rem] h-[45rem] rounded-full blur-[160px] pointer-events-none z-0"
         style={{ backgroundColor: activeTenantPreview.brandColor || '#0284c7' }}
       />
 
       {/* 3. Traveling Moon in Deep Space Background */}
       <motion.div
         animate={{
-          y: [-15, 15, -15],
-          x: [-10, 10, -10],
-          rotate: [0, 360]
+          y: [-10, 10, -10],
+          x: [-8, 8, -8]
         }}
         transition={{
-          y: { duration: 8, repeat: Infinity, ease: 'easeInOut' },
-          x: { duration: 10, repeat: Infinity, ease: 'easeInOut' },
-          rotate: { duration: 180, repeat: Infinity, ease: 'linear' }
+          duration: 10,
+          repeat: Infinity,
+          ease: 'easeInOut'
         }}
-        className="absolute -bottom-28 -left-28 w-[32rem] h-[32rem] rounded-full bg-gradient-to-br from-slate-300 via-slate-600 to-slate-950 border border-slate-700/50 shadow-[inset_-30px_-30px_70px_rgba(0,0,0,0.95),0_0_50px_rgba(56,189,248,0.15)] pointer-events-none opacity-40 xl:opacity-80 z-0"
+        className="absolute -bottom-28 -left-28 w-[30rem] h-[30rem] rounded-full bg-gradient-to-br from-slate-300 via-slate-600 to-slate-950 border border-slate-700/50 shadow-[inset_-30px_-30px_70px_rgba(0,0,0,0.95),0_0_50px_rgba(56,189,248,0.15)] pointer-events-none opacity-40 xl:opacity-80 z-0"
       >
         {/* Dynamic Craters */}
         <div className="absolute top-16 left-28 w-16 h-16 rounded-full bg-slate-800/60 border border-slate-600/40 shadow-inner" />
@@ -158,14 +157,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
       {/* 4. Flying Spacecraft across the Screen */}
       <motion.div
         animate={{
-          x: ['-20vw', '120vw'],
-          y: ['80vh', '-20vh']
+          x: [-200, 1200],
+          y: [400, -200]
         }}
         transition={{
-          duration: 18,
+          duration: 16,
           repeat: Infinity,
           ease: 'linear',
-          delay: 2
+          delay: 1
         }}
         className="absolute z-0 pointer-events-none flex items-center gap-2 opacity-70"
       >
@@ -186,15 +185,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
           {/* Artemis Space Telemetry Badge */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-cyan-500/40 text-xs font-mono font-medium text-cyan-300 backdrop-blur-md shadow-[0_0_20px_rgba(6,182,212,0.2)]">
             <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-            <span>Quantum Cloud Corp.</span>
+            <span>{activeTenantPreview.companyName || 'BiDOCS Enterprise'}</span>
           </div>
 
           <div className="space-y-3">
             <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
-              Quantum <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-500">Cloud</span>
+              BiDOCS <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-500">Vault</span>
             </h1>
             <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
-              Philippine Public Bidding Management.
+              Philippine Public Bidding & Procurement Architect.
             </p>
           </div>
 
