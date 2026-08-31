@@ -180,29 +180,13 @@ export const getGrandTotalWithServicesDisplay = (itemList: ScheduleItem[], perce
 };
 
 const defaultDelivery = '30 Calendar Days upon receipt of NTP';
-const DEFAULT_SECTION_VI_ITEMS: ScheduleItem[] = [
+const BLANK_SECTION_VI_ITEMS: ScheduleItem[] = [
   {
     id: '1',
-    description: 'Enterprise Server Rack Systems with High-Availability Redundancy, Dual Hot-Swappable 1200W Power Supplies, Rail Kits, and 5-Year OEM On-Site Warranty Support',
-    quantity: '5 units',
-    unitAmount: 'PHP 500,000.00',
-    total: 'PHP 2,500,000.00',
-    delivered: defaultDelivery
-  },
-  {
-    id: '2',
-    description: 'Managed Layer 3 Core Network Switches (48-Port PoE+ 740W, 4x 10G SFP+ Uplinks, Stacking Module, Redundant Power Module, Advanced L3 Routing License)',
-    quantity: '10 units',
-    unitAmount: 'PHP 120,000.00',
-    total: 'PHP 1,200,000.00',
-    delivered: defaultDelivery
-  },
-  {
-    id: '3',
-    description: 'Uninterruptible Power Supply (UPS) 10kVA Online Double Conversion Tower/Rack Mountable with Extended Battery Module (EBM) and Network Management Card',
-    quantity: '4 units',
-    unitAmount: 'PHP 200,000.00',
-    total: 'PHP 800,000.00',
+    description: '',
+    quantity: '',
+    unitAmount: '',
+    total: '',
     delivered: defaultDelivery
   }
 ];
@@ -248,11 +232,11 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   const [signatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'President / General Manager');
 
   // Items State (Shared & Mirrored with Framework Agreement Page 1)
-  const [items, setItems] = useState<ScheduleItem[]>(DEFAULT_SECTION_VI_ITEMS);
+  const [items, setItems] = useState<ScheduleItem[]>(BLANK_SECTION_VI_ITEMS);
 
   // Editable Services / Logistics Layer State (Tax Inclusive)
-  const [servicesDescription, setServicesDescription] = useState<string>(DEFAULT_SERVICES_DESCRIPTION);
-  const [servicesPercentage, setServicesPercentage] = useState<number>(35);
+  const [servicesDescription, setServicesDescription] = useState<string>('');
+  const [servicesPercentage, setServicesPercentage] = useState<number>(0);
   const [servicesCustomAmount, setServicesCustomAmount] = useState<string>('');
 
   // Load real saved opportunity projects from Opportunity Finder
@@ -270,7 +254,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
         if (preferred.dateTimeSubmitted) {
           setDateTimeSubmitted(preferred.dateTimeSubmitted);
         }
-        setItems(DEFAULT_SECTION_VI_ITEMS);
       }
     } else {
       setSelectedOppId('');
@@ -278,20 +261,19 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       setSolicitationNumber('');
       setProjectTitle('');
       setProcuringEntity('');
-      setItems(DEFAULT_SECTION_VI_ITEMS);
     }
   }, [tenant?.id, activeProjectRefNo]);
 
   // Load shared Section VI data for current project
   useEffect(() => {
     if (!projectScopeKey) {
-      setItems(DEFAULT_SECTION_VI_ITEMS);
-      setServicesDescription(DEFAULT_SERVICES_DESCRIPTION);
-      setServicesPercentage(35);
+      setItems(BLANK_SECTION_VI_ITEMS);
+      setServicesDescription('');
+      setServicesPercentage(0);
       setServicesCustomAmount('');
       return;
     }
-    setItems(DEFAULT_SECTION_VI_ITEMS);
+    
     const storageKey = `bidocs_sec_vi_${tenant?.id || 'default'}_${projectScopeKey}`;
     const saved = localStorage.getItem(storageKey);
     if (saved) {
@@ -299,8 +281,14 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setItems(parsed);
+        } else {
+          setItems(BLANK_SECTION_VI_ITEMS);
         }
-      } catch (e) { }
+      } catch (e) {
+        setItems(BLANK_SECTION_VI_ITEMS);
+      }
+    } else {
+      setItems(BLANK_SECTION_VI_ITEMS);
     }
 
     const servicesKey = `bidocs_sec_vi_services_${tenant?.id || 'default'}_${projectScopeKey}`;
@@ -315,8 +303,8 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
         }
       } catch (e) {}
     } else {
-      setServicesDescription(DEFAULT_SERVICES_DESCRIPTION);
-      setServicesPercentage(35);
+      setServicesDescription('');
+      setServicesPercentage(0);
       setServicesCustomAmount('');
     }
   }, [projectScopeKey, tenant?.id]);
@@ -937,6 +925,10 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
             size: 8.5in 13in portrait;
             margin: 0.3in;
           }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .sticky {
             display: none !important;
           }
@@ -1146,7 +1138,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
         <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900 shrink-0 print:hidden no-export">
           <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Class A Technical Exhibit — Legal Landscape Standard (13" × 8.5")</span>
+            <span>Class A Technical Exhibit — Legal Portrait Standard (8.5" × 13")</span>
           </div>
 
           <div className="flex items-center gap-3">

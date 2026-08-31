@@ -2440,7 +2440,13 @@ export const DocumentVaultView: React.FC = () => {
                               <span>PDF</span>
                             </button>
                             <button
-                              onClick={() => setShowBidFormGoodsModal(true)}
+                              onClick={() => {
+                                if (existingDoc.documentCode === 'GPPB-BIDFORM-INFRASTRUCTURE') {
+                                  setShowBidFormInfraModal(true);
+                                } else {
+                                  setShowBidFormGoodsModal(true);
+                                }
+                              }}
                               className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
                               title="Re-edit or update"
                             >
@@ -2457,13 +2463,24 @@ export const DocumentVaultView: React.FC = () => {
                             </button>
                           </>
                         ) : (
-                          <button
-                            onClick={() => setShowBidFormGoodsModal(true)}
-                            className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow transition flex items-center justify-center gap-1"
-                          >
-                            <FileSignature className="w-3.5 h-3.5" />
-                            <span>Create Form</span>
-                          </button>
+                          <div className="grid grid-cols-2 gap-1.5 w-full">
+                            <button
+                              onClick={() => setShowBidFormGoodsModal(true)}
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center justify-center gap-1"
+                              title="Bid Form for Goods & General Support"
+                            >
+                              <FileSignature className="w-3.5 h-3.5" />
+                              <span>For Goods</span>
+                            </button>
+                            <button
+                              onClick={() => setShowBidFormInfraModal(true)}
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-950 bg-amber-500 hover:bg-amber-400 shadow transition flex items-center justify-center gap-1"
+                              title="Bid Form for Infrastructure Projects (GPPB Resolution 09-2020)"
+                            >
+                              <FileSignature className="w-3.5 h-3.5" />
+                              <span>For Infra</span>
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
+import { savePdfData } from '../../../utils/vaultIndexedDB';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
@@ -506,6 +507,18 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
           [{ title: `Price Schedule for ${projectCategory}`, formElement: elemArray }],
           fileName
         );
+      }
+      if (dataUrl) {
+        const tenantKey = tenant?.id || 'default';
+        const scopeKey = projectRefNo || selectedOppId || 'default';
+        try {
+          await savePdfData(`priceschedule_${tenantKey}_${scopeKey}`, dataUrl);
+          await savePdfData(`pricesched_${tenantKey}_${scopeKey}`, dataUrl);
+          if (selectedOppId) await savePdfData(`priceschedule_${tenantKey}_${selectedOppId}`, dataUrl);
+          if (projectRefNo) await savePdfData(`priceschedule_${tenantKey}_${projectRefNo}`, dataUrl);
+        } catch (dbErr) {
+          console.warn('[PriceSchedule] Failed to cache PDF in IndexedDB:', dbErr);
+        }
       }
       if (onSaveAndComplete) {
         onSaveAndComplete(dataUrl, `Price Schedule for ${projectCategory} - [${projectRefNo}]`, projectRefNo, projectTitle);

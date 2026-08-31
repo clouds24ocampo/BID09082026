@@ -181,32 +181,6 @@ export const getGrandTotalWithServicesDisplay = (itemList: ScheduleItem[], perce
 };
 
 const defaultDelivery = '30 Calendar Days upon receipt of NTP';
-const DEFAULT_SECTION_VI_ITEMS: ScheduleItem[] = [
-  {
-    id: '1',
-    description: 'Enterprise Server Rack Systems with High-Availability Redundancy, Dual Hot-Swappable 1200W Power Supplies, Rail Kits, and 5-Year OEM On-Site Warranty Support',
-    quantity: '5 units',
-    unitAmount: 'PHP 500,000.00',
-    total: 'PHP 2,500,000.00',
-    delivered: defaultDelivery
-  },
-  {
-    id: '2',
-    description: 'Managed Layer 3 Core Network Switches (48-Port PoE+ 740W, 4x 10G SFP+ Uplinks, Stacking Module, Redundant Power Module, Advanced L3 Routing License)',
-    quantity: '10 units',
-    unitAmount: 'PHP 120,000.00',
-    total: 'PHP 1,200,000.00',
-    delivered: defaultDelivery
-  },
-  {
-    id: '3',
-    description: 'Uninterruptible Power Supply (UPS) 10kVA Online Double Conversion Tower/Rack Mountable with Extended Battery Module (EBM) and Network Management Card',
-    quantity: '4 units',
-    unitAmount: 'PHP 200,000.00',
-    total: 'PHP 800,000.00',
-    delivered: defaultDelivery
-  }
-];
 
 interface PageRow {
   item: ScheduleItem;
@@ -829,6 +803,10 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             size: 8.5in 13in portrait;
             margin: 0.3in;
           }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .sticky {
             display: none !important;
           }
@@ -1063,7 +1041,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
         <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900 shrink-0 print:hidden no-export">
           <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Class A Legal Package — Framework Agreement List ({totalPages} {totalPages === 1 ? 'Page' : 'Pages'} • 13" × 8.5")</span>
+            <span>Class A Legal Package — Framework Agreement List ({totalPages} {totalPages === 1 ? 'Page' : 'Pages'} • Legal Portrait 8.5" × 13")</span>
           </div>
 
           <div className="flex items-center gap-3">

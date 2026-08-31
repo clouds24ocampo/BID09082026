@@ -140,34 +140,51 @@ export const BidPackageBuilderView: React.FC = () => {
   const projectCategory = (activeProject?.category || 'Infrastructure').toLowerCase();
   const projectScopeKey = projectRefNo || selectedOppId || 'default';
 
-  // Master Statutory Bidding Documents Checklist definitions
+  // Master Statutory Bidding Documents Checklist definitions (Strictly aligned with 1-17 Statutory Checklist Order)
   const statutoryDocsList: StatutoryDocDefinition[] = [
-    // Envelope 1: Legal & Eligibility Documents (Class A & B)
+    // 1. PhilGEPS Platinum Certificate of Registration
     { id: 'PHILGEPS_PLATINUM', name: 'PhilGEPS Platinum Certificate of Registration (Annex A)', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'PHILGEPS_PLATINUM', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
-    { id: 'SEC_DTI_REG', name: 'SEC / DTI Certificate of Business Registration', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'SEC_DTI_REG', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
-    { id: 'MAYORS_PERMIT', name: "Mayor's / Business Permit (Current Year)", category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'MAYORS_PERMIT', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
-    { id: 'TAX_CLEARANCE', name: 'BIR Tax Clearance Certificate for Bidding Purposes', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'TAX_CLEARANCE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+    // 2. Statement of All Ongoing Government & Private Contracts
+    { id: 'ONGOING_CONTRACTS', name: 'Statement of All Ongoing Government & Private Contracts', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'ONGOING_CONTRACTS', storageKey: `bidocs_ongoing_${tenantId}_${projectScopeKey}` },
+    // 3. Statement of Single Largest Completed Contract (SLCC)
+    { id: 'SLCC_STATEMENT', name: 'Statement of Single Largest Completed Contract (SLCC)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'SLCC_STATEMENT', storageKey: `bidocs_slcc_${tenantId}_${projectScopeKey}` },
+    // 4. Bid Securing Declaration / Bid Security or Surety Bond
+    { id: 'BID_SECURING_DECLARATION', name: 'Bid Securing Declaration / Bid Security or Surety Bond (BSD)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'BID_SECURING_DECLARATION' },
+    // 5. Section VI: Schedule of Requirements
+    { id: 'SECTION_VI_REQUIREMENTS', name: 'Section VI: Schedule of Requirements', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'SECTION_VI_REQUIREMENTS', storageKey: `bidocs_sec_vi_${tenantId}_${projectScopeKey}` },
+    // 6. Section VII: Technical Specifications Statement of Compliance
+    { id: 'TECH_SPECS_SECTION_VII', name: 'Section VII: Technical Specifications Statement of Compliance', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'TECH_SPECS_SECTION_VII', storageKey: `bidocs_tech_specs_${tenantId}_${projectScopeKey}` },
+    // 7. Delivery Schedule / Framework Agreement List
+    { id: 'DELIVERY_SCHEDULE', name: 'Delivery Schedule / Framework Agreement List', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'DELIVERY_SCHEDULE', storageKey: `bidocs_fal_${tenantId}_${projectScopeKey}` },
+    // 8. Organizational Chart, Manpower Requirements & Key Personnel
+    { id: 'ORGANIZATIONAL_CHART', name: 'Organizational Chart for the Contract to be Bid', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'ORGANIZATIONAL_CHART', storageKey: `bidocs_org_chart_${tenantId}_${projectScopeKey}` },
+    { id: 'KEY_PERSONNEL', name: 'Key Personnel Matrix, Bio-Data & PRC Certifications (Manpower Requirements)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'KEY_PERSONNEL', storageKey: `bidocs_personnel_${tenantId}_${projectScopeKey}` },
+    { id: 'MAJOR_EQUIPMENT', name: "Contractor's Major Equipment Utilization Matrix", category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'MAJOR_EQUIPMENT', storageKey: `bidocs_equipment_${tenantId}_${projectScopeKey}` },
+    // 9. After-Sales Services & Warranty Undertaking
+    { id: 'AFTERSALES_WARRANTY', name: 'After-Sales Services & Warranty Undertaking', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'AFTERSALES_WARRANTY', storageKey: `bidocs_aftersale_${tenantId}_${projectScopeKey}` },
+    // 10. Omnibus Sworn Statement (OSS)
+    { id: 'OMNIBUS_SWORN_STATEMENT', name: 'Omnibus Sworn Statement (OSS)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'OMNIBUS_SWORN_STATEMENT' },
+    // 11. Net Financial Contracting Capacity (NFCC) Computation
+    { id: 'NFCC_COMPUTATION', name: 'Net Financial Contracting Capacity (NFCC) Computation', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'NFCC_COMPUTATION', storageKey: `bidocs_nfcc_${tenantId}_${projectScopeKey}` },
+    // 12. Audited Financial Statements (AFS)
     { id: 'AUDITED_FS', name: 'Audited Financial Statements (AFS) stamped received by BIR', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'AUDITED_FS', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+    // 13. Mayor's / Business Permit (Current Year)
+    { id: 'MAYORS_PERMIT', name: "Mayor's / Business Permit (Current Year)", category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'MAYORS_PERMIT', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+    // 14. PCAB License and Special License
     { id: 'PCAB_LICENSE', name: 'PCAB License and Special License (for Infrastructure)', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'PCAB_LICENSE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
-    { id: 'SECRETARY_CERTIFICATE', name: "Secretary's Certificate / Board Resolution / Special Power of Attorney", category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'SECRETARY_CERTIFICATE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+    // 15. SEC / DTI Certificate of Business Registration
+    { id: 'SEC_DTI_REG', name: 'SEC / DTI Certificate of Business Registration', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'SEC_DTI_REG', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+    // 16. BIR Registration and Tax Clearance Certificate
+    { id: 'TAX_CLEARANCE', name: 'BIR Tax Clearance Certificate & BIR Registration', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'TAX_CLEARANCE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+    // 17. Secretary's Certificate / Board Resolution / SPA
+    { id: 'SECRETARY_CERTIFICATE', name: "Secretary's Certificate / Board Resolution / Special Power of Attorney (SPA)", category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'SECRETARY_CERTIFICATE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
     { id: 'JOINT_VENTURE_AGREEMENT', name: 'Joint Venture Agreement (JVA) / Class B Legal Documents', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'JOINT_VENTURE_AGREEMENT', vaultMatchCategory: 'ELIGIBILITY_CLASS_B' },
 
-    // Envelope 1: Technical Documents & Statements
-    { id: 'SLCC_STATEMENT', name: 'Statement of Single Largest Completed Contract (SLCC)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'SLCC_STATEMENT', storageKey: `bidocs_slcc_${tenantId}_${projectScopeKey}` },
-    { id: 'ONGOING_CONTRACTS', name: 'Statement of All Ongoing Government & Private Contracts', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'ONGOING_CONTRACTS', storageKey: `bidocs_ongoing_${tenantId}_${projectScopeKey}` },
-    { id: 'NFCC_COMPUTATION', name: 'Net Financial Contracting Capacity (NFCC) Computation', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'NFCC_COMPUTATION', storageKey: `bidocs_nfcc_${tenantId}_${projectScopeKey}` },
-    { id: 'SECTION_VI_REQUIREMENTS', name: 'Section VI: Schedule of Requirements & Delivery Timeline', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'SECTION_VI_REQUIREMENTS', storageKey: `bidocs_sec_vi_${tenantId}_${projectScopeKey}` },
-    { id: 'TECH_SPECS_SECTION_VII', name: 'Section VII: Technical Specifications Statement of Compliance', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'TECH_SPECS_SECTION_VII', storageKey: `bidocs_tech_specs_${tenantId}_${projectScopeKey}` },
-    { id: 'BID_SECURING_DECLARATION', name: 'Bid Securing Declaration (BSD)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'BID_SECURING_DECLARATION' },
-    { id: 'OMNIBUS_SWORN_STATEMENT', name: 'Omnibus Sworn Statement (OSS)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'OMNIBUS_SWORN_STATEMENT' },
-    { id: 'ORGANIZATIONAL_CHART', name: 'Organizational Chart for the Contract to be Bid', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'ORGANIZATIONAL_CHART', storageKey: `bidocs_org_chart_${tenantId}_${projectScopeKey}` },
-    { id: 'KEY_PERSONNEL', name: 'Key Personnel Matrix, Bio-Data & PRC Certifications', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'KEY_PERSONNEL', storageKey: `bidocs_personnel_${tenantId}_${projectScopeKey}` },
-    { id: 'MAJOR_EQUIPMENT', name: "Contractor's Major Equipment Utilization Matrix", category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'MAJOR_EQUIPMENT', storageKey: `bidocs_equipment_${tenantId}_${projectScopeKey}` },
-    { id: 'AFTERSALES_WARRANTY', name: 'After-Sales Services & Warranty Undertaking', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'AFTERSALES_WARRANTY', storageKey: `bidocs_aftersale_${tenantId}_${projectScopeKey}` },
-
     // Envelope 2: Financial Proposal Documents
-    { id: 'FINANCIAL_BID_FORM', name: 'Official Financial Bid Form (GPPB Standard Form)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'FINANCIAL_BID_FORM' },
-    { id: 'PRICE_SCHEDULE_GOODS', name: 'Detailed Price Schedule for Goods / BOQ Breakdown', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'PRICE_SCHEDULE_GOODS' },
+    { id: 'FINANCIAL_BID_FORM_GOODS', name: 'Official Financial Bid Form (for Goods & General Support)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'GPPB-BIDFORM-GOODS', storageKey: `bidocs_bidform_goods_${tenantId}_${projectScopeKey}` },
+    { id: 'FINANCIAL_BID_FORM_INFRA', name: 'Official Financial Bid Form (for Infrastructure Projects)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'GPPB-BIDFORM-INFRASTRUCTURE', storageKey: `bidocs_bidform_infra_${tenantId}_${projectScopeKey}` },
+    { id: 'PRICE_SCHEDULE_GOODS', name: 'Detailed Price Schedule for Goods (Offered from Abroad / Within Philippines)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'PRICE_SCHEDULE_GOODS', storageKey: `bidocs_pricesched_${tenantId}_${projectScopeKey}` },
+    { id: 'BILL_OF_QUANTITIES', name: 'Bill of Quantities (BOQ Breakdown)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'BILL_OF_QUANTITIES', storageKey: `bidocs_boq_${tenantId}_${projectScopeKey}` },
     { id: 'DETAILED_ESTIMATES_FORM_L', name: '(Form L) Detailed Estimates (Direct Labor, Logistics & Equipment)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'DETAILED_ESTIMATES_FORM_L', storageKey: `bidocs_detailed_estimates_${tenantId}_${projectScopeKey}` },
     { id: 'SUMMARY_BID_PRICES', name: 'Summary of Bid Prices & Lump-Sum Breakdown', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'SUMMARY_BID_PRICES', storageKey: `bidocs_summary_bid_price_${tenantId}_${projectScopeKey}` },
     { id: 'CASH_FLOW_BY_QUARTER', name: 'Cash Flow by Quarter and Payment Schedule (SF-INFR-56)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'CASH_FLOW_BY_QUARTER', storageKey: `bidocs_cash_flow_${tenantId}_${projectScopeKey}` }
@@ -382,11 +399,17 @@ export const BidPackageBuilderView: React.FC = () => {
       }
 
       // Financial Proposals Matching
-      if (doc.id === 'FINANCIAL_BID_FORM') {
-        return (vCode.includes('BIDFORM') || vName.includes('bid form')) && isForThisProject;
+      if (doc.id === 'FINANCIAL_BID_FORM_GOODS') {
+        return (vCode.includes('GOODS') || vName.includes('goods')) && (vCode.includes('BIDFORM') || vName.includes('bid form')) && isForThisProject;
+      }
+      if (doc.id === 'FINANCIAL_BID_FORM_INFRA') {
+        return (vCode.includes('INFRA') || vName.includes('infrastructure')) && (vCode.includes('BIDFORM') || vName.includes('bid form')) && isForThisProject;
       }
       if (doc.id === 'PRICE_SCHEDULE_GOODS') {
-        return (vCode.includes('PRICESCHED') || vCode.includes('BOQ') || vName.includes('price schedule') || vName.includes('bill of quantities') || vName.includes('boq')) && isForThisProject;
+        return (vCode.includes('PRICESCHED') || vCode.includes('PRICE-SCHEDULE') || vName.includes('price schedule')) && isForThisProject;
+      }
+      if (doc.id === 'BILL_OF_QUANTITIES') {
+        return (vCode.includes('BOQ') || vName.includes('bill of quantities') || vName.includes('boq')) && isForThisProject;
       }
       if (doc.id === 'DETAILED_ESTIMATES_FORM_L') {
         return (vCode.includes('DETAILED-ESTIMATES') || vName.includes('detailed estimate') || vName.includes('form l') || vName.includes('form (l)')) && isForThisProject;
@@ -415,7 +438,104 @@ export const BidPackageBuilderView: React.FC = () => {
     return { isReady: false };
   };
 
-  // Add selected completed statutory documents to ORIGINAL (Auto-replicated to COPY 1 & COPY 2)
+  // Master Document Checklist Rank Matcher (Strictly 1-17 Order for Envelope 1, followed by 18-24 for Envelope 2)
+  const getDocumentChecklistRank = (doc: PackageItem): number => {
+    const name = (doc.documentName || '').toLowerCase();
+    
+    // Check defined statutory list
+    const def = statutoryDocsList.find(
+      d => d.name.toLowerCase() === name || name.includes(d.name.toLowerCase()) || d.name.toLowerCase().includes(name)
+    );
+    if (def) {
+      const STATUTORY_ORDER_RANK: Record<string, number> = {
+        'PHILGEPS_PLATINUM': 1,
+        'ONGOING_CONTRACTS': 2,
+        'SLCC_STATEMENT': 3,
+        'BID_SECURING_DECLARATION': 4,
+        'SECTION_VI_REQUIREMENTS': 5,
+        'TECH_SPECS_SECTION_VII': 6,
+        'DELIVERY_SCHEDULE': 7,
+        'ORGANIZATIONAL_CHART': 8,
+        'KEY_PERSONNEL': 9,
+        'MAJOR_EQUIPMENT': 10,
+        'AFTERSALES_WARRANTY': 11,
+        'OMNIBUS_SWORN_STATEMENT': 12,
+        'NFCC_COMPUTATION': 13,
+        'AUDITED_FS': 14,
+        'MAYORS_PERMIT': 15,
+        'PCAB_LICENSE': 16,
+        'SEC_DTI_REG': 17,
+        'TAX_CLEARANCE': 18,
+        'SECRETARY_CERTIFICATE': 19,
+        'JOINT_VENTURE_AGREEMENT': 20,
+        'FINANCIAL_BID_FORM_GOODS': 21,
+        'FINANCIAL_BID_FORM_INFRA': 22,
+        'PRICE_SCHEDULE_GOODS': 23,
+        'BILL_OF_QUANTITIES': 24,
+        'DETAILED_ESTIMATES_FORM_L': 25,
+        'SUMMARY_BID_PRICES': 26,
+        'CASH_FLOW_BY_QUARTER': 27,
+      };
+      if (STATUTORY_ORDER_RANK[def.id]) {
+        return STATUTORY_ORDER_RANK[def.id];
+      }
+    }
+
+    // 1. PhilGEPS Platinum Certificate of Registration
+    if (name.includes('philgeps')) return 1;
+    // 2. Statement of All Ongoing Contracts
+    if (name.includes('ongoing')) return 2;
+    // 3. Statement of Single Largest Completed Contract (SLCC)
+    if (name.includes('slcc') || name.includes('single largest')) return 3;
+    // 4. Bid Security / BSD / Surety Bond
+    if (name.includes('bid secur') || name.includes('bsd') || name.includes('surety bond') || name.includes('bid security')) return 4;
+    // 5. Section 6: Schedule of Requirements
+    if (name.includes('section vi') || name.includes('section 6') || name.includes('schedule of requirements') || name.includes('schedule of req')) return 5;
+    // 6. Section 7: Technical Specifications Statement of Compliance
+    if (name.includes('section vii') || name.includes('section 7') || name.includes('technical specification') || name.includes('statement of compliance')) return 6;
+    // 7. Delivery Schedule / Framework Agreement List
+    if (name.includes('delivery schedule') || name.includes('framework agreement') || name.includes('delivery timeline') || name.includes('fal')) return 7;
+    // 8. Organizational Chart / Key Personnel / Manpower / Major Equipment
+    if (name.includes('organizational chart') || name.includes('org chart')) return 8;
+    if (name.includes('key personnel') || name.includes('manpower') || name.includes('bio-data') || name.includes('prc')) return 9;
+    if (name.includes('major equipment') || name.includes('equipment utilization') || name.includes('equipment matrix')) return 10;
+    // 9. After Sales Services & Warranty
+    if (name.includes('after-sale') || name.includes('aftersale') || name.includes('warranty')) return 11;
+    // 10. Omnibus Sworn Statement (OSS)
+    if (name.includes('omnibus') || name.includes('oss')) return 12;
+    // 11. Net Financial Contracting Capacity (NFCC)
+    if (name.includes('nfcc') || name.includes('contracting capacity')) return 13;
+    // 12. Audited Financial Statements (AFS)
+    if (name.includes('audited') || name.includes('afs') || name.includes('financial statement')) return 14;
+    // 13. Mayor's / Business Permit
+    if (name.includes('mayor') || name.includes('business permit') || name.includes('barangay business')) return 15;
+    // 14. PCAB License
+    if (name.includes('pcab')) return 16;
+    // 15. Securities and Exchange Commission (SEC) / DTI
+    if (name.includes('sec ') || name.includes('dti') || name.includes('securities and exchange') || name.includes('certificate of business registration') || name.includes('sec/dti')) return 17;
+    // 16. BIR Registration and Tax Clearance
+    if (name.includes('tax clearance') || name.includes('bir registration') || name.includes('bir tax') || name.includes('tax')) return 18;
+    // 17. Secretary's Certificate / Board Resolution / Special Power of Attorney (SPA)
+    if (name.includes('secretary') || name.includes('board resolution') || name.includes('special power of attorney') || name.includes('spa')) return 19;
+    if (name.includes('joint venture') || name.includes('jva')) return 20;
+
+    // Envelope 2: Financial Proposal Items
+    if (name.includes('bid form') && (name.includes('goods') || name.includes('supply'))) return 21;
+    if (name.includes('bid form') && (name.includes('infra') || name.includes('civil works'))) return 22;
+    if (name.includes('bid form') || name.includes('financial proposal')) return 21;
+    if (name.includes('price schedule')) return 23;
+    if (name.includes('bill of quantities') || name.includes('boq')) return 24;
+    if (name.includes('detailed estimate') || name.includes('form l') || name.includes('form (l)')) return 25;
+    if (name.includes('summary of bid') || name.includes('summary bid')) return 26;
+    if (name.includes('cash flow') || name.includes('sf-infr-56')) return 27;
+
+    if (doc.category === 'LEGAL') return 16;
+    if (doc.category === 'TECHNICAL') return 8;
+    if (doc.category === 'FINANCIAL') return 22;
+    return 50;
+  };
+
+  // Add selected completed statutory documents to ORIGINAL (Auto-replicated to COPY 1 & COPY 2 in 1-17 checklist sequence)
   const handleAddSelectedCompletedDocs = () => {
     if (selectedDocIdsToAdd.length === 0) return;
 
@@ -447,7 +567,14 @@ export const BidPackageBuilderView: React.FC = () => {
       }
     });
 
-    savePackageItems(originalItems);
+    // Automatically organize active envelope items into the 1-17 Statutory Checklist sequence
+    const activeEnvelopeSorted = originalItems
+      .filter(i => i.envelope === activeEnvelope)
+      .sort((a, b) => getDocumentChecklistRank(a) - getDocumentChecklistRank(b));
+    
+    const otherEnvelopeItems = originalItems.filter(i => i.envelope !== activeEnvelope);
+
+    savePackageItems([...otherEnvelopeItems, ...activeEnvelopeSorted]);
     setSelectedDocIdsToAdd([]);
     setShowAddCompletedModal(false);
     setShowAutoSyncSuccess(true);
@@ -589,6 +716,26 @@ export const BidPackageBuilderView: React.FC = () => {
     savePackageItems([...otherOriginalDocs, ...reordered]);
   };
 
+  // Instant 1-Click Action: Organize current folder documents according to the 17-item statutory checklist order
+  const handleOrganizeDirectlyByChecklist = () => {
+    const currentFolderDocs = packageItems.filter(
+      item => item.folderCopy === 'ORIGINAL' && item.envelope === activeEnvelope
+    );
+    const otherOriginalDocs = packageItems.filter(
+      item => item.folderCopy === 'ORIGINAL' && item.envelope !== activeEnvelope
+    );
+
+    if (currentFolderDocs.length === 0) return;
+
+    const sortedCurrent = [...currentFolderDocs].sort(
+      (a, b) => getDocumentChecklistRank(a) - getDocumentChecklistRank(b)
+    );
+
+    savePackageItems([...otherOriginalDocs, ...sortedCurrent]);
+    setShowAutoSyncSuccess(true);
+    setTimeout(() => setShowAutoSyncSuccess(false), 3500);
+  };
+
   // Open Reorganize Modal for active envelope
   const handleOpenReorderModal = () => {
     const currentFolderDocs = packageItems.filter(
@@ -611,48 +758,11 @@ export const BidPackageBuilderView: React.FC = () => {
     setShowReorderModal(false);
   };
 
-  // Auto-sort by Philippine Statutory Order (Class A -> Class B -> Technical -> Financial)
+  // Auto-sort by Philippine Statutory Checklist Order (1–17 sequence)
   const handleAutoSortStatutory = () => {
-    const STATUTORY_ORDER_RANK: Record<string, number> = {
-      'PHILGEPS_PLATINUM': 1,
-      'SEC_DTI_REG': 2,
-      'MAYORS_PERMIT': 3,
-      'TAX_CLEARANCE': 4,
-      'AUDITED_FS': 5,
-      'PCAB_LICENSE': 6,
-      'SECRETARY_CERTIFICATE': 7,
-      'JOINT_VENTURE_AGREEMENT': 8,
-      'SLCC_STATEMENT': 9,
-      'ONGOING_CONTRACTS': 10,
-      'NFCC_COMPUTATION': 11,
-      'SECTION_VI_REQUIREMENTS': 12,
-      'TECH_SPECS_SECTION_VII': 13,
-      'BID_SECURING_DECLARATION': 14,
-      'OMNIBUS_SWORN_STATEMENT': 15,
-      'ORGANIZATIONAL_CHART': 16,
-      'KEY_PERSONNEL': 17,
-      'MAJOR_EQUIPMENT': 18,
-      'AFTERSALES_WARRANTY': 19,
-      'FINANCIAL_BID_FORM': 20,
-      'PRICE_SCHEDULE_GOODS': 21,
-      'DETAILED_ESTIMATES_FORM_L': 22,
-      'SUMMARY_BID_PRICES': 23,
-      'CASH_FLOW_BY_QUARTER': 24,
-    };
-
-    const getRank = (doc: PackageItem) => {
-      const name = doc.documentName.toLowerCase();
-      const def = statutoryDocsList.find(d => d.name.toLowerCase() === name || name.includes(d.name.toLowerCase()));
-      if (def && STATUTORY_ORDER_RANK[def.id]) {
-        return STATUTORY_ORDER_RANK[def.id];
-      }
-      if (doc.category === 'LEGAL') return 5;
-      if (doc.category === 'TECHNICAL') return 15;
-      if (doc.category === 'FINANCIAL') return 25;
-      return 50;
-    };
-
-    const sorted = [...reorderList].sort((a, b) => getRank(a) - getRank(b));
+    const sorted = [...reorderList].sort(
+      (a, b) => getDocumentChecklistRank(a) - getDocumentChecklistRank(b)
+    );
     setReorderList(sorted);
   };
 
@@ -783,8 +893,11 @@ export const BidPackageBuilderView: React.FC = () => {
       `bsd_${tenantId}_${projectScopeKey}`,
       `oss_${tenantId}_${projectScopeKey}`,
       `priceschedule_${tenantId}_${projectScopeKey}`,
+      `pricesched_${tenantId}_${projectScopeKey}`,
+      `priceschedule_${tenantId}_${projectRefNo}`,
       `bidform_${tenantId}_${projectScopeKey}`,
       `boq_${tenantId}_${projectScopeKey}`,
+      `boq_${tenantId}_${projectRefNo}`,
       `estimates_${tenantId}_${projectScopeKey}`,
       `cashflow_${tenantId}_${projectScopeKey}`,
       `summarybid_${tenantId}_${projectScopeKey}`
@@ -1238,6 +1351,17 @@ export const BidPackageBuilderView: React.FC = () => {
               >
                 <Plus className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Custom Doc</span>
+              </button>
+
+              {/* 1-Click Instant Organize by Checklist */}
+              <button
+                onClick={handleOrganizeDirectlyByChecklist}
+                disabled={filteredItems.length <= 1}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/40 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1.5 shadow cursor-pointer"
+                title="Automatically organize all documents in this folder according to the standard 17-item Philippine Statutory Checklist"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Organize by Checklist</span>
               </button>
 
               {/* Reorganize & Reorder Sequence Button */}
@@ -1842,23 +1966,61 @@ export const BidPackageBuilderView: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* 2. ENVELOPE COVER PAGE MODAL (ENVELOPE 1 OR ENVELOPE 2 OUTER COVER)         */}
+      {/* 2. ENVELOPE COVER PAGE MODAL (ENVELOPE 1 OR ENVELOPE 2 OUTER COVER - LANDSCAPE) */}
       {/* ========================================================================= */}
       {showEnvelopeCoverModal && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white">
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-6xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white">
+            <style>{`
+              @media print {
+                @page {
+                  size: 13in 8.5in landscape;
+                  margin: 0.25in;
+                }
+                * {
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+                header, nav, aside, button, .print\\:hidden, .no-print, .no-export {
+                  display: none !important;
+                }
+                html, body, #root, .fixed, .backdrop-blur-md, .bg-slate-900, .bg-slate-950 {
+                  position: static !important;
+                  background: #ffffff !important;
+                  color: #000000 !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  width: 100% !important;
+                  height: auto !important;
+                  overflow: visible !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                }
+                .landscape-envelope-cover {
+                  box-shadow: none !important;
+                  border: 3px solid #000000 !important;
+                  margin: 0 auto !important;
+                  padding: 0.35in !important;
+                  width: 13in !important;
+                  min-height: 8.5in !important;
+                  box-sizing: border-box !important;
+                  page-break-after: avoid !important;
+                }
+              }
+            `}</style>
+
             <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 print:hidden">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-blue-400" />
-                <span>Envelope Cover Page — {activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1 (Technical & Eligibility)' : 'Envelope 2 (Financial Component)'}</span>
+                <span>Envelope Outer Cover Label (Landscape Legal 13" × 8.5") — {activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1 (Technical & Eligibility)' : 'Envelope 2 (Financial Component)'}</span>
               </h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 cursor-pointer shadow"
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 cursor-pointer shadow"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print Envelope Cover</span>
+                  <span>Print Landscape Cover</span>
                 </button>
                 <button onClick={() => setShowEnvelopeCoverModal(false)} className="text-slate-400 hover:text-white p-1">
                   <X className="w-5 h-5" />
@@ -1866,86 +2028,131 @@ export const BidPackageBuilderView: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 bg-slate-950 flex justify-center print:p-0 print:bg-white">
-              <div className="w-[8.5in] min-h-[13in] bg-white text-black p-10 shadow-2xl border-4 border-black flex flex-col justify-between font-serif print:shadow-none print:border-2 print:p-8">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-950 flex justify-center print:p-0 print:bg-white">
+              <div className="landscape-envelope-cover w-[13in] max-w-[1200px] min-h-[780px] aspect-[13/8.5] bg-white text-black p-6 sm:p-8 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 box-border">
                 
-                {/* Header: Bidder Details */}
-                <div className="text-center border-b-2 border-black pb-6 space-y-1">
-                  <h1 className="text-2xl font-black uppercase tracking-wider text-black">
+                {/* Inner Frame */}
+                <div className="absolute inset-2.5 border-2 border-black rounded-xl pointer-events-none" />
+
+                {/* TOP HEADER: Bidder Corporate Info */}
+                <div className="text-center border-b-2 border-black pb-2.5 space-y-0.5 relative z-10">
+                  <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide text-black leading-tight">
                     {currentTenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}
                   </h1>
-                  <p className="text-xs text-slate-700">
-                    {currentTenant?.address || 'Metro Manila, Philippines'} • TIN: {currentTenant?.tin || '000-000-000-000'}
+                  <p className="text-xs text-slate-700 font-medium">
+                    {currentTenant?.address || 'Metro Manila, Philippines'} • TIN: <span className="font-mono font-bold">{currentTenant?.tin || '000-000-000-000'}</span> • PhilGEPS Reg. No.: <span className="font-bold text-blue-950">{currentTenant?.philgepsPlatinumNo || 'PLAT-2026-ACTIVE'}</span>
                   </p>
                 </div>
 
-                {/* Center Addressee */}
-                <div className="my-auto space-y-8 text-center py-6">
-                  <div className="space-y-1">
-                    <p className="text-xs sm:text-sm uppercase font-mono font-black tracking-widest text-slate-600">SUBMITTED TO:</p>
-                    <h2 className="text-2xl sm:text-3xl font-black uppercase text-blue-950 tracking-tight leading-tight">
-                      THE BIDS AND AWARDS COMMITTEE (BAC)
-                    </h2>
-                    <h3 className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-wide">
-                      {procuringEntity}
-                    </h3>
-                  </div>
+                {/* MIDDLE SECTION: 2-Column Grid */}
+                <div className="grid grid-cols-12 gap-4 my-2 relative z-10">
+                  
+                  {/* Left Column (5 cols): Addressee & Envelope Breakdown */}
+                  <div className="col-span-5 space-y-3">
+                    <div className="p-3 border-2 border-black bg-slate-50 rounded-xl space-y-1 text-left">
+                      <p className="text-[10px] uppercase font-mono font-black tracking-widest text-slate-600">SUBMITTED TO:</p>
+                      <h2 className="text-lg font-black uppercase text-blue-950 leading-tight">
+                        THE BIDS AND AWARDS COMMITTEE (BAC)
+                      </h2>
+                      <h3 className="text-sm font-black text-slate-900 uppercase">
+                        {procuringEntity}
+                      </h3>
+                    </div>
 
-                  {/* Project Info Block */}
-                  <div className="border-2 border-black p-6 bg-slate-50 space-y-3 max-w-xl mx-auto text-left">
-                    <p className="text-xs font-bold text-slate-500 uppercase">Project Title:</p>
-                    <p className="text-base font-black text-black uppercase leading-tight">
-                      {projectTitle || 'INFRASTRUCTURE & IT MODERNIZATION PROJECT'}
-                    </p>
-                    <div className="pt-2 border-t border-slate-300 flex justify-between text-xs font-mono">
-                      <span>Ref No: <strong>{projectRefNo || 'PhilGEPS-2026-001'}</strong></span>
-                      <span>ABC: <strong>{activeProject?.abc || '₱0.00'}</strong></span>
+                    <div className="p-3 border-2 border-slate-900 bg-slate-100 rounded-xl text-left space-y-1 font-sans text-xs">
+                      <p className="font-black text-black uppercase border-b border-slate-400 pb-1 text-[11px]">
+                        📦 INCLUDED FOLDERS IN THIS ENVELOPE:
+                      </p>
+                      <ul className="text-[11px] text-slate-800 space-y-0.5 pt-0.5 font-medium">
+                        <li>• <strong>Original Copy</strong> ({activeEnvelope === 'ENVELOPE_1' ? 'Technical & Legal' : 'Financial'})</li>
+                        <li>• <strong>Copy 1</strong> (First Certified True Duplicate Copy)</li>
+                        <li>• <strong>Copy 2</strong> (Second Certified True Triplicate Copy)</li>
+                      </ul>
                     </div>
                   </div>
 
-                  {/* Large Envelope Marking */}
-                  <div className="p-5 border-4 border-black bg-black text-white font-mono font-black text-xl uppercase tracking-widest">
-                    {activeEnvelope === 'ENVELOPE_1' 
-                      ? 'ENVELOPE NO. 1: TECHNICAL & ELIGIBILITY COMPONENT'
-                      : 'ENVELOPE NO. 2: FINANCIAL BID PROPOSAL COMPONENT'}
-                  </div>
+                  {/* Right Column (7 cols): Full Project Details, Envelope Title, and Warning */}
+                  <div className="col-span-7 space-y-2.5 text-left">
+                    
+                    {/* Project Details Box */}
+                    <div className="border-2 border-black p-3.5 bg-slate-50 rounded-xl space-y-2">
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">Project Title / Description:</span>
+                        <p className="text-sm font-black text-black uppercase leading-tight">
+                          {projectTitle || 'INFRASTRUCTURE & IT MODERNIZATION PROJECT'}
+                        </p>
+                      </div>
 
-                  {/* Included Copies Notation */}
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Contains 3 Folders: Original Copy, Copy 1 (Duplicate), Copy 2 (Triplicate)
-                  </div>
-
-                  {/* Warning Box */}
-                  <div className="p-4 border-2 border-dashed border-red-600 text-red-700 font-bold text-sm uppercase">
-                    WARNING: DO NOT OPEN BEFORE BID OPENING DATE & TIME
-                    <div className="text-xs font-mono text-black mt-1 font-normal">
-                      Submission Deadline: <strong>{submissionDeadline}</strong>
+                      <div className="pt-2 border-t border-slate-300 grid grid-cols-3 gap-2 text-xs font-mono">
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block uppercase font-bold">PhilGEPS Ref No.</span>
+                          <strong className="text-blue-950 font-black truncate block">{projectRefNo || 'PhilGEPS-2026-001'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Solicitation No.</span>
+                          <strong className="text-blue-950 font-black truncate block">{activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Approved Budget (ABC)</span>
+                          <strong className="text-emerald-800 font-black block">{activeProject?.abc || '₱12,500,000.00'}</strong>
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Large Envelope Identifier */}
+                    <div className="p-3 border-4 border-black bg-black text-white text-center rounded-xl space-y-0.5 shadow-md">
+                      <div className="font-mono font-black text-base uppercase tracking-wider text-amber-300">
+                        {activeEnvelope === 'ENVELOPE_1' 
+                          ? 'ENVELOPE NO. 1: TECHNICAL & ELIGIBILITY COMPONENT'
+                          : 'ENVELOPE NO. 2: FINANCIAL BID PROPOSAL COMPONENT'}
+                      </div>
+                      <div className="text-[10px] font-sans font-semibold text-slate-200 uppercase">
+                        Official Sealed Envelope Submission pursuant to RA 12009 / RA 9184
+                      </div>
+                    </div>
+
+                    {/* Prominent Red Warning Box */}
+                    <div className="p-2.5 border-2 border-red-600 bg-red-50 text-center rounded-xl space-y-0.5">
+                      <h4 className="text-xs sm:text-sm font-black text-red-600 uppercase tracking-wide leading-tight">
+                        ⚠️ WARNING: DO NOT OPEN BEFORE SCHEDULED BID OPENING DATE & TIME!
+                      </h4>
+                      <p className="text-[11px] font-black text-red-900 font-mono uppercase">
+                        SCHEDULED BID OPENING: <span className="bg-red-600 text-white px-2 py-0.2 rounded font-black">{submissionDeadline}</span>
+                      </p>
+                    </div>
+
                   </div>
+
                 </div>
 
-                {/* Footer: QR Code & Verification */}
-                <div className="border-t-2 border-black pt-6 flex items-center justify-between">
-                  <div className="space-y-1 text-left">
-                    <p className="text-xs font-bold uppercase">Authorized Managing Officer:</p>
-                    <p className="text-sm font-black uppercase underline">{currentTenant?.authorizedSignatory?.name || 'CLOUD OCAMPO'}</p>
-                    <p className="text-xs text-slate-600">{currentTenant?.authorizedSignatory?.title || 'President'}</p>
+                {/* BOTTOM FOOTER: Signatory & QR Code */}
+                <div className="border-t-2 border-black pt-2 flex items-center justify-between relative z-10 text-xs">
+                  <div className="space-y-0.5 text-left">
+                    <p className="text-[9.5px] font-mono font-bold uppercase text-slate-600">Authorized Managing Officer / Bidder Signatory:</p>
+                    <p className="text-sm font-black uppercase text-black underline tracking-wide">
+                      {currentTenant?.authorizedSignatory?.name || 'AUTHORIZED MANAGING OFFICER'}
+                    </p>
+                    <p className="text-[10.5px] text-slate-700 font-medium">
+                      {currentTenant?.authorizedSignatory?.title || 'President & Authorized Signatory'}
+                    </p>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="text-right text-[10px] font-mono text-slate-600">
-                      <div>Official Submission QR</div>
-                      <div className="font-bold">{projectRefNo}</div>
+                    <div className="text-right text-[9.5px] font-mono text-slate-600">
+                      <div className="font-bold text-black">Official Submission QR</div>
+                      <div>{projectRefNo || 'PhilGEPS-2026-001'}</div>
                     </div>
                     <DocumentQrCode
                       details={{
-                        documentNumber: projectRefNo,
+                        documentNumber: projectRefNo || 'PhilGEPS-2026-001',
                         documentName: activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1 Technical Outer Cover' : 'Envelope 2 Financial Outer Cover',
                         projectName: projectTitle,
-                        dateTimeSubmitted: submissionDeadline
+                        dateTimeSubmitted: submissionDeadline,
+                        companyName: currentTenant?.companyName,
+                        solicitationNo: activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'
                       }}
-                      size={80}
-                      className="border border-black p-1 bg-white"
+                      size={65}
+                      className="border-2 border-black p-0.5 bg-white shrink-0"
                     />
                   </div>
                 </div>
@@ -1957,20 +2164,58 @@ export const BidPackageBuilderView: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* 3. FOLDER COVER PAGE MODAL (ORIGINAL / COPY 1 / COPY 2 FOR TECH OR FIN)    */}
+      {/* 3. FOLDER COVER PAGE MODAL (ORIGINAL / COPY 1 / COPY 2 - LANDSCAPE)        */}
       {/* ========================================================================= */}
       {showFolderCoverModal && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white">
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-6xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white">
+            <style>{`
+              @media print {
+                @page {
+                  size: 13in 8.5in landscape;
+                  margin: 0.25in;
+                }
+                * {
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+                header, nav, aside, button, .print\\:hidden, .no-print, .no-export {
+                  display: none !important;
+                }
+                html, body, #root, .fixed, .backdrop-blur-md, .bg-slate-900, .bg-slate-950 {
+                  position: static !important;
+                  background: #ffffff !important;
+                  color: #000000 !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  width: 100% !important;
+                  height: auto !important;
+                  overflow: visible !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                }
+                .landscape-folder-cover {
+                  box-shadow: none !important;
+                  border: 3px solid #000000 !important;
+                  margin: 0 auto !important;
+                  padding: 0.35in !important;
+                  width: 13in !important;
+                  min-height: 8.5in !important;
+                  box-sizing: border-box !important;
+                  page-break-after: avoid !important;
+                }
+              }
+            `}</style>
+
             <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 print:hidden">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Folder className="w-4 h-4 text-emerald-400" />
-                <span>Folder Cover Page — {activeFolderCopy} ({activeEnvelope === 'ENVELOPE_1' ? 'Technical' : 'Financial'})</span>
+                <span>Folder Cover Page (Landscape Legal 13" × 8.5") — {activeFolderCopy} ({activeEnvelope === 'ENVELOPE_1' ? 'Technical' : 'Financial'})</span>
               </h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 cursor-pointer shadow"
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 cursor-pointer shadow"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   <span>Print Folder Cover</span>
@@ -1981,93 +2226,144 @@ export const BidPackageBuilderView: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 bg-slate-950 flex justify-center print:p-0 print:bg-white">
-              <div className="w-[8.5in] min-h-[13in] bg-white text-black p-10 shadow-2xl border-4 border-black flex flex-col justify-between font-serif print:shadow-none print:border-2 print:p-8">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-950 flex justify-center print:p-0 print:bg-white">
+              <div className="landscape-folder-cover w-[13in] max-w-[1200px] min-h-[780px] aspect-[13/8.5] bg-white text-black p-6 sm:p-8 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 box-border">
                 
+                {/* Inner Frame */}
+                <div className="absolute inset-2.5 border-2 border-black rounded-xl pointer-events-none" />
+
                 {/* Header */}
-                <div className="text-center border-b-2 border-black pb-4 space-y-1">
-                  <h1 className="text-xl font-black uppercase tracking-wider text-black">
+                <div className="text-center border-b-2 border-black pb-2 space-y-0.5 relative z-10">
+                  <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide text-black">
                     {currentTenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}
                   </h1>
-                  <p className="text-xs text-slate-700">
-                    Republic of the Philippines • RA 12009 NGPA & RA 9184 Standard Submission
+                  <p className="text-xs text-slate-700 font-medium">
+                    {currentTenant?.address || 'Metro Manila, Philippines'} • TIN: <span className="font-mono font-bold">{currentTenant?.tin || '000-000-000-000'}</span> • PhilGEPS Platinum: <span className="font-bold text-blue-950">{currentTenant?.philgepsPlatinumNo || 'PLAT-2026-ACTIVE'}</span>
                   </p>
                 </div>
 
-                {/* Folder Title Marking */}
-                <div className="text-center space-y-4 my-4">
-                  <div className="inline-block border-4 border-black px-8 py-3 bg-slate-100 font-mono font-black text-2xl uppercase tracking-widest text-black">
-                    {activeFolderCopy}
+                {/* Main 2-Column Section */}
+                <div className="grid grid-cols-12 gap-4 my-2 relative z-10 flex-1">
+                  
+                  {/* Left Column: Project Details & Folder Badge */}
+                  <div className="col-span-5 space-y-2.5 text-left">
+                    <div className="p-3 border-2 border-black bg-slate-50 rounded-xl space-y-1.5">
+                      <p className="text-[10px] uppercase font-mono font-black text-slate-500">SUBMITTED TO:</p>
+                      <h3 className="text-sm font-black uppercase text-blue-950 leading-tight">
+                        THE BIDS AND AWARDS COMMITTEE
+                      </h3>
+                      <p className="text-xs font-bold text-slate-800 uppercase">{procuringEntity}</p>
+                    </div>
+
+                    <div className="p-3 border-2 border-black bg-slate-50 rounded-xl space-y-1.5">
+                      <div>
+                        <span className="text-[9.5px] font-mono font-bold text-slate-500 uppercase block">Project Title:</span>
+                        <p className="text-xs font-black text-black uppercase leading-tight">{projectTitle}</p>
+                      </div>
+                      <div className="pt-1.5 border-t border-slate-300 grid grid-cols-2 gap-1 text-[11px] font-mono">
+                        <div>
+                          <span className="text-[9px] text-slate-500 block uppercase">PhilGEPS Ref:</span>
+                          <strong className="text-blue-950 font-bold">{projectRefNo}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-slate-500 block uppercase">ABC:</span>
+                          <strong className="text-emerald-800 font-bold">{activeProject?.abc || '₱0.00'}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Folder Badge */}
+                    <div className="p-3 border-3 border-black bg-slate-900 text-white rounded-xl text-center space-y-0.5">
+                      <div className="font-mono font-black text-lg text-amber-300 uppercase tracking-widest">
+                        {activeFolderCopy}
+                      </div>
+                      <div className="text-[10px] font-bold text-slate-200 uppercase">
+                        {activeEnvelope === 'ENVELOPE_1' ? 'ELIGIBILITY & TECHNICAL COMPONENT' : 'FINANCIAL BID PROPOSAL'}
+                      </div>
+                    </div>
                   </div>
 
-                  <h2 className="text-lg font-black uppercase text-slate-900">
-                    {activeEnvelope === 'ENVELOPE_1' 
-                      ? 'ELIGIBILITY & TECHNICAL COMPONENT FOLDER'
-                      : 'FINANCIAL BID PROPOSAL FOLDER'}
-                  </h2>
+                  {/* Right Column: Table of Contents Matrix */}
+                  <div className="col-span-7 flex flex-col justify-between text-left">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                        Table of Contents / Documents Included in this {activeFolderCopy} Folder:
+                      </p>
 
-                  <div className="text-xs border-y border-black py-2 font-mono flex justify-between max-w-lg mx-auto">
-                    <span>Target Ref: <strong>{projectRefNo}</strong></span>
-                    <span>Submission Date: <strong>{submissionDeadline}</strong></span>
-                  </div>
-                </div>
-
-                {/* Folder Checklist Matrix Table */}
-                <div className="space-y-2 flex-1 my-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Table of Contents / Documents Included in this {activeFolderCopy} Folder:
-                  </p>
-
-                  <div className="border border-black overflow-hidden">
-                    <table className="w-full text-left text-xs border-collapse font-sans">
-                      <thead>
-                        <tr className="bg-slate-900 text-white font-mono font-bold">
-                          <th className="p-2 border-r border-slate-700 w-12 text-center">#</th>
-                          <th className="p-2 border-r border-slate-700">Document Title / Specification</th>
-                          <th className="p-2 border-r border-slate-700 w-24 text-center">Category</th>
-                          <th className="p-2 w-20 text-center">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {currentFolderItems.length === 0 ? (
-                          <tr>
-                            <td colSpan={4} className="p-6 text-center text-slate-400 italic">
-                              (No documents attached to this folder yet)
-                            </td>
-                          </tr>
-                        ) : (
-                          currentFolderItems.map((item, idx) => (
-                            <tr key={item.id} className="border-t border-black hover:bg-slate-50">
-                              <td className="p-2 border-r border-black text-center font-mono font-bold">{idx + 1}</td>
-                              <td className="p-2 border-r border-black font-semibold">{item.documentName}</td>
-                              <td className="p-2 border-r border-black text-center font-mono text-[10px]">{item.category}</td>
-                              <td className="p-2 text-center font-bold text-emerald-700 text-[10px]">PRESENT</td>
+                      <div className="border-2 border-black overflow-hidden rounded-lg">
+                        <table className="w-full text-left text-xs border-collapse font-sans">
+                          <thead>
+                            <tr className="bg-black text-white font-mono font-bold text-[10px]">
+                              <th className="p-1.5 border-r border-slate-700 w-10 text-center">#</th>
+                              <th className="p-1.5 border-r border-slate-700">Document Title / Specification</th>
+                              <th className="p-1.5 border-r border-slate-700 w-24 text-center">Category</th>
+                              <th className="p-1.5 w-16 text-center">Status</th>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
+                          </thead>
+                          <tbody>
+                            {currentFolderItems.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="p-4 text-center text-slate-400 italic text-xs">
+                                  (No documents attached to this folder yet)
+                                </td>
+                              </tr>
+                            ) : (
+                              currentFolderItems.slice(0, 10).map((item, idx) => (
+                                <tr key={item.id} className="border-t border-slate-300 hover:bg-slate-50 text-[10.5px]">
+                                  <td className="p-1 border-r border-slate-300 text-center font-mono font-bold">{idx + 1}</td>
+                                  <td className="p-1 border-r border-slate-300 font-semibold truncate max-w-[280px]">{item.documentName}</td>
+                                  <td className="p-1 border-r border-slate-300 text-center font-mono text-[9.5px]">{item.category}</td>
+                                  <td className="p-1 text-center font-bold text-emerald-700 text-[9.5px]">PRESENT</td>
+                                </tr>
+                              ))
+                            )}
+                            {currentFolderItems.length > 10 && (
+                              <tr className="border-t border-slate-300 bg-slate-50 text-[10px] italic text-slate-600">
+                                <td colSpan={4} className="p-1 text-center">
+                                  + and {currentFolderItems.length - 10} more documents in this folder
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="p-2 border border-red-500 bg-red-50 rounded-lg text-center mt-2">
+                      <p className="text-[10px] font-bold text-red-800 uppercase">
+                        Scheduled Bid Opening Deadline: <span className="font-black underline">{submissionDeadline}</span>
+                      </p>
+                    </div>
                   </div>
+
                 </div>
 
                 {/* Footer */}
-                <div className="border-t-2 border-black pt-4 flex items-center justify-between">
-                  <div className="space-y-1 text-left">
-                    <p className="text-xs font-bold uppercase">Certified Complete & Authentic By:</p>
-                    <p className="text-sm font-black uppercase underline">{currentTenant?.authorizedSignatory?.name || 'CLOUD OCAMPO'}</p>
-                    <p className="text-xs text-slate-600">{currentTenant?.authorizedSignatory?.title || 'President'}</p>
+                <div className="border-t-2 border-black pt-2 flex items-center justify-between relative z-10 text-xs">
+                  <div className="space-y-0.5 text-left">
+                    <p className="text-[9.5px] font-mono font-bold uppercase text-slate-600">Certified Complete & Authentic By:</p>
+                    <p className="text-sm font-black uppercase underline text-black tracking-wide">{currentTenant?.authorizedSignatory?.name || 'AUTHORIZED MANAGING OFFICER'}</p>
+                    <p className="text-[10.5px] text-slate-700 font-medium">{currentTenant?.authorizedSignatory?.title || 'President'}</p>
                   </div>
 
-                  <DocumentQrCode
-                    details={{
-                      documentNumber: projectRefNo,
-                      documentName: `${activeFolderCopy} — ${activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1 Folder Cover' : 'Envelope 2 Folder Cover'}`,
-                      projectName: projectTitle,
-                      dateTimeSubmitted: submissionDeadline
-                    }}
-                    size={75}
-                    className="border border-black p-1 bg-white"
-                  />
+                  <div className="flex items-center gap-3">
+                    <div className="text-right text-[9.5px] font-mono text-slate-600">
+                      <div className="font-bold text-black">{activeFolderCopy} Cover QR</div>
+                      <div>{projectRefNo}</div>
+                    </div>
+                    <DocumentQrCode
+                      details={{
+                        documentNumber: projectRefNo || 'PhilGEPS-2026-001',
+                        documentName: `${activeFolderCopy} — ${activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1 Folder Cover' : 'Envelope 2 Folder Cover'}`,
+                        projectName: projectTitle,
+                        dateTimeSubmitted: submissionDeadline,
+                        companyName: currentTenant?.companyName,
+                        solicitationNo: activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'
+                      }}
+                      size={60}
+                      className="border-2 border-black p-0.5 bg-white shrink-0"
+                    />
+                  </div>
                 </div>
 
               </div>
@@ -2381,11 +2677,11 @@ export const BidPackageBuilderView: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleAutoSortStatutory}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/40 transition flex items-center gap-1.5 cursor-pointer"
-                  title="Sort by Philippine Statutory Checklist Order"
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/40 transition flex items-center gap-1.5 cursor-pointer shadow"
+                  title="Sort into standard 17-item Philippine Statutory Checklist Order: 1. PhilGEPS, 2. Ongoing Contracts, 3. SLCC, 4. BSD/Surety, 5. Section VI, 6. Section VII, 7. Delivery Schedule, 8. Org Chart/Personnel/Equipment, 9. After-Sales, 10. OSS, 11. NFCC, 12. AFS, 13. Mayor's Permit, 14. PCAB, 15. SEC/DTI, 16. Tax Clearance, 17. Sec Cert/SPA"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Statutory Order</span>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>⚡ Checklist Order (1–17)</span>
                 </button>
 
                 <button

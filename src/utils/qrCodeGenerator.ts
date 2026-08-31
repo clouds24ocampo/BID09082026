@@ -41,20 +41,38 @@ export const generateUniqueDocumentId = (
 /**
  * Formats structured text payload for QR codes containing exact official bidding verification fields:
  * - Company Name
- * - PhilGEPS Reference Number
- * - Bidding Date and Time
+ * - Project Title
+ * - Project Submission Date and Time
  * - Document Name
+ * - Document Number
+ * - Copy Type (Original, Copy 1, Copy 2)
  */
 export const formatQrCodePayload = (details: QrCodeDetails): string => {
-  const company = details.companyName || 'Quantum Cloud Corporation';
-  const philgepsRef = details.projectRefNo || (details as any).philgepsRefNo || 'PhilGEPS-2026-001';
-  const biddingDateTime = details.dateTimeSubmitted || details.submissionDate || (details as any).submissionDeadline || 'August 30, 2026 at 02:00 PM';
+  const company = details.companyName || details.generatedBy || 'Quantum Cloud Corporation';
+  const project = details.projectTitle || details.projectName || 'Infrastructure & IT Modernization Project';
+  const submissionDateTime = details.dateTimeSubmitted || details.submissionDate || (details as any).submissionDeadline || 'August 30, 2026 at 02:00 PM';
   const docName = details.documentName || 'Official Bid Document';
+  const docNumber = details.documentNumber || details.projectRefNo || (details as any).philgepsRefNo || 'DOC-2026-001';
+  
+  // Format folder copy (ORIGINAL / COPY 1 / COPY 2)
+  const rawCopy = (details.folderCopy || (details as any).copy || 'ORIGINAL').toUpperCase();
+  let copyFormatted = 'Original Copy';
+  if (rawCopy.includes('COPY 1') || rawCopy.includes('DUPLICATE')) {
+    copyFormatted = 'Copy 1 (Duplicate)';
+  } else if (rawCopy.includes('COPY 2') || rawCopy.includes('TRIPLICATE')) {
+    copyFormatted = 'Copy 2 (Triplicate)';
+  } else if (rawCopy.includes('ORIGINAL')) {
+    copyFormatted = 'Original Copy';
+  } else {
+    copyFormatted = details.folderCopy || 'Original Copy';
+  }
 
   return `Company Name: ${company}
-PhilGEPS Reference Number: ${philgepsRef}
-Bidding Date and Time: ${biddingDateTime}
-Document Name: ${docName}`;
+Project Title: ${project}
+Project Submission Date & Time: ${submissionDateTime}
+Document Name: ${docName}
+Document Number: ${docNumber}
+Copy: ${copyFormatted}`;
 };
 
 export const formatQrPayload = formatQrCodePayload;

@@ -825,6 +825,10 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             size: 8.5in 13in portrait;
             margin: 0.3in;
           }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
           header, nav, aside, button, .print\\:hidden, .no-print, .no-export, .proof-column, .actions-column, .sticky {
             display: none !important;
           }
@@ -1067,7 +1071,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
           </div>
 
-          {/* PAGES CONTAINER (LEGAL LANDSCAPE 13" x 8.5") */}
+          {/* PAGES CONTAINER (PORTRAIT LEGAL 8.5" x 13") */}
           <div id="section-vii-pages-container" className="flex flex-col items-center gap-8 print:gap-0">
             {pagesList}
           </div>
@@ -1078,7 +1082,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
         <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900 shrink-0 print:hidden no-export">
           <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Class A Technical Exhibit — Legal Landscape Standard (13" × 8.5")</span>
+            <span>Class A Technical Exhibit — Legal Portrait Standard (8.5" × 13")</span>
           </div>
 
           <div className="flex items-center gap-3">

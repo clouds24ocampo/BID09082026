@@ -206,7 +206,7 @@ export async function clearVaultDataForTenant(tenantId: string): Promise<void> {
  */
 export async function migrateFromLocalStorage(): Promise<any[]> {
   const key = 'bidocs_vault_items';
-  const raw = localStorage.getItem(key);
+  const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
   if (!raw) return [];
 
   try {
@@ -222,4 +222,30 @@ export async function migrateFromLocalStorage(): Promise<any[]> {
   }
 
   return [];
+}
+
+/**
+ * Completely flush all localStorage, sessionStorage, and IndexedDB data
+ */
+export async function purgeEntireApplicationStorage(): Promise<void> {
+  // 1. Clear Web Storages
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+  } catch (_) {}
+
+  // 2. Clear Vault IndexedDB
+  await clearAllVaultData();
+
+  // 3. Delete BiDOCS Database completely
+  try {
+    indexedDB.deleteDatabase(DB_NAME);
+  } catch (_) {}
+
+  console.log('[BiDOCS] Entire database and storage flushed successfully.');
+}
+
+// Expose on window for easy developer/user console access
+if (typeof window !== 'undefined') {
+  (window as any).flushBiDocsDatabase = purgeEntireApplicationStorage;
 }
