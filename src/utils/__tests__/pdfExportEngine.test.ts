@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
-import { buildMergedThreeLayerPdfDataUrl, generateAndDownloadThreeLayerPdf } from '../pdfExportEngine';
+import { buildMergedThreeLayerPdfDataUrl, generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfBytes } from '../pdfExportEngine';
 
 describe('pdfExportEngine', () => {
   it('should be defined and callable', () => {
@@ -15,19 +15,17 @@ describe('pdfExportEngine', () => {
     srcDoc.addPage([612, 936]); // Native Portrait page
     const srcBytes = await srcDoc.save();
 
-    const dataUrl = await buildMergedThreeLayerPdfDataUrl([
+    const pdfBytes = await buildMergedThreeLayerPdfBytes([
       {
         title: 'Vector PDF Test',
         fileSource: srcBytes
       }
     ], 'native_vector_test.pdf');
 
-    expect(dataUrl).toContain('data:application/pdf;base64,');
+    expect(pdfBytes).toBeDefined();
+    expect(pdfBytes.length).toBeGreaterThan(0);
 
-    const base64Data = dataUrl.split(',')[1];
-    const pdfBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     const pdfDoc = await PDFDocument.load(pdfBytes);
-
     expect(pdfDoc.getPageCount()).toBe(1);
 
     const firstPage = pdfDoc.getPage(0);
@@ -50,7 +48,7 @@ describe('pdfExportEngine', () => {
     secViiDoc.addPage([936, 612]);
     const secViiBytes = await secViiDoc.save();
 
-    const mergedDataUrl = await buildMergedThreeLayerPdfDataUrl([
+    const pdfBytes = await buildMergedThreeLayerPdfBytes([
       {
         title: 'PhilGEPS Platinum Registration',
         fileSource: legalBytes
@@ -61,10 +59,6 @@ describe('pdfExportEngine', () => {
       }
     ], 'merged_test_bundle.pdf');
 
-    expect(mergedDataUrl).toContain('data:application/pdf;base64,');
-
-    const base64Data = mergedDataUrl.split(',')[1];
-    const pdfBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     const finalDoc = await PDFDocument.load(pdfBytes);
 
     // Total pages should be 1 + 2 = 3 pages

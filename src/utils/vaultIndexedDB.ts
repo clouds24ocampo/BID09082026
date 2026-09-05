@@ -15,8 +15,26 @@ const DB_VERSION = 1;
 const STORE_VAULT_ITEMS = 'vaultItems';       // metadata (no PDF binary)
 const STORE_PDF_BLOBS = 'pdfBlobs';           // PDF binary data keyed by item ID
 
-/** Open (or create) the IndexedDB database */
+// In-memory hot caches for 0ms instant data retrieval
+const memoryPdfCache = new Map<string, string>();
+const absentPdfCache = new Set<string>();
+const memoryVaultItemsCache = new Map<string, any[]>();
+
+let cachedDB: IDBDatabase | null = null;
+
+
+/** Open (or get cached) IndexedDB database connection */
 function openDB(): Promise<IDBDatabase> {
+  if (cachedDB) {
+    try {
+      // Test if connection is still active
+      cachedDB.transaction(STORE_VAULT_ITEMS, 'readonly');
+      return Promise.resolve(cachedDB);
+    } catch (_) {
+      cachedDB = null;
+    }
+  }
+
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
@@ -30,7 +48,12 @@ function openDB(): Promise<IDBDatabase> {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      cachedDB = request.result;
+      cachedDB.onclose = () => { cachedDB = null; };
+      cachedDB.onversionchange = () => { cachedDB?.close(); cachedDB = null; };
+      resolve(cachedDB);
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -39,6 +62,13 @@ function openDB(): Promise<IDBDatabase> {
 
 /** Save vault items for a specific tenant or all items (metadata only, no fileDataUrl) */
 export async function saveVaultItems(items: any[], tenantId?: string): Promise<void> {
+  // Update memory cache immediately for instantaneous UI response
+  if (tenantId) {
+    memoryVaultItemsCache.set(tenantId, items);
+  } else {
+    memoryVaultItemsCache.set('all', items);
+  }
+
   const db = await openDB();
 
   // If tenantId is specified, read items in a separate readonly transaction first
@@ -73,13 +103,18 @@ export async function saveVaultItems(items: any[], tenantId?: string): Promise<v
   }
 
   return new Promise((resolve, reject) => {
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 }
 
 /** Load vault items (metadata only), optionally filtered by tenantId */
 export async function loadVaultItems(tenantId?: string): Promise<any[]> {
+  const cacheKey = tenantId || 'all';
+  if (memoryVaultItemsCache.has(cacheKey)) {
+    return memoryVaultItemsCache.get(cacheKey)!;
+  }
+
   const db = await openDB();
   const tx = db.transaction(STORE_VAULT_ITEMS, 'readonly');
   const store = tx.objectStore(STORE_VAULT_ITEMS);
@@ -87,15 +122,12 @@ export async function loadVaultItems(tenantId?: string): Promise<any[]> {
 
   return new Promise((resolve, reject) => {
     request.onsuccess = () => {
-      db.close();
       const allItems: any[] = request.result || [];
-      if (tenantId) {
-        resolve(allItems.filter(item => item.tenantId === tenantId));
-      } else {
-        resolve(allItems);
-      }
+      const result = tenantId ? allItems.filter(item => item.tenantId === tenantId) : allItems;
+      memoryVaultItemsCache.set(cacheKey, result);
+      resolve(result);
     };
-    request.onerror = () => { db.close(); reject(request.error); };
+    request.onerror = () => reject(request.error);
   });
 }
 
@@ -103,55 +135,107 @@ export async function loadVaultItems(tenantId?: string): Promise<any[]> {
 
 /** Store a PDF data URL blob by item ID (supports 200MB+ total) */
 export async function savePdfData(itemId: string, dataUrl: string): Promise<void> {
+  // Populate memory cache instantly & clear from absent cache
+  absentPdfCache.delete(itemId);
+  memoryPdfCache.set(itemId, dataUrl);
+
   const db = await openDB();
   const tx = db.transaction(STORE_PDF_BLOBS, 'readwrite');
   const store = tx.objectStore(STORE_PDF_BLOBS);
   store.put(dataUrl, itemId);
 
   return new Promise((resolve, reject) => {
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 }
 
 /** Retrieve a PDF data URL blob by item ID */
 export async function loadPdfData(itemId: string): Promise<string | undefined> {
+  // 0ms instant retrieval from in-memory cache if present
+  if (memoryPdfCache.has(itemId)) {
+    return memoryPdfCache.get(itemId);
+  }
+  if (absentPdfCache.has(itemId)) {
+    return undefined;
+  }
+
   const db = await openDB();
   const tx = db.transaction(STORE_PDF_BLOBS, 'readonly');
   const store = tx.objectStore(STORE_PDF_BLOBS);
   const request = store.get(itemId);
 
   return new Promise((resolve, reject) => {
-    request.onsuccess = () => { db.close(); resolve(request.result || undefined); };
-    request.onerror = () => { db.close(); reject(request.error); };
+    request.onsuccess = () => {
+      const result = request.result || undefined;
+      if (result) {
+        memoryPdfCache.set(itemId, result);
+      } else {
+        absentPdfCache.add(itemId);
+      }
+      resolve(result);
+    };
+    request.onerror = () => reject(request.error);
   });
+}
+
+/** Retrieve multiple PDF data URL blobs concurrently */
+export async function loadMultiplePdfData(itemIds: string[]): Promise<Record<string, string>> {
+  const result: Record<string, string> = {};
+  const toFetch: string[] = [];
+
+  for (const id of itemIds) {
+    if (memoryPdfCache.has(id)) {
+      result[id] = memoryPdfCache.get(id)!;
+    } else if (!absentPdfCache.has(id)) {
+      toFetch.push(id);
+    }
+  }
+
+  if (toFetch.length === 0) return result;
+
+  await Promise.all(
+    toFetch.map(async (id) => {
+      const data = await loadPdfData(id);
+      if (data) result[id] = data;
+    })
+  );
+
+  return result;
 }
 
 /** Delete a specific PDF blob */
 export async function deletePdfData(itemId: string): Promise<void> {
+  memoryPdfCache.delete(itemId);
+  absentPdfCache.add(itemId);
+
   const db = await openDB();
   const tx = db.transaction(STORE_PDF_BLOBS, 'readwrite');
   const store = tx.objectStore(STORE_PDF_BLOBS);
   store.delete(itemId);
 
   return new Promise((resolve, reject) => {
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 }
 
 /** Clear all PDF blobs */
 export async function clearAllPdfData(): Promise<void> {
+  memoryPdfCache.clear();
+  absentPdfCache.clear();
+  memoryVaultItemsCache.clear();
   const db = await openDB();
   const tx = db.transaction(STORE_PDF_BLOBS, 'readwrite');
   const store = tx.objectStore(STORE_PDF_BLOBS);
   store.clear();
 
   return new Promise((resolve, reject) => {
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 }
+
 
 /** Clear ALL vault data (items + PDFs) — USE WITH CAUTION: destroys all tenants */
 export async function clearAllVaultData(): Promise<void> {
@@ -161,8 +245,8 @@ export async function clearAllVaultData(): Promise<void> {
   tx.objectStore(STORE_PDF_BLOBS).clear();
 
   return new Promise((resolve, reject) => {
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
   });
 }
 
@@ -195,8 +279,8 @@ export async function clearVaultDataForTenant(tenantId: string): Promise<void> {
   }
 
   return new Promise((resolve, reject) => {
-    writeTx.oncomplete = () => { db.close(); resolve(); };
-    writeTx.onerror = () => { db.close(); reject(writeTx.error); };
+    writeTx.oncomplete = () => resolve();
+    writeTx.onerror = () => reject(writeTx.error);
   });
 }
 

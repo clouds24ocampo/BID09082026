@@ -18,6 +18,7 @@ import { CashFlowByQuarterModal } from './templates/cashflowbyquarter';
 import { PriceSchedule4GoodsModal } from './templates/priceschedule4goods';
 import { SummaryOfBidPriceModal } from './templates/summaryofbidprice';
 import { DetailedEstimatesModal } from './templates/detailedestimates';
+import { PackageItem } from '../bids/bidpackage';
 import VaultErrorBoundary from '../common/VaultErrorBoundary';
 import {
   saveVaultItems,
@@ -54,6 +55,7 @@ import {
   FileSignature,
   Building2,
   Lock,
+  Unlock,
   Trash2,
   Edit3,
   Filter,
@@ -291,18 +293,20 @@ export const DocumentVaultView: React.FC = () => {
         }
 
         if (!cancelled) {
-          // Pre-load PDF blobs from IndexedDB into in-memory cache and attach them to item state
+          // Pre-load PDF blobs from IndexedDB into in-memory cache and attach them to item state in parallel
           let pdfLoadedCount = 0;
-          for (const item of items) {
-            try {
-              const pdfData = await loadPdfDataFromDB(item.id);
-              if (pdfData) {
-                pdfDataCache.current[item.id] = pdfData;
-                item.fileDataUrl = pdfData;
-                pdfLoadedCount++;
-              }
-            } catch (_) { /* skip items without PDF data */ }
-          }
+          await Promise.all(
+            items.map(async (item) => {
+              try {
+                const pdfData = await loadPdfDataFromDB(item.id);
+                if (pdfData) {
+                  pdfDataCache.current[item.id] = pdfData;
+                  item.fileDataUrl = pdfData;
+                  pdfLoadedCount++;
+                }
+              } catch (_) { /* skip items without PDF data */ }
+            })
+          );
 
           setVaultItems(items);
 
@@ -383,36 +387,216 @@ export const DocumentVaultView: React.FC = () => {
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [showMergeModal, setShowMergeModal] = useState(false);
 
-  // Active Bidding Project Scoping State (Strict Project Isolation)
+  // Active Bidding Project Scoping State (Strict Project Isolation - 1 Project at a Time)
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
-  const [activeProjectRefNo, setActiveProjectRefNo] = useState<string>('');
+  const [activeProjectRefNo, setActiveProjectRefNo] = useState<string>(() => {
+    try {
+      return localStorage.getItem(`bidocs_active_vault_project_${activeTenantId}`) || '';
+    } catch (_) {
+      return '';
+    }
+  });
   const [activeProjectTitle, setActiveProjectTitle] = useState<string>('');
   const [activeProcuringEntity, setActiveProcuringEntity] = useState<string>('');
   const activeProjectId = oppProjects.find((project) => project.refNo === activeProjectRefNo)?.id || '';
 
+  const handleSelectActiveProject = (selectedRef: string) => {
+    setActiveProjectRefNo(selectedRef);
+    const match = oppProjects.find(p => p.refNo === selectedRef);
+    setActiveProjectTitle(match?.title || '');
+    setActiveProcuringEntity(match?.procuringEntity || '');
+    try {
+      if (selectedRef) {
+        localStorage.setItem(`bidocs_active_vault_project_${activeTenantId}`, selectedRef);
+      } else {
+        localStorage.removeItem(`bidocs_active_vault_project_${activeTenantId}`);
+      }
+    } catch (_) {}
+  };
+
+  const handleUnlockOrChangeProject = () => {
+    setActiveProjectRefNo('');
+    setActiveProjectTitle('');
+    setActiveProcuringEntity('');
+    try {
+      localStorage.removeItem(`bidocs_active_vault_project_${activeTenantId}`);
+    } catch (_) {}
+  };
+
   React.useEffect(() => {
     const list = getOpportunityProjects(activeTenantId);
     setOppProjects(list);
-    if (list.length > 0) {
-      let storedRef = '';
-      try {
-        const rawStored = localStorage.getItem(`bidocs_active_project_${activeTenantId}`) || localStorage.getItem('bidocs_active_project');
-        if (rawStored) {
-          const parsed = JSON.parse(rawStored);
-          storedRef = parsed.refNo || '';
+    try {
+      const savedRef = localStorage.getItem(`bidocs_active_vault_project_${activeTenantId}`);
+      if (savedRef) {
+        const match = list.find(p => p.refNo === savedRef);
+        if (match) {
+          setActiveProjectRefNo(match.refNo);
+          setActiveProjectTitle(match.title);
+          setActiveProcuringEntity(match.procuringEntity);
         }
-      } catch (e) {}
-
-      const preferred = list.find((p) => p.refNo === storedRef) || list[0];
-      setActiveProjectRefNo(preferred.refNo);
-      setActiveProjectTitle(preferred.title);
-      setActiveProcuringEntity(preferred.procuringEntity);
-    } else {
-      setActiveProjectRefNo('');
-      setActiveProjectTitle('');
-      setActiveProcuringEntity('');
-    }
+      }
+    } catch (_) {}
   }, [activeTenantId]);
+
+  // Active Bid Package Items tracking across projects for the tenant
+  const [activePackageItems, setActivePackageItems] = useState<PackageItem[]>([]);
+
+  const loadActivePackageItems = React.useCallback(() => {
+    if (!activeTenantId) {
+      setActivePackageItems([]);
+      return;
+    }
+
+    const items: PackageItem[] = [];
+    const seen = new Set<string>();
+
+    const candidateKeys = [
+      activeProjectRefNo ? `bidocs_package_items_${activeTenantId}_${activeProjectRefNo}` : '',
+      activeProjectRefNo ? `bidocs_package_items_${activeTenantId}_${activeProjectRefNo.replace(/[^a-zA-Z0-9]/g, '_')}` : '',
+      activeProjectId ? `bidocs_package_items_${activeTenantId}_${activeProjectId}` : '',
+      `bidocs_package_items_${activeTenantId}_default`
+    ].filter(Boolean);
+
+    // Scan all package keys for this tenant to ensure complete cross-project awareness
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(`bidocs_package_items_${activeTenantId}_`)) {
+        if (!candidateKeys.includes(k)) {
+          candidateKeys.push(k);
+        }
+      }
+    }
+
+    for (const k of candidateKeys) {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((item: PackageItem) => {
+              if (item && item.id && !seen.has(item.id)) {
+                seen.add(item.id);
+                items.push(item);
+              }
+            });
+          }
+        } catch (_) {}
+      }
+    }
+    setActivePackageItems(items);
+  }, [activeTenantId, activeProjectRefNo, activeProjectId]);
+
+  React.useEffect(() => {
+    loadActivePackageItems();
+  }, [loadActivePackageItems]);
+
+  React.useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key && e.key.includes('bidocs_package_items_')) {
+        loadActivePackageItems();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', loadActivePackageItems);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', loadActivePackageItems);
+    };
+  }, [loadActivePackageItems]);
+
+  // Memoized fast lookup indexes for instant Bid Package matching (0ms)
+  const packageLookup = React.useMemo(() => {
+    const directIds = new Set<string>();
+    const docNumbers = new Set<string>();
+    const pkgNames: string[] = [];
+
+    activePackageItems.forEach(pkg => {
+      if (pkg.vaultDocId) directIds.add(pkg.vaultDocId);
+      if (pkg.id) directIds.add(pkg.id);
+      if (pkg.documentNumber) docNumbers.add(pkg.documentNumber.toLowerCase().trim());
+      if (pkg.documentName) pkgNames.push(pkg.documentName.toLowerCase().trim());
+    });
+
+    return { directIds, docNumbers, pkgNames };
+  }, [activePackageItems]);
+
+  // Master helper: Determines whether a document is currently merged/added inside the Bid Package
+  const isDocInBidPackage = React.useCallback((docItem?: DocumentVaultItem | null): boolean => {
+    if (!docItem || activePackageItems.length === 0) return false;
+
+    const docId = docItem.id;
+    if (packageLookup.directIds.has(docId)) return true;
+
+    const docName = (docItem.documentName || '').toLowerCase().trim();
+    const docCode = (docItem.documentCode || '').toUpperCase().trim();
+
+    for (let i = 0; i < packageLookup.pkgNames.length; i++) {
+      const pkgName = packageLookup.pkgNames[i];
+
+      // 1. Exact or substring name match
+      if (pkgName === docName || (docName && pkgName.includes(docName)) || (pkgName && docName.includes(pkgName))) {
+        return true;
+      }
+
+      // 2. Technical code mappings
+      if (docCode === 'B' || docCode === 'ONGOING_CONTRACTS' || docCode.includes('ONGOING')) {
+        if (pkgName.includes('ongoing')) return true;
+      }
+      if (docCode === 'C' || docCode === 'SLCC_STATEMENT' || docCode.includes('SLCC')) {
+        if (pkgName.includes('slcc') || pkgName.includes('single largest')) return true;
+      }
+      if (docCode === 'E' || docCode === 'BSD' || docCode.includes('BID_SECURING')) {
+        if (pkgName.includes('bid secur') || pkgName.includes('bsd') || pkgName.includes('surety bond')) return true;
+      }
+      if (docCode === 'F' || docCode === 'FA' || docCode.includes('(F.A)') || docCode.includes('ORG')) {
+        if (pkgName.includes('organizational chart') || pkgName.includes('org chart')) return true;
+      }
+      if (docCode === 'FB' || docCode.includes('(F.B)') || docCode.includes('PERSONNEL')) {
+        if (pkgName.includes('key personnel') || pkgName.includes('manpower') || pkgName.includes('bio-data')) return true;
+      }
+      if (docCode === 'FC' || docCode.includes('(F.C)') || docCode.includes('EQUIPMENT')) {
+        if (pkgName.includes('major equipment') || pkgName.includes('equipment utilization') || pkgName.includes('equipment')) return true;
+      }
+      if (docCode === 'FD' || docCode.includes('(F.D)') || docCode.includes('SEC-VI')) {
+        if (pkgName.includes('section vi') || pkgName.includes('schedule of requirements')) return true;
+      }
+      if (docCode === 'G' || docCode.includes('SEC-VII')) {
+        if (pkgName.includes('section vii') || pkgName.includes('technical specification')) return true;
+      }
+      if (docCode === 'H' || docCode.includes('AFTER')) {
+        if (pkgName.includes('after-sales') || pkgName.includes('aftersales') || pkgName.includes('warranty')) return true;
+      }
+      if (docCode === 'I' || docCode === 'OSS' || docCode.includes('OMNIBUS')) {
+        if (pkgName.includes('omnibus') || pkgName.includes('oss')) return true;
+      }
+      if (docCode === 'K' || docCode === 'NFCC') {
+        if (pkgName.includes('nfcc') || pkgName.includes('contracting capacity')) return true;
+      }
+
+      // 3. Financial code mappings
+      if (docCode.includes('DETAILED-ESTIMATES') || docCode.includes('FORM-L') || docCode.includes('DETAILED_ESTIMATES')) {
+        if (pkgName.includes('detailed estimate') || pkgName.includes('form l') || pkgName.includes('form (l)')) return true;
+      }
+      if (docCode.includes('PRICESCHED') || docCode.includes('PRICE_SCHEDULE')) {
+        if (pkgName.includes('price schedule')) return true;
+      }
+      if (docCode === 'BOQ' || docCode.includes('BILL_OF_QUANTITIES')) {
+        if (pkgName.includes('bill of quantities') || pkgName.includes('boq')) return true;
+      }
+      if (docCode.includes('BIDFORM') || docCode.includes('FINANCIAL_BID_FORM')) {
+        if (pkgName.includes('bid form')) return true;
+      }
+      if (docCode.includes('SUMMARY-BIDPRICE') || docCode.includes('SUMMARY_BID_PRICES')) {
+        if (pkgName.includes('summary of bid price') || pkgName.includes('summary bid')) return true;
+      }
+      if (docCode.includes('SF-INFR-56') || docCode.includes('CASHFLOW') || docCode.includes('CASH_FLOW')) {
+        if (pkgName.includes('cash flow') || pkgName.includes('sf-infr-56')) return true;
+      }
+    }
+
+    return false;
+  }, [activePackageItems, packageLookup]);
 
   // Technical Documents Sub-Tab State
   const [techSubTab, setTechSubTab] = useState<'CHECKLIST' | 'COMPLETED'>('CHECKLIST');
@@ -1248,7 +1432,7 @@ export const DocumentVaultView: React.FC = () => {
     !!activeProjectRefNo && vaultItems.some(item =>
       item.category === 'TECHNICAL' &&
       ((item.projectId && item.projectId === activeProjectId) || item.philgepsRefNo === activeProjectRefNo) &&
-      item.documentCode === docCode
+      (item.documentCode === docCode || (docCode === 'FAL-01' && (item.documentCode === 'FAL-01' || item.documentCode === 'SEC-VI-FAL' || item.documentName.toLowerCase().includes('framework agreement'))))
     );
 
   const hasFinancialDocForActiveProject = (docCode: string) =>
@@ -1267,20 +1451,33 @@ export const DocumentVaultView: React.FC = () => {
         )
       : undefined;
 
-  const completedTechVaultItems = vaultItems.filter(item =>
+  const completedTechVaultItems = React.useMemo(() => vaultItems.filter(item =>
     item.category === 'TECHNICAL' &&
-    (selectedTechProjectFilter === 'ALL' || item.philgepsRefNo === selectedTechProjectFilter || item.projectId === selectedTechProjectFilter)
-  );
+    (selectedTechProjectFilter === 'ALL' || item.philgepsRefNo === selectedTechProjectFilter || item.projectId === selectedTechProjectFilter) &&
+    !isDocInBidPackage(item)
+  ), [vaultItems, selectedTechProjectFilter, isDocInBidPackage]);
 
-  const filteredGridItems = vaultItems.filter(item => {
-    const matchesSearch = item.documentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.documentNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.legalBasisReference || '').toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCat = selectedCategory === 'ALL' || item.category === selectedCategory;
-    return matchesSearch && matchesCat;
-  });
+  const filteredGridItems = React.useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return vaultItems.filter(item => {
+      // If document is in active Bid Package and not searching explicitly, remove it from available vault list
+      if (!q && isDocInBidPackage(item)) return false;
 
-  const selectedVaultObjects = vaultItems.filter(item => selectedItemIds.includes(item.id));
+      const matchesSearch = !q ||
+        item.documentName.toLowerCase().includes(q) ||
+        (item.documentNumber || '').toLowerCase().includes(q) ||
+        (item.legalBasisReference || '').toLowerCase().includes(q) ||
+        (item.philgepsRefNo || '').toLowerCase().includes(q);
+      const matchesCat = selectedCategory === 'ALL' || item.category === selectedCategory;
+      return matchesSearch && matchesCat;
+    });
+  }, [vaultItems, searchQuery, selectedCategory, isDocInBidPackage]);
+
+  const selectedVaultObjects = React.useMemo(() => {
+    if (selectedItemIds.length === 0) return [];
+    const idSet = new Set(selectedItemIds);
+    return vaultItems.filter(item => idSet.has(item.id));
+  }, [vaultItems, selectedItemIds]);
 
   return (
     <VaultErrorBoundary fallbackTitle="Document Vault Render Protected">
@@ -1783,31 +1980,50 @@ export const DocumentVaultView: React.FC = () => {
           {oppProjects.length > 0 && (
             <div className="p-4 rounded-2xl border border-slate-800 bg-slate-950/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <p className="text-[11px] text-slate-400 font-mono">Active Bidding Project Scope</p>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <p className="text-[11px] text-slate-400 font-mono">Active Bidding Project Scope</p>
+                  {activeProjectRefNo && (
+                    <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                      <Lock className="w-3 h-3 text-amber-400" />
+                      <span>Project Locked (1 Project at a Time)</span>
+                    </span>
+                  )}
+                </div>
                 <h4 className="text-sm font-bold text-white">
-                  [{activeProjectRefNo}] {activeProjectTitle || 'Select a Project'}
+                  {activeProjectRefNo ? `[${activeProjectRefNo}] ${activeProjectTitle}` : 'No Project Selected'}
                 </h4>
-                <p className="text-[11px] text-slate-500">{activeProcuringEntity}</p>
+                <p className="text-[11px] text-slate-500">
+                  {activeProjectRefNo ? activeProcuringEntity : 'Please select a bidding project to scope technical and financial components'}
+                </p>
               </div>
-              <div className="min-w-65">
-                <label className="block text-slate-300 text-[11px] font-medium mb-1">Select project for technical documents</label>
-                <select
-                  value={activeProjectRefNo}
-                  onChange={(e) => {
-                    const selectedRef = e.target.value;
-                    const match = oppProjects.find(p => p.refNo === selectedRef);
-                    setActiveProjectRefNo(selectedRef);
-                    setActiveProjectTitle(match?.title || 'Selected Opportunity');
-                    setActiveProcuringEntity(match?.procuringEntity || 'Government Agency');
-                  }}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                >
-                  {oppProjects.map((project) => (
-                    <option key={project.id} value={project.refNo}>
-                      [{project.refNo}] {project.title}
-                    </option>
-                  ))}
-                </select>
+              <div className="min-w-65 flex items-center gap-2">
+                <div className="flex-1">
+                  <label className="block text-slate-300 text-[11px] font-medium mb-1">Target Bidding Project (Locked)</label>
+                  <select
+                    value={activeProjectRefNo}
+                    disabled={Boolean(activeProjectRefNo)}
+                    onChange={(e) => handleSelectActiveProject(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500 disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-950/80"
+                  >
+                    <option value="">-- Choose / Select a Bidding Project --</option>
+                    {oppProjects.map((project) => (
+                      <option key={project.id} value={project.refNo}>
+                        [{project.refNo}] {project.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {activeProjectRefNo && (
+                  <button
+                    type="button"
+                    onClick={handleUnlockOrChangeProject}
+                    className="mt-5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700 shrink-0 cursor-pointer shadow"
+                    title="Unlock to switch or select a different project"
+                  >
+                    <Unlock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Unlock Project</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -2287,31 +2503,50 @@ export const DocumentVaultView: React.FC = () => {
               {oppProjects.length > 0 && (
                 <div className="p-4 rounded-2xl border border-slate-800 bg-slate-950/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <p className="text-[11px] text-slate-400 font-mono">Active Bidding Project Scope</p>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="text-[11px] text-slate-400 font-mono">Active Bidding Project Scope</p>
+                      {activeProjectRefNo && (
+                        <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                          <Lock className="w-3 h-3 text-amber-400" />
+                          <span>Project Locked (1 Project at a Time)</span>
+                        </span>
+                      )}
+                    </div>
                     <h4 className="text-sm font-bold text-white">
-                      [{activeProjectRefNo}] {activeProjectTitle || 'Select a Project'}
+                      {activeProjectRefNo ? `[${activeProjectRefNo}] ${activeProjectTitle}` : 'No Project Selected'}
                     </h4>
-                    <p className="text-[11px] text-slate-500">{activeProcuringEntity}</p>
+                    <p className="text-[11px] text-slate-500">
+                      {activeProjectRefNo ? activeProcuringEntity : 'Please select a bidding project to generate or view financial component documents'}
+                    </p>
                   </div>
-                  <div className="min-w-65">
-                    <label className="block text-slate-300 text-[11px] font-medium mb-1">Select project for financial documents</label>
-                    <select
-                      value={activeProjectRefNo}
-                      onChange={(e) => {
-                        const selectedRef = e.target.value;
-                        const match = oppProjects.find(p => p.refNo === selectedRef);
-                        setActiveProjectRefNo(selectedRef);
-                        setActiveProjectTitle(match?.title || 'Selected Opportunity');
-                        setActiveProcuringEntity(match?.procuringEntity || 'Government Agency');
-                      }}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                    >
-                      {oppProjects.map((project) => (
-                        <option key={project.id} value={project.refNo}>
-                          [{project.refNo}] {project.title}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="min-w-65 flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="block text-slate-300 text-[11px] font-medium mb-1">Target Bidding Project (Locked)</label>
+                      <select
+                        value={activeProjectRefNo}
+                        disabled={Boolean(activeProjectRefNo)}
+                        onChange={(e) => handleSelectActiveProject(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500 disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-950/80"
+                      >
+                        <option value="">-- Choose / Select a Bidding Project --</option>
+                        {oppProjects.map((project) => (
+                          <option key={project.id} value={project.refNo}>
+                            [{project.refNo}] {project.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {activeProjectRefNo && (
+                      <button
+                        type="button"
+                        onClick={handleUnlockOrChangeProject}
+                        className="mt-5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700 shrink-0 cursor-pointer shadow"
+                        title="Unlock to switch or select a different project"
+                      >
+                        <Unlock className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Unlock Project</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -2322,11 +2557,17 @@ export const DocumentVaultView: React.FC = () => {
                 {(() => {
                   const isDone = hasFinancialDocForActiveProject('PBD-DETAILED-ESTIMATES');
                   const existingDoc = getCompletedFinancialDocForActiveProject('PBD-DETAILED-ESTIMATES');
+                  const isInBidPackage = existingDoc ? isDocInBidPackage(existingDoc) : false;
+
                   return (
-                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-purple-500/50'}`}>
+                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? 'border-blue-500/60 bg-blue-950/20' : isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-purple-500/50'}`}>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between flex-wrap gap-1">
-                          {isDone ? (
+                          {isInBidPackage ? (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
+                              <Layers className="w-3 h-3 text-blue-400" /> In Bid Package
+                            </span>
+                          ) : isDone ? (
                             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
                             </span>
@@ -2362,22 +2603,30 @@ export const DocumentVaultView: React.FC = () => {
                               <Eye className="w-3.5 h-3.5" />
                               <span>PDF</span>
                             </button>
-                            <button
-                              onClick={() => setShowDetailedEstimatesModal(true)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
-                              title="Re-edit or update"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
-                              title="Delete from project"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Del</span>
-                            </button>
+                            {isInBidPackage ? (
+                              <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
+                                In Bid Package
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => setShowDetailedEstimatesModal(true)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
+                                  title="Re-edit or update"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
+                                  title="Delete from project"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Del</span>
+                                </button>
+                              </>
+                            )}
                           </>
                         ) : (
                           <button
@@ -2393,17 +2642,45 @@ export const DocumentVaultView: React.FC = () => {
                   );
                 })()}
 
-                {/* CARD 2: Unified Financial Bid Form (Goods, Infra, Consulting) */}
+                {/* CARD 2: Unified Financial Bid Form (Auto-Classified: Goods, Infra, Consulting) */}
                 {(() => {
                   const isDoneGoods = hasFinancialDocForActiveProject('GPPB-BIDFORM-GOODS');
                   const isDoneInfra = hasFinancialDocForActiveProject('GPPB-BIDFORM-INFRASTRUCTURE');
                   const isDone = isDoneGoods || isDoneInfra;
                   const existingDoc = getCompletedFinancialDocForActiveProject('GPPB-BIDFORM-GOODS') || getCompletedFinancialDocForActiveProject('GPPB-BIDFORM-INFRASTRUCTURE');
+                  const isInBidPackage = existingDoc ? isDocInBidPackage(existingDoc) : false;
+
+                  const matchedProject = oppProjects.find(p => p.refNo === activeProjectRefNo || p.id === activeProjectRefNo);
+                  const isInfraProject = (() => {
+                    // 1. Primary Authority: Project's explicit category
+                    if (matchedProject?.category) {
+                      const cat = matchedProject.category.toUpperCase();
+                      if (cat.includes('INFRA') || cat.includes('CIVIL')) return true;
+                      if (cat.includes('GOOD')) return false;
+                      if (cat.includes('CONSULT')) return false;
+                    }
+                    // 2. Fallback: Check project title and ref if category is not explicitly set
+                    const combined = `${activeProjectRefNo || ''} ${activeProjectTitle || matchedProject?.title || ''}`.toUpperCase();
+                    return combined.includes('CONSTRUCT') || combined.includes('CIVIL WORKS') || combined.includes('ROAD OPENING') || combined.includes('DRAINAGE SYSTEM') || combined.includes('INFRASTRUCTURE') || combined.includes('BUILDING');
+                  })();
+
+                  const handleOpenBidForm = () => {
+                    if (isInfraProject) {
+                      setShowBidFormInfraModal(true);
+                    } else {
+                      setShowBidFormGoodsModal(true);
+                    }
+                  };
+
                   return (
-                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-blue-500/50'}`}>
+                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? 'border-blue-500/60 bg-blue-950/20' : isDone ? 'border-emerald-500/60 bg-emerald-950/10' : (isInfraProject ? 'border-slate-800 hover:border-amber-500/50' : 'border-slate-800 hover:border-blue-500/50')}`}>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between flex-wrap gap-1">
-                          {isDone ? (
+                          {isInBidPackage ? (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
+                              <Layers className="w-3 h-3 text-blue-400" /> In Bid Package
+                            </span>
+                          ) : isDone ? (
                             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
                             </span>
@@ -2412,19 +2689,29 @@ export const DocumentVaultView: React.FC = () => {
                               <Clock className="w-3 h-3 text-amber-400" /> Pending
                             </span>
                           )}
-                          <span className="text-[9px] font-mono text-slate-400">GPPB Statutory Form</span>
+                          <span className={`text-[9px] font-mono font-bold ${isInfraProject ? 'text-amber-400' : 'text-blue-400'}`}>
+                            {isInfraProject ? 'Infra Template' : 'Goods & Services'}
+                          </span>
                         </div>
 
                         <div>
-                          <h3 className="text-sm font-bold text-white leading-snug">Financial Bid Form</h3>
+                          <h3 className="text-sm font-bold text-white leading-snug">
+                            {isInfraProject ? 'Infrastructure Bid Form' : 'Financial Bid Form'}
+                          </h3>
                           <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                            Statutory Financial Bid Form auto-classified for Goods, Infrastructure, or Consulting based on selected project.
+                            {isInfraProject
+                              ? 'Statutory Bid Form for Infrastructure Projects (GPPB Resolution 09-2020).'
+                              : 'Statutory Financial Bid Form for Goods, Services, and Consulting Projects.'}
                           </p>
                         </div>
 
                         <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
-                          <p className="text-slate-300 font-bold">Ref: Sec. 30.1 / Res. 09-2020</p>
-                          <p className="text-emerald-400">Legal 13" × 8.5"</p>
+                          <p className="text-slate-300 font-bold">
+                            {isInfraProject ? 'Ref: GPPB Res. 09-2020' : 'Ref: GPPB 6th Ed. PBDs'}
+                          </p>
+                          <p className={isInfraProject ? 'text-amber-400' : 'text-blue-400'}>
+                            {isInfraProject ? 'Infrastructure (Auto-Selected)' : 'Goods & Services (Auto-Selected)'}
+                          </p>
                         </div>
                       </div>
 
@@ -2439,122 +2726,48 @@ export const DocumentVaultView: React.FC = () => {
                               <Eye className="w-3.5 h-3.5" />
                               <span>PDF</span>
                             </button>
-                            <button
-                              onClick={() => {
-                                if (existingDoc.documentCode === 'GPPB-BIDFORM-INFRASTRUCTURE') {
-                                  setShowBidFormInfraModal(true);
-                                } else {
-                                  setShowBidFormGoodsModal(true);
-                                }
-                              }}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
-                              title="Re-edit or update"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
-                              title="Delete from project"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Del</span>
-                            </button>
-                          </>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-1.5 w-full">
-                            <button
-                              onClick={() => setShowBidFormGoodsModal(true)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center justify-center gap-1"
-                              title="Bid Form for Goods & General Support"
-                            >
-                              <FileSignature className="w-3.5 h-3.5" />
-                              <span>For Goods</span>
-                            </button>
-                            <button
-                              onClick={() => setShowBidFormInfraModal(true)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-950 bg-amber-500 hover:bg-amber-400 shadow transition flex items-center justify-center gap-1"
-                              title="Bid Form for Infrastructure Projects (GPPB Resolution 09-2020)"
-                            >
-                              <FileSignature className="w-3.5 h-3.5" />
-                              <span>For Infra</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* CARD 3: Price Schedule for Goods */}
-                {(() => {
-                  const isDone = hasFinancialDocForActiveProject('GPPB-PRICESCHED-GOODS');
-                  const existingDoc = getCompletedFinancialDocForActiveProject('GPPB-PRICESCHED-GOODS');
-                  return (
-                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-emerald-500/50'}`}>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between flex-wrap gap-1">
-                          {isDone ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-amber-400" /> Pending
-                            </span>
-                          )}
-                          <span className="text-[9px] font-mono text-slate-400">Cols 1 to 10</span>
-                        </div>
-
-                        <div>
-                          <h3 className="text-sm font-bold text-white leading-snug">Price Schedule</h3>
-                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                            Statutory Price Schedule tracing columns 1-10 with EXW unit price, taxes, and auto-computed total cost.
-                          </p>
-                        </div>
-
-                        <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
-                          <p className="text-slate-300 font-bold">Ref: Section 32.2.1</p>
-                          <p className="text-emerald-400">Legal 13" × 8.5"</p>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
-                        {isDone && existingDoc ? (
-                          <>
-                            <button
-                              onClick={() => openPreviewItem(existingDoc)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
-                              title="View saved PDF"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>PDF</span>
-                            </button>
-                            <button
-                              onClick={() => setShowPriceScheduleGoodsModal(true)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
-                              title="Re-edit or update"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
-                              title="Delete from project"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Del</span>
-                            </button>
+                            {isInBidPackage ? (
+                              <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
+                                In Bid Package
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    if (existingDoc.documentCode === 'GPPB-BIDFORM-INFRASTRUCTURE') {
+                                      setShowBidFormInfraModal(true);
+                                    } else {
+                                      setShowBidFormGoodsModal(true);
+                                    }
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
+                                  title="Re-edit or update"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
+                                  title="Delete from project"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Del</span>
+                                </button>
+                              </>
+                            )}
                           </>
                         ) : (
                           <button
-                            onClick={() => setShowPriceScheduleGoodsModal(true)}
-                            className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow transition flex items-center justify-center gap-1"
+                            onClick={handleOpenBidForm}
+                            className={`w-full px-3 py-1.5 rounded-xl text-xs font-bold shadow transition flex items-center justify-center gap-1.5 ${
+                              isInfraProject
+                                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                                : 'bg-blue-600 hover:bg-blue-500 text-white'
+                            }`}
                           >
                             <FileSignature className="w-3.5 h-3.5" />
-                            <span>Create Form</span>
+                            <span>Create Bid Form</span>
                           </button>
                         )}
                       </div>
@@ -2562,90 +2775,21 @@ export const DocumentVaultView: React.FC = () => {
                   );
                 })()}
 
-                {/* CARD 4: Summary of Bid Prices */}
-                {(() => {
-                  const isDone = hasFinancialDocForActiveProject('PBD-SUMMARY-BIDPRICE');
-                  const existingDoc = getCompletedFinancialDocForActiveProject('PBD-SUMMARY-BIDPRICE');
-                  return (
-                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-blue-500/50'}`}>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between flex-wrap gap-1">
-                          {isDone ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-amber-400" /> Pending
-                            </span>
-                          )}
-                          <span className="text-[9px] font-mono text-slate-400">Cols 1 to 4</span>
-                        </div>
-
-                        <div>
-                          <h3 className="text-sm font-bold text-white leading-snug">Summary of Bid Prices</h3>
-                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                            Statutory Summary of Bid Prices table with Item No, Item, Particulars/Description, and Total Amount.
-                          </p>
-                        </div>
-
-                        <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
-                          <p className="text-slate-300 font-bold">Ref: Section 32.2.1</p>
-                          <p className="text-blue-400">Legal 13" × 8.5"</p>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
-                        {isDone && existingDoc ? (
-                          <>
-                            <button
-                              onClick={() => openPreviewItem(existingDoc)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
-                              title="View saved PDF"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>PDF</span>
-                            </button>
-                            <button
-                              onClick={() => setShowSummaryBidPriceModal(true)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
-                              title="Re-edit or update"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
-                              title="Delete from project"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Del</span>
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => setShowSummaryBidPriceModal(true)}
-                            className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center justify-center gap-1"
-                          >
-                            <FileSignature className="w-3.5 h-3.5" />
-                            <span>Create Form</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* CARD 6: Bill of Quantities (BOQ) */}
+                {/* CARD 3: Bill of Quantities (BOQ) */}
                 {(() => {
                   const isDone = hasFinancialDocForActiveProject('BOQ');
                   const existingDoc = getCompletedFinancialDocForActiveProject('BOQ');
+                  const isInBidPackage = existingDoc ? isDocInBidPackage(existingDoc) : false;
+
                   return (
-                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-blue-500/50'}`}>
+                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? 'border-blue-500/60 bg-blue-950/20' : isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-blue-500/50'}`}>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between flex-wrap gap-1">
-                          {isDone ? (
+                          {isInBidPackage ? (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
+                              <Layers className="w-3 h-3 text-blue-400" /> In Bid Package
+                            </span>
+                          ) : isDone ? (
                             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
                             </span>
@@ -2681,22 +2825,30 @@ export const DocumentVaultView: React.FC = () => {
                               <Eye className="w-3.5 h-3.5" />
                               <span>PDF</span>
                             </button>
-                            <button
-                              onClick={() => setShowBoqModal(true)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
-                              title="Re-edit or update"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
-                              title="Delete from project"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Del</span>
-                            </button>
+                            {isInBidPackage ? (
+                              <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
+                                In Bid Package
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => setShowBoqModal(true)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
+                                  title="Re-edit or update"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
+                                  title="Delete from project"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Del</span>
+                                </button>
+                              </>
+                            )}
                           </>
                         ) : (
                           <button
@@ -2712,15 +2864,199 @@ export const DocumentVaultView: React.FC = () => {
                   );
                 })()}
 
-                {/* CARD 7: Cash Flow by Quarter (SF-INFR-56) */}
+                {/* CARD 4: Price Schedule for Goods */}
+                {(() => {
+                  const isDone = hasFinancialDocForActiveProject('GPPB-PRICESCHED-GOODS');
+                  const existingDoc = getCompletedFinancialDocForActiveProject('GPPB-PRICESCHED-GOODS');
+                  const isInBidPackage = existingDoc ? isDocInBidPackage(existingDoc) : false;
+
+                  return (
+                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? 'border-blue-500/60 bg-blue-950/20' : isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-emerald-500/50'}`}>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between flex-wrap gap-1">
+                          {isInBidPackage ? (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
+                              <Layers className="w-3 h-3 text-blue-400" /> In Bid Package
+                            </span>
+                          ) : isDone ? (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-amber-400" /> Pending
+                            </span>
+                          )}
+                          <span className="text-[9px] font-mono text-slate-400">Cols 1 to 10</span>
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-bold text-white leading-snug">Price Schedule</h3>
+                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                            Statutory Price Schedule tracing columns 1-10 with EXW unit price, taxes, and auto-computed total cost.
+                          </p>
+                        </div>
+
+                        <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
+                          <p className="text-slate-300 font-bold">Ref: Section 32.2.1</p>
+                          <p className="text-emerald-400">Legal 13" × 8.5"</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
+                        {isDone && existingDoc ? (
+                          <>
+                            <button
+                              onClick={() => openPreviewItem(existingDoc)}
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
+                              title="View saved PDF"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>PDF</span>
+                            </button>
+                            {isInBidPackage ? (
+                              <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
+                                In Bid Package
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => setShowPriceScheduleGoodsModal(true)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
+                                  title="Re-edit or update"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
+                                  title="Delete from project"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Del</span>
+                                </button>
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setShowPriceScheduleGoodsModal(true)}
+                            className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow transition flex items-center justify-center gap-1"
+                          >
+                            <FileSignature className="w-3.5 h-3.5" />
+                            <span>Create Form</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* CARD 5: Summary of Bid Prices */}
+                {(() => {
+                  const isDone = hasFinancialDocForActiveProject('PBD-SUMMARY-BIDPRICE');
+                  const existingDoc = getCompletedFinancialDocForActiveProject('PBD-SUMMARY-BIDPRICE');
+                  const isInBidPackage = existingDoc ? isDocInBidPackage(existingDoc) : false;
+
+                  return (
+                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? 'border-blue-500/60 bg-blue-950/20' : isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-blue-500/50'}`}>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between flex-wrap gap-1">
+                          {isInBidPackage ? (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
+                              <Layers className="w-3 h-3 text-blue-400" /> In Bid Package
+                            </span>
+                          ) : isDone ? (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-amber-400" /> Pending
+                            </span>
+                          )}
+                          <span className="text-[9px] font-mono text-slate-400">Cols 1 to 4</span>
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-bold text-white leading-snug">Summary of Bid Prices</h3>
+                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                            Statutory Summary of Bid Prices table with Item No, Item, Particulars/Description, and Total Amount.
+                          </p>
+                        </div>
+
+                        <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
+                          <p className="text-slate-300 font-bold">Ref: Section 32.2.1</p>
+                          <p className="text-blue-400">Legal 13" × 8.5"</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
+                        {isDone && existingDoc ? (
+                          <>
+                            <button
+                              onClick={() => openPreviewItem(existingDoc)}
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
+                              title="View saved PDF"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>PDF</span>
+                            </button>
+                            {isInBidPackage ? (
+                              <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
+                                In Bid Package
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => setShowSummaryBidPriceModal(true)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
+                                  title="Re-edit or update"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
+                                  title="Delete from project"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Del</span>
+                                </button>
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setShowSummaryBidPriceModal(true)}
+                            className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center justify-center gap-1"
+                          >
+                            <FileSignature className="w-3.5 h-3.5" />
+                            <span>Create Form</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* CARD 6: Cash Flow by Quarter (SF-INFR-56) */}
                 {(() => {
                   const isDone = hasFinancialDocForActiveProject('SF-INFR-56');
                   const existingDoc = getCompletedFinancialDocForActiveProject('SF-INFR-56');
+                  const isInBidPackage = existingDoc ? isDocInBidPackage(existingDoc) : false;
+
                   return (
-                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-purple-500/50'}`}>
+                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? 'border-blue-500/60 bg-blue-950/20' : isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-purple-500/50'}`}>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between flex-wrap gap-1">
-                          {isDone ? (
+                          {isInBidPackage ? (
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
+                              <Layers className="w-3 h-3 text-blue-400" /> In Bid Package
+                            </span>
+                          ) : isDone ? (
                             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
                             </span>
@@ -2756,22 +3092,30 @@ export const DocumentVaultView: React.FC = () => {
                               <Eye className="w-3.5 h-3.5" />
                               <span>PDF</span>
                             </button>
-                            <button
-                              onClick={() => setShowCashFlowModal(true)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
-                              title="Re-edit or update"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
-                              title="Delete from project"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Del</span>
-                            </button>
+                            {isInBidPackage ? (
+                              <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
+                                In Bid Package
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => setShowCashFlowModal(true)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
+                                  title="Re-edit or update"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <span>Edit</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
+                                  title="Delete from project"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Del</span>
+                                </button>
+                              </>
+                            )}
                           </>
                         ) : (
                           <button
@@ -2969,6 +3313,9 @@ export const DocumentVaultView: React.FC = () => {
         />
       )}
 
+
+
+      {/* FRAMEWORK AGREEMENT LIST TEMPLATE */}
       {fillingTemplateItem && (fillingTemplateItem.code === 'FAL-01' || fillingTemplateItem.code === 'SEC-VI-FAL' || fillingTemplateItem.name.toLowerCase().includes('framework agreement') || fillingTemplateItem.name.toLowerCase().includes('framework agreement list')) && (
         <FrameworkAgreementList
           item={fillingTemplateItem}

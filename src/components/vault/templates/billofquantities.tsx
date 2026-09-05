@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
+import { autoFitPageChunks, calculateRowHeight } from '../../../utils/autoFitEngine';
 import { savePdfData } from '../../../utils/vaultIndexedDB';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import {
@@ -11,7 +12,8 @@ import {
   Building2,
   Table,
   RefreshCw,
-  CheckCircle2
+  CheckCircle2,
+  Lock
 } from 'lucide-react';
 
 export interface BoqItemRow {
@@ -100,55 +102,27 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  // Helper to load Detailed Estimates (Form L) with fallback to Section VI / Section VII
+  // Helper to load Detailed Estimates (Form L) with fallback strictly to this project's Section VI
   const loadProjectData = (projectKey: string, candidateTitle?: string, oppId?: string) => {
-    const tenantId = tenant?.id || 'default';
-    const targetOppId = oppId || selectedOppId || '';
-    const cleanKey = (projectKey || '').replace(/[^a-zA-Z0-9_-]/g, '_');
-
-    // 1. Build all candidate keys for Form (L) Detailed Estimates
-    const candidateDetKeys = [
-      targetOppId ? `bidocs_detailed_estimates_${tenantId}_${targetOppId}` : '',
-      projectKey ? `bidocs_detailed_estimates_${tenantId}_${projectKey}` : '',
-      cleanKey ? `bidocs_detailed_estimates_${tenantId}_${cleanKey}` : '',
-      projectRefNo ? `bidocs_detailed_estimates_${tenantId}_${projectRefNo}` : '',
-      activeProjectRefNo ? `bidocs_detailed_estimates_${tenantId}_${activeProjectRefNo}` : ''
-    ].filter(Boolean);
-
-    let savedDetEst: string | null = null;
-    for (const key of candidateDetKeys) {
-      const val = localStorage.getItem(key);
-      if (val) {
-        savedDetEst = val;
-        break;
-      }
+    if (!projectKey && !candidateTitle && !oppId) {
+      setBoqRows([]);
+      setLaborLumpSum(0);
+      setLogisticsLumpSum(0);
+      setEquipmentLumpSum(0);
+      setIsSyncedFromDetailedEstimates(false);
+      return;
     }
 
-    // 2. If not found by direct keys, scan all localStorage detailed estimates keys for this tenant
-    if (!savedDetEst) {
-      try {
-        const prefix = `bidocs_detailed_estimates_${tenantId}_`;
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && k.startsWith(prefix)) {
-            const raw = localStorage.getItem(k);
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              const pRef = (parsed.projectRefNo || '').trim().toLowerCase();
-              const pTitle = (parsed.projectName || parsed.projectTitle || '').trim().toLowerCase();
-              const qRef = (projectKey || '').trim().toLowerCase();
-              const qTitle = (candidateTitle || '').trim().toLowerCase();
-              
-              if ((qRef && pRef === qRef) || (qTitle && pTitle === qTitle) || (targetOppId && k.includes(targetOppId))) {
-                savedDetEst = raw;
-                break;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[BOQ] Error scanning detailed estimates in localStorage:', e);
-      }
+    const tenantId = tenant?.id || 'default';
+    const targetOppId = oppId || '';
+
+    // 1. Check exact key match (strictly non-default)
+    let savedDetEst: string | null = null;
+    if (projectKey && projectKey !== 'default') {
+      savedDetEst = localStorage.getItem(`bidocs_detailed_estimates_${tenantId}_${projectKey}`);
+    }
+    if (!savedDetEst && targetOppId && targetOppId !== 'default') {
+      savedDetEst = localStorage.getItem(`bidocs_detailed_estimates_${tenantId}_${targetOppId}`);
     }
 
     let loadedFromDetEst = false;
@@ -157,26 +131,35 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
       try {
         const parsed = JSON.parse(savedDetEst);
         if (parsed) {
-          const laborCost = parseNum(parsed.totalLaborCost);
-          const logCost = parseNum(parsed.totalLogisticsCost);
-          const eqCost = parseNum(parsed.totalEquipmentCost);
+          // STRICT PROJECT SCOPE VALIDATION:
+          // Ensure this estimate belongs to this project only
+          const parsedRef = parsed.projectRefNo || '';
+          const isMatch = (parsedRef && (parsedRef === projectKey || parsedRef === targetOppId)) ||
+                          (projectKey && projectKey !== 'default') ||
+                          (targetOppId && targetOppId !== 'default');
 
-          setLaborLumpSum(laborCost);
-          setLogisticsLumpSum(logCost);
-          setEquipmentLumpSum(eqCost);
+          if (isMatch) {
+            const laborCost = parseNum(parsed.totalLaborCost);
+            const logCost = parseNum(parsed.totalLogisticsCost);
+            const eqCost = parseNum(parsed.totalEquipmentCost);
 
-          if (Array.isArray(parsed.materials) && parsed.materials.length > 0) {
-            const rows: BoqItemRow[] = parsed.materials.map((item: any, idx: number) => ({
-              id: item.id || `boq-det-${idx + 1}`,
-              itemNo: item.itemNo || `${idx + 1}`,
-              description: item.description || `Material Item ${idx + 1}`,
-              unit: item.unit || 'Unit',
-              quantity: parseNum(item.quantity) || 1,
-              unitPrice: parseNum(item.unitPrice) || 0
-            }));
-            setBoqRows(rows);
-            loadedFromDetEst = true;
-            setIsSyncedFromDetailedEstimates(true);
+            setLaborLumpSum(laborCost);
+            setLogisticsLumpSum(logCost);
+            setEquipmentLumpSum(eqCost);
+
+            if (Array.isArray(parsed.materials) && parsed.materials.length > 0) {
+              const rows: BoqItemRow[] = parsed.materials.map((item: any, idx: number) => ({
+                id: item.id || `boq-det-${idx + 1}`,
+                itemNo: item.itemNo || `${idx + 1}`,
+                description: item.description || `Material Item ${idx + 1}`,
+                unit: item.unit || 'Unit',
+                quantity: parseNum(item.quantity) || 1,
+                unitPrice: parseNum(item.unitPrice) || 0
+              }));
+              setBoqRows(rows);
+              loadedFromDetEst = true;
+              setIsSyncedFromDetailedEstimates(true);
+            }
           }
         }
       } catch (e) {
@@ -184,7 +167,7 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
       }
     }
 
-    // 3. Fallback: If not found in Detailed Estimates, check Section VI Schedule of Requirements & Section VII
+    // 2. Fallback: If not found in Detailed Estimates, check Section VI Schedule of Requirements strictly for this project
     if (!loadedFromDetEst) {
       setIsSyncedFromDetailedEstimates(false);
       setLaborLumpSum(0);
@@ -192,11 +175,8 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
       setEquipmentLumpSum(0);
 
       const candidateSecViKeys = [
-        targetOppId ? `bidocs_sec_vi_${tenantId}_${targetOppId}` : '',
-        projectKey ? `bidocs_sec_vi_${tenantId}_${projectKey}` : '',
-        cleanKey ? `bidocs_sec_vi_${tenantId}_${cleanKey}` : '',
-        projectRefNo ? `bidocs_sec_vi_${tenantId}_${projectRefNo}` : '',
-        activeProjectRefNo ? `bidocs_sec_vi_${tenantId}_${activeProjectRefNo}` : ''
+        projectKey && projectKey !== 'default' ? `bidocs_sec_vi_${tenantId}_${projectKey}` : '',
+        targetOppId && targetOppId !== 'default' ? `bidocs_sec_vi_${tenantId}_${targetOppId}` : ''
       ].filter(Boolean);
 
       let secViItems: any[] = [];
@@ -224,40 +204,8 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
         }));
         setBoqRows(rows);
       } else {
-        const candidateTechKeys = [
-          targetOppId ? `bidocs_tech_specs_${tenantId}_${targetOppId}` : '',
-          projectKey ? `bidocs_tech_specs_${tenantId}_${projectKey}` : '',
-          cleanKey ? `bidocs_tech_specs_${tenantId}_${cleanKey}` : '',
-          projectRefNo ? `bidocs_tech_specs_${tenantId}_${projectRefNo}` : ''
-        ].filter(Boolean);
-
-        let techItems: any[] = [];
-        for (const key of candidateTechKeys) {
-          const savedTech = localStorage.getItem(key);
-          if (savedTech) {
-            try {
-              const parsed = JSON.parse(savedTech);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                techItems = parsed;
-                break;
-              }
-            } catch (e) {}
-          }
-        }
-
-        if (techItems.length > 0) {
-          const rows: BoqItemRow[] = techItems.map((item: any, idx: number) => ({
-            id: `boq-sec7-${item.id || idx + 1}`,
-            itemNo: item.itemNo || `${idx + 1}`,
-            description: item.specification || item.description || `Item ${idx + 1}`,
-            unit: item.unit || 'Unit',
-            quantity: parseNum(item.quantity) || 1,
-            unitPrice: 0
-          }));
-          setBoqRows(rows);
-        } else {
-          setBoqRows([]);
-        }
+        // STRICT ISOLATION: Zero items for unconfigured projects
+        setBoqRows([]);
       }
     }
   };
@@ -266,32 +214,31 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
 
-    const activeKey = activeProjectRefNo || (list.length > 0 ? list[0].refNo : '');
-    if (activeKey) {
-      const match = list.find(p => p.refNo === activeKey || p.id === activeKey);
-      if (match) {
-        setSelectedOppId(match.id);
-        setProjectRefNo(match.refNo);
-        setProjectTitle(match.title);
-        setContractLocation(match.procuringEntity);
-        if (match.dateTimeSubmitted) setDateSubmitted(match.dateTimeSubmitted);
-        loadProjectData(match.refNo, match.title, match.id);
-      } else {
-        setProjectRefNo(activeKey);
-        if (activeProjectTitle) setProjectTitle(activeProjectTitle);
-        if (activeProcuringEntity) setContractLocation(activeProcuringEntity);
-        loadProjectData(activeKey, activeProjectTitle, activeKey);
-      }
+    let targetMatch: OpportunityProjectOption | undefined;
+    if (activeProjectRefNo) {
+      targetMatch = list.find(p => p.refNo === activeProjectRefNo || p.id === activeProjectRefNo);
     } else if (list.length > 0) {
-      const first = list[0];
-      setSelectedOppId(first.id);
-      setProjectRefNo(first.refNo);
-      setProjectTitle(first.title);
-      setContractLocation(first.procuringEntity);
-      if (first.dateTimeSubmitted) setDateSubmitted(first.dateTimeSubmitted);
-      loadProjectData(first.refNo, first.title, first.id);
+      targetMatch = list[0];
+    }
+
+    if (targetMatch) {
+      setSelectedOppId(targetMatch.id);
+      setProjectRefNo(targetMatch.refNo);
+      setProjectTitle(targetMatch.title);
+      setContractLocation(targetMatch.procuringEntity);
+      if (targetMatch.dateTimeSubmitted) setDateSubmitted(targetMatch.dateTimeSubmitted);
+      loadProjectData(targetMatch.refNo, targetMatch.title, targetMatch.id);
+    } else if (activeProjectRefNo) {
+      setProjectRefNo(activeProjectRefNo);
+      if (activeProjectTitle) setProjectTitle(activeProjectTitle);
+      if (activeProcuringEntity) setContractLocation(activeProcuringEntity);
+      loadProjectData(activeProjectRefNo, activeProjectTitle, activeProjectRefNo);
     } else {
-      loadProjectData('default');
+      setBoqRows([]);
+      setLaborLumpSum(0);
+      setLogisticsLumpSum(0);
+      setEquipmentLumpSum(0);
+      setIsSyncedFromDetailedEstimates(false);
     }
   }, [tenant?.id, activeProjectRefNo, activeProjectTitle, activeProcuringEntity]);
 
@@ -311,7 +258,11 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
       if (found.dateTimeSubmitted) setDateSubmitted(found.dateTimeSubmitted);
       loadProjectData(found.refNo, found.title, found.id);
     } else {
-      loadProjectData(oppId, '', oppId);
+      setBoqRows([]);
+      setLaborLumpSum(0);
+      setLogisticsLumpSum(0);
+      setEquipmentLumpSum(0);
+      setIsSyncedFromDetailedEstimates(false);
     }
   };
 
@@ -381,101 +332,22 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
   const totalLumpSums = (laborLumpSum || 0) + (logisticsLumpSum || 0) + (equipmentLumpSum || 0);
   const grandTotal = materialsSubtotal + totalLumpSums;
 
-  // Intelligent Multi-Page Pagination Chunking for 13" x 8.5" Landscape Paper
+  // Dynamic Auto-Fit Multi-Page Pagination Chunking for 13" x 8.5" Landscape Paper
   const pageChunks = useMemo(() => {
     const allRows = getAllDisplayBoqRows();
     if (allRows.length === 0) return [[]];
 
-    const getRowHeight = (desc: string) => {
-      const dLen = (desc || '').length;
-      // Col 2 width (54% of ~12in landscape) holds ~85 chars per line at 8pt font
-      const lineCount = Math.max(1, Math.ceil(dLen / 85));
-      return 18 + (lineCount - 1) * 11;
-    };
-
-    const pages: BoqItemRow[][] = [];
-    let currentChunk: BoqItemRow[] = [];
-    let currentHeight = 0;
-    let pageIdx = 0;
-
-    for (let idx = 0; idx < allRows.length; idx++) {
-      const row = allRows[idx];
-      const rHeight = getRowHeight(row.description);
-      const isPage1 = pageIdx === 0;
-
-      // Height budget for 13" x 8.5" Landscape Legal (740px printable)
-      // Page 1 has big header block (~130px), final page needs space for summary + signature (~210px)
-      // Continuation pages have no top header rows (reclaimed 130px)
-      const finalPageLimit = isPage1 ? 380 : 530;
-      const continuationLimit = isPage1 ? 580 : 710;
-
-      let remainingHeight = 0;
-      for (let r = idx; r < allRows.length; r++) {
-        remainingHeight += getRowHeight(allRows[r].description);
+    return autoFitPageChunks(
+      allRows,
+      (row) => calculateRowHeight(row.description || '', 80, 13, 8, 22),
+      {
+        orientation: 'landscape',
+        columnCharWidth: 80,
+        headerHeightPx: 110,
+        footerHeightPx: 180,
+        runningFooterPx: 30
       }
-
-      if (currentHeight + remainingHeight <= finalPageLimit) {
-        currentChunk.push(row);
-        currentHeight += rHeight;
-        continue;
-      }
-
-      if (currentHeight + rHeight > continuationLimit && currentChunk.length > 0) {
-        const remainingSpace = continuationLimit - currentHeight;
-        const desc = row.description || '';
-
-        // If there is usable space on current page, split description across pages
-        if (remainingSpace >= 30 && desc.length > 50) {
-          const linesFit = Math.max(1, Math.floor((remainingSpace - 18) / 11));
-          const charsFit = Math.max(40, linesFit * 85);
-
-          let splitIdx = desc.lastIndexOf(' ', charsFit);
-          if (splitIdx < 30) splitIdx = charsFit;
-
-          const part1Desc = desc.substring(0, splitIdx).trim();
-          const part2Desc = desc.substring(splitIdx).trim();
-
-          if (part1Desc.length > 15 && part2Desc.length > 10) {
-            const part1Row: BoqItemRow = {
-              ...row,
-              id: `${row.id}-pt1`,
-              description: part1Desc
-            };
-            const part2Row: BoqItemRow = {
-              ...row,
-              id: `${row.id}-pt2`,
-              itemNo: row.itemNo,
-              description: part2Desc,
-              quantity: '',
-              unitPrice: '',
-              isSplitContinuation: true
-            };
-
-            currentChunk.push(part1Row);
-            pages.push(currentChunk);
-
-            pageIdx++;
-            currentChunk = [part2Row];
-            currentHeight = getRowHeight(part2Desc);
-            continue;
-          }
-        }
-
-        pages.push(currentChunk);
-        pageIdx++;
-        currentChunk = [row];
-        currentHeight = rHeight;
-      } else {
-        currentChunk.push(row);
-        currentHeight += rHeight;
-      }
-    }
-
-    if (currentChunk.length > 0) {
-      pages.push(currentChunk);
-    }
-
-    return pages;
+    );
   }, [boqRows, includeLumpSumsInTable, laborLumpSum, logisticsLumpSum, equipmentLumpSum]);
 
   const totalPagesCount = pageChunks.length;
@@ -670,13 +542,23 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
               <div className="col-span-full">
-                <label className="block text-slate-300 font-mono mb-1 font-bold">
-                  Select Active Bidding Opportunity:
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-300 font-mono font-bold flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Target Bidding Project:</span>
+                  </label>
+                  {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                    <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                      <Lock className="w-3 h-3 text-amber-400" />
+                      <span>Project Locked (Strict Isolation Active)</span>
+                    </span>
+                  )}
+                </div>
                 <select
                   value={selectedOppId}
+                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => handleSelectOpportunity(e.target.value)}
-                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer"
+                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner disabled:opacity-85 disabled:cursor-not-allowed"
                 >
                   <option value="">-- Select Opportunity --</option>
                   {oppProjects.map(p => (
@@ -692,9 +574,10 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
                 <input
                   type="text"
                   value={projectRefNo}
+                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => setProjectRefNo(e.target.value)}
                   placeholder="e.g. 2026-FIN-009"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono font-bold"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono font-bold disabled:opacity-75 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -771,66 +654,87 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
                           <col style={{ width: '13.5%' }} />
                           <col style={{ width: '15%' }} />
                         </colgroup>
-                        {isFirstPage && (
-                          <thead>
-                            {/* Row 1: Document Title Header */}
-                            <tr className="border-b border-slate-950 bg-slate-100 text-center">
-                              <td colSpan={6} className="p-1 font-bold text-slate-950 uppercase tracking-widest text-[9.5pt]">
-                                BILL OF QUANTITIES
-                              </td>
-                            </tr>
+                        <thead>
+                          {isFirstPage ? (
+                            <>
+                              {/* Row 1: Document Title Header */}
+                              <tr className="border-b border-slate-950 bg-slate-100 text-center">
+                                <td colSpan={6} className="p-1 font-bold text-slate-950 uppercase tracking-widest text-[9.5pt]">
+                                  BILL OF QUANTITIES
+                                </td>
+                              </tr>
 
-                            {/* Row 2: Name / Location */}
-                            <tr>
-                              <td colSpan={6} className="border border-slate-950 p-1.5 text-left font-bold italic text-[8pt]">
-                                Name: <span className="not-italic uppercase">{projectTitle || '____________________________________________________________________'}</span>
-                                {contractLocation && (
-                                  <span className="ml-4 font-bold italic">
-                                    Location: <span className="not-italic uppercase">{contractLocation}</span>
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
+                              {/* Row 2: Name / Location */}
+                              <tr>
+                                <td colSpan={6} className="border border-slate-950 p-1.5 text-left font-bold italic text-[8pt]">
+                                  Name: <span className="not-italic uppercase">{projectTitle || '____________________________________________________________________'}</span>
+                                  {contractLocation && (
+                                    <span className="ml-4 font-bold italic">
+                                      Location: <span className="not-italic uppercase">{contractLocation}</span>
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
 
-                            {/* Row 3: Name of Bidder (Left) & Project ID No. (Right) */}
-                            <tr>
-                              <td colSpan={4} className="border border-slate-950 p-1.5 text-left text-[9pt]">
-                                <span className="font-semibold">Name of Bidder: </span>
-                                <span className="font-bold uppercase">{companyName || 'Quantum Cloud Corporation'}</span>
-                              </td>
-                              <td colSpan={2} className="border border-slate-950 p-1.5 text-left text-[9pt]">
-                                <span className="font-medium">Project ID No. </span>
-                                <span className="font-bold font-mono pl-1">{projectRefNo || 'N/A'}</span>
-                              </td>
-                            </tr>
+                              {/* Row 3: Name of Bidder (Left) & Project ID No. (Right) */}
+                              <tr>
+                                <td colSpan={4} className="border border-slate-950 p-1.5 text-left text-[9pt]">
+                                  <span className="font-semibold">Name of Bidder: </span>
+                                  <span className="font-bold uppercase">{companyName || 'Quantum Cloud Corporation'}</span>
+                                </td>
+                                <td colSpan={2} className="border border-slate-950 p-1.5 text-left text-[9pt]">
+                                  <span className="font-medium">Project ID No. </span>
+                                  <span className="font-bold font-mono pl-1">{projectRefNo || 'N/A'}</span>
+                                </td>
+                              </tr>
 
-                            {/* Row 4: Column Number Headers (1, 2, 3, 4, 5, 6) */}
-                            <tr className="text-center font-semibold border-b border-slate-950 text-[8pt] bg-slate-100 font-mono">
-                              <td className="border border-slate-950 py-0.5 px-1">1</td>
-                              <td className="border border-slate-950 py-0.5 px-2">2</td>
-                              <td className="border border-slate-950 py-0.5 px-1">3</td>
-                              <td className="border border-slate-950 py-0.5 px-1">4</td>
-                              <td className="border border-slate-950 py-0.5 px-1">5</td>
-                              <td className="border border-slate-950 py-0.5 px-1">6</td>
-                            </tr>
+                              {/* Row 4: Column Number Headers (1, 2, 3, 4, 5, 6) */}
+                              <tr className="text-center font-semibold border-b border-slate-950 text-[8pt] bg-slate-100 font-mono">
+                                <td className="border border-slate-950 py-0.5 px-1">1</td>
+                                <td className="border border-slate-950 py-0.5 px-2">2</td>
+                                <td className="border border-slate-950 py-0.5 px-1">3</td>
+                                <td className="border border-slate-950 py-0.5 px-1">4</td>
+                                <td className="border border-slate-950 py-0.5 px-1">5</td>
+                                <td className="border border-slate-950 py-0.5 px-1">6</td>
+                              </tr>
 
-                            {/* Row 5: Column Title Headers */}
-                            <tr className="text-center font-bold border-b-2 border-slate-950 text-[7.5pt] uppercase bg-slate-50">
-                              <td className="border border-slate-950 p-1 italic">Item</td>
-                              <td className="border border-slate-950 p-1 italic text-left pl-2">Description</td>
-                              <td className="border border-slate-950 p-1">UNIT</td>
-                              <td className="border border-slate-950 p-1">QTY</td>
-                              <td className="border border-slate-950 p-1">
-                                <div>UNIT PRICE</div>
-                                <div className="text-[7pt] lowercase italic text-slate-700">(Pesos)</div>
-                              </td>
-                              <td className="border border-slate-950 p-1">
-                                <div>AMOUNT</div>
-                                <div className="text-[7pt] italic text-slate-700">(Pesos)</div>
-                              </td>
-                            </tr>
-                          </thead>
-                        )}
+                              {/* Row 5: Column Title Headers */}
+                              <tr className="text-center font-bold border-b-2 border-slate-950 text-[7.5pt] uppercase bg-slate-50">
+                                <td className="border border-slate-950 p-1 italic">Item</td>
+                                <td className="border border-slate-950 p-1 italic text-left pl-2">Description</td>
+                                <td className="border border-slate-950 p-1">UNIT</td>
+                                <td className="border border-slate-950 p-1">QTY</td>
+                                <td className="border border-slate-950 p-1">
+                                  <div>UNIT PRICE</div>
+                                  <div className="text-[7pt] lowercase italic text-slate-700">(Pesos)</div>
+                                </td>
+                                <td className="border border-slate-950 p-1">
+                                  <div>AMOUNT</div>
+                                  <div className="text-[7pt] italic text-slate-700">(Pesos)</div>
+                                </td>
+                              </tr>
+                            </>
+                          ) : (
+                            <>
+                              <tr className="text-center font-semibold border-b border-slate-950 text-[7.5pt] bg-slate-100 font-mono">
+                                <td className="border border-slate-950 py-0.5 px-1">1</td>
+                                <td className="border border-slate-950 py-0.5 px-2">2</td>
+                                <td className="border border-slate-950 py-0.5 px-1">3</td>
+                                <td className="border border-slate-950 py-0.5 px-1">4</td>
+                                <td className="border border-slate-950 py-0.5 px-1">5</td>
+                                <td className="border border-slate-950 py-0.5 px-1">6</td>
+                              </tr>
+                              <tr className="text-center font-bold border-b-2 border-slate-950 text-[7pt] uppercase bg-slate-50">
+                                <td className="border border-slate-950 p-0.5 italic">Item</td>
+                                <td className="border border-slate-950 p-0.5 italic text-left pl-2">Description (Continuation)</td>
+                                <td className="border border-slate-950 p-0.5">UNIT</td>
+                                <td className="border border-slate-950 p-0.5">QTY</td>
+                                <td className="border border-slate-950 p-0.5">UNIT PRICE</td>
+                                <td className="border border-slate-950 p-0.5">AMOUNT</td>
+                              </tr>
+                            </>
+                          )}
+                        </thead>
                         <tbody>
                         
                         {/* BOQ Data Rows for Current Page Chunk */}

@@ -94,39 +94,37 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
     setError('');
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      const generatedCode = brandCode || companyName.split(' ')[0].toUpperCase();
-      const success = registerTenantAndUser(
-        {
-          companyName,
-          brandCode: generatedCode,
-          brandColor,
-          tin,
-          secDtiRegNo,
-          pcabLicenseNo,
-          pcabCategory,
-          philgepsPlatinumNo: philgepsPlatinumNo || '',
-          address: address || '',
-          authorizedSignatory: {
-            name: signatoryName,
-            title: signatoryTitle,
-            tin: signatoryTin || tin
-          },
-          preferredRegime,
-          primaryProcurementType
+    const generatedCode = brandCode || companyName.split(' ')[0].toUpperCase();
+    const success = registerTenantAndUser(
+      {
+        companyName,
+        brandCode: generatedCode,
+        brandColor,
+        tin,
+        secDtiRegNo,
+        pcabLicenseNo,
+        pcabCategory,
+        philgepsPlatinumNo: philgepsPlatinumNo || '',
+        address: address || '',
+        authorizedSignatory: {
+          name: signatoryName,
+          title: signatoryTitle,
+          tin: signatoryTin || tin
         },
-        {
-          email,
-          fullName,
-          role,
-          password: password || undefined
-        }
-      );
-      setIsSubmitting(false);
-      if (!success) {
-        setError('Registration failed. Please review your details.');
+        preferredRegime,
+        primaryProcurementType
+      },
+      {
+        email,
+        fullName,
+        role,
+        password: password || undefined
       }
-    }, 600);
+    );
+    setIsSubmitting(false);
+    if (!success) {
+      setError('Registration failed. Please review your details.');
+    }
   };
 
   return (

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, generateThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
+import { autoFitPageChunks, calculateRowHeight, getAutoFitTypographyClass } from '../../../utils/autoFitEngine';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
@@ -16,7 +17,8 @@ import {
   RefreshCw,
   Sparkles,
   FileSpreadsheet,
-  Type
+  Type,
+  Lock
 } from 'lucide-react';
 
 export interface ScheduleItem {
@@ -164,7 +166,44 @@ export const getServicesCostAmount = (itemList: ScheduleItem[], percentage: numb
 
 export const formatDescriptionText = (text: string): string => {
   if (!text) return '';
-  return text.replace(/([a-zA-Z0-9])&([a-zA-Z0-9])/g, '$1 & $2');
+  let formatted = text;
+
+  // 1. Insert space between lowercase letter/number and uppercase letter (e.g. cablesCable -> cables Cable, 1Lot -> 1 Lot)
+  formatted = formatted.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+
+  // 2. Insert space between uppercase sequence and uppercase+lowercase word (e.g. USB3.0PORTREAR -> USB 3.0 PORT REAR, EXCEPTIONAccessories -> EXCEPTION Accessories)
+  formatted = formatted.replace(/([A-Z]{2,})([A-Z][a-z])/g, '$1 $2');
+
+  // 3. Known concatenated uppercase words commonly extracted from procurement specs without spaces
+  const gluedKeywords = [
+    'WARRANTY', 'SERVICE', 'AGREEMENT', 'COMPREHENSIVE', 'HARDWARE', 'NETWORK',
+    'INFRASTRUCTURE', 'INSTALLATION', 'CONFIGURATION', 'DEVICES', 'CABLE', 'LAYING',
+    'TERMINATION', 'TESTING', 'PREVENTIVE', 'MAINTENANCE', 'TECHNICAL', 'SUPPORT',
+    'EXCEPTION', 'ACCESSORIES', 'WORKMANSHIP', 'STANDARD', 'EDITION', 'ENTERPRISE',
+    'SERVER', 'PROCESSOR', 'MEMORY', 'STORAGE', 'CONTROLLER', 'POWER', 'SUPPLY',
+    'PORT', 'PORTS', 'REAR', 'FRONT', 'DIMENSION', 'YEAR', 'YEARS', 'MONTH', 'MONTHS', 'DAYS',
+    'LOT', 'UNIT', 'UNITS', 'SET', 'SETS', 'PCS', 'PIECES'
+  ];
+
+  for (const kw of gluedKeywords) {
+    const reg1 = new RegExp(`([a-z0-9])(${kw})`, 'gi');
+    formatted = formatted.replace(reg1, '$1 $2');
+    const reg2 = new RegExp(`(${kw})([A-Z][a-z])`, 'g');
+    formatted = formatted.replace(reg2, '$1 $2');
+  }
+
+  // 4. Insert space after punctuation (comma, semicolon, colon, closing parenthesis, period) if directly followed by a word/character without space
+  formatted = formatted.replace(/([,:;)])([a-zA-Z0-9])/g, '$1 $2');
+  formatted = formatted.replace(/([a-zA-Z0-9])([(])/g, '$1 $2');
+  formatted = formatted.replace(/([a-zA-Z0-9])&([a-zA-Z0-9])/g, '$1 & $2');
+
+  // 5. Insert space between letters and numbers when appropriate (e.g. USB3.0 -> USB 3.0, 3000VA -> 3000 VA)
+  formatted = formatted.replace(/([a-zA-Z])(\d+)/g, '$1 $2');
+  formatted = formatted.replace(/(\d+)([A-Z][a-z]+)/g, '$1 $2');
+
+  // 6. Clean up multiple spaces
+  formatted = formatted.replace(/[ \t]+/g, ' ');
+  return formatted;
 };
 
 export const getServicesCostDisplay = (itemList: ScheduleItem[], percentage: number = 35, customAmountStr?: string): string => {
@@ -264,7 +303,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     }
   }, [tenant?.id, activeProjectRefNo]);
 
-  // Load shared Section VI data for current project
+  // Load shared Section VI data for current project (Instantaneous & Multi-Key Synced)
   useEffect(() => {
     if (!projectScopeKey) {
       setItems(BLANK_SECTION_VI_ITEMS);
@@ -273,62 +312,90 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       setServicesCustomAmount('');
       return;
     }
-    
-    const storageKey = `bidocs_sec_vi_${tenant?.id || 'default'}_${projectScopeKey}`;
-    const saved = localStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setItems(parsed);
-        } else {
-          setItems(BLANK_SECTION_VI_ITEMS);
-        }
-      } catch (e) {
-        setItems(BLANK_SECTION_VI_ITEMS);
-      }
-    } else {
-      setItems(BLANK_SECTION_VI_ITEMS);
-    }
 
-    const servicesKey = `bidocs_sec_vi_services_${tenant?.id || 'default'}_${projectScopeKey}`;
-    const savedServices = localStorage.getItem(servicesKey);
-    if (savedServices) {
-      try {
-        const parsedSvc = JSON.parse(savedServices);
-        if (parsedSvc) {
-          if (parsedSvc.description !== undefined) setServicesDescription(parsedSvc.description);
-          if (parsedSvc.percentage !== undefined) setServicesPercentage(parsedSvc.percentage);
-          if (parsedSvc.customAmount !== undefined) setServicesCustomAmount(parsedSvc.customAmount);
-        }
-      } catch (e) {}
-    } else {
+    const tenantKey = tenant?.id || 'default';
+    const candidateKeys = [
+      `bidocs_sec_vi_${tenantKey}_${projectScopeKey}`,
+      selectedOppId ? `bidocs_sec_vi_${tenantKey}_${selectedOppId}` : '',
+      projectRefNo ? `bidocs_sec_vi_${tenantKey}_${projectRefNo}` : ''
+    ].filter(Boolean);
+
+    let foundItems: ScheduleItem[] | null = null;
+    for (const key of candidateKeys) {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            foundItems = parsed;
+            break;
+          }
+        } catch (e) {}
+      }
+    }
+    setItems(foundItems || BLANK_SECTION_VI_ITEMS);
+
+    const candidateServiceKeys = [
+      `bidocs_sec_vi_services_${tenantKey}_${projectScopeKey}`,
+      selectedOppId ? `bidocs_sec_vi_services_${tenantKey}_${selectedOppId}` : '',
+      projectRefNo ? `bidocs_sec_vi_services_${tenantKey}_${projectRefNo}` : ''
+    ].filter(Boolean);
+
+    let foundServices = false;
+    for (const sKey of candidateServiceKeys) {
+      const savedServices = localStorage.getItem(sKey);
+      if (savedServices) {
+        try {
+          const parsedSvc = JSON.parse(savedServices);
+          if (parsedSvc) {
+            if (parsedSvc.description !== undefined) setServicesDescription(parsedSvc.description);
+            if (parsedSvc.percentage !== undefined) setServicesPercentage(parsedSvc.percentage);
+            if (parsedSvc.customAmount !== undefined) setServicesCustomAmount(parsedSvc.customAmount);
+            foundServices = true;
+            break;
+          }
+        } catch (e) {}
+      }
+    }
+    if (!foundServices) {
       setServicesDescription('');
       setServicesPercentage(0);
       setServicesCustomAmount('');
     }
-  }, [projectScopeKey, tenant?.id]);
+  }, [projectScopeKey, selectedOppId, projectRefNo, tenant?.id]);
 
   const saveServicesData = (desc: string, pct: number, customAmt: string) => {
     setServicesDescription(desc);
     setServicesPercentage(pct);
     setServicesCustomAmount(customAmt);
-    if (projectScopeKey) {
-      const servicesKey = `bidocs_sec_vi_services_${tenant?.id || 'default'}_${projectScopeKey}`;
-      localStorage.setItem(servicesKey, JSON.stringify({
-        description: desc,
-        percentage: pct,
-        customAmount: customAmt
-      }));
-    }
+    const tenantKey = tenant?.id || 'default';
+    const keys = new Set([
+      projectScopeKey ? `bidocs_sec_vi_services_${tenantKey}_${projectScopeKey}` : '',
+      selectedOppId ? `bidocs_sec_vi_services_${tenantKey}_${selectedOppId}` : '',
+      projectRefNo ? `bidocs_sec_vi_services_${tenantKey}_${projectRefNo}` : ''
+    ]);
+    const json = JSON.stringify({
+      description: desc,
+      percentage: pct,
+      customAmount: customAmt
+    });
+    keys.forEach(k => {
+      if (k) localStorage.setItem(k, json);
+    });
   };
 
   const saveSharedItems = (newItems: ScheduleItem[]) => {
     setItems(newItems);
-    if (projectScopeKey) {
-      const storageKey = `bidocs_sec_vi_${tenant?.id || 'default'}_${projectScopeKey}`;
-      localStorage.setItem(storageKey, JSON.stringify(newItems));
-    }
+    const tenantKey = tenant?.id || 'default';
+    const keys = new Set([
+      projectScopeKey ? `bidocs_sec_vi_${tenantKey}_${projectScopeKey}` : '',
+      selectedOppId ? `bidocs_sec_vi_${tenantKey}_${selectedOppId}` : '',
+      projectRefNo ? `bidocs_sec_vi_${tenantKey}_${projectRefNo}` : ''
+    ]);
+    const json = JSON.stringify(newItems);
+    keys.forEach(k => {
+      if (k) localStorage.setItem(k, json);
+    });
   };
 
   const handleDeliveredChange = (index: number, newDelivered: string) => {
@@ -390,7 +457,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
 
   const handleExportPdf = async () => {
     setIsExporting(true);
-    await new Promise((r) => setTimeout(r, 200));
     try {
       const fileName = `${projectRefNo}_Section_VI_Schedule_of_Requirements_${todayStr}.pdf`;
       const containerElem = document.getElementById('section-vi-pages-container') || document.getElementById('section-vi-paper');
@@ -426,8 +492,8 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       const qty = `"${(it.quantity || '').replace(/"/g, '""')}"`;
       const unitAmt = `"${(it.unitAmount || '').replace(/"/g, '""')}"`;
       const tot = `"${(it.total || computeTotalAmount(it.unitAmount, it.quantity) || '').replace(/"/g, '""')}"`;
-      const del = `"${(it.delivered || '').replace(/"/g, '""')}"`;
-      csvContent += `${itemNum},${desc},${qty},${unitAmt},${tot},${del}\n`;
+      const deliv = `"${(it.delivered || defaultDelivery).replace(/"/g, '""')}"`;
+      csvContent += `${itemNum},${desc},${qty},${unitAmt},${tot},${deliv}\n`;
     });
 
     const totalQtyStr = computeTotalQuantity(items);
@@ -451,7 +517,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
 
   const handleSave = async () => {
     setIsExporting(true);
-    await new Promise((r) => setTimeout(r, 200));
     try {
       const containerElem = (document.getElementById('section-vi-pages-container') || document.getElementById('section-vi-paper')) as HTMLElement;
       let dataUrl: string | undefined = undefined;
@@ -476,78 +541,35 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     }
   };
 
+  const totalCharactersInDoc = useMemo(() => {
+    return items.reduce((sum, it) => sum + (it.description || '').length, 0);
+  }, [items]);
+
+  const autoTypographyClass = useMemo(() => {
+    return getAutoFitTypographyClass(totalCharactersInDoc, items.length);
+  }, [totalCharactersInDoc, items.length]);
+
   const getTableFontSizeClass = () => {
-    if (fontSizeMode === 'fine') return 'text-[10px] leading-snug';
-    if (fontSizeMode === 'xs') return 'text-xs leading-normal';
-    return 'text-sm leading-relaxed';
+    if (fontSizeMode === 'fine') return 'text-[9.5px] leading-tight';
+    if (fontSizeMode === 'xs') return autoTypographyClass;
+    return 'text-xs leading-normal';
   };
 
-  // --- CONTENT-AWARE ACCURATE PRINT-CALIBRATED CHUNKING ---
-  // Calculates exact row heights based on multiline text to fill each page to maximum capacity without overflowing or splitting
+  // --- DYNAMIC AUTO-FIT PAGE-PACKING ENGINE ---
+  // Automatically measures and packs all information inside the minimum necessary number of pages with zero empty space
   const pageChunks = useMemo<PageRow[][]>(() => {
-    if (items.length === 0) return [[]];
-
-    const getRowHeight = (item: ScheduleItem) => {
-      const desc = item.description || '';
-      const paragraphs = desc.split('\n');
-      let lines = 0;
-      for (const para of paragraphs) {
-        lines += Math.max(1, Math.ceil((para.length || 1) / 85));
+    const indexedItems: PageRow[] = items.map((it, idx) => ({ item: it, index: idx }));
+    return autoFitPageChunks(
+      indexedItems,
+      (row) => calculateRowHeight(row.item.description || '', 65, 13.5, 8, 22),
+      {
+        orientation: 'portrait',
+        columnCharWidth: 65,
+        headerHeightPx: 170,
+        footerHeightPx: 260,
+        runningFooterPx: 30
       }
-      return Math.max(32, 16 + lines * 13);
-    };
-
-    const rowHeights = items.map((it) => getRowHeight(it));
-    const totalContentHeight = rowHeights.reduce((sum, h) => sum + h, 0);
-
-    // Single-page check: if all content fits in 680px alongside header, summary & signatory in Portrait
-    if (totalContentHeight <= 680) {
-      return [items.map((it, idx) => ({ item: it, index: idx }))];
-    }
-
-    const pages: PageRow[][] = [];
-    let currentChunk: PageRow[] = [];
-    let currentHeight = 0;
-    let pageIdx = 0;
-
-    for (let idx = 0; idx < items.length; idx++) {
-      const item = items[idx];
-      const rHeight = rowHeights[idx];
-      const isPage1 = pageIdx === 0;
-
-      // Calculate remaining height of items from idx to end
-      let remainingHeight = 0;
-      for (let r = idx; r < items.length; r++) {
-        remainingHeight += rowHeights[r];
-      }
-
-      const finalPageLimit = isPage1 ? 680 : 850;
-      const continuationPageLimit = isPage1 ? 920 : 1100;
-
-      // If all remaining items fit in final page limit, include them on current page
-      if (currentHeight + remainingHeight <= finalPageLimit) {
-        currentChunk.push({ item, index: idx });
-        currentHeight += rHeight;
-        continue;
-      }
-
-      // If adding this item exceeds the continuation limit, finalize current page
-      if (currentHeight + rHeight > continuationPageLimit && currentChunk.length > 0) {
-        pages.push(currentChunk);
-        pageIdx++;
-        currentChunk = [{ item, index: idx }];
-        currentHeight = rHeight;
-      } else {
-        currentChunk.push({ item, index: idx });
-        currentHeight += rHeight;
-      }
-    }
-
-    if (currentChunk.length > 0) {
-      pages.push(currentChunk);
-    }
-
-    return pages;
+    );
   }, [items]);
 
   const totalPages = pageChunks.length;
@@ -556,24 +578,26 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     <div
       key={`sec-6-page-${pIdx}`}
       id={pIdx === 0 ? 'section-vi-paper' : `section-vi-paper-p${pIdx + 1}`}
-      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 sm:p-8 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
+      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
     >
       <div>
         {/* COMPANY & PROJECT HEADER BLOCK (PAGE 1 ONLY) */}
         {pIdx === 0 ? (
-          <div className="mb-3 pb-2.5 border-b-2 border-slate-900 font-serif">
+          <div className="mb-2 pb-2 border-b-2 border-slate-900 font-serif">
             {/* Centered Company Name Header */}
-            <div className="text-center pb-2 border-b border-slate-300">
+            <div className="text-center pb-1.5 border-b border-slate-300">
               <h1 className="text-lg font-bold uppercase tracking-wider text-black font-serif">
                 {companyName}
               </h1>
-              <p className="text-xs text-slate-700 font-serif font-semibold mt-0.5 uppercase tracking-wide">
-                
-              </p>
+              {companyAddress && (
+                <p className="text-xs text-slate-700 font-serif font-medium mt-0.5 uppercase tracking-wide">
+                  {companyAddress}
+                </p>
+              )}
             </div>
 
             {/* 4-Field Project Information Grid */}
-            <div className="mt-2.5 grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs font-serif text-black">
+            <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-xs font-serif text-black">
               <div>
                 <span className="font-bold">Project Name: </span>
                 <span className="font-semibold text-slate-900">{projectTitle || 'N/A'}</span>
@@ -596,10 +620,13 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
 
         {/* FORM TITLE (PAGE 1 ONLY) */}
         {pIdx === 0 ? (
-          <div className="mb-3 text-center">
-            <h2 className="text-lg font-bold uppercase tracking-wide text-black border-b border-black inline-block pb-0.5 font-serif">
+          <div className="mb-2 text-center">
+            <h2 className="text-base font-bold uppercase tracking-wide text-black border-b border-black inline-block pb-0.5 font-serif">
               Section VI. Schedule of Requirements
             </h2>
+            <p className="text-[11px] font-serif text-slate-700 italic mt-1 text-justify leading-snug">
+              The delivery schedule expressed as weeks/months stipulates hereafter a delivery date which is the date of delivery to the project site.
+            </p>
           </div>
         ) : null}
 
@@ -608,29 +635,40 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
           <table className="w-full border-collapse border border-black text-xs font-serif table-fixed">
             <colgroup>
               <col className="w-[5%]" />
-              <col className="w-[40%]" />
-              <col className="w-[10%]" />
+              <col className="w-[41%]" />
+              <col className="w-[9%]" />
               <col className="w-[14%]" />
-              <col className="w-[16%]" />
               <col className="w-[15%]" />
+              <col className="w-[16%]" />
             </colgroup>
             {pIdx === 0 ? (
               <thead>
-                <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[11px]">
-                  <th className="border border-black px-1.5 py-1.5 w-[5%]">Item No.</th>
-                  <th className="border border-black px-2 py-1.5 text-left w-[40%]">Description</th>
-                  <th className="border border-black px-1.5 py-1.5 w-[10%]">Qty</th>
-                  <th className="border border-black px-2 py-1.5 w-[14%]">Unit Cost</th>
-                  <th className="border border-black px-2 py-1.5 w-[16%]">Total Cost</th>
-                  <th className="border border-black px-2 py-1.5 w-[15%]">Delivered Weeks/Months</th>
+                <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[10.5px]">
+                  <th className="border border-black px-1 py-1.5 w-[5%]">Item No.</th>
+                  <th className="border border-black px-2 py-1.5 text-left w-[41%]">Description</th>
+                  <th className="border border-black px-1 py-1.5 w-[9%]">Qty</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[14%]">Unit Cost</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[15%]">Total Cost</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[16%] text-center">Delivered, Weeks/Months</th>
                 </tr>
               </thead>
-            ) : null}
+            ) : (
+              <thead>
+                <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[10px]">
+                  <th className="border border-black px-1 py-1 w-[5%]">Item No.</th>
+                  <th className="border border-black px-2 py-1 text-left w-[41%]">Description (Continuation)</th>
+                  <th className="border border-black px-1 py-1 w-[9%]">Qty</th>
+                  <th className="border border-black px-1.5 py-1 w-[14%]">Unit Cost</th>
+                  <th className="border border-black px-1.5 py-1 w-[15%]">Total Cost</th>
+                  <th className="border border-black px-1.5 py-1 w-[16%] text-center">Delivered</th>
+                </tr>
+              </thead>
+            )}
             <tbody>
               {chunk.map(({ item: rowItem, index: itemIdx }) => (
                 <tr key={rowItem.id} className="border-b border-black hover:bg-amber-50/20 even:bg-slate-50/30 transition-colors">
                   {/* 1. Item # */}
-                  <td className="border border-black px-1.5 py-2 text-center font-serif font-bold align-top text-slate-950">
+                  <td className="border border-black px-1 py-1.5 text-center font-serif font-bold align-top text-slate-950">
                     <div className="flex flex-col items-center justify-between h-full">
                       <span className="block pt-0.5 font-bold text-xs">{itemIdx + 1}</span>
                       {!isExporting && items.length > 1 && (
@@ -647,10 +685,10 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                   </td>
 
                   {/* 2. Description */}
-                  <td className="border border-black px-3.5 py-2 font-serif align-top break-words">
+                  <td className="border border-black px-2.5 py-1.5 font-serif align-top break-words">
                     {!isExporting ? (
                       <textarea
-                        rows={Math.max(2, Math.ceil((rowItem.description || '').length / 90))}
+                        rows={Math.max(2, Math.ceil((rowItem.description || '').length / 85))}
                         value={rowItem.description}
                         onChange={(e) => handleFieldChange(itemIdx, 'description', e.target.value)}
                         placeholder="Enter detailed technical specification..."
@@ -663,7 +701,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                   </td>
 
                   {/* 3. Quantity */}
-                  <td className="border border-black px-1.5 py-2 font-serif text-center align-top">
+                  <td className="border border-black px-1 py-1.5 font-serif text-center align-top">
                     {!isExporting ? (
                       <input
                         type="text"
@@ -679,7 +717,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                   </td>
 
                   {/* 4. Unit Amount */}
-                  <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
+                  <td className="border border-black px-1.5 py-1.5 font-serif text-center align-top break-words">
                     {!isExporting ? (
                       <input
                         type="text"
@@ -717,7 +755,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                   </td>
 
                   {/* 5. Total Amount */}
-                  <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
+                  <td className="border border-black px-1.5 py-1.5 font-serif text-center align-top break-words">
                     {!isExporting ? (
                       <input
                         type="text"
@@ -732,24 +770,33 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                     </div>
                   </td>
 
-                  {/* 6. Delivered */}
-                  <td className="border border-black px-2.5 py-2 font-serif text-center align-top break-words">
+                  {/* 6. Delivered, Weeks/Months */}
+                  <td className="border border-black px-1.5 py-1.5 font-serif text-center align-top break-words bg-emerald-50/20">
                     {!isExporting ? (
                       <input
                         type="text"
-                        value={rowItem.delivered}
+                        value={rowItem.delivered || ''}
                         onChange={(e) => handleFieldChange(itemIdx, 'delivered', e.target.value)}
-                        placeholder="e.g. 30 Days"
-                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${itemIdx === 0 ? 'font-semibold text-blue-950' : ''
-                          } ${getTableFontSizeClass()}`}
+                        placeholder="e.g. 30 Calendar Days"
+                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 font-medium ${getTableFontSizeClass()}`}
+                        title="Delivery Schedule (Editing Line 1 cascades to all rows)"
                       />
                     ) : null}
-                    <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
-                      {rowItem.delivered || ''}
+                    <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-medium break-words ${getTableFontSizeClass()}`}>
+                      {rowItem.delivered || defaultDelivery}
                     </div>
                   </td>
                 </tr>
               ))}
+
+              {/* Statutory *** NOTHING FOLLOWS *** Security Seal (Final Page after items) */}
+              {pIdx === totalPages - 1 && (
+                <tr className="border-b border-black text-center font-bold tracking-widest text-[10.5px] bg-slate-100/60 uppercase text-slate-800">
+                  <td colSpan={6} className="py-1">
+                    *** NOTHING FOLLOWS ***
+                  </td>
+                </tr>
+              )}
             </tbody>
 
             {/* SUMMARY ROWS (TOTAL MATERIALS, SERVICES, GRAND TOTAL) ONLY ON FINAL PAGE */}
@@ -777,92 +824,94 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                       </span>
                     </div>
                   </td>
-                  <td className="border border-black px-1.5 py-1.5 text-center font-bold text-black text-xs font-mono break-words bg-amber-50/70">
+                  <td className="border border-black px-1 py-1.5 text-center font-bold text-black text-xs font-mono break-words bg-amber-50/70">
                     {computeTotalQuantity(items)}
                   </td>
-                  <td className="border border-black px-2 py-1.5 text-center text-xs font-serif text-slate-500">
+                  <td className="border border-black px-1.5 py-1.5 text-center text-xs font-serif text-slate-500">
                     —
                   </td>
-                  <td className="border border-black px-2 py-1.5 text-center font-bold text-black text-xs font-mono break-words bg-amber-50/90">
+                  <td className="border border-black px-1.5 py-1.5 text-center font-bold text-black text-xs font-mono break-words bg-amber-50/90">
                     {computeGrandTotalMaterials(items)}
                   </td>
-                  <td className="border border-black px-2.5 py-1.5 text-center text-xs font-serif text-slate-500">
+                  <td className="border border-black px-1.5 py-1.5 text-center text-xs font-serif text-slate-500">
                     —
                   </td>
                 </tr>
 
-                {/* 2. Services & Logistics Layer Row (Editable Description & Percentage / Custom Amount) */}
-                <tr className="border-b border-black bg-blue-50/40">
-                  <td className="border border-black px-1.5 py-2 text-center font-serif font-bold text-xs text-slate-950 align-top">
-                    {items.length + 1}
-                  </td>
-                  <td className="border border-black px-3 py-2 text-left font-serif text-xs text-black align-top">
-                    {!isExporting ? (
-                      <textarea
-                        rows={2}
-                        value={servicesDescription}
-                        onChange={(e) => saveServicesData(e.target.value, servicesPercentage, servicesCustomAmount)}
-                        className="w-full bg-transparent resize-y outline-none font-serif text-black text-[11px] leading-snug focus:bg-amber-50/40 p-1 rounded border border-slate-300 print:hidden"
-                        placeholder="Edit logistics, installation & service details..."
-                      />
-                    ) : null}
-                    <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-[11px] leading-snug whitespace-pre-wrap`}>
-                      {servicesDescription}
-                    </div>
-                  </td>
-                  <td className="border border-black px-1.5 py-2 text-center font-serif text-xs text-black font-bold">
-                    1 Lot
-                  </td>
-                  <td className="border border-black px-2 py-2 text-center text-xs font-serif text-slate-500">
-                    —
-                  </td>
-                  <td className="border border-black px-2 py-2 text-center font-bold text-blue-950 text-xs font-mono break-words bg-blue-50/80">
-                    {!isExporting ? (
-                      <div className="flex flex-col items-center gap-1 print:hidden no-export">
+                {/* 2. Services & Logistics Layer Row (Only shown when percentage or custom amount is active) */}
+                {(servicesPercentage > 0 || !!servicesCustomAmount) && (
+                  <tr className="border-b border-black bg-blue-50/40">
+                    <td className="border border-black px-1 py-1 text-center font-serif font-bold text-xs text-slate-950 align-middle">
+                      {items.length + 1}
+                    </td>
+                    <td className="border border-black px-2.5 py-1 text-left font-serif text-xs text-black align-middle">
+                      {!isExporting ? (
                         <input
                           type="text"
-                          value={servicesCustomAmount || (servicesPercentage ? `${servicesPercentage}%` : '')}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val.includes('%')) {
-                              const num = parseFloat(val.replace('%', ''));
-                              saveServicesData(servicesDescription, !isNaN(num) ? num : 35, '');
-                            } else {
-                              saveServicesData(servicesDescription, servicesPercentage, val);
-                            }
-                          }}
-                          className="w-full bg-transparent text-center outline-none font-mono text-xs text-blue-950 font-bold p-0.5 border border-slate-300 rounded hover:border-slate-500"
-                          title="Enter percentage (e.g. 35%) or custom amount"
+                          value={servicesDescription}
+                          onChange={(e) => saveServicesData(e.target.value, servicesPercentage, servicesCustomAmount)}
+                          className="w-full bg-transparent outline-none font-serif text-black text-xs focus:bg-amber-50/40 p-0.5 rounded border border-slate-300 print:hidden font-medium"
+                          placeholder="Logistics, Installation, Testing & Commissioning Services"
                         />
-                        <span className="text-[9.5px] text-slate-600 font-mono font-semibold">
-                          {getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount)}
-                        </span>
+                      ) : null}
+                      <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-xs font-medium`}>
+                        {formatDescriptionText(servicesDescription) || 'Logistics, Installation, Testing & Commissioning Services'}
                       </div>
-                    ) : null}
-                    <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-mono text-blue-950 text-xs font-bold`}>
-                      {getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount)}
-                    </div>
-                  </td>
-                  <td className="border border-black px-2.5 py-2 text-center text-xs font-serif text-slate-500">
-                    —
-                  </td>
-                </tr>
+                    </td>
+                    <td className="border border-black px-1 py-1 text-center font-serif text-xs text-black font-bold align-middle">
+                      1 Lot
+                    </td>
+                    <td className="border border-black px-1.5 py-1 text-center text-xs font-serif text-slate-500 align-middle">
+                      —
+                    </td>
+                    <td className="border border-black px-1.5 py-1 text-center font-bold text-blue-950 text-xs font-mono break-words bg-blue-50/80 align-middle">
+                      {!isExporting ? (
+                        <div className="flex flex-col items-center gap-0.5 print:hidden no-export">
+                          <input
+                            type="text"
+                            value={servicesCustomAmount || (servicesPercentage ? `${servicesPercentage}%` : '')}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val.includes('%')) {
+                                const num = parseFloat(val.replace('%', ''));
+                                saveServicesData(servicesDescription, !isNaN(num) ? num : 35, '');
+                              } else {
+                                saveServicesData(servicesDescription, servicesPercentage, val);
+                              }
+                            }}
+                            className="w-full bg-transparent text-center outline-none font-mono text-xs text-blue-950 font-bold p-0.5 border border-slate-300 rounded hover:border-slate-500"
+                            title="Enter percentage (e.g. 35%) or custom amount"
+                          />
+                          <span className="text-[9px] text-slate-600 font-mono font-semibold">
+                            {getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount)}
+                          </span>
+                        </div>
+                      ) : null}
+                      <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-mono text-blue-950 text-xs font-bold`}>
+                        {getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount)}
+                      </div>
+                    </td>
+                    <td className="border border-black px-1.5 py-1 text-center text-xs font-serif text-slate-500 align-middle">
+                      —
+                    </td>
+                  </tr>
+                )}
 
                 {/* 3. Grand Total Requirements Row */}
                 <tr className="border-b-2 border-black bg-amber-100/90 text-black">
                   <td colSpan={2} className="border border-black px-3 py-2 text-right uppercase tracking-wider text-black font-bold font-serif text-xs">
                     GRAND TOTAL REQUIREMENTS (MATERIALS + SERVICES):
                   </td>
+                  <td className="border border-black px-1 py-2 text-center text-xs font-serif text-slate-600">
+                    —
+                  </td>
                   <td className="border border-black px-1.5 py-2 text-center text-xs font-serif text-slate-600">
                     —
                   </td>
-                  <td className="border border-black px-2 py-2 text-center text-xs font-serif text-slate-600">
-                    —
-                  </td>
-                  <td className="border border-black px-2 py-2 text-center font-extrabold text-black text-sm font-mono break-words bg-amber-200">
+                  <td className="border border-black px-1.5 py-2 text-center font-extrabold text-black text-sm font-mono break-words bg-amber-200">
                     {getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount)}
                   </td>
-                  <td className="border border-black px-2.5 py-2 text-center text-xs font-serif text-slate-600">
+                  <td className="border border-black px-1.5 py-2 text-center text-xs font-serif text-slate-600">
                     —
                   </td>
                 </tr>
@@ -876,33 +925,38 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       <div>
         {/* Signatory Block & GPPB QR Code (Final Page Only) */}
         {pIdx === totalPages - 1 && (
-          <div className="mt-6 pt-3 border-t border-slate-300 flex items-end justify-between text-xs font-serif signatory-block mb-3">
-            <div>
-              <p className="font-bold text-black uppercase">{companyName}</p>
-              <div className="mt-6 border-b border-black w-64"></div>
-              <p className="font-bold text-black mt-1 uppercase">{signatoryName}</p>
-              <p className="text-slate-700">{signatoryTitle}</p>
-            </div>
+          <div className="mt-4 pt-2.5 border-t border-slate-300 font-serif text-xs mb-2">
+            <p className="font-bold text-black uppercase text-[11px] mb-2 tracking-wide">
+              I hereby certify to comply and deliver all the above requirements:
+            </p>
+            <div className="flex items-end justify-between signatory-block">
+              <div>
+                <p className="font-bold text-black uppercase">{companyName}</p>
+                <div className="mt-5 border-b border-black w-64"></div>
+                <p className="font-bold text-black mt-1 uppercase">{signatoryName}</p>
+                <p className="text-slate-700">{signatoryTitle}</p>
+              </div>
 
-            <div className="text-right flex flex-col items-end">
-              <DocumentQrCode
-                details={{
-                  companyName: companyName,
-                  documentName: 'Section VI. Schedule of Requirements',
-                  documentNumber: `SEC-VI-${projectRefNo || '2026-901283'}`,
-                  projectTitle: projectTitle,
-                  projectRefNo: projectRefNo,
-                  procuringEntity: procuringEntity,
-                  dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
-                  documentCategory: 'Bid Forms',
-                  generatedBy: companyName
-                }}
-                size={80}
-                showCaption={false}
-              />
-              <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
-                VERIFIED GPPB DOC • {projectRefNo}
-              </span>
+              <div className="text-right flex flex-col items-end">
+                <DocumentQrCode
+                  details={{
+                    companyName: companyName,
+                    documentName: 'Section VI. Schedule of Requirements',
+                    documentNumber: `SEC-VI-${projectRefNo || '2026-901283'}`,
+                    projectTitle: projectTitle,
+                    projectRefNo: projectRefNo,
+                    procuringEntity: procuringEntity,
+                    dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
+                    documentCategory: 'Bid Forms',
+                    generatedBy: companyName
+                  }}
+                  size={75}
+                  showCaption={false}
+                />
+                <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
+                  VERIFIED GPPB DOC • {projectRefNo}
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -923,7 +977,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
         @media print {
           @page {
             size: 8.5in 13in portrait;
-            margin: 0.3in;
+            margin: 0;
           }
           * {
             -webkit-print-color-adjust: exact !important;
@@ -951,15 +1005,16 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
             position: relative !important;
             width: 8.5in !important;
             max-width: 8.5in !important;
+            height: 13in !important;
+            max-height: 13in !important;
             min-height: 13in !important;
-            height: auto !important;
-            margin: 0 auto 0.5in auto !important;
-            padding: 0.3in 0.4in !important;
-            border: 2px solid #000000 !important;
+            margin: 0 !important;
+            padding: 0.4in 0.45in !important;
+            border: none !important;
             box-shadow: none !important;
             background: #ffffff !important;
             color: #000000 !important;
-            overflow: visible !important;
+            overflow: hidden !important;
             box-sizing: border-box !important;
             page-break-after: always !important;
             break-after: page !important;
@@ -967,7 +1022,10 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
           .single-page-paper:last-child {
             page-break-after: avoid !important;
             break-after: avoid !important;
-            margin-bottom: 0 !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
@@ -1032,14 +1090,21 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
           <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 print:hidden no-export">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex-1 space-y-1.5">
-                <label className="block text-slate-200 font-mono text-xs font-bold flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-blue-300">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-200 font-mono text-xs font-bold flex items-center gap-1.5 text-blue-300">
                     <Building2 className="w-4 h-4 text-blue-400" />
-                    Select Target Project from Opportunity Finder:
-                  </span>
-                </label>
+                    <span>Target Bidding Project:</span>
+                  </label>
+                  {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                    <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                      <Lock className="w-3 h-3 text-amber-400" />
+                      <span>Project Locked (Strict Isolation Active)</span>
+                    </span>
+                  )}
+                </div>
                 <select
                   value={selectedOppId}
+                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => {
                     const val = e.target.value;
                     setSelectedOppId(val);
@@ -1054,7 +1119,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                       }
                     }
                   }}
-                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer hover:border-blue-400"
+                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-900/90"
                 >
                   {oppProjects.length === 0 ? (
                     <option value="">-- No Saved Projects in Opportunity Finder --</option>

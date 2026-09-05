@@ -2,7 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
 import { buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit, PdfAttachmentSource, generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import { savePdfData } from '../../../utils/vaultIndexedDB';
+import { autoFitPageChunks, calculateRowHeight, getAutoFitTypographyClass } from '../../../utils/autoFitEngine';
+import { formatDescriptionText } from './SectionViScheduleOfRequirements';
+import { savePdfData, loadPdfData } from '../../../utils/vaultIndexedDB';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
@@ -22,7 +24,9 @@ import {
   RefreshCw,
   Tag,
   Sparkles,
-  Trash2
+  Trash2,
+  Lock,
+  Eye
 } from 'lucide-react';
 
 export interface TechSpecItem {
@@ -142,8 +146,12 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
   const [isExporting, setIsExporting] = useState(false);
   const [brochurePdfFile, setBrochurePdfFile] = useState<File | null>(null);
   const [brochurePdfName, setBrochurePdfName] = useState<string>('');
+  const [brochurePdfDataUrl, setBrochurePdfDataUrl] = useState<string>('');
   const [drawingPdfFile, setDrawingPdfFile] = useState<File | null>(null);
   const [drawingPdfName, setDrawingPdfName] = useState<string>('');
+  const [drawingPdfDataUrl, setDrawingPdfDataUrl] = useState<string>('');
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState<boolean>(false);
   const [fontSizeMode, setFontSizeMode] = useState<'fine' | 'xs' | 'sm'>('xs');
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
@@ -287,25 +295,62 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     }
 
     setItems(baseItems);
+
+    // Load persisted brochure and drawing attachments from IndexedDB / localStorage
+    const loadAttachments = async () => {
+      try {
+        const savedBrochureName = localStorage.getItem(`tech_specs_brochure_name_${tenantKey}_${projectScopeKey}`) || '';
+        if (savedBrochureName) {
+          setBrochurePdfName(savedBrochureName);
+          const bData = await loadPdfData(`tech_specs_brochure_${tenantKey}_${projectScopeKey}`);
+          if (bData) setBrochurePdfDataUrl(bData);
+        } else {
+          setBrochurePdfName('');
+          setBrochurePdfDataUrl('');
+          setBrochurePdfFile(null);
+        }
+
+        const savedDrawingName = localStorage.getItem(`tech_specs_drawing_name_${tenantKey}_${projectScopeKey}`) || '';
+        if (savedDrawingName) {
+          setDrawingPdfName(savedDrawingName);
+          const dData = await loadPdfData(`tech_specs_drawing_${tenantKey}_${projectScopeKey}`);
+          if (dData) setDrawingPdfDataUrl(dData);
+        } else {
+          setDrawingPdfName('');
+          setDrawingPdfDataUrl('');
+          setDrawingPdfFile(null);
+        }
+      } catch (err) {
+        console.warn('Failed to load Section VII attachments from IndexedDB:', err);
+      }
+    };
+    loadAttachments();
   }, [projectScopeKey, tenant?.id]);
 
   const saveSharedItems = (newItems: TechSpecItem[]) => {
     setItems(newItems);
-    if (projectScopeKey) {
-      const storageKey = `bidocs_tech_specs_${tenant?.id || 'default'}_${projectScopeKey}`;
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(newItems));
-      } catch (err) {
-        console.warn('localStorage write failed:', err);
+    const tenantKey = tenant?.id || 'default';
+    const keys = new Set([
+      projectScopeKey ? `bidocs_tech_specs_${tenantKey}_${projectScopeKey}` : '',
+      selectedOppId ? `bidocs_tech_specs_${tenantKey}_${selectedOppId}` : '',
+      projectRefNo ? `bidocs_tech_specs_${tenantKey}_${projectRefNo}` : ''
+    ]);
+    const json = JSON.stringify(newItems);
+    keys.forEach(k => {
+      if (k) {
+        try {
+          localStorage.setItem(k, json);
+        } catch (err) {
+          console.warn('localStorage write failed:', err);
+        }
       }
-    }
+    });
   };
 
   const handleFieldChange = (index: number, field: keyof TechSpecItem, value: any) => {
     const updated = items.map((it, idx) => (idx === index ? { ...it, [field]: value } : it));
     saveSharedItems(updated);
   };
-
 
   const handleComplyClick = (index: number) => {
     const updated = items.map((it, idx) =>
@@ -357,6 +402,22 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     }
     setBrochurePdfName(file.name);
     setBrochurePdfFile(file);
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      setBrochurePdfDataUrl(dataUrl);
+      const tenantKey = tenant?.id || 'default';
+      try {
+        await savePdfData(`tech_specs_brochure_${tenantKey}_${projectScopeKey}`, dataUrl);
+        if (selectedOppId) await savePdfData(`tech_specs_brochure_${tenantKey}_${selectedOppId}`, dataUrl);
+        if (projectRefNo) await savePdfData(`tech_specs_brochure_${tenantKey}_${projectRefNo}`, dataUrl);
+        localStorage.setItem(`tech_specs_brochure_name_${tenantKey}_${projectScopeKey}`, file.name);
+      } catch (err) {
+        console.warn('Failed to save brochure to IndexedDB:', err);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDrawingPdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -368,16 +429,48 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     }
     setDrawingPdfName(file.name);
     setDrawingPdfFile(file);
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      setDrawingPdfDataUrl(dataUrl);
+      const tenantKey = tenant?.id || 'default';
+      try {
+        await savePdfData(`tech_specs_drawing_${tenantKey}_${projectScopeKey}`, dataUrl);
+        if (selectedOppId) await savePdfData(`tech_specs_drawing_${tenantKey}_${selectedOppId}`, dataUrl);
+        if (projectRefNo) await savePdfData(`tech_specs_drawing_${tenantKey}_${projectRefNo}`, dataUrl);
+        localStorage.setItem(`tech_specs_drawing_name_${tenantKey}_${projectScopeKey}`, file.name);
+      } catch (err) {
+        console.warn('Failed to save drawing to IndexedDB:', err);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
-  const handleRemoveBrochurePdf = () => {
+  const handleRemoveBrochurePdf = async () => {
     setBrochurePdfFile(null);
     setBrochurePdfName('');
+    setBrochurePdfDataUrl('');
+    const tenantKey = tenant?.id || 'default';
+    localStorage.removeItem(`tech_specs_brochure_name_${tenantKey}_${projectScopeKey}`);
+    try {
+      await savePdfData(`tech_specs_brochure_${tenantKey}_${projectScopeKey}`, '');
+      if (selectedOppId) await savePdfData(`tech_specs_brochure_${tenantKey}_${selectedOppId}`, '');
+      if (projectRefNo) await savePdfData(`tech_specs_brochure_${tenantKey}_${projectRefNo}`, '');
+    } catch (e) { }
   };
 
-  const handleRemoveDrawingPdf = () => {
+  const handleRemoveDrawingPdf = async () => {
     setDrawingPdfFile(null);
     setDrawingPdfName('');
+    setDrawingPdfDataUrl('');
+    const tenantKey = tenant?.id || 'default';
+    localStorage.removeItem(`tech_specs_drawing_name_${tenantKey}_${projectScopeKey}`);
+    try {
+      await savePdfData(`tech_specs_drawing_${tenantKey}_${projectScopeKey}`, '');
+      if (selectedOppId) await savePdfData(`tech_specs_drawing_${tenantKey}_${selectedOppId}`, '');
+      if (projectRefNo) await savePdfData(`tech_specs_drawing_${tenantKey}_${projectRefNo}`, '');
+    } catch (e) { }
   };
 
   const handlePrint = () => {
@@ -386,7 +479,10 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
   const buildFinalPdfDataUrl = async (): Promise<string | undefined> => {
     const containerElem = document.getElementById('section-vii-pages-container') || document.getElementById('section-vii-paper');
-    const attachmentSources = [brochurePdfFile, drawingPdfFile].filter((value): value is File => !!value);
+    const bSource = brochurePdfFile || brochurePdfDataUrl;
+    const dSource = drawingPdfFile || drawingPdfDataUrl;
+    const attachmentSources: PdfAttachmentSource[] = [bSource, dSource].filter(Boolean) as PdfAttachmentSource[];
+
     if (!containerElem && attachmentSources.length === 0) {
       return undefined;
     }
@@ -396,7 +492,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
       units.push({
         title: item.name,
         formElement: containerElem,
-        fileSource: attachmentSources[0] as PdfAttachmentSource | undefined
+        fileSource: attachmentSources[0]
       });
     } else if (attachmentSources[0]) {
       units.push({
@@ -407,7 +503,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
     if (attachmentSources[1]) {
       units.push({
-        title: `${item.name} Attachment`,
+        title: `${item.name} Attached Drawing`,
         fileSource: attachmentSources[1]
       });
     }
@@ -418,9 +514,24 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     );
   };
 
+  const handleViewPdf = async () => {
+    setIsPreviewing(true);
+    try {
+      const dataUrl = await buildFinalPdfDataUrl();
+      if (dataUrl) {
+        setPreviewPdfUrl(dataUrl);
+      } else {
+        alert('Could not generate Section VII PDF preview.');
+      }
+    } catch (err) {
+      console.error('[SectionVII] View PDF generation error:', err);
+    } finally {
+      setIsPreviewing(false);
+    }
+  };
+
   const handleExportPdf = async () => {
     setIsExporting(true);
-    await new Promise((r) => setTimeout(r, 200));
     try {
       const fileName = `${philgepsRefNo || projectRefNo}_Section_VII_Technical_Specifications_${todayStr}.pdf`;
       const finalPdfDataUrl = await buildFinalPdfDataUrl();
@@ -480,7 +591,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
   const handleSave = async () => {
     setIsExporting(true);
-    await new Promise((r) => setTimeout(r, 200));
     let dataUrl: string | undefined = undefined;
     try {
       dataUrl = await buildFinalPdfDataUrl();
@@ -511,79 +621,39 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     return it.compliance;
   };
 
+  const totalCharactersInDoc = useMemo(() => {
+    return items.reduce((sum, it) => sum + (it.specification || '').length + (it.brandModel || '').length, 0);
+  }, [items]);
+
+  const autoTypographyClass = useMemo(() => {
+    return getAutoFitTypographyClass(totalCharactersInDoc, items.length);
+  }, [totalCharactersInDoc, items.length]);
+
   const getTableFontSizeClass = () => {
-    if (fontSizeMode === 'fine') return 'text-[10px] leading-snug';
-    if (fontSizeMode === 'xs') return 'text-xs leading-normal';
-    return 'text-sm leading-relaxed';
+    if (fontSizeMode === 'fine') return 'text-[9.5px] leading-tight';
+    if (fontSizeMode === 'xs') return autoTypographyClass;
+    return 'text-xs leading-normal';
   };
 
-  // --- CONTENT-AWARE ACCURATE PRINT-CALIBRATED CHUNKING ---
-  // Calculates exact row heights based on multiline text to fill each page to maximum capacity without overflowing or splitting
+  // --- DYNAMIC AUTO-FIT PAGE-PACKING ENGINE ---
+  // Automatically measures and packs all information inside the minimum necessary number of pages with zero empty space
   const pageChunks = useMemo<PageRow[][]>(() => {
-    if (items.length === 0) return [[]];
-
-    const getRowLines = (it: TechSpecItem): number => {
-      const specDesc = it.specification || '';
-      const paragraphs = specDesc.split('\n');
-      let lines = 0;
-      for (const para of paragraphs) {
-        lines += Math.max(1, Math.ceil((para.length || 1) / 135));
+    const indexedItems: PageRow[] = items.map((it, idx) => ({ item: it, index: idx }));
+    return autoFitPageChunks(
+      indexedItems,
+      (row) => {
+        const specHeight = calculateRowHeight(row.item.specification || '', 60, 13.5, 8, 22);
+        const bmHeight = calculateRowHeight(row.item.brandModel || '', 25, 13.5, 8, 22);
+        return Math.max(specHeight, bmHeight, 22);
+      },
+      {
+        orientation: 'portrait',
+        columnCharWidth: 60,
+        headerHeightPx: 170,
+        footerHeightPx: 260,
+        runningFooterPx: 30
       }
-      const bmLines = it.brandModel ? Math.ceil(it.brandModel.length / 25) : 0;
-      return Math.max(lines, 1 + bmLines);
-    };
-
-    const rowLines = items.map(getRowLines);
-    const totalLines = rowLines.reduce((sum, l) => sum + l, 0);
-
-    // Single-page check: if all content fits alongside header, summary & signatory (<= 32 lines in Portrait)
-    if (totalLines <= 32) {
-      return [items.map((it, idx) => ({ item: it, index: idx }))];
-    }
-
-    const pages: PageRow[][] = [];
-    let currentChunk: PageRow[] = [];
-    let currentLines = 0;
-    let pageIdx = 0;
-
-    for (let idx = 0; idx < items.length; idx++) {
-      const item = items[idx];
-      const lines = rowLines[idx];
-      const isPage1 = pageIdx === 0;
-
-      // Calculate remaining lines of items from idx to end
-      let remainingLines = 0;
-      for (let r = idx; r < items.length; r++) {
-        remainingLines += rowLines[r];
-      }
-
-      const finalPageLimit = isPage1 ? 32 : 42;
-      const continuationPageLimit = isPage1 ? 44 : 56;
-
-      // If all remaining items fit in final page limit (with signatory), include them on current page
-      if (currentLines + remainingLines <= finalPageLimit) {
-        currentChunk.push({ item, index: idx });
-        currentLines += lines;
-        continue;
-      }
-
-      // If adding this item exceeds the continuation limit, finalize current page
-      if (currentLines + lines > continuationPageLimit && currentChunk.length > 0) {
-        pages.push(currentChunk);
-        pageIdx++;
-        currentChunk = [{ item, index: idx }];
-        currentLines = lines;
-      } else {
-        currentChunk.push({ item, index: idx });
-        currentLines += lines;
-      }
-    }
-
-    if (currentChunk.length > 0) {
-      pages.push(currentChunk);
-    }
-
-    return pages;
+    );
   }, [items]);
 
   const totalPages = pageChunks.length;
@@ -592,7 +662,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     <div
       key={`sec-7-page-${pIdx}`}
       id={pIdx === 0 ? 'section-vii-paper' : `section-vii-paper-p${pIdx + 1}`}
-      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 sm:p-8 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
+      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
     >
       <div>
         {/* COMPANY & PROJECT HEADER BLOCK (PAGE 1 ONLY) */}
@@ -604,7 +674,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                 {companyName}
               </h1>
               <p className="text-xs text-slate-700 font-serif font-semibold mt-0.5 uppercase tracking-wide">
-                
+                {companyAddress}
               </p>
             </div>
 
@@ -671,7 +741,16 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                   </th>
                 </tr>
               </thead>
-            ) : null}
+            ) : (
+              <thead>
+                <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[10px]">
+                  <th className="border border-black px-1 py-1 w-[6%]">Item No.</th>
+                  <th className="border border-black px-1.5 py-1 w-[8%]">Qty</th>
+                  <th className="border border-black px-3 py-1 text-center w-[58%]">Technical Specifications / Scope of Work (Continuation)</th>
+                  <th className="border border-black px-3 py-1 text-center w-[28%]">Statement of Compliance</th>
+                </tr>
+              </thead>
+            )}
             <tbody>
               {chunk.map(({ item: rowItem, index: itemIdx }) => (
                 <tr key={rowItem.id || `tech-spec-${itemIdx}`} className="border-b border-black hover:bg-slate-50/50 transition-colors">
@@ -690,7 +769,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                   {/* 3. Technical Specifications (Strictly Mirrored from Section VI - Read-Only) */}
                   <td className="border border-black px-3 py-1.5 font-serif align-top break-words">
                     <div className={`font-serif text-black pt-0.5 whitespace-pre-wrap font-normal break-words [overflow-wrap:break-word] leading-snug ${getTableFontSizeClass()}`}>
-                      {rowItem.specification || ''}
+                      {formatDescriptionText(rowItem.specification || '')}
                     </div>
                   </td>
 
@@ -746,7 +825,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                         </div>
                         {rowItem.compliance === 'Comply' && rowItem.brandModel && (
                           <div className="text-slate-900 mt-0.5 whitespace-pre-wrap break-words font-medium">
-                            {rowItem.brandModel}
+                            {formatDescriptionText(rowItem.brandModel)}
                           </div>
                         )}
                       </div>
@@ -754,6 +833,14 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                   </td>
                 </tr>
               ))}
+              {/* Statutory *** NOTHING FOLLOWS *** Security Seal (Final Page after items) */}
+              {pIdx === totalPages - 1 && (
+                <tr className="border-b border-black text-center font-bold tracking-widest text-[10.5px] bg-slate-100/60 uppercase text-slate-800">
+                  <td colSpan={4} className="py-1">
+                    *** NOTHING FOLLOWS ***
+                  </td>
+                </tr>
+              )}
             </tbody>
 
             {/* SUMMARY ROW (FINAL PAGE ONLY) */}
@@ -823,7 +910,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
         @media print {
           @page {
             size: 8.5in 13in portrait;
-            margin: 0.3in;
+            margin: 0;
           }
           * {
             -webkit-print-color-adjust: exact !important;
@@ -851,15 +938,16 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             position: relative !important;
             width: 8.5in !important;
             max-width: 8.5in !important;
+            height: 13in !important;
+            max-height: 13in !important;
             min-height: 13in !important;
-            height: auto !important;
-            margin: 0 auto 0.5in auto !important;
-            padding: 0.3in 0.4in !important;
-            border: 2px solid #000000 !important;
+            margin: 0 !important;
+            padding: 0.4in 0.45in !important;
+            border: none !important;
             box-shadow: none !important;
             background: #ffffff !important;
             color: #000000 !important;
-            overflow: visible !important;
+            overflow: hidden !important;
             box-sizing: border-box !important;
             page-break-after: always !important;
             break-after: page !important;
@@ -867,7 +955,10 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
           .single-page-paper:last-child {
             page-break-after: avoid !important;
             break-after: avoid !important;
-            margin-bottom: 0 !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
         .single-page-paper,
@@ -899,6 +990,15 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
           <div className="flex items-center gap-2">
             <button
+              onClick={handleViewPdf}
+              disabled={isPreviewing || isExporting}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 transition shadow flex items-center gap-1.5 cursor-pointer"
+              title="View compiled PDF document including all attached brochure and drawing pages"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>{isPreviewing ? 'Loading PDF...' : 'View PDF'}</span>
+            </button>
+            <button
               onClick={handleExportExcel}
               className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-600 transition shadow flex items-center gap-1.5 border border-emerald-500/40 cursor-pointer"
             >
@@ -915,7 +1015,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             </button>
             <button
               onClick={handlePrint}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-slate-700 hover:bg-slate-600 transition shadow flex items-center gap-1.5 cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Print Pages</span>
@@ -935,15 +1035,21 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex-1 space-y-1.5">
-                <label className="block text-slate-200 font-mono text-xs font-bold flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-blue-300">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-200 font-mono text-xs font-bold flex items-center gap-1.5 text-blue-300">
                     <Building2 className="w-4 h-4 text-blue-400" />
-                    Select Target Project from Opportunity Finder:
-                  </span>
-                  <span className="text-[10px] text-emerald-400 font-semibold font-mono">⚡ 100% Synced with Section VI & Framework Agreement</span>
-                </label>
+                    <span>Target Bidding Project:</span>
+                  </label>
+                  {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                    <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                      <Lock className="w-3 h-3 text-amber-400" />
+                      <span>Project Locked (Strict Isolation Active)</span>
+                    </span>
+                  )}
+                </div>
                 <select
                   value={selectedOppId}
+                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => {
                     const val = e.target.value;
                     setSelectedOppId(val);
@@ -958,7 +1064,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                       }
                     }
                   }}
-                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer hover:border-blue-400"
+                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-900/90"
                 >
                   {oppProjects.length === 0 ? (
                     <option value="">-- No Saved Projects in Opportunity Finder --</option>
@@ -1106,6 +1212,53 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
         </div>
 
       </div>
+
+      {/* FULL-SCREEN PDF VIEWER MODAL (MATCHES SLCC & ONGOING CONTRACTS) */}
+      {previewPdfUrl && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-6xl h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-3 sm:p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+              <div className="flex items-center gap-2.5">
+                <FileText className="w-5 h-5 text-blue-400" />
+                <div>
+                  <h3 className="text-sm font-bold text-white leading-tight">
+                    Section VII. Technical Specifications — Merged Document Preview
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    Includes Statement Table + All Attached Brochure & Drawing PDF Pages
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewPdfUrl}
+                  download={`${philgepsRefNo || projectRefNo}_Section_VII_Technical_Specifications_${todayStr}.pdf`}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download PDF</span>
+                </a>
+                <button
+                  onClick={() => setPreviewPdfUrl(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                  title="Close PDF Viewer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 bg-slate-950 p-2 overflow-hidden">
+              <iframe
+                src={previewPdfUrl}
+                className="w-full h-full rounded-xl border border-slate-800 bg-white"
+                title="Section VII PDF Preview"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

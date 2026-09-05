@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, generateThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
+import { autoFitPageChunks, calculateRowHeight, getAutoFitTypographyClass } from '../../../utils/autoFitEngine';
 import { savePdfData } from '../../../utils/vaultIndexedDB';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import {
@@ -366,7 +367,6 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
 
   const handleExportPdf = async () => {
     setIsExporting(true);
-    await new Promise((r) => setTimeout(r, 200));
     try {
       const fileName = `${projectRefNo}_Framework_Agreement_List_${todayStr}.pdf`;
       const containerElem = document.getElementById('framework-pages-container') || document.getElementById('framework-paper');
@@ -394,7 +394,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     csvContent += `"Procuring Entity:","${procuringEntity.replace(/"/g, '""')}"\n`;
     csvContent += `"Submission Date & Time:","${formatDateTimeDisplay(dateTimeSubmitted)}"\n\n`;
 
-    csvContent += `"Item Number","Description","Quantity","Unit Amount","Total","Delivered, Weeks/Months"\n`;
+    csvContent += `"Item Number","Description","Quantity","Unit Amount","Total"\n`;
 
     items.forEach((it, idx) => {
       const itemNum = `"${idx + 1}"`;
@@ -402,8 +402,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       const qty = `"${(it.quantity || '').replace(/"/g, '""')}"`;
       const unitAmt = `"${(it.unitAmount || '').replace(/"/g, '""')}"`;
       const tot = `"${(it.total || computeTotalAmount(it.unitAmount, it.quantity) || '').replace(/"/g, '""')}"`;
-      const del = `"${(it.delivered || '').replace(/"/g, '""')}"`;
-      csvContent += `${itemNum},${desc},${qty},${unitAmt},${tot},${del}\n`;
+      csvContent += `${itemNum},${desc},${qty},${unitAmt},${tot}\n`;
     });
 
     const totalQtyStr = computeTotalQuantity(items);
@@ -411,9 +410,9 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     const servicesCostStr = getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount);
     const overallGrandTotalStr = getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount);
 
-    csvContent += `"","TOTAL MATERIALS:","${totalQtyStr}","","${grandTotalStr}",""\n`;
-    csvContent += `"","${servicesDescription.replace(/"/g, '""')}","1 Lot","","${servicesCostStr}",""\n`;
-    csvContent += `"","GRAND TOTAL REQUIREMENTS (MATERIALS + SERVICES):","","","${overallGrandTotalStr}",""\n`;
+    csvContent += `"","TOTAL MATERIALS:","${totalQtyStr}","","${grandTotalStr}"\n`;
+    csvContent += `"","${servicesDescription.replace(/"/g, '""')}","1 Lot","","${servicesCostStr}"\n`;
+    csvContent += `"","GRAND TOTAL REQUIREMENTS (MATERIALS + SERVICES):","","","${overallGrandTotalStr}"\n`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -427,7 +426,6 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
 
   const handleSave = async () => {
     setIsExporting(true);
-    await new Promise((r) => setTimeout(r, 200));
     try {
       const containerElem = (document.getElementById('framework-pages-container') || document.getElementById('framework-paper')) as HTMLElement;
       let dataUrl: string | undefined = undefined;
@@ -465,77 +463,35 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     }
   };
 
+  const totalCharactersInDoc = useMemo(() => {
+    return items.reduce((sum, it) => sum + (it.description || '').length, 0);
+  }, [items]);
+
+  const autoTypographyClass = useMemo(() => {
+    return getAutoFitTypographyClass(totalCharactersInDoc, items.length);
+  }, [totalCharactersInDoc, items.length]);
+
   const getTableFontSizeClass = () => {
-    if (fontSizeMode === 'fine') return 'text-[10px] leading-snug';
-    if (fontSizeMode === 'xs') return 'text-xs leading-normal';
-    return 'text-sm leading-relaxed';
+    if (fontSizeMode === 'fine') return 'text-[9.5px] leading-tight';
+    if (fontSizeMode === 'xs') return autoTypographyClass;
+    return 'text-xs leading-normal';
   };
 
-  // --- CONTENT-AWARE ACCURATE PRINT-CALIBRATED CHUNKING ---
+  // --- DYNAMIC AUTO-FIT PAGE-PACKING ENGINE ---
+  // Automatically measures and packs all information inside the minimum necessary number of pages with zero empty space
   const pageChunks = useMemo<PageRow[][]>(() => {
-    if (items.length === 0) return [[]];
-
-    const getRowHeight = (item: ScheduleItem) => {
-      const desc = item.description || '';
-      const paragraphs = desc.split('\n');
-      let lines = 0;
-      for (const para of paragraphs) {
-        lines += Math.max(1, Math.ceil((para.length || 1) / 85));
+    const indexedItems: PageRow[] = items.map((it, idx) => ({ item: it, index: idx }));
+    return autoFitPageChunks(
+      indexedItems,
+      (row) => calculateRowHeight(row.item.description || '', 65, 13.5, 8, 22),
+      {
+        orientation: 'portrait',
+        columnCharWidth: 65,
+        headerHeightPx: 170,
+        footerHeightPx: 260,
+        runningFooterPx: 30
       }
-      return Math.max(32, 16 + lines * 13);
-    };
-
-    const rowHeights = items.map((it) => getRowHeight(it));
-    const totalContentHeight = rowHeights.reduce((sum, h) => sum + h, 0);
-
-    // Single-page check: if all content fits in 680px alongside header, summary & signatory in Portrait
-    if (totalContentHeight <= 680) {
-      return [items.map((it, idx) => ({ item: it, index: idx }))];
-    }
-
-    const pages: PageRow[][] = [];
-    let currentChunk: PageRow[] = [];
-    let currentHeight = 0;
-    let pageIdx = 0;
-
-    for (let idx = 0; idx < items.length; idx++) {
-      const item = items[idx];
-      const rHeight = rowHeights[idx];
-      const isPage1 = pageIdx === 0;
-
-      // Calculate remaining height of items from idx to end
-      let remainingHeight = 0;
-      for (let r = idx; r < items.length; r++) {
-        remainingHeight += rowHeights[r];
-      }
-
-      const finalPageLimit = isPage1 ? 680 : 850;
-      const continuationPageLimit = isPage1 ? 920 : 1100;
-
-      // If all remaining items fit in final page limit, include them on current page
-      if (currentHeight + remainingHeight <= finalPageLimit) {
-        currentChunk.push({ item, index: idx });
-        currentHeight += rHeight;
-        continue;
-      }
-
-      // If adding this item exceeds the continuation limit, finalize current page
-      if (currentHeight + rHeight > continuationPageLimit && currentChunk.length > 0) {
-        pages.push(currentChunk);
-        pageIdx++;
-        currentChunk = [{ item, index: idx }];
-        currentHeight = rHeight;
-      } else {
-        currentChunk.push({ item, index: idx });
-        currentHeight += rHeight;
-      }
-    }
-
-    if (currentChunk.length > 0) {
-      pages.push(currentChunk);
-    }
-
-    return pages;
+    );
   }, [items]);
 
   const totalPages = pageChunks.length;
@@ -544,7 +500,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     <div
       key={`fal-page-${pIdx}`}
       id={pIdx === 0 ? 'framework-paper' : `framework-paper-p${pIdx + 1}`}
-      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 sm:p-8 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
+      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
     >
       <div>
         {/* COMPANY & PROJECT HEADER BLOCK (PAGE 1 ONLY) */}
@@ -598,25 +554,33 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
         <div className="w-full overflow-x-auto">
           <table className="w-full border-collapse border border-black text-xs font-serif table-fixed">
             <colgroup>
-              <col className="w-[5%]" />
-              <col className="w-[40%]" />
-              <col className="w-[10%]" />
-              <col className="w-[14%]" />
+              <col className="w-[6%]" />
+              <col className="w-[48%]" />
+              <col className="w-[12%]" />
               <col className="w-[16%]" />
-              <col className="w-[15%]" />
+              <col className="w-[18%]" />
             </colgroup>
             {pIdx === 0 ? (
               <thead>
                 <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[11px]">
-                  <th className="border border-black px-1.5 py-1.5 w-[5%]">Item No.</th>
-                  <th className="border border-black px-2 py-1.5 text-left w-[40%]">Description</th>
-                  <th className="border border-black px-1.5 py-1.5 w-[10%]">Qty</th>
-                  <th className="border border-black px-2 py-1.5 w-[14%]">Unit Cost</th>
-                  <th className="border border-black px-2 py-1.5 w-[16%]">Total Cost</th>
-                  <th className="border border-black px-2 py-1.5 w-[15%]">Delivered Weeks/Months</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[6%]">Item No.</th>
+                  <th className="border border-black px-2 py-1.5 text-left w-[48%]">Description</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[12%]">Qty</th>
+                  <th className="border border-black px-2 py-1.5 w-[16%]">Unit Cost</th>
+                  <th className="border border-black px-2 py-1.5 w-[18%]">Total Cost</th>
                 </tr>
               </thead>
-            ) : null}
+            ) : (
+              <thead>
+                <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[10px]">
+                  <th className="border border-black px-1.5 py-1 w-[6%]">Item No.</th>
+                  <th className="border border-black px-2 py-1 text-left w-[48%]">Description (Continuation)</th>
+                  <th className="border border-black px-1.5 py-1 w-[12%]">Qty</th>
+                  <th className="border border-black px-2 py-1 w-[16%]">Unit Cost</th>
+                  <th className="border border-black px-2 py-1 w-[18%]">Total Cost</th>
+                </tr>
+              </thead>
+            )}
             <tbody>
               {chunk.map(({ item: rowItem, index: itemIdx }) => (
                 <tr key={rowItem.id} className="border-b border-black hover:bg-amber-50/20 even:bg-slate-50/30 transition-colors">
@@ -661,19 +625,16 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                       {computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total || ''}
                     </div>
                   </td>
-
-                  {/* 6. Delivered, Weeks/Months (Editable Input & Synchronized Across Documents) */}
-                  <td className="border border-black px-1.5 py-1.5 font-serif text-center align-top break-words">
-                    <input
-                      type="text"
-                      value={rowItem.delivered || ''}
-                      onChange={(e) => handleDeliveryChange(itemIdx, e.target.value)}
-                      placeholder="e.g. 30 Calendar Days"
-                      className={`w-full bg-transparent border-b border-dashed border-slate-300 hover:border-blue-500 focus:border-blue-600 font-serif text-black text-center focus:outline-none focus:bg-blue-50/50 transition px-1 py-0.5 print:border-none print:bg-transparent ${getTableFontSizeClass()}`}
-                    />
-                  </td>
                 </tr>
               ))}
+              {/* Statutory *** NOTHING FOLLOWS *** Security Seal (Final Page after items) */}
+              {pIdx === totalPages - 1 && (
+                <tr className="border-b border-black text-center font-bold tracking-widest text-[10.5px] bg-slate-100/60 uppercase text-slate-800">
+                  <td colSpan={5} className="py-1">
+                    *** NOTHING FOLLOWS ***
+                  </td>
+                </tr>
+              )}
             </tbody>
 
             {/* SUMMARY ROWS (TOTAL MATERIALS, SERVICES, GRAND TOTAL) ONLY ON FINAL PAGE */}
@@ -695,36 +656,32 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                   <td className="border border-black px-2 py-1.5 text-center font-bold text-black text-xs font-mono break-words bg-amber-50/90">
                     {computeGrandTotalMaterials(items)}
                   </td>
-                  <td className="border border-black px-2.5 py-1.5 text-center text-xs font-serif text-slate-500">
-                    —
-                  </td>
                 </tr>
 
                 {/* 2. Services & Logistics Layer Row (Read-Only Mirrored from Section VI) */}
-                <tr className="border-b border-black bg-blue-50/40">
-                  <td className="border border-black px-1.5 py-2 text-center font-serif font-bold text-xs text-slate-950 align-top">
-                    {items.length + 1}
-                  </td>
-                  <td className="border border-black px-3 py-2 text-left font-serif text-xs text-black align-top">
-                    <div className="font-serif text-black text-[11px] leading-snug whitespace-pre-wrap">
-                      {servicesDescription}
-                    </div>
-                  </td>
-                  <td className="border border-black px-1.5 py-2 text-center font-serif text-xs text-black font-bold">
-                    1 Lot
-                  </td>
-                  <td className="border border-black px-2 py-2 text-center text-xs font-serif text-slate-500">
-                    —
-                  </td>
-                  <td className="border border-black px-2 py-2 text-center font-bold text-blue-950 text-xs font-mono break-words bg-blue-50/80">
-                    <div className="font-mono text-blue-950 text-xs font-bold">
-                      {getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount)}
-                    </div>
-                  </td>
-                  <td className="border border-black px-2.5 py-2 text-center text-xs font-serif text-slate-500">
-                    —
-                  </td>
-                </tr>
+                {(servicesPercentage > 0 || !!servicesCustomAmount) && (
+                  <tr className="border-b border-black bg-blue-50/40">
+                    <td className="border border-black px-1.5 py-1 text-center font-serif font-bold text-xs text-slate-950 align-middle">
+                      {items.length + 1}
+                    </td>
+                    <td className="border border-black px-3 py-1 text-left font-serif text-xs text-black align-middle">
+                      <div className="font-serif text-black text-xs font-medium">
+                        {servicesDescription || 'Logistics, Installation, Testing & Commissioning Services'}
+                      </div>
+                    </td>
+                    <td className="border border-black px-1.5 py-1 text-center font-serif text-xs text-black font-bold align-middle">
+                      1 Lot
+                    </td>
+                    <td className="border border-black px-2 py-1 text-center text-xs font-serif text-slate-500 align-middle">
+                      —
+                    </td>
+                    <td className="border border-black px-2 py-1 text-center font-bold text-blue-950 text-xs font-mono break-words bg-blue-50/80 align-middle">
+                      <div className="font-mono text-blue-950 text-xs font-bold">
+                        {getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount)}
+                      </div>
+                    </td>
+                  </tr>
+                )}
 
                 {/* 3. Grand Total Requirements Row */}
                 <tr className="border-b-2 border-black bg-amber-100/90 text-black">
@@ -739,9 +696,6 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                   </td>
                   <td className="border border-black px-2 py-2 text-center font-extrabold text-black text-sm font-mono break-words bg-amber-200">
                     {getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount)}
-                  </td>
-                  <td className="border border-black px-2.5 py-2 text-center text-xs font-serif text-slate-600">
-                    —
                   </td>
                 </tr>
               </tfoot>
@@ -801,7 +755,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
         @media print {
           @page {
             size: 8.5in 13in portrait;
-            margin: 0.3in;
+            margin: 0;
           }
           * {
             -webkit-print-color-adjust: exact !important;
@@ -830,15 +784,16 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             position: relative !important;
             width: 8.5in !important;
             max-width: 8.5in !important;
+            height: 13in !important;
+            max-height: 13in !important;
             min-height: 13in !important;
-            height: auto !important;
-            margin: 0 auto 0.5in auto !important;
-            padding: 0.3in 0.4in !important;
-            border: 2px solid #000000 !important;
+            margin: 0 !important;
+            padding: 0.4in 0.45in !important;
+            border: none !important;
             box-shadow: none !important;
             background: #ffffff !important;
             color: #000000 !important;
-            overflow: visible !important;
+            overflow: hidden !important;
             box-sizing: border-box !important;
             page-break-after: always !important;
             break-after: page !important;
@@ -846,7 +801,10 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
           .single-page-paper:last-child {
             page-break-after: avoid !important;
             break-after: avoid !important;
-            margin-bottom: 0 !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
@@ -911,17 +869,21 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
           <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex-1 space-y-1.5">
-                <label className="block text-slate-200 font-mono text-xs font-bold flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-blue-300">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-200 font-mono text-xs font-bold flex items-center gap-1.5 text-blue-300">
                     <Building2 className="w-4 h-4 text-blue-400" />
-                    Select Target Project from Opportunity Finder:
-                  </span>
-                  <span className="text-[10px] text-emerald-400 font-semibold font-mono flex items-center gap-1">
-                    <Lock className="w-3 h-3 text-emerald-400" /> 100% Mirrored from Section VI (Read-Only)
-                  </span>
-                </label>
+                    <span>Target Bidding Project:</span>
+                  </label>
+                  {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                    <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                      <Lock className="w-3 h-3 text-amber-400" />
+                      <span>Project Locked (Strict Isolation Active)</span>
+                    </span>
+                  )}
+                </div>
                 <select
                   value={selectedOppId}
+                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => {
                     const val = e.target.value;
                     setSelectedOppId(val);
@@ -936,7 +898,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                       }
                     }
                   }}
-                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer hover:border-blue-400"
+                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-900/90"
                 >
                   {oppProjects.length === 0 ? (
                     <option value="">-- No Saved Projects in Opportunity Finder --</option>
@@ -986,46 +948,10 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
               </div>
             </div>
 
-            {/* Quick Delivery Days Universal Sync Bar */}
-            <div className="p-3.5 rounded-xl bg-slate-950/80 border border-blue-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-white block">
-                    Delivery Schedule / Timeline (Weeks / Months / Calendar Days):
-                  </span>
-                  <span className="text-[10.5px] text-slate-400 font-mono">
-                    Directly editable in the 6th column below or apply across all items to sync with Section VI & Form L.
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={globalDeliveryDays}
-                  onChange={(e) => setGlobalDeliveryDays(e.target.value)}
-                  placeholder="e.g. 30 Calendar Days"
-                  className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-blue-400 w-48"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleApplyDeliveryToAll(globalDeliveryDays)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5 cursor-pointer shrink-0"
-                  title="Apply this delivery timeline to all items and sync with Section VI & Form L"
-                >
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>Apply to All Items</span>
-                </button>
-              </div>
-            </div>
-
             <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] flex items-center gap-2">
               <Sparkles className="w-4 h-4 shrink-0 text-blue-400" />
               <span>
-                <strong>Synchronized with Section VI & Bid Documents:</strong> All item descriptions, quantities, unit prices, delivery schedules, and services are synchronized across all project bid forms.
+                <strong>Synchronized with Section VI & Bid Documents:</strong> All item descriptions, quantities, unit prices, and services are automatically synchronized across all project bid forms.
               </span>
             </div>
           </div>

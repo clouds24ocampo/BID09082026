@@ -8,7 +8,7 @@ import { PdfPreviewModal } from '../vault/PdfPreviewModal';
 import DocumentQrCode from '../common/DocumentQrCode';
 import { loadVaultItems, loadPdfData } from '../../utils/vaultIndexedDB';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../utils/opportunityProjects';
-import { generateAndDownloadThreeLayerPdf, exportMergedThreeLayerPdf, ExportDocumentUnit } from '../../utils/pdfExportEngine';
+import { generateAndDownloadThreeLayerPdf, exportMergedThreeLayerPdf, buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit } from '../../utils/pdfExportEngine';
 import { 
   ChevronDown, 
   Briefcase, 
@@ -20,6 +20,8 @@ import {
   ChevronRight, 
   Eye, 
   Printer, 
+  Download,
+  Loader2,
   CheckCircle2, 
   Clock, 
   Search, 
@@ -40,9 +42,7 @@ import {
   ArrowUpDown,
   GripVertical,
   ListOrdered,
-  FileStack,
-  Loader2,
-  Download
+  FileStack
 } from 'lucide-react';
 
 export type FolderCopyType = 'ORIGINAL' | 'COPY_1' | 'COPY_2';
@@ -58,6 +58,7 @@ export interface PackageItem {
   fileSizeBytes?: number;
   dateAdded: string;
   isAutoDetected?: boolean;
+  pageCount?: number;
 }
 
 interface StatutoryDocDefinition {
@@ -93,11 +94,14 @@ export const BidPackageBuilderView: React.FC = () => {
   const [showOrganizeModal, setShowOrganizeModal] = useState(false);
   const [showMergedPackageViewerModal, setShowMergedPackageViewerModal] = useState(false);
 
-  // Cover Page Modals:
-  const [showMotherCoverModal, setShowMotherCoverModal] = useState(false);
-  const [showEnvelopeCoverModal, setShowEnvelopeCoverModal] = useState(false);
-  const [showFolderCoverModal, setShowFolderCoverModal] = useState(false);
+  // Unified Cover Pages Modal State:
+  const [showUnifiedCoverModal, setShowUnifiedCoverModal] = useState(false);
+  const [coverModalTab, setCoverModalTab] = useState<'MOTHER' | 'ENVELOPE' | 'FOLDER' | 'TOC'>('MOTHER');
+  const [coverEnvelopeChoice, setCoverEnvelopeChoice] = useState<'ENVELOPE_1' | 'ENVELOPE_2'>('ENVELOPE_1');
+  const [coverFolderCopyChoice, setCoverFolderCopyChoice] = useState<FolderCopyType>('ORIGINAL');
   const [selectedDocForCover, setSelectedDocForCover] = useState<PackageItem | null>(null);
+  const [isDownloadingAllCovers, setIsDownloadingAllCovers] = useState(false);
+  const [isPrintingAllCovers, setIsPrintingAllCovers] = useState(false);
 
   // Add Completed Documents Picker Modal State
   const [showAddCompletedModal, setShowAddCompletedModal] = useState(false);
@@ -127,68 +131,105 @@ export const BidPackageBuilderView: React.FC = () => {
   useEffect(() => {
     const list = getOpportunityProjects(tenantId);
     setOppProjects(list);
-    if (list.length > 0 && !selectedOppId) {
-      setSelectedOppId(list[0].id);
-    }
+    // User Directive: No automatic project pre-selection, let user choose first
+    setSelectedOppId('');
   }, [tenantId]);
 
-  const activeProject = oppProjects.find(p => p.id === selectedOppId || p.refNo === selectedOppId) || oppProjects[0] || null;
+  const activeProject = selectedOppId ? (oppProjects.find(p => p.id === selectedOppId || p.refNo === selectedOppId) || null) : null;
   const projectRefNo = activeProject?.refNo || '';
   const projectTitle = activeProject?.title || '';
   const procuringEntity = activeProject?.procuringEntity || 'Bids and Awards Committee';
   const submissionDeadline = activeProject?.dateTimeSubmitted || 'March 19, 2026';
   const projectCategory = (activeProject?.category || 'Infrastructure').toLowerCase();
-  const projectScopeKey = projectRefNo || selectedOppId || 'default';
+  const projectScopeKey = (projectRefNo || '').trim();
 
-  // Master Statutory Bidding Documents Checklist definitions (Strictly aligned with 1-17 Statutory Checklist Order)
-  const statutoryDocsList: StatutoryDocDefinition[] = [
-    // 1. PhilGEPS Platinum Certificate of Registration
-    { id: 'PHILGEPS_PLATINUM', name: 'PhilGEPS Platinum Certificate of Registration (Annex A)', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'PHILGEPS_PLATINUM', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
-    // 2. Statement of All Ongoing Government & Private Contracts
-    { id: 'ONGOING_CONTRACTS', name: 'Statement of All Ongoing Government & Private Contracts', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'ONGOING_CONTRACTS', storageKey: `bidocs_ongoing_${tenantId}_${projectScopeKey}` },
-    // 3. Statement of Single Largest Completed Contract (SLCC)
-    { id: 'SLCC_STATEMENT', name: 'Statement of Single Largest Completed Contract (SLCC)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'SLCC_STATEMENT', storageKey: `bidocs_slcc_${tenantId}_${projectScopeKey}` },
-    // 4. Bid Securing Declaration / Bid Security or Surety Bond
-    { id: 'BID_SECURING_DECLARATION', name: 'Bid Securing Declaration / Bid Security or Surety Bond (BSD)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'BID_SECURING_DECLARATION' },
-    // 5. Section VI: Schedule of Requirements
-    { id: 'SECTION_VI_REQUIREMENTS', name: 'Section VI: Schedule of Requirements', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'SECTION_VI_REQUIREMENTS', storageKey: `bidocs_sec_vi_${tenantId}_${projectScopeKey}` },
-    // 6. Section VII: Technical Specifications Statement of Compliance
-    { id: 'TECH_SPECS_SECTION_VII', name: 'Section VII: Technical Specifications Statement of Compliance', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'TECH_SPECS_SECTION_VII', storageKey: `bidocs_tech_specs_${tenantId}_${projectScopeKey}` },
-    // 7. Delivery Schedule / Framework Agreement List
-    { id: 'DELIVERY_SCHEDULE', name: 'Delivery Schedule / Framework Agreement List', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'DELIVERY_SCHEDULE', storageKey: `bidocs_fal_${tenantId}_${projectScopeKey}` },
-    // 8. Organizational Chart, Manpower Requirements & Key Personnel
-    { id: 'ORGANIZATIONAL_CHART', name: 'Organizational Chart for the Contract to be Bid', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'ORGANIZATIONAL_CHART', storageKey: `bidocs_org_chart_${tenantId}_${projectScopeKey}` },
-    { id: 'KEY_PERSONNEL', name: 'Key Personnel Matrix, Bio-Data & PRC Certifications (Manpower Requirements)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'KEY_PERSONNEL', storageKey: `bidocs_personnel_${tenantId}_${projectScopeKey}` },
-    { id: 'MAJOR_EQUIPMENT', name: "Contractor's Major Equipment Utilization Matrix", category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'MAJOR_EQUIPMENT', storageKey: `bidocs_equipment_${tenantId}_${projectScopeKey}` },
-    // 9. After-Sales Services & Warranty Undertaking
-    { id: 'AFTERSALES_WARRANTY', name: 'After-Sales Services & Warranty Undertaking', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'AFTERSALES_WARRANTY', storageKey: `bidocs_aftersale_${tenantId}_${projectScopeKey}` },
-    // 10. Omnibus Sworn Statement (OSS)
-    { id: 'OMNIBUS_SWORN_STATEMENT', name: 'Omnibus Sworn Statement (OSS)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'OMNIBUS_SWORN_STATEMENT' },
-    // 11. Net Financial Contracting Capacity (NFCC) Computation
-    { id: 'NFCC_COMPUTATION', name: 'Net Financial Contracting Capacity (NFCC) Computation', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'NFCC_COMPUTATION', storageKey: `bidocs_nfcc_${tenantId}_${projectScopeKey}` },
-    // 12. Audited Financial Statements (AFS)
-    { id: 'AUDITED_FS', name: 'Audited Financial Statements (AFS) stamped received by BIR', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'AUDITED_FS', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
-    // 13. Mayor's / Business Permit (Current Year)
-    { id: 'MAYORS_PERMIT', name: "Mayor's / Business Permit (Current Year)", category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'MAYORS_PERMIT', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
-    // 14. PCAB License and Special License
-    { id: 'PCAB_LICENSE', name: 'PCAB License and Special License (for Infrastructure)', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'PCAB_LICENSE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
-    // 15. SEC / DTI Certificate of Business Registration
-    { id: 'SEC_DTI_REG', name: 'SEC / DTI Certificate of Business Registration', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'SEC_DTI_REG', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
-    // 16. BIR Registration and Tax Clearance Certificate
-    { id: 'TAX_CLEARANCE', name: 'BIR Tax Clearance Certificate & BIR Registration', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'TAX_CLEARANCE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
-    // 17. Secretary's Certificate / Board Resolution / SPA
-    { id: 'SECRETARY_CERTIFICATE', name: "Secretary's Certificate / Board Resolution / Special Power of Attorney (SPA)", category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'SECRETARY_CERTIFICATE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
-    { id: 'JOINT_VENTURE_AGREEMENT', name: 'Joint Venture Agreement (JVA) / Class B Legal Documents', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'JOINT_VENTURE_AGREEMENT', vaultMatchCategory: 'ELIGIBILITY_CLASS_B' },
+  const isInfraProject = React.useMemo(() => {
+    // 1. Primary Authority: Project's explicit category from PhilGEPS / Opportunity Setup
+    if (activeProject?.category) {
+      const cat = activeProject.category.toUpperCase();
+      if (cat.includes('INFRA') || cat.includes('CIVIL')) return true;
+      if (cat.includes('GOOD')) return false;
+      if (cat.includes('CONSULT')) return false;
+    }
+    
+    // 2. Fallback: Check project title and reference number if category is not explicitly set
+    const combined = `${projectRefNo || ''} ${projectTitle || ''}`.toUpperCase();
+    return combined.includes('CONSTRUCT') || combined.includes('CIVIL WORKS') || combined.includes('ROAD OPENING') || combined.includes('DRAINAGE SYSTEM') || combined.includes('INFRASTRUCTURE') || combined.includes('BUILDING');
+  }, [activeProject, projectRefNo, projectTitle]);
 
-    // Envelope 2: Financial Proposal Documents
-    { id: 'FINANCIAL_BID_FORM_GOODS', name: 'Official Financial Bid Form (for Goods & General Support)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'GPPB-BIDFORM-GOODS', storageKey: `bidocs_bidform_goods_${tenantId}_${projectScopeKey}` },
-    { id: 'FINANCIAL_BID_FORM_INFRA', name: 'Official Financial Bid Form (for Infrastructure Projects)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'GPPB-BIDFORM-INFRASTRUCTURE', storageKey: `bidocs_bidform_infra_${tenantId}_${projectScopeKey}` },
-    { id: 'PRICE_SCHEDULE_GOODS', name: 'Detailed Price Schedule for Goods (Offered from Abroad / Within Philippines)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'PRICE_SCHEDULE_GOODS', storageKey: `bidocs_pricesched_${tenantId}_${projectScopeKey}` },
-    { id: 'BILL_OF_QUANTITIES', name: 'Bill of Quantities (BOQ Breakdown)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'BILL_OF_QUANTITIES', storageKey: `bidocs_boq_${tenantId}_${projectScopeKey}` },
-    { id: 'DETAILED_ESTIMATES_FORM_L', name: '(Form L) Detailed Estimates (Direct Labor, Logistics & Equipment)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'DETAILED_ESTIMATES_FORM_L', storageKey: `bidocs_detailed_estimates_${tenantId}_${projectScopeKey}` },
-    { id: 'SUMMARY_BID_PRICES', name: 'Summary of Bid Prices & Lump-Sum Breakdown', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'SUMMARY_BID_PRICES', storageKey: `bidocs_summary_bid_price_${tenantId}_${projectScopeKey}` },
-    { id: 'CASH_FLOW_BY_QUARTER', name: 'Cash Flow by Quarter and Payment Schedule (SF-INFR-56)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'CASH_FLOW_BY_QUARTER', storageKey: `bidocs_cash_flow_${tenantId}_${projectScopeKey}` }
-  ];
+  const isConsultingProject = React.useMemo(() => {
+    if (activeProject?.category) {
+      const cat = activeProject.category.toUpperCase();
+      if (cat.includes('CONSULT')) return true;
+      if (cat.includes('INFRA') || cat.includes('GOOD')) return false;
+    }
+    const titleLower = (projectTitle || '').toLowerCase();
+    return titleLower.includes('consult') || titleLower.includes('feasibility') || titleLower.includes('master plan');
+  }, [activeProject, projectTitle]);
+
+  // Master Statutory Bidding Documents Checklist definitions (Memoized for Fast Refresh & 0ms Rendering)
+  const statutoryDocsList: StatutoryDocDefinition[] = React.useMemo(() => {
+    const list: StatutoryDocDefinition[] = [
+      // 1. PhilGEPS Platinum Certificate of Registration
+      { id: 'PHILGEPS_PLATINUM', name: 'PhilGEPS Platinum Certificate of Registration (Annex A)', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'PHILGEPS_PLATINUM', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+      // 2. Statement of All Ongoing Government & Private Contracts
+      { id: 'ONGOING_CONTRACTS', name: 'Statement of All Ongoing Government & Private Contracts', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'ONGOING_CONTRACTS', storageKey: `bidocs_ongoing_${tenantId}_${projectScopeKey}` },
+      // 3. Statement of Single Largest Completed Contract (SLCC)
+      { id: 'SLCC_STATEMENT', name: 'Statement of Single Largest Completed Contract (SLCC)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'SLCC_STATEMENT', storageKey: `bidocs_slcc_${tenantId}_${projectScopeKey}` },
+      // 4. Bid Securing Declaration / Bid Security or Surety Bond
+      { id: 'BID_SECURING_DECLARATION', name: 'Bid Securing Declaration / Bid Security or Surety Bond (BSD)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'BID_SECURING_DECLARATION' },
+      // 5. Section VI: Schedule of Requirements
+      { id: 'SECTION_VI_REQUIREMENTS', name: 'Section VI: Schedule of Requirements', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'SECTION_VI_REQUIREMENTS', storageKey: `bidocs_sec_vi_${tenantId}_${projectScopeKey}` },
+      // 6. Section VII: Technical Specifications Statement of Compliance
+      { id: 'TECH_SPECS_SECTION_VII', name: 'Section VII: Technical Specifications Statement of Compliance', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'TECH_SPECS_SECTION_VII', storageKey: `bidocs_tech_specs_${tenantId}_${projectScopeKey}` },
+      // 7. Framework Agreement List
+      { id: 'FRAMEWORK_AGREEMENT_LIST', name: 'Framework Agreement List', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'FRAMEWORK_AGREEMENT_LIST', storageKey: `bidocs_fal_${tenantId}_${projectScopeKey}` },
+      // 8. Organizational Chart, Manpower Requirements & Key Personnel
+      { id: 'ORGANIZATIONAL_CHART', name: 'Organizational Chart for the Contract to be Bid', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'ORGANIZATIONAL_CHART', storageKey: `bidocs_org_chart_${tenantId}_${projectScopeKey}` },
+      { id: 'KEY_PERSONNEL', name: 'Key Personnel Matrix, Bio-Data & PRC Certifications (Manpower Requirements)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'KEY_PERSONNEL', storageKey: `bidocs_key_personnel_${tenantId}_${projectScopeKey}` },
+      { id: 'MAJOR_EQUIPMENT', name: "Contractor's Major Equipment Utilization Matrix", category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'MAJOR_EQUIPMENT', storageKey: `bidocs_equipment_${tenantId}_${projectScopeKey}` },
+      // 9. After-Sales Services & Warranty Undertaking
+      { id: 'AFTERSALES_WARRANTY', name: 'After-Sales Services & Warranty Undertaking', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'AFTERSALES_WARRANTY', storageKey: `bidocs_aftersale_${tenantId}_${projectScopeKey}` },
+      // 10. Omnibus Sworn Statement (OSS)
+      { id: 'OMNIBUS_SWORN_STATEMENT', name: 'Omnibus Sworn Statement (OSS)', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'OMNIBUS_SWORN_STATEMENT' },
+      // 11. Net Financial Contracting Capacity (NFCC) Computation
+      { id: 'NFCC_COMPUTATION', name: 'Net Financial Contracting Capacity (NFCC) Computation', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'NFCC_COMPUTATION', storageKey: `bidocs_nfcc_${tenantId}_${projectScopeKey}` },
+      // 12. Audited Financial Statements (AFS)
+      { id: 'AUDITED_FS', name: 'Audited Financial Statements (AFS) stamped received by BIR', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'AUDITED_FS', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+      // 13. Mayor's / Business Permit (Current Year)
+      { id: 'MAYORS_PERMIT', name: "Mayor's / Business Permit (Current Year)", category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'MAYORS_PERMIT', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+      // 14. PCAB License and Special License
+      { id: 'PCAB_LICENSE', name: 'PCAB License and Special License (for Infrastructure)', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'PCAB_LICENSE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+      // 15. SEC / DTI Certificate of Business Registration
+      { id: 'SEC_DTI_REG', name: 'SEC / DTI Certificate of Business Registration', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'SEC_DTI_REG', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+      // 16. BIR Registration and Tax Clearance Certificate
+      { id: 'TAX_CLEARANCE', name: 'BIR Tax Clearance Certificate & BIR Registration', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'TAX_CLEARANCE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+      // 17. Secretary's Certificate / Board Resolution / SPA
+      { id: 'SECRETARY_CERTIFICATE', name: "Secretary's Certificate / Board Resolution / Special Power of Attorney (SPA)", category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'SECRETARY_CERTIFICATE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+      { id: 'JOINT_VENTURE_AGREEMENT', name: 'Joint Venture Agreement (JVA) / Class B Legal Documents', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'JOINT_VENTURE_AGREEMENT', vaultMatchCategory: 'ELIGIBILITY_CLASS_B' },
+
+      // Envelope 2: Financial Proposal Documents (1st: Detailed Estimates, 2nd: Bid Form, 3rd: BOQ, 4th: Price Schedule, 5th: Summary of Bid Prices, 6th: Cash Flow)
+      { id: 'DETAILED_ESTIMATES_FORM_L', name: '(Form L) Detailed Estimates (Direct Labor, Logistics & Equipment)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'DETAILED_ESTIMATES_FORM_L', storageKey: `bidocs_detailed_estimates_${tenantId}_${projectScopeKey}` },
+    ];
+
+    // Dynamic 2nd Document: Only the relevant Bid Form matching the Project Type
+    if (isInfraProject) {
+      list.push({ id: 'FINANCIAL_BID_FORM_INFRA', name: 'Official Financial Bid Form (for Infrastructure Projects)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'GPPB-BIDFORM-INFRASTRUCTURE', storageKey: `bidocs_bidform_infra_${tenantId}_${projectScopeKey}` });
+    } else if (isConsultingProject) {
+      list.push({ id: 'FINANCIAL_BID_FORM_CONSULTING', name: 'Financial Proposal Submission Form (for Consulting Services)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'GPPB-BIDFORM-CONSULTING', storageKey: `bidocs_bidform_consulting_${tenantId}_${projectScopeKey}` });
+    } else {
+      list.push({ id: 'FINANCIAL_BID_FORM_GOODS', name: 'Official Financial Bid Form (for Goods & General Support)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'GPPB-BIDFORM-GOODS', storageKey: `bidocs_bidform_goods_${tenantId}_${projectScopeKey}` });
+    }
+
+    list.push(
+      { id: 'BILL_OF_QUANTITIES', name: 'Bill of Quantities (BOQ Breakdown)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'BILL_OF_QUANTITIES', storageKey: `bidocs_boq_${tenantId}_${projectScopeKey}` },
+      { id: 'PRICE_SCHEDULE_GOODS', name: 'Detailed Price Schedule for Goods (Offered from Abroad / Within Philippines)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'PRICE_SCHEDULE_GOODS', storageKey: `bidocs_pricesched_${tenantId}_${projectScopeKey}` },
+      { id: 'SUMMARY_BID_PRICES', name: 'Summary of Bid Prices & Lump-Sum Breakdown', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'SUMMARY_BID_PRICES', storageKey: `bidocs_summary_bid_price_${tenantId}_${projectScopeKey}` },
+      { id: 'CASH_FLOW_BY_QUARTER', name: 'Cash Flow by Quarter and Payment Schedule (SF-INFR-56)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'CASH_FLOW_BY_QUARTER', storageKey: `bidocs_cash_flow_${tenantId}_${projectScopeKey}` }
+    );
+
+    return list;
+  }, [tenantId, projectScopeKey, isInfraProject, isConsultingProject]);
 
   // Load vault documents from IndexedDB + Completed Forms
   useEffect(() => {
@@ -209,7 +250,7 @@ export const BidPackageBuilderView: React.FC = () => {
                   tenantId: tenantId,
                   documentName: form.title || form.formCode,
                   documentCode: form.formCode,
-                  documentNumber: form.projectRefNo || projectRefNo,
+                  documentNumber: form.projectRefNo || '',
                   category: form.formCode === 'SEC-VII' || form.formCode === 'SEC-VI' ? 'TECHNICAL' : 'TECHNICAL',
                   procurementApplicability: ['Infrastructure'],
                   legalBasisReference: 'RA 12009 NGPA / RA 9184 Standard',
@@ -222,8 +263,8 @@ export const BidPackageBuilderView: React.FC = () => {
                   requiresIssueDate: false,
                   requiresExpiryDate: false,
                   status: 'ACTIVE',
-                  projectTitle: form.projectTitle || projectTitle,
-                  philgepsRefNo: form.projectRefNo || projectRefNo,
+                  projectTitle: form.projectTitle || '',
+                  philgepsRefNo: form.projectRefNo || '',
                   previousVersions: []
                 });
               }
@@ -236,12 +277,14 @@ export const BidPackageBuilderView: React.FC = () => {
 
       setVaultDocs(combinedDocs);
 
-      for (const d of combinedDocs) {
-        try {
-          const data = await loadPdfData(d.id);
-          if (data) pdfDataCache.current[d.id] = data;
-        } catch (_) { /* ignore missing binary */ }
-      }
+      await Promise.all(
+        combinedDocs.map(async (d) => {
+          try {
+            const data = await loadPdfData(d.id);
+            if (data) pdfDataCache.current[d.id] = data;
+          } catch (_) { /* ignore missing binary */ }
+        })
+      );
     }).catch(e => console.error('[BidPackage] Failed to load vault items:', e));
   }, [tenantId, projectScopeKey]);
 
@@ -300,148 +343,360 @@ export const BidPackageBuilderView: React.FC = () => {
     }
   };
 
-  // Helper to check if a statutory document is ready/configured in system (100% ACCURATE & STRICT PROJECT ISOLATION)
-  const checkDocReadiness = (doc: StatutoryDocDefinition): { isReady: boolean; vaultId?: string } => {
+  // Memoized batch readiness map for all statutory docs (0ms instantaneous lookup)
+  const docReadinessMap = React.useMemo(() => {
     const currentRef = (projectRefNo || '').trim().toLowerCase();
     const currentTitle = (projectTitle || '').trim().toLowerCase();
+    const ref = projectRefNo || '';
+    const opp = selectedOppId || '';
+    const currentRefDigits = currentRef.replace(/[^0-9]/g, '');
+    const currentOppId = (selectedOppId || '').trim().toLowerCase();
 
-    // 1. Check local storage template for THIS specific project (must have actual non-empty content)
-    if (doc.storageKey) {
-      const raw = localStorage.getItem(doc.storageKey);
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return { isReady: true };
-          } else if (typeof parsed === 'object' && parsed !== null) {
-            // Check for objects with arrays like detailed estimates
-            const hasData = Object.values(parsed).some(val => Array.isArray(val) && val.length > 0);
-            if (hasData || Object.keys(parsed).length > 2) {
-              return { isReady: true };
+    const map: Record<string, { isReady: boolean; vaultId?: string }> = {};
+
+    statutoryDocsList.forEach(doc => {
+      // 1. Candidate localStorage keys strictly for THIS active project (MUST have valid ref)
+      const candidateStorageKeys: string[] = [];
+      if (ref && doc.storageKey) candidateStorageKeys.push(doc.storageKey);
+
+      if (ref) {
+        if (doc.id === 'ORGANIZATIONAL_CHART') {
+          candidateStorageKeys.push(`bidocs_org_chart_${tenantId}_${ref}`);
+        } else if (doc.id === 'KEY_PERSONNEL') {
+          candidateStorageKeys.push(`bidocs_key_personnel_${tenantId}_${ref}`);
+          candidateStorageKeys.push(`bidocs_personnel_${tenantId}_${ref}`);
+        } else if (doc.id === 'MAJOR_EQUIPMENT') {
+          candidateStorageKeys.push(`bidocs_equipment_${tenantId}_${ref}`);
+          candidateStorageKeys.push(`bidocs_major_equipment_${tenantId}_${ref}`);
+        } else if (doc.id === 'SECTION_VI_REQUIREMENTS') {
+          candidateStorageKeys.push(`bidocs_sec_vi_${tenantId}_${ref}`);
+        } else if (doc.id === 'TECH_SPECS_SECTION_VII') {
+          candidateStorageKeys.push(`bidocs_tech_specs_${tenantId}_${ref}`);
+        } else if (doc.id === 'FRAMEWORK_AGREEMENT_LIST') {
+          candidateStorageKeys.push(`bidocs_fal_${tenantId}_${ref}`);
+        } else if (doc.id === 'ONGOING_CONTRACTS') {
+          candidateStorageKeys.push(`bidocs_ongoing_${tenantId}_${ref}`);
+        } else if (doc.id === 'SLCC_STATEMENT') {
+          candidateStorageKeys.push(`bidocs_slcc_${tenantId}_${ref}`);
+        } else if (doc.id === 'NFCC_COMPUTATION') {
+          candidateStorageKeys.push(`bidocs_nfcc_${tenantId}_${ref}`);
+        } else if (doc.id === 'BID_SECURING_DECLARATION') {
+          candidateStorageKeys.push(`bidocs_bsd_${tenantId}_${ref}`);
+        } else if (doc.id === 'OMNIBUS_SWORN_STATEMENT') {
+          candidateStorageKeys.push(`bidocs_oss_${tenantId}_${ref}`);
+        } else if (doc.id === 'AFTERSALES_WARRANTY') {
+          candidateStorageKeys.push(`bidocs_aftersale_${tenantId}_${ref}`);
+        } else if (doc.id === 'CASH_FLOW_BY_QUARTER') {
+          candidateStorageKeys.push(`bidocs_cash_flow_${tenantId}_${ref}`);
+        } else if (doc.id === 'PRICE_SCHEDULE_GOODS') {
+          candidateStorageKeys.push(`bidocs_pricesched_${tenantId}_${ref}`);
+        } else if (doc.id === 'BILL_OF_QUANTITIES') {
+          candidateStorageKeys.push(`bidocs_boq_${tenantId}_${ref}`);
+        } else if (doc.id === 'DETAILED_ESTIMATES_FORM_L') {
+          candidateStorageKeys.push(`bidocs_detailed_estimates_${tenantId}_${ref}`);
+        } else if (doc.id === 'SUMMARY_BID_PRICES') {
+          candidateStorageKeys.push(`bidocs_summary_bid_price_${tenantId}_${ref}`);
+        } else if (doc.id === 'FINANCIAL_BID_FORM_GOODS') {
+          candidateStorageKeys.push(`bidocs_bidform_goods_${tenantId}_${ref}`);
+        } else if (doc.id === 'FINANCIAL_BID_FORM_INFRA') {
+          candidateStorageKeys.push(`bidocs_bidform_infra_${tenantId}_${ref}`);
+        } else if (doc.id === 'FINANCIAL_BID_FORM_CONSULTING') {
+          candidateStorageKeys.push(`bidocs_bidform_consulting_${tenantId}_${ref}`);
+        }
+      }
+
+      let foundInStorage = false;
+      for (const key of candidateStorageKeys) {
+        if (!key) continue;
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (!parsed) continue;
+
+            // Strict project reference verification if metadata is stored
+            if (typeof parsed === 'object' && !Array.isArray(parsed)) {
+              const pRef = (parsed.projectRefNo || parsed.philgepsRefNo || '').trim().toLowerCase();
+              if (pRef && pRef !== currentRef) continue;
             }
+
+            if (doc.id === 'SECTION_VI_REQUIREMENTS') {
+              const rows = Array.isArray(parsed) ? parsed : (parsed.requirements || parsed.items || parsed.scheduleRows || []);
+              const hasActualItems = Array.isArray(rows) && rows.length > 0 && rows.some((it: any) => {
+                const desc = (it.description || '').trim();
+                return desc.length > 0 && !desc.toLowerCase().includes('enterprise server rack');
+              });
+              if (hasActualItems) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            } else if (doc.id === 'TECH_SPECS_SECTION_VII') {
+              const rows = Array.isArray(parsed) ? parsed : (parsed.specs || parsed.specifications || parsed.items || parsed.rows || []);
+              const hasActualSpecs = Array.isArray(rows) && rows.length > 0 && rows.some((it: any) => {
+                const spec = (it.description || it.specification || it.statement || it.specs || '').trim();
+                return spec.length > 0;
+              });
+              if (hasActualSpecs) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            } else if (doc.id === 'FRAMEWORK_AGREEMENT_LIST') {
+              const rows = Array.isArray(parsed) ? parsed : (parsed.items || parsed.frameworkItems || []);
+              const hasActualFal = Array.isArray(rows) && rows.length > 0 && rows.some((it: any) => {
+                const item = (it.description || it.item || '').trim();
+                return item.length > 0;
+              });
+              if (hasActualFal) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            } else if (doc.id === 'ONGOING_CONTRACTS' || doc.id === 'SLCC_STATEMENT') {
+              const rows = Array.isArray(parsed) ? parsed : (parsed.contracts || parsed.ongoingContracts || parsed.slccContracts || parsed.items || []);
+              const hasActualContracts = Array.isArray(rows) && rows.some((it: any) => (it.contractName || it.clientName || it.description || it.title || '').trim().length > 0);
+              if (hasActualContracts) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            } else if (doc.id === 'BID_SECURING_DECLARATION' || doc.id === 'OMNIBUS_SWORN_STATEMENT') {
+              const isConfigured = !!(
+                (parsed.projectTitle && parsed.projectTitle.trim().length > 0) ||
+                (parsed.procuringEntity && parsed.procuringEntity.trim().length > 0) ||
+                (parsed.signatoryName && parsed.signatoryName.trim().length > 0) ||
+                (parsed.notaryDetails && typeof parsed.notaryDetails === 'object') ||
+                parsed.fileDataUrl
+              );
+              if (isConfigured) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            } else if (doc.id === 'MAJOR_EQUIPMENT') {
+              const arr = parsed.equipments || parsed.items || parsed.equipmentList || (Array.isArray(parsed) ? parsed : []);
+              const hasEquip = Array.isArray(arr) && arr.some((e: any) => (e.description || e.equipmentName || e.model || '').trim().length > 0);
+              if (hasEquip) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            } else if (doc.id === 'KEY_PERSONNEL') {
+              const arr = parsed.labors || parsed.personnel || parsed.keyPersonnel || (Array.isArray(parsed) ? parsed : []);
+              const hasPersonnel = Array.isArray(arr) && arr.some((p: any) => (p.name || p.personnelName || p.position || '').trim().length > 0);
+              if (hasPersonnel) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            } else if (doc.id === 'ORGANIZATIONAL_CHART') {
+              const hasChart = !!(parsed.chartData || (Array.isArray(parsed.nodes) && parsed.nodes.length > 0) || parsed.fileDataUrl || parsed.uploaded);
+              if (hasChart) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            } else if (doc.id === 'NFCC_COMPUTATION') {
+              const hasNfcc = (Number(parsed.currentAssets) > 0 || Number(parsed.currentLiabilities) > 0 || Number(parsed.nfccAmount) > 0 || Number(parsed.nfccTotal) > 0);
+              if (hasNfcc) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            } else if (doc.id === 'DETAILED_ESTIMATES_FORM_L' || doc.id === 'BILL_OF_QUANTITIES') {
+              const hasCost = (typeof parsed.totalEstimatedProjectCost === 'number' && parsed.totalEstimatedProjectCost > 0) ||
+                              (typeof parsed.grandTotal === 'number' && parsed.grandTotal > 0) ||
+                              (typeof parsed.totalBidAmount === 'number' && parsed.totalBidAmount > 0) ||
+                              (Array.isArray(parsed.materials) && parsed.materials.length > 0 && parsed.materials.some((m: any) => (Number(m.quantity) > 0 && Number(m.unitPrice) > 0))) ||
+                              (Array.isArray(parsed.items) && parsed.items.length > 0 && parsed.items.some((it: any) => (Number(it.amount || it.totalAmount) > 0)));
+              if (hasCost) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            } else if (doc.id === 'PRICE_SCHEDULE_GOODS') {
+              const arr = parsed.items || parsed.scheduleRows || (Array.isArray(parsed) ? parsed : []);
+              const hasRows = Array.isArray(arr) && arr.some((r: any) => (r.description || '').trim().length > 0 && (Number(r.unitPrice || r.totalPrice || r.amount) > 0));
+              if (hasRows) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            } else if (doc.id === 'CASH_FLOW_BY_QUARTER') {
+              const arr = parsed.quarters || parsed.paymentSchedule || (Array.isArray(parsed) ? parsed : []);
+              const hasQuarter = Array.isArray(arr) && arr.some((q: any) => Number(q.amount || q.cashFlow || q.total) > 0);
+              if (hasQuarter) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            } else if (doc.id === 'FINANCIAL_BID_FORM_GOODS' || doc.id === 'FINANCIAL_BID_FORM_INFRA') {
+              const num = parseFloat(`${parsed.totalBidAmountFigures || parsed.totalBidAmount || ''}`.replace(/,/g, ''));
+              if (num > 0) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            } else if (Array.isArray(parsed)) {
+              const hasRealItems = parsed.some((it: any) => {
+                if (!it || typeof it !== 'object') return false;
+                const textFields = [it.description, it.contractName, it.clientName, it.projectName, it.title, it.specs, it.name];
+                return textFields.some(f => typeof f === 'string' && f.trim().length > 0);
+              });
+              if (hasRealItems) {
+                map[doc.id] = { isReady: true };
+                foundInStorage = true;
+                break;
+              }
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (foundInStorage) return;
+
+      // 2. Check vault items (Class A/B Corporate vs Strictly Isolated Project Exhibits)
+      const isCorporateClassAOrB = [
+        'PHILGEPS_PLATINUM',
+        'SEC_DTI_REG',
+        'MAYORS_PERMIT',
+        'TAX_CLEARANCE',
+        'AUDITED_FS',
+        'PCAB_LICENSE',
+        'SECRETARY_CERTIFICATE',
+        'JOINT_VENTURE_AGREEMENT'
+      ].includes(doc.id);
+
+      const matchingVault = vaultDocs.find(v => {
+        const vName = (v.documentName || '').toLowerCase();
+        const vCode = (v.documentCode || '').toUpperCase();
+        const vRef = (v.philgepsRefNo || '').trim().toLowerCase();
+        const vRefDigits = vRef.replace(/[^0-9]/g, '');
+
+        if (isCorporateClassAOrB) {
+          // Class A / B Corporate Credentials belong to the company/tenant in Vault
+          if (doc.id === 'PHILGEPS_PLATINUM') {
+            return vCode === 'DOC-1' || vName.includes('philgeps') || vName.includes('platinum');
           }
-        } catch (_) {}
-      }
-    }
+          if (doc.id === 'SEC_DTI_REG') {
+            return vCode === 'DOC-2' || vName.includes('sec') || vName.includes('dti') || vName.includes('cda');
+          }
+          if (doc.id === 'MAYORS_PERMIT') {
+            return vCode === 'DOC-3' || vName.includes('mayor') || vName.includes('business permit');
+          }
+          if (doc.id === 'TAX_CLEARANCE') {
+            return vCode === 'DOC-4' || vName.includes('tax clearance') || vName.includes('bir');
+          }
+          if (doc.id === 'AUDITED_FS') {
+            return vCode === 'DOC-5' || vName.includes('audited') || vName.includes('financial statement') || vName.includes('afs');
+          }
+          if (doc.id === 'PCAB_LICENSE') {
+            return vCode === 'DOC-6' || vName.includes('pcab') || vName.includes('contractor license');
+          }
+          if (doc.id === 'SECRETARY_CERTIFICATE') {
+            return vCode === 'DOC-13' || vCode.includes('SPA') || vName.includes('secretary') || vName.includes('board resolution') || vName.includes('power of attorney') || vName.includes('spa');
+          }
+          if (doc.id === 'JOINT_VENTURE_AGREEMENT') {
+            return vCode === 'DOC-14' || vCode.includes('JVA') || vName.includes('joint venture') || vName.includes('jva');
+          }
+          return false;
+        }
 
-    // 2. Check vault items (Class A/B Legal & Eligibility, Technical, Financial)
-    const matchingVault = vaultDocs.find(v => {
-      const vName = (v.documentName || '').toLowerCase();
-      const vCode = (v.documentCode || '').toUpperCase();
-      const vRef = (v.philgepsRefNo || v.documentNumber || '').trim().toLowerCase();
-      const vTitle = (v.projectTitle || '').trim().toLowerCase();
+        // Project-Specific Technical Exhibits & Financial Documents MUST match THIS active project!
+        const isStrictlyForThisProject = !!(
+          currentRef && vRef && (
+            vRef === currentRef ||
+            (currentRefDigits.length >= 6 && vRefDigits === currentRefDigits)
+          )
+        );
 
-      // If document belongs to a specific project, ensure it matches THIS project strictly
-      const isForThisProject = (!currentRef && !currentTitle) ||
-                               (!vRef && !vTitle) ||
-                               (currentRef && (vRef.includes(currentRef) || currentRef.includes(vRef))) ||
-                               (currentTitle && (vTitle.includes(currentTitle) || currentTitle.includes(vTitle)));
+        if (!isStrictlyForThisProject) return false;
 
-      // Class A / B Corporate Credentials Matching
-      if (doc.id === 'PHILGEPS_PLATINUM') {
-        return (vCode === 'DOC-1' || vCode.includes('PHILGEPS') || vName.includes('philgeps')) && isForThisProject;
-      }
-      if (doc.id === 'SEC_DTI_REG') {
-        return (vCode === 'DOC-2' || vCode.includes('SEC') || vCode.includes('DTI') || vName.includes('sec') || vName.includes('dti') || vName.includes('business registration')) && isForThisProject;
-      }
-      if (doc.id === 'MAYORS_PERMIT') {
-        return (vCode === 'DOC-3' || vCode === 'DOC-4' || vName.includes('mayor') || vName.includes('business permit') || vName.includes('barangay business')) && isForThisProject;
-      }
-      if (doc.id === 'TAX_CLEARANCE') {
-        return (vCode === 'DOC-7' || vCode === 'DOC-6' || vCode.includes('TAX') || vName.includes('tax clearance') || vName.includes('bir tax') || vName.includes('tax')) && isForThisProject;
-      }
-      if (doc.id === 'AUDITED_FS') {
-        return (vCode === 'DOC-15' || vCode.includes('AFS') || vName.includes('financial statement') || vName.includes('afs') || vName.includes('audited')) && isForThisProject;
-      }
-      if (doc.id === 'PCAB_LICENSE') {
-        return (vCode === 'DOC-8' || vCode.includes('PCAB') || vName.includes('pcab')) && isForThisProject;
-      }
-      if (doc.id === 'SECRETARY_CERTIFICATE') {
-        return (vCode === 'DOC-13' || vCode.includes('SECRETARY') || vName.includes('secretary') || vName.includes('board resolution') || vName.includes('power of attorney') || vName.includes('spa')) && isForThisProject;
-      }
-      if (doc.id === 'JOINT_VENTURE_AGREEMENT') {
-        return (vCode === 'DOC-14' || vCode.includes('JVA') || vName.includes('joint venture') || vName.includes('jva')) && isForThisProject;
-      }
+        // Technical Exhibits & Statements Matching
+        if (doc.id === 'SLCC_STATEMENT') {
+          return vCode.includes('SLCC') || vCode.includes('(C)') || vName.includes('slcc') || vName.includes('single largest');
+        }
+        if (doc.id === 'ONGOING_CONTRACTS') {
+          return vCode.includes('ONGOING') || vCode.includes('(B)') || vName.includes('ongoing');
+        }
+        if (doc.id === 'NFCC_COMPUTATION') {
+          return vCode.includes('NFCC') || vName.includes('nfcc') || vName.includes('contracting capacity');
+        }
+        if (doc.id === 'SECTION_VI_REQUIREMENTS') {
+          return vCode.includes('SEC-VI') || vCode.includes('(F.D)') || vName.includes('section vi') || vName.includes('schedule of requirements');
+        }
+        if (doc.id === 'TECH_SPECS_SECTION_VII') {
+          return vCode.includes('SEC-VII') || vCode.includes('(G)') || vName.includes('section vii') || vName.includes('technical specifications');
+        }
+        if (doc.id === 'BID_SECURING_DECLARATION') {
+          return vCode.includes('BSD') || vCode.includes('(E)') || vName.includes('bid securing') || vName.includes('bsd') || vName.includes('bid security');
+        }
+        if (doc.id === 'OMNIBUS_SWORN_STATEMENT') {
+          return vCode.includes('OSS') || vCode.includes('(I)') || vName.includes('omnibus') || vName.includes('oss');
+        }
+        if (doc.id === 'ORGANIZATIONAL_CHART') {
+          return vCode.includes('ORG') || vCode.includes('FA-2026') || vCode.includes('(F.A)') || vCode === '(F)' || vName.includes('organizational chart') || vName.includes('org chart');
+        }
+        if (doc.id === 'KEY_PERSONNEL') {
+          return vCode.includes('PERSONNEL') || vCode.includes('FB-2026') || vCode.includes('(F.B)') || vCode === '(F)' || vName.includes('key personnel') || vName.includes('bio-data') || vName.includes('manpower');
+        }
+        if (doc.id === 'MAJOR_EQUIPMENT') {
+          return vCode.includes('EQUIPMENT') || vCode.includes('FC-2026') || vCode.includes('(F.C)') || vCode === '(F)' || vName.includes('equipment') || vName.includes('machinery');
+        }
+        if (doc.id === 'AFTERSALES_WARRANTY') {
+          return vCode.includes('AFTER') || vCode.includes('(H)') || vName.includes('after-sales') || vName.includes('aftersales') || vName.includes('warranty');
+        }
+        if (doc.id === 'FRAMEWORK_AGREEMENT_LIST') {
+          return vCode.includes('FAL') || vName.includes('framework agreement');
+        }
 
-      // Technical Exhibits & Statements Matching
-      if (doc.id === 'SLCC_STATEMENT') {
-        return (vCode.includes('SLCC') || vName.includes('slcc') || vName.includes('single largest')) && isForThisProject;
-      }
-      if (doc.id === 'ONGOING_CONTRACTS') {
-        return (vCode.includes('ONGOING') || vName.includes('ongoing')) && isForThisProject;
-      }
-      if (doc.id === 'NFCC_COMPUTATION') {
-        return (vCode.includes('NFCC') || vName.includes('nfcc') || vName.includes('contracting capacity')) && isForThisProject;
-      }
-      if (doc.id === 'SECTION_VI_REQUIREMENTS') {
-        return (vCode.includes('SEC-VI') || vName.includes('section vi') || vName.includes('schedule of requirements')) && isForThisProject;
-      }
-      if (doc.id === 'TECH_SPECS_SECTION_VII') {
-        return (vCode.includes('SEC-VII') || vName.includes('section vii') || vName.includes('technical specifications')) && isForThisProject;
-      }
-      if (doc.id === 'BID_SECURING_DECLARATION') {
-        return (vCode.includes('BSD') || vName.includes('bid securing') || vName.includes('bsd') || vName.includes('bid security')) && isForThisProject;
-      }
-      if (doc.id === 'OMNIBUS_SWORN_STATEMENT') {
-        return (vCode.includes('OSS') || vName.includes('omnibus') || vName.includes('oss')) && isForThisProject;
-      }
-      if (doc.id === 'ORGANIZATIONAL_CHART') {
-        return (vCode.includes('ORG') || vName.includes('organizational chart') || vName.includes('org chart')) && isForThisProject;
-      }
-      if (doc.id === 'KEY_PERSONNEL') {
-        return (vCode.includes('PERSONNEL') || vName.includes('key personnel') || vName.includes('bio-data') || vName.includes('prc')) && isForThisProject;
-      }
-      if (doc.id === 'MAJOR_EQUIPMENT') {
-        return (vCode.includes('EQUIPMENT') || vName.includes('equipment')) && isForThisProject;
-      }
-      if (doc.id === 'AFTERSALES_WARRANTY') {
-        return (vCode.includes('AFTER') || vName.includes('after-sales') || vName.includes('aftersales') || vName.includes('warranty')) && isForThisProject;
-      }
+        // Financial Proposals Matching
+        if (doc.id === 'FINANCIAL_BID_FORM_GOODS') {
+          return (vCode.includes('GOODS') || vName.includes('goods')) && (vCode.includes('BIDFORM') || vName.includes('bid form'));
+        }
+        if (doc.id === 'FINANCIAL_BID_FORM_INFRA') {
+          return (vCode.includes('INFRA') || vName.includes('infrastructure')) && (vCode.includes('BIDFORM') || vName.includes('bid form'));
+        }
+        if (doc.id === 'PRICE_SCHEDULE_GOODS') {
+          return vCode.includes('PRICESCHED') || vCode.includes('PRICE-SCHEDULE') || vName.includes('price schedule');
+        }
+        if (doc.id === 'BILL_OF_QUANTITIES') {
+          return vCode.includes('BOQ') || vName.includes('bill of quantities') || vName.includes('boq');
+        }
+        if (doc.id === 'DETAILED_ESTIMATES_FORM_L') {
+          return vCode.includes('DETAILED-ESTIMATES') || vName.includes('detailed estimate') || vName.includes('form l') || vName.includes('form (l)');
+        }
+        if (doc.id === 'SUMMARY_BID_PRICES') {
+          return vCode.includes('SUMMARY-BIDPRICE') || vName.includes('summary of bid price');
+        }
+        if (doc.id === 'CASH_FLOW_BY_QUARTER') {
+          return vCode.includes('SF-INFR-56') || vCode.includes('CASHFLOW') || vName.includes('cash flow') || vName.includes('sf-infr-56');
+        }
 
-      // Financial Proposals Matching
-      if (doc.id === 'FINANCIAL_BID_FORM_GOODS') {
-        return (vCode.includes('GOODS') || vName.includes('goods')) && (vCode.includes('BIDFORM') || vName.includes('bid form')) && isForThisProject;
-      }
-      if (doc.id === 'FINANCIAL_BID_FORM_INFRA') {
-        return (vCode.includes('INFRA') || vName.includes('infrastructure')) && (vCode.includes('BIDFORM') || vName.includes('bid form')) && isForThisProject;
-      }
-      if (doc.id === 'PRICE_SCHEDULE_GOODS') {
-        return (vCode.includes('PRICESCHED') || vCode.includes('PRICE-SCHEDULE') || vName.includes('price schedule')) && isForThisProject;
-      }
-      if (doc.id === 'BILL_OF_QUANTITIES') {
-        return (vCode.includes('BOQ') || vName.includes('bill of quantities') || vName.includes('boq')) && isForThisProject;
-      }
-      if (doc.id === 'DETAILED_ESTIMATES_FORM_L') {
-        return (vCode.includes('DETAILED-ESTIMATES') || vName.includes('detailed estimate') || vName.includes('form l') || vName.includes('form (l)')) && isForThisProject;
-      }
-      if (doc.id === 'SUMMARY_BID_PRICES') {
-        return (vCode.includes('SUMMARY-BIDPRICE') || vName.includes('summary of bid price')) && isForThisProject;
-      }
-      if (doc.id === 'CASH_FLOW_BY_QUARTER') {
-        return (vCode.includes('SF-INFR-56') || vCode.includes('CASHFLOW') || vName.includes('cash flow') || vName.includes('sf-infr-56')) && isForThisProject;
+        return false;
+      });
+
+      if (matchingVault) {
+        map[doc.id] = { isReady: true, vaultId: matchingVault.id };
+        return;
       }
 
-      // Fallback substring matching
-      const dName = (doc.name || '').toLowerCase();
-      return (vName.includes(dName) || dName.includes(vName)) && isForThisProject;
+      map[doc.id] = { isReady: false };
     });
 
-    if (matchingVault) {
-      return { isReady: true, vaultId: matchingVault.id };
-    }
+    return map;
+  }, [statutoryDocsList, vaultDocs, projectRefNo, projectTitle, selectedOppId, tenantId, projectScopeKey]);
 
-    // BSD & OSS are official Cover Separator documents that are printed, notarized with wet-ink, and attached in real life
-    if (doc.id === 'BID_SECURING_DECLARATION' || doc.id === 'OMNIBUS_SWORN_STATEMENT') {
-      return { isReady: true };
-    }
-
-    return { isReady: false };
+  // Helper to check if a statutory document is ready/configured in system (0ms O(1) Instant Lookup)
+  const checkDocReadiness = (doc: StatutoryDocDefinition): { isReady: boolean; vaultId?: string } => {
+    return docReadinessMap[doc.id] || { isReady: false };
   };
 
   // Master Document Checklist Rank Matcher (Strictly 1-17 Order for Envelope 1, followed by 18-24 for Envelope 2)
   const getDocumentChecklistRank = (doc: PackageItem): number => {
     const name = (doc.documentName || '').toLowerCase();
-    
+
     // Check defined statutory list
     const def = statutoryDocsList.find(
       d => d.name.toLowerCase() === name || name.includes(d.name.toLowerCase()) || d.name.toLowerCase().includes(name)
@@ -454,7 +709,7 @@ export const BidPackageBuilderView: React.FC = () => {
         'BID_SECURING_DECLARATION': 4,
         'SECTION_VI_REQUIREMENTS': 5,
         'TECH_SPECS_SECTION_VII': 6,
-        'DELIVERY_SCHEDULE': 7,
+        'FRAMEWORK_AGREEMENT_LIST': 7,
         'ORGANIZATIONAL_CHART': 8,
         'KEY_PERSONNEL': 9,
         'MAJOR_EQUIPMENT': 10,
@@ -519,15 +774,15 @@ export const BidPackageBuilderView: React.FC = () => {
     if (name.includes('secretary') || name.includes('board resolution') || name.includes('special power of attorney') || name.includes('spa')) return 19;
     if (name.includes('joint venture') || name.includes('jva')) return 20;
 
-    // Envelope 2: Financial Proposal Items
-    if (name.includes('bid form') && (name.includes('goods') || name.includes('supply'))) return 21;
+    // Envelope 2: Financial Proposal Items (1st: Detailed Estimates, 2nd: Bid Form, 3rd: BOQ, 4th: Price Schedule, 5th: Summary of Bid Prices, 6th: Cash Flow)
+    if (name.includes('detailed estimate') || name.includes('form l') || name.includes('form (l)')) return 21;
+    if (name.includes('bid form') && (name.includes('goods') || name.includes('supply'))) return 22;
     if (name.includes('bid form') && (name.includes('infra') || name.includes('civil works'))) return 22;
-    if (name.includes('bid form') || name.includes('financial proposal')) return 21;
-    if (name.includes('price schedule')) return 23;
-    if (name.includes('bill of quantities') || name.includes('boq')) return 24;
-    if (name.includes('detailed estimate') || name.includes('form l') || name.includes('form (l)')) return 25;
-    if (name.includes('summary of bid') || name.includes('summary bid')) return 26;
-    if (name.includes('cash flow') || name.includes('sf-infr-56')) return 27;
+    if (name.includes('bid form') || name.includes('financial proposal')) return 22;
+    if (name.includes('bill of quantities') || name.includes('boq')) return 23;
+    if (name.includes('price schedule')) return 24;
+    if (name.includes('summary of bid') || name.includes('summary bid')) return 25;
+    if (name.includes('cash flow') || name.includes('sf-infr-56')) return 26;
 
     if (doc.category === 'LEGAL') return 16;
     if (doc.category === 'TECHNICAL') return 8;
@@ -687,6 +942,144 @@ export const BidPackageBuilderView: React.FC = () => {
       item => !(item.id === id || (item.documentName === target.documentName && item.envelope === target.envelope))
     );
     savePackageItems(updatedOriginal);
+
+    // Also clean up any lingering project-scoped storage or completed forms for this document
+    try {
+      const ref = (projectRefNo || '').trim();
+      if (ref && target.documentName) {
+        const dName = target.documentName.toLowerCase();
+        if (dName.includes('schedule of requirements') || dName.includes('section vi')) {
+          localStorage.removeItem(`bidocs_sec_vi_${tenantId}_${ref}`);
+          localStorage.removeItem(`bidocs_sec_vi_services_${tenantId}_${ref}`);
+        }
+        if (dName.includes('technical specifications') || dName.includes('section vii')) {
+          localStorage.removeItem(`bidocs_tech_specs_${tenantId}_${ref}`);
+        }
+        if (dName.includes('framework agreement')) {
+          localStorage.removeItem(`bidocs_fal_${tenantId}_${ref}`);
+        }
+        if (dName.includes('ongoing')) {
+          localStorage.removeItem(`bidocs_ongoing_${tenantId}_${ref}`);
+        }
+        if (dName.includes('slcc')) {
+          localStorage.removeItem(`bidocs_slcc_${tenantId}_${ref}`);
+        }
+        if (dName.includes('bid securing') || dName.includes('bsd')) {
+          localStorage.removeItem(`bidocs_bsd_${tenantId}_${ref}`);
+        }
+        if (dName.includes('omnibus') || dName.includes('oss')) {
+          localStorage.removeItem(`bidocs_oss_${tenantId}_${ref}`);
+        }
+
+        const rawCompleted = localStorage.getItem(`bidocs_completed_notarized_${tenantId}`);
+        if (rawCompleted) {
+          const parsed = JSON.parse(rawCompleted);
+          if (Array.isArray(parsed)) {
+            const filtered = parsed.filter((f: any) => {
+              const fRef = (f.projectRefNo || '').trim().toLowerCase();
+              const fTitle = (f.title || f.formCode || '').toLowerCase();
+              return !(fRef === ref.toLowerCase() && (fTitle.includes(dName) || dName.includes(fTitle)));
+            });
+            localStorage.setItem(`bidocs_completed_notarized_${tenantId}`, JSON.stringify(filtered));
+          }
+        }
+      }
+    } catch (_) {}
+  };
+
+  const handleResetDocReadiness = (doc: StatutoryDocDefinition) => {
+    const ref = (projectRefNo || '').trim();
+    if (!ref) return;
+
+    const dName = doc.name.toLowerCase();
+    const keysToRemove: string[] = [];
+    if (doc.storageKey) keysToRemove.push(doc.storageKey);
+
+    if (dName.includes('schedule of requirements') || dName.includes('section vi') || doc.id === 'SECTION_VI_REQUIREMENTS') {
+      keysToRemove.push(`bidocs_sec_vi_${tenantId}_${ref}`);
+      keysToRemove.push(`bidocs_sec_vi_services_${tenantId}_${ref}`);
+    }
+    if (dName.includes('technical specifications') || dName.includes('section vii') || doc.id === 'TECH_SPECS_SECTION_VII') {
+      keysToRemove.push(`bidocs_tech_specs_${tenantId}_${ref}`);
+    }
+    if (dName.includes('framework agreement') || doc.id === 'FRAMEWORK_AGREEMENT_LIST') {
+      keysToRemove.push(`bidocs_fal_${tenantId}_${ref}`);
+    }
+    if (dName.includes('ongoing') || doc.id === 'ONGOING_CONTRACTS') {
+      keysToRemove.push(`bidocs_ongoing_${tenantId}_${ref}`);
+    }
+    if (dName.includes('slcc') || doc.id === 'SLCC_STATEMENT') {
+      keysToRemove.push(`bidocs_slcc_${tenantId}_${ref}`);
+    }
+    if (dName.includes('bid securing') || dName.includes('bsd') || doc.id === 'BID_SECURING_DECLARATION') {
+      keysToRemove.push(`bidocs_bsd_${tenantId}_${ref}`);
+    }
+    if (dName.includes('omnibus') || dName.includes('oss') || doc.id === 'OMNIBUS_SWORN_STATEMENT') {
+      keysToRemove.push(`bidocs_oss_${tenantId}_${ref}`);
+    }
+    if (dName.includes('organizational chart') || doc.id === 'ORGANIZATIONAL_CHART') {
+      keysToRemove.push(`bidocs_org_chart_${tenantId}_${ref}`);
+    }
+    if (dName.includes('key personnel') || doc.id === 'KEY_PERSONNEL') {
+      keysToRemove.push(`bidocs_key_personnel_${tenantId}_${ref}`);
+      keysToRemove.push(`bidocs_personnel_${tenantId}_${ref}`);
+    }
+    if (dName.includes('equipment') || doc.id === 'MAJOR_EQUIPMENT') {
+      keysToRemove.push(`bidocs_equipment_${tenantId}_${ref}`);
+      keysToRemove.push(`bidocs_major_equipment_${tenantId}_${ref}`);
+    }
+    if (dName.includes('warranty') || doc.id === 'AFTERSALES_WARRANTY') {
+      keysToRemove.push(`bidocs_aftersale_${tenantId}_${ref}`);
+    }
+    if (dName.includes('nfcc') || doc.id === 'NFCC_COMPUTATION') {
+      keysToRemove.push(`bidocs_nfcc_${tenantId}_${ref}`);
+    }
+    if (dName.includes('bill of quantities') || doc.id === 'BILL_OF_QUANTITIES') {
+      keysToRemove.push(`bidocs_boq_${tenantId}_${ref}`);
+    }
+    if (dName.includes('detailed estimates') || doc.id === 'DETAILED_ESTIMATES_FORM_L') {
+      keysToRemove.push(`bidocs_detailed_estimates_${tenantId}_${ref}`);
+    }
+    if (dName.includes('price schedule') || doc.id === 'PRICE_SCHEDULE_GOODS') {
+      keysToRemove.push(`bidocs_pricesched_${tenantId}_${ref}`);
+    }
+    if (dName.includes('summary of bid price') || doc.id === 'SUMMARY_BID_PRICES') {
+      keysToRemove.push(`bidocs_summary_bid_price_${tenantId}_${ref}`);
+    }
+    if (dName.includes('cash flow') || doc.id === 'CASH_FLOW_BY_QUARTER') {
+      keysToRemove.push(`bidocs_cash_flow_${tenantId}_${ref}`);
+    }
+
+    keysToRemove.forEach(k => {
+      try { localStorage.removeItem(k); } catch (_) {}
+    });
+
+    try {
+      const rawCompleted = localStorage.getItem(`bidocs_completed_notarized_${tenantId}`);
+      if (rawCompleted) {
+        const parsed = JSON.parse(rawCompleted);
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter((f: any) => {
+            const fRef = (f.projectRefNo || '').trim().toLowerCase();
+            const fTitle = (f.title || f.formCode || '').toLowerCase();
+            const isMatchProj = fRef === ref.toLowerCase();
+            const isMatchDoc = fTitle.includes(dName) || dName.includes(fTitle) || (doc.code && f.formCode === doc.code);
+            return !(isMatchProj && isMatchDoc);
+          });
+          localStorage.setItem(`bidocs_completed_notarized_${tenantId}`, JSON.stringify(filtered));
+        }
+      }
+    } catch (_) {}
+
+    setVaultDocs(prev => prev.filter(v => {
+      const vRef = (v.philgepsRefNo || '').trim().toLowerCase();
+      const vName = (v.documentName || '').toLowerCase();
+      const isMatchProj = vRef === ref.toLowerCase();
+      const isMatchDoc = vName.includes(dName) || dName.includes(vName) || (doc.code && v.documentCode === doc.code);
+      return !(isMatchProj && isMatchDoc);
+    }));
+
+    setSelectedDocIdsToAdd(prev => prev.filter(id => id !== doc.id));
   };
 
   // Move single item UP or DOWN in ORIGINAL (Automatically keeps COPY 1 and COPY 2 100% in sync)
@@ -828,9 +1221,13 @@ export const BidPackageBuilderView: React.FC = () => {
       } catch (_) {}
     }
 
-    // 3. Vault Item match by Name
+    // 3. Vault Item match by Name (Strictly verify project reference for technical docs)
+    const currRef = (projectRefNo || '').trim().toLowerCase();
+    const isCorporate = doc.category === 'LEGAL' && !dName.includes('affidavit') && !dName.includes('sworn');
     const matchedVault = vaultDocs.find(v => {
       const vName = (v.documentName || '').toLowerCase();
+      const vRef = (v.philgepsRefNo || '').trim().toLowerCase();
+      if (!isCorporate && currRef && vRef && vRef !== currRef) return false;
       return vName === dName || vName.includes(dName) || dName.includes(vName);
     });
     if (matchedVault?.fileDataUrl) return matchedVault.fileDataUrl;
@@ -841,7 +1238,7 @@ export const BidPackageBuilderView: React.FC = () => {
       } catch (_) {}
     }
 
-    // 4. Check completed notarized & statutory forms in localStorage
+    // 4. Check completed notarized & statutory forms in localStorage (Strictly enforce projectRefNo match)
     try {
       const raw = localStorage.getItem(`bidocs_completed_notarized_${tenantId || 'default'}`);
       if (raw) {
@@ -850,6 +1247,11 @@ export const BidPackageBuilderView: React.FC = () => {
           const found = parsed.find(f => {
             const fTitle = (f.title || '').toLowerCase();
             const fCode = (f.formCode || '').toUpperCase();
+            const fRef = (f.projectRefNo || '').trim().toLowerCase();
+
+            // Strict Project Isolation: Do not attach completed forms belonging to another project
+            if (currRef && fRef && fRef !== currRef) return false;
+
             if (f.id === doc.vaultDocId || f.id === doc.id) return true;
             if (fTitle === dName || fTitle.includes(dName) || dName.includes(fTitle)) return true;
 
@@ -903,12 +1305,26 @@ export const BidPackageBuilderView: React.FC = () => {
       `summarybid_${tenantId}_${projectScopeKey}`
     ];
 
+    // Check memory cache first (0ms)
     for (const k of candidateKeys) {
-      try {
-        const data = await loadPdfData(k);
-        if (data) return data;
-      } catch (_) {}
+      if (pdfDataCache.current[k]) return pdfDataCache.current[k];
     }
+
+    // Parallel load from IndexedDB
+    const idbResults = await Promise.all(
+      candidateKeys.map(async (k) => {
+        try {
+          const data = await loadPdfData(k);
+          if (data) {
+            pdfDataCache.current[k] = data;
+            return data;
+          }
+        } catch (_) {}
+        return null;
+      })
+    );
+    const foundData = idbResults.find(res => Boolean(res));
+    if (foundData) return foundData;
 
     return null;
   };
@@ -930,12 +1346,14 @@ export const BidPackageBuilderView: React.FC = () => {
     try {
       const units: ExportDocumentUnit[] = [];
 
+      // Pre-resolve all attachments concurrently in parallel
+      const resolvedAttachments = await Promise.all(
+        docsToMerge.map(doc => resolveAttachmentForDoc(doc))
+      );
+
       for (let i = 0; i < docsToMerge.length; i++) {
         const doc = docsToMerge[i];
-        setMergeStatusText(`Processing [${i + 1}/${docsToMerge.length}]: ${doc.documentName}...`);
-
-        // 1. Locate attached vault / template file with universal resolver
-        const fileDataUrl = await resolveAttachmentForDoc(doc);
+        const fileDataUrl = resolvedAttachments[i];
 
         // 2. Cover Page element from pre-rendered offscreen container
         const coverElem = document.getElementById(`cover-page-render-${doc.id}`) as HTMLElement | null;
@@ -968,6 +1386,82 @@ export const BidPackageBuilderView: React.FC = () => {
     }
   };
 
+  // 1-Click Download for All Packaging Labels (Mother Box, Envelopes, Folders, TOCs)
+  const handleDownloadAllPackagingLabels = async () => {
+    setIsDownloadingAllCovers(true);
+    try {
+      const units: ExportDocumentUnit[] = [];
+      const coverIds = [
+        { id: 'cover-render-mother', title: 'Mother Box Official Outer Cover' },
+        { id: 'cover-render-env1', title: 'Envelope 1 (Technical & Legal) Outer Cover' },
+        { id: 'cover-render-env2', title: 'Envelope 2 (Financial Proposal) Outer Cover' },
+        { id: 'cover-render-folder-env1-original', title: 'Folder Cover — Envelope 1 (Original Copy)' },
+        { id: 'cover-render-folder-env1-copy1', title: 'Folder Cover — Envelope 1 (Copy 1 Duplicate)' },
+        { id: 'cover-render-folder-env1-copy2', title: 'Folder Cover — Envelope 1 (Copy 2 Triplicate)' },
+        { id: 'cover-render-folder-env2-original', title: 'Folder Cover — Envelope 2 (Original Copy)' },
+        { id: 'cover-render-folder-env2-copy1', title: 'Folder Cover — Envelope 2 (Copy 1 Duplicate)' },
+        { id: 'cover-render-folder-env2-copy2', title: 'Folder Cover — Envelope 2 (Copy 2 Triplicate)' },
+        { id: 'cover-render-toc-env1-original', title: 'Table of Contents — Envelope 1 (Original Copy)' },
+        { id: 'cover-render-toc-env1-copy1', title: 'Table of Contents — Envelope 1 (Copy 1 Duplicate)' },
+        { id: 'cover-render-toc-env1-copy2', title: 'Table of Contents — Envelope 1 (Copy 2 Triplicate)' },
+        { id: 'cover-render-toc-env2-original', title: 'Table of Contents — Envelope 2 (Original Copy)' },
+        { id: 'cover-render-toc-env2-copy1', title: 'Table of Contents — Envelope 2 (Copy 1 Duplicate)' },
+        { id: 'cover-render-toc-env2-copy2', title: 'Table of Contents — Envelope 2 (Copy 2 Triplicate)' }
+      ];
+
+      for (const item of coverIds) {
+        const el = document.getElementById(item.id) as HTMLElement | null;
+        if (el) {
+          units.push({
+            title: item.title,
+            coverElement: el,
+            fileDataUrl: null,
+            documentName: item.title
+          });
+        }
+      }
+
+      if (units.length === 0) {
+        const activeElem = document.querySelector('.landscape-unified-cover') as HTMLElement | null;
+        if (activeElem) {
+          units.push({
+            title: 'Packaging Cover Label',
+            coverElement: activeElem,
+            fileDataUrl: null,
+            documentName: 'Packaging Cover'
+          });
+        }
+      }
+
+      const cleanRef = (activeProject?.refNo || projectRefNo || 'BID_PACKAGE').replace(/[^a-zA-Z0-9]/g, '_');
+      const fileName = `${cleanRef}_COMPLETE_PACKAGING_LABELS_SET.pdf`;
+      const dataUrl = await buildMergedThreeLayerPdfDataUrl(units, fileName);
+
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Failed to download packaging covers bundle:', err);
+      alert('Error generating packaging bundle. Please try again.');
+    } finally {
+      setIsDownloadingAllCovers(false);
+    }
+  };
+
+  // 1-Click Sequential Print for All Packaging Covers & Labels
+  const handlePrintAllCovers = () => {
+    setIsPrintingAllCovers(true);
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => {
+        setIsPrintingAllCovers(false);
+      }, 1000);
+    }, 250);
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn text-left min-h-[60vh] p-2 sm:p-4 md:p-6">
       
@@ -992,6 +1486,9 @@ export const BidPackageBuilderView: React.FC = () => {
                     onChange={(e) => setSelectedOppId(e.target.value)}
                     className="w-full appearance-none bg-[#040814] hover:bg-[#060c1d] border border-blue-600/70 hover:border-blue-500 focus:border-blue-400 rounded-full px-5 py-2.5 pr-10 text-xs sm:text-sm font-extrabold text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 shadow-inner cursor-pointer truncate transition-all"
                   >
+                    <option value="" className="bg-slate-950 text-slate-400 font-medium py-1.5">
+                      -- Choose / Select a Bidding Project --
+                    </option>
                     {oppProjects.map((p) => (
                       <option key={p.id} value={p.id} className="bg-slate-950 text-white font-medium py-1.5">
                         {p.refNo} — {p.title}
@@ -1015,6 +1512,10 @@ export const BidPackageBuilderView: React.FC = () => {
             {/* Add Completed Documents to Current Folder Button */}
             <button
               onClick={() => {
+                if (!selectedOppId) {
+                  alert('Please select a target bidding project from the dropdown first.');
+                  return;
+                }
                 setSelectedDocIdsToAdd([]);
                 setShowAddCompletedModal(true);
               }}
@@ -1025,14 +1526,22 @@ export const BidPackageBuilderView: React.FC = () => {
               <span>+ Add Completed Documents ({activeFolderCopy})</span>
             </button>
 
-            {/* Mother Cover Labeling Page */}
+            {/* Unified Cover Pages & Packaging Labels Button */}
             <button
-              onClick={() => setShowMotherCoverModal(true)}
+              onClick={() => {
+                if (!selectedOppId) {
+                  alert('Please select a target bidding project from the dropdown first.');
+                  return;
+                }
+                setCoverEnvelopeChoice(activeEnvelope);
+                setCoverFolderCopyChoice(activeFolderCopy);
+                setShowUnifiedCoverModal(true);
+              }}
               className="px-4 py-2.5 rounded-full text-xs font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-lg shadow-amber-950/30 transition flex items-center gap-2 cursor-pointer"
-              title="Print Mother Envelope / Outer Box Label Cover Page"
+              title="View, Print & Preview All Cover Pages (Mother Box, Envelopes & Folders)"
             >
-              <Box className="w-4 h-4" />
-              <span>Mother Cover Labeling Page</span>
+              <Box className="w-4 h-4 text-slate-950" />
+              <span>Cover Pages & Packaging Labels</span>
             </button>
           </div>
 
@@ -1047,6 +1556,20 @@ export const BidPackageBuilderView: React.FC = () => {
         )}
       </div>
 
+      {!selectedOppId ? (
+        <div className="glass-panel p-12 text-center rounded-2xl border border-slate-800 space-y-4 shadow-xl">
+          <div className="w-14 h-14 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto border border-blue-500/20">
+            <Briefcase className="w-7 h-7" />
+          </div>
+          <div className="max-w-md mx-auto space-y-2">
+            <h3 className="text-lg font-bold text-white">No Bidding Project Selected</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Please select a target bidding project from the <span className="text-blue-400 font-bold">Target Bidding Project</span> dropdown above to assemble, organize, and compile your project-scoped bid packages (Envelope 1 & Envelope 2).
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* 2. Envelope 1 & Envelope 2 Tabs Container */}
       <div className="w-full">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1196,26 +1719,6 @@ export const BidPackageBuilderView: React.FC = () => {
                 <span>Replicate Original → Copy 1 & 2</span>
               </button>
             )}
-
-            {/* Envelope Cover Page Button */}
-            <button
-              onClick={() => setShowEnvelopeCoverModal(true)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600/20 hover:bg-blue-600 hover:text-white text-blue-300 border border-blue-500/40 transition flex items-center gap-1.5 cursor-pointer shadow"
-              title="Print Envelope Outer Cover Page"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-              <span>Envelope Cover</span>
-            </button>
-
-            {/* Folder Cover Page Button */}
-            <button
-              onClick={() => setShowFolderCoverModal(true)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 hover:bg-emerald-600 hover:text-white text-emerald-300 border border-emerald-500/40 transition flex items-center gap-1.5 cursor-pointer shadow"
-              title="Print Folder Cover Page for this copy"
-            >
-              <Folder className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Folder Cover ({activeFolderCopy})</span>
-            </button>
 
             {/* Merged Bid Packages Folder (Preview & Download Original, Copy 1, Copy 2) */}
             <button
@@ -1601,6 +2104,8 @@ export const BidPackageBuilderView: React.FC = () => {
         </div>
 
       </div>
+        </>
+      )}
 
       {/* ========================================================================= */}
       {/* ADD COMPLETED DOCUMENTS PICKER MODAL (CHECKLIST SELECTOR)                 */}
@@ -1735,16 +2240,29 @@ export const BidPackageBuilderView: React.FC = () => {
                       </div>
 
                       {/* Status Tag */}
-                      <div className="shrink-0">
+                      <div className="shrink-0 flex items-center gap-2">
                         {isAlreadyInFolder ? (
                           <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
                             Already in {activeFolderCopy}
                           </span>
                         ) : readiness.isReady ? (
-                          <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                            <span>Ready in System</span>
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                              <span>Ready in System</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleResetDocReadiness(doc);
+                              }}
+                              title="Reset document to Standard Template for this project"
+                              className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         ) : (
                           <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">
                             Standard Template
@@ -1784,191 +2302,14 @@ export const BidPackageBuilderView: React.FC = () => {
                 </button>
               </div>
             </div>
-
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* 1. MOTHER COVER LABELING PAGE MODAL (OUTER PACKAGING BOX / MOTHER ENVELOPE) */}
+      {/* UNIFIED PACKAGING & COVER PAGES MODAL (MOTHER BOX, ENVELOPES & FOLDERS)    */}
       {/* ========================================================================= */}
-      {/* 1. MOTHER ENVELOPE / OUTER BOX SUBMISSION COVER MODAL (PORTRAIT LEGAL 8.5x13) */}
-      {/* ========================================================================= */}
-      {showMotherCoverModal && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 print:hidden">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Box className="w-4 h-4 text-amber-400" />
-                <span>Mother Envelope Cover Label (Portrait Legal 8.5" × 13")</span>
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold flex items-center gap-1.5 cursor-pointer shadow"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Mother Cover</span>
-                </button>
-                <button onClick={() => setShowMotherCoverModal(false)} className="text-slate-400 hover:text-white p-1">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-950 flex justify-center print:p-0 print:bg-white">
-              <div 
-                className="max-w-[850px] w-full min-h-[1100px] aspect-[8.5/13] bg-white text-black p-7 sm:p-9 border-4 border-black flex flex-col justify-between font-sans relative overflow-hidden shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 print:break-inside-avoid print:page-break-inside-avoid"
-                style={{ boxSizing: 'border-box' }}
-              >
-                
-                {/* Inner Elegant Border Frame */}
-                <div className="absolute inset-3 border-2 border-black rounded-xl pointer-events-none" />
-
-                {/* TOP SECTION: Header & Addressee */}
-                <div className="space-y-3.5 relative z-10">
-                  
-                  {/* Bidder Identity (Centered at Top) */}
-                  <div className="text-center border-b-2 border-black pb-3.5 space-y-1">
-                    <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide text-black leading-tight">
-                      {currentTenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}
-                    </h1>
-                    <p className="text-xs text-slate-700 font-medium">
-                      {currentTenant?.address || 'Metro Manila, Philippines'} • TIN: <span className="font-mono font-bold">{currentTenant?.tin || '000-000-000-000'}</span>
-                    </p>
-                    <p className="text-[11px] text-slate-600 font-mono">
-                      PhilGEPS Platinum Reg. No.: <span className="font-bold text-blue-950">{currentTenant?.philgepsPlatinumNo || 'PLAT-2026-ACTIVE'}</span>
-                    </p>
-                  </div>
-
-                  {/* Submitted To: Bids and Awards Committee */}
-                  <div className="text-center space-y-1 pt-2 pb-1">
-                    <p className="text-xs sm:text-sm uppercase font-mono font-black tracking-widest text-slate-600">SUBMITTED TO:</p>
-                    <h2 className="text-2xl sm:text-3xl font-black uppercase text-blue-950 tracking-tight leading-tight">
-                      THE BIDS AND AWARDS COMMITTEE (BAC)
-                    </h2>
-                    <h3 className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-wide">
-                      {procuringEntity}
-                    </h3>
-                  </div>
-
-                  {/* Project & Solicitation Details Box */}
-                  <div className="border-2 border-black p-4 bg-slate-50 rounded-xl space-y-2 text-left">
-                    <div>
-                      <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">Project Title / Description</span>
-                      <p className="text-sm font-black text-black uppercase leading-tight">
-                        {projectTitle || 'INFRASTRUCTURE & IT MODERNIZATION PROJECT'}
-                      </p>
-                    </div>
-
-                    <div className="pt-2 border-t border-slate-300 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-mono">
-                      <div>
-                        <span className="text-[10px] text-slate-500 block uppercase font-bold">PhilGEPS Ref No.</span>
-                        <strong className="text-blue-950 font-black truncate block">{projectRefNo || 'PhilGEPS-2026-001'}</strong>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-500 block uppercase font-bold">Solicitation No.</span>
-                        <strong className="text-blue-950 font-black truncate block">{activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'}</strong>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-500 block uppercase font-bold">Approved Budget (ABC)</span>
-                        <strong className="text-emerald-800 font-black block">{activeProject?.abc || '₱12,500,000.00'}</strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Large Mother Envelope Identification Banner */}
-                  <div className="p-3.5 border-4 border-black bg-black text-white text-center rounded-xl space-y-0.5 shadow-md">
-                    <div className="font-mono font-black text-base sm:text-lg uppercase tracking-widest text-amber-300">
-                      MOTHER ENVELOPE: OFFICIAL BID PROPOSAL
-                    </div>
-                    <div className="text-[10px] font-sans font-semibold text-slate-200 uppercase tracking-wide">
-                      CONTAINS: ENVELOPE 1 (LEGAL & TECHNICAL) & ENVELOPE 2 (FINANCIAL BID PROPOSAL)
-                    </div>
-                  </div>
-
-                  {/* Envelope Packaging Breakdown (2-Column Grid) */}
-                  <div className="grid grid-cols-2 gap-3 text-left font-sans text-xs">
-                    <div className="p-3 border-2 border-blue-950 bg-blue-50/80 rounded-xl space-y-1">
-                      <p className="font-black text-blue-950 uppercase border-b border-blue-900 pb-1 text-[11px] flex items-center justify-between">
-                        <span>📦 ENVELOPE 1: LEGAL & TECHNICAL</span>
-                      </p>
-                      <ul className="text-[11px] text-slate-800 space-y-0.5 pt-0.5 font-medium">
-                        <li>• Original Technical & Legal Copy</li>
-                        <li>• Copy 1 (Duplicate)</li>
-                        <li>• Copy 2 (Triplicate)</li>
-                      </ul>
-                    </div>
-
-                    <div className="p-3 border-2 border-emerald-950 bg-emerald-50/80 rounded-xl space-y-1">
-                      <p className="font-black text-emerald-950 uppercase border-b border-emerald-900 pb-1 text-[11px] flex items-center justify-between">
-                        <span>💰 ENVELOPE 2: FINANCIAL PROPOSAL</span>
-                      </p>
-                      <ul className="text-[11px] text-slate-800 space-y-0.5 pt-0.5 font-medium">
-                        <li>• Original Financial Copy</li>
-                        <li>• Copy 1 (Duplicate)</li>
-                        <li>• Copy 2 (Triplicate)</li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  {/* BIGGER AND BOLD WARNING BOX WITH RED INK */}
-                  <div className="p-4 sm:p-5 border-4 border-red-600 bg-red-50/95 rounded-2xl text-center space-y-1.5 shadow-md">
-                    <h3 className="text-lg sm:text-2xl font-black text-red-600 uppercase tracking-wide leading-tight animate-pulse">
-                      ⚠️ WARNING: DO NOT OPEN BEFORE SCHEDULED BID OPENING DATE & TIME!
-                    </h3>
-                    <p className="text-xs sm:text-sm font-black text-red-800 font-mono uppercase">
-                      SCHEDULED BID OPENING DEADLINE: <span className="bg-red-600 text-white px-2.5 py-0.5 rounded-md font-black text-xs sm:text-sm">{submissionDeadline}</span>
-                    </p>
-                    <p className="text-[10px] sm:text-[11px] font-bold text-red-900 uppercase tracking-tight">
-                      Official Sealed Bidding Proposal • Shall only be unsealed publicly by the Bids and Awards Committee (BAC) pursuant to Republic Act No. 12009 / RA 9184
-                    </p>
-                  </div>
-
-                </div>
-
-                {/* FOOTER SECTION: Authorized Signatory & Official Submission QR */}
-                <div className="border-t-2 border-black pt-3 flex items-center justify-between relative z-10">
-                  <div className="space-y-0.5 text-left">
-                    <p className="text-[10px] font-mono font-bold uppercase text-slate-600">Authorized Managing Officer / Bidder Signatory:</p>
-                    <p className="text-sm font-black uppercase text-black underline tracking-wide">
-                      {currentTenant?.authorizedSignatory?.name || 'AUTHORIZED MANAGING OFFICER'}
-                    </p>
-                    <p className="text-[11px] text-slate-700 font-medium">
-                      {currentTenant?.authorizedSignatory?.title || 'President & Authorized Signatory'}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="text-right text-[10px] font-mono text-slate-600">
-                      <div className="font-bold text-black">Official Submission QR</div>
-                      <div>{projectRefNo || 'PhilGEPS-2026-001'}</div>
-                    </div>
-                    <DocumentQrCode
-                      details={{
-                        documentNumber: projectRefNo || 'PhilGEPS-2026-001',
-                        documentName: 'Mother Envelope Outer Packaging Cover',
-                        projectName: projectTitle,
-                        dateTimeSubmitted: submissionDeadline,
-                        companyName: currentTenant?.companyName,
-                        solicitationNo: activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'
-                      }}
-                      size={75}
-                      className="border-2 border-black p-1 bg-white shrink-0"
-                    />
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 2. ENVELOPE COVER PAGE MODAL (ENVELOPE 1 OR ENVELOPE 2 OUTER COVER - LANDSCAPE) */}
-      {/* ========================================================================= */}
-      {showEnvelopeCoverModal && (
+      {showUnifiedCoverModal && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-6xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white">
             <style>{`
@@ -1996,7 +2337,7 @@ export const BidPackageBuilderView: React.FC = () => {
                   border: none !important;
                   box-shadow: none !important;
                 }
-                .landscape-envelope-cover {
+                .landscape-unified-cover {
                   box-shadow: none !important;
                   border: 3px solid #000000 !important;
                   margin: 0 auto !important;
@@ -2004,369 +2345,996 @@ export const BidPackageBuilderView: React.FC = () => {
                   width: 13in !important;
                   min-height: 8.5in !important;
                   box-sizing: border-box !important;
-                  page-break-after: avoid !important;
+                  page-break-after: always !important;
+                  break-after: page !important;
+                }
+                .print-all-covers-section {
+                  display: ${isPrintingAllCovers ? 'block' : 'none'} !important;
+                }
+                .single-cover-preview-section {
+                  display: ${isPrintingAllCovers ? 'none' : 'block'} !important;
                 }
               }
             `}</style>
 
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 print:hidden">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-blue-400" />
-                <span>Envelope Outer Cover Label (Landscape Legal 13" × 8.5") — {activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1 (Technical & Eligibility)' : 'Envelope 2 (Financial Component)'}</span>
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 cursor-pointer shadow"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Landscape Cover</span>
-                </button>
-                <button onClick={() => setShowEnvelopeCoverModal(false)} className="text-slate-400 hover:text-white p-1">
-                  <X className="w-5 h-5" />
-                </button>
+            {/* Modal Navigation & Controls Header */}
+            <div className="p-3 sm:p-4 border-b border-slate-800 bg-slate-900/95 sticky top-0 z-20 print:hidden space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    <Box className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-white">
+                      Bidding Packaging & Cover Pages
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Standardized Landscape Legal (13" × 8.5") packaging templates with live QR verification.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  {/* 1-Click Download All Packaging PDFs */}
+                  <button
+                    onClick={handleDownloadAllPackagingLabels}
+                    disabled={isDownloadingAllCovers}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white flex items-center gap-1.5 cursor-pointer shadow-lg transition disabled:opacity-50"
+                    title="Download all packaging covers, envelopes, folder separators and Table of Contents in 1 PDF bundle"
+                  >
+                    {isDownloadingAllCovers ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Generating Bundle...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download All Labels (1-Click)</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* 1-Click Print All Packaging Covers & Labels */}
+                  <button
+                    onClick={handlePrintAllCovers}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 cursor-pointer shadow transition"
+                    title="Print complete packaging set (Mother box, all envelopes, all folder copies & TOCs) in sequential order"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Print All (1-Click)</span>
+                  </button>
+
+                  {/* Print Active Cover */}
+                  <button
+                    onClick={() => {
+                      setIsPrintingAllCovers(false);
+                      setTimeout(() => window.print(), 100);
+                    }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 cursor-pointer shadow transition"
+                    title="Print currently active cover template"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Print Active</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowUnifiedCoverModal(false)}
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                    title="Close modal"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* 4-Tab Selector for Mother Box, Envelope Cover, Folder Cover & Table of Contents */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
+                <div className="flex flex-wrap items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setCoverModalTab('MOTHER')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      coverModalTab === 'MOTHER'
+                        ? 'bg-amber-500 text-slate-950 shadow font-black'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                    }`}
+                  >
+                    <Box className="w-3.5 h-3.5" />
+                    <span>1. Mother Box Cover</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCoverModalTab('ENVELOPE')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      coverModalTab === 'ENVELOPE'
+                        ? 'bg-blue-600 text-white shadow font-black'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>2. Envelope Outer Cover</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCoverModalTab('FOLDER')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      coverModalTab === 'FOLDER'
+                        ? 'bg-emerald-600 text-white shadow font-black'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                    }`}
+                  >
+                    <Folder className="w-3.5 h-3.5" />
+                    <span>3. Folder Cover Page</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCoverModalTab('TOC')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      coverModalTab === 'TOC'
+                        ? 'bg-purple-600 text-white shadow font-black'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>4. Table of Contents (TOC)</span>
+                  </button>
+                </div>
+
+                {/* Sub-selectors for Envelope Tab */}
+                {coverModalTab === 'ENVELOPE' && (
+                  <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <span className="text-[10px] font-mono text-slate-500 px-2 uppercase font-bold">Select Envelope:</span>
+                    <button
+                      type="button"
+                      onClick={() => setCoverEnvelopeChoice('ENVELOPE_1')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        coverEnvelopeChoice === 'ENVELOPE_1'
+                          ? 'bg-blue-600 text-white shadow'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Envelope 1 (Technical)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCoverEnvelopeChoice('ENVELOPE_2')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        coverEnvelopeChoice === 'ENVELOPE_2'
+                          ? 'bg-emerald-600 text-white shadow'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Envelope 2 (Financial)
+                    </button>
+                  </div>
+                )}
+
+                {/* Sub-selectors for Folder & TOC Tabs */}
+                {(coverModalTab === 'FOLDER' || coverModalTab === 'TOC') && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setCoverEnvelopeChoice('ENVELOPE_1')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                          coverEnvelopeChoice === 'ENVELOPE_1'
+                            ? 'bg-blue-600 text-white shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Env 1 (Technical)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCoverEnvelopeChoice('ENVELOPE_2')}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                          coverEnvelopeChoice === 'ENVELOPE_2'
+                            ? 'bg-emerald-600 text-white shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Env 2 (Financial)
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                      {(['ORIGINAL', 'COPY_1', 'COPY_2'] as FolderCopyType[]).map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setCoverFolderCopyChoice(c)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                            coverFolderCopyChoice === c
+                              ? 'bg-amber-500 text-slate-950 shadow font-black'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {c === 'ORIGINAL' ? 'Original' : c === 'COPY_1' ? 'Copy 1' : 'Copy 2'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-950 flex justify-center print:p-0 print:bg-white">
-              <div className="landscape-envelope-cover w-[13in] max-w-[1200px] min-h-[780px] aspect-[13/8.5] bg-white text-black p-6 sm:p-8 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 box-border">
-                
-                {/* Inner Frame */}
-                <div className="absolute inset-2.5 border-2 border-black rounded-xl pointer-events-none" />
-
-                {/* TOP HEADER: Bidder Corporate Info */}
-                <div className="text-center border-b-2 border-black pb-2.5 space-y-0.5 relative z-10">
-                  <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide text-black leading-tight">
-                    {currentTenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}
-                  </h1>
-                  <p className="text-xs text-slate-700 font-medium">
-                    {currentTenant?.address || 'Metro Manila, Philippines'} • TIN: <span className="font-mono font-bold">{currentTenant?.tin || '000-000-000-000'}</span> • PhilGEPS Reg. No.: <span className="font-bold text-blue-950">{currentTenant?.philgepsPlatinumNo || 'PLAT-2026-ACTIVE'}</span>
-                  </p>
-                </div>
-
-                {/* MIDDLE SECTION: 2-Column Grid */}
-                <div className="grid grid-cols-12 gap-4 my-2 relative z-10">
-                  
-                  {/* Left Column (5 cols): Addressee & Envelope Breakdown */}
-                  <div className="col-span-5 space-y-3">
-                    <div className="p-3 border-2 border-black bg-slate-50 rounded-xl space-y-1 text-left">
-                      <p className="text-[10px] uppercase font-mono font-black tracking-widest text-slate-600">SUBMITTED TO:</p>
-                      <h2 className="text-lg font-black uppercase text-blue-950 leading-tight">
-                        THE BIDS AND AWARDS COMMITTEE (BAC)
-                      </h2>
-                      <h3 className="text-sm font-black text-slate-900 uppercase">
-                        {procuringEntity}
-                      </h3>
-                    </div>
-
-                    <div className="p-3 border-2 border-slate-900 bg-slate-100 rounded-xl text-left space-y-1 font-sans text-xs">
-                      <p className="font-black text-black uppercase border-b border-slate-400 pb-1 text-[11px]">
-                        📦 INCLUDED FOLDERS IN THIS ENVELOPE:
-                      </p>
-                      <ul className="text-[11px] text-slate-800 space-y-0.5 pt-0.5 font-medium">
-                        <li>• <strong>Original Copy</strong> ({activeEnvelope === 'ENVELOPE_1' ? 'Technical & Legal' : 'Financial'})</li>
-                        <li>• <strong>Copy 1</strong> (First Certified True Duplicate Copy)</li>
-                        <li>• <strong>Copy 2</strong> (Second Certified True Triplicate Copy)</li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  {/* Right Column (7 cols): Full Project Details, Envelope Title, and Warning */}
-                  <div className="col-span-7 space-y-2.5 text-left">
+            {/* Template Preview Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-950 flex flex-col items-center print:p-0 print:bg-white">
+              
+              {/* SINGLE ACTIVE PREVIEW SECTION */}
+              <div className="single-cover-preview-section w-full flex justify-center">
+                {/* ============================================================ */}
+                {/* VIEW 1: MOTHER BOX LABEL COVER (MASTER ENCLOSURE)            */}
+                {/* ============================================================ */}
+                {coverModalTab === 'MOTHER' && (
+                  <div className="landscape-unified-cover w-[13in] max-w-[1200px] min-h-[780px] aspect-[13/8.5] bg-white text-black p-6 sm:p-8 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 box-border">
                     
-                    {/* Project Details Box */}
-                    <div className="border-2 border-black p-3.5 bg-slate-50 rounded-xl space-y-2">
-                      <div>
-                        <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">Project Title / Description:</span>
-                        <p className="text-sm font-black text-black uppercase leading-tight">
-                          {projectTitle || 'INFRASTRUCTURE & IT MODERNIZATION PROJECT'}
+                    {/* Inner Frame */}
+                    <div className="absolute inset-2.5 border-2 border-black rounded-xl pointer-events-none" />
+
+                    {/* TOP HEADER: Bidder Corporate Info */}
+                    <div className="text-center border-b-2 border-black pb-2.5 space-y-0.5 relative z-10">
+                      <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide text-black leading-tight">
+                        {currentTenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}
+                      </h1>
+                      <p className="text-xs text-slate-700 font-medium">
+                        {currentTenant?.address || 'Metro Manila, Philippines'} • TIN: <span className="font-mono font-bold">{currentTenant?.tin || '000-000-000-000'}</span> • PhilGEPS Reg. No.: <span className="font-bold text-blue-950">{currentTenant?.philgepsPlatinumNo || 'PLAT-2026-ACTIVE'}</span>
+                      </p>
+                    </div>
+
+                    {/* MIDDLE SECTION: 2-Column Grid */}
+                    <div className="grid grid-cols-12 gap-4 my-2 relative z-10">
+                      
+                      {/* Left Column (5 cols): Addressee & Outer Enclosures */}
+                      <div className="col-span-5 space-y-3">
+                        <div className="p-3 border-2 border-black bg-slate-50 rounded-xl space-y-1 text-left">
+                          <p className="text-[10px] uppercase font-mono font-black tracking-widest text-slate-600">SUBMITTED TO:</p>
+                          <h2 className="text-lg font-black uppercase text-blue-950 leading-tight">
+                            THE BIDS AND AWARDS COMMITTEE (BAC)
+                          </h2>
+                          <h3 className="text-sm font-black text-slate-900 uppercase">
+                            {procuringEntity}
+                          </h3>
+                        </div>
+
+                        <div className="p-3 border-2 border-slate-900 bg-slate-100 rounded-xl text-left space-y-1 font-sans text-xs">
+                          <p className="font-black text-black uppercase border-b border-slate-400 pb-1 text-[11px]">
+                            📦 ENCLOSED ENVELOPES IN THIS MOTHER BOX:
+                          </p>
+                          <div className="space-y-1.5 pt-1 text-[11px]">
+                            <div className="p-1.5 rounded bg-blue-50 border border-blue-200">
+                              <strong className="text-blue-950 font-bold block">1. ENVELOPE 1: LEGAL & TECHNICAL DOCUMENTS</strong>
+                              <span className="text-slate-700 text-[10px] block">Includes: Original, Copy 1 (Duplicate), Copy 2 (Triplicate)</span>
+                            </div>
+                            <div className="p-1.5 rounded bg-emerald-50 border border-emerald-200">
+                              <strong className="text-emerald-950 font-bold block">2. ENVELOPE 2: FINANCIAL BID PROPOSAL</strong>
+                              <span className="text-slate-700 text-[10px] block">Includes: Original, Copy 1 (Duplicate), Copy 2 (Triplicate)</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right Column (7 cols): Full Project Details, Mother Banner, and Warning */}
+                      <div className="col-span-7 space-y-2.5 text-left">
+                        
+                        {/* Project Details Box */}
+                        <div className="border-2 border-black p-3.5 bg-slate-50 rounded-xl space-y-2">
+                          <div>
+                            <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">Project Title / Description:</span>
+                            <p className="text-sm font-black text-black uppercase leading-tight">
+                              {projectTitle || 'INFRASTRUCTURE & IT MODERNIZATION PROJECT'}
+                            </p>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-300 grid grid-cols-3 gap-2 text-xs font-mono">
+                            <div>
+                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">PhilGEPS Ref No.</span>
+                              <strong className="text-blue-950 font-black truncate block">{projectRefNo || 'PhilGEPS-2026-001'}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Solicitation No.</span>
+                              <strong className="text-blue-950 font-black truncate block">{activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Approved Budget (ABC)</span>
+                              <strong className="text-emerald-800 font-black block">{activeProject?.abc || '₱12,500,000.00'}</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Large Mother Envelope Identifier */}
+                        <div className="p-3 border-4 border-black bg-black text-white text-center rounded-xl space-y-0.5 shadow-md">
+                          <div className="font-mono font-black text-base uppercase tracking-wider text-amber-300">
+                            MOTHER ENVELOPE: OFFICIAL BID PROPOSAL
+                          </div>
+                          <div className="text-[10px] font-sans font-semibold text-slate-200 uppercase">
+                            MASTER OUTER ENVELOPE / ENCLOSING CONTAINER PURSUANT TO RA 12009 / RA 9184
+                          </div>
+                        </div>
+
+                        {/* Prominent Red Warning Box */}
+                        <div className="p-2.5 border-2 border-red-600 bg-red-50 text-center rounded-xl space-y-0.5">
+                          <h4 className="text-xs sm:text-sm font-black text-red-600 uppercase tracking-wide leading-tight">
+                            ⚠️ WARNING: DO NOT OPEN BEFORE SCHEDULED BID OPENING DATE & TIME!
+                          </h4>
+                          <p className="text-[11px] font-black text-red-900 font-mono uppercase">
+                            SCHEDULED BID OPENING: <span className="bg-red-600 text-white px-2 py-0.2 rounded font-black">{submissionDeadline}</span>
+                          </p>
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                    {/* BOTTOM FOOTER: Signatory & QR Code */}
+                    <div className="border-t-2 border-black pt-2 flex items-center justify-between relative z-10 text-xs">
+                      <div className="space-y-0.5 text-left">
+                        <p className="text-[9.5px] font-mono font-bold uppercase text-slate-600">Authorized Managing Officer / Bidder Signatory:</p>
+                        <p className="text-sm font-black uppercase text-black underline tracking-wide">
+                          {currentTenant?.authorizedSignatory?.name || 'AUTHORIZED MANAGING OFFICER'}
+                        </p>
+                        <p className="text-[10.5px] text-slate-700 font-medium">
+                          {currentTenant?.authorizedSignatory?.title || 'President & Authorized Signatory'}
                         </p>
                       </div>
 
-                      <div className="pt-2 border-t border-slate-300 grid grid-cols-3 gap-2 text-xs font-mono">
-                        <div>
-                          <span className="text-[9.5px] text-slate-500 block uppercase font-bold">PhilGEPS Ref No.</span>
-                          <strong className="text-blue-950 font-black truncate block">{projectRefNo || 'PhilGEPS-2026-001'}</strong>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right text-[9.5px] font-mono text-slate-600">
+                          <div className="font-bold text-black">Official Submission QR</div>
+                          <div>{projectRefNo || 'PhilGEPS-2026-001'}</div>
                         </div>
-                        <div>
-                          <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Solicitation No.</span>
-                          <strong className="text-blue-950 font-black truncate block">{activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'}</strong>
-                        </div>
-                        <div>
-                          <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Approved Budget (ABC)</span>
-                          <strong className="text-emerald-800 font-black block">{activeProject?.abc || '₱12,500,000.00'}</strong>
-                        </div>
+                        <DocumentQrCode
+                          details={{
+                            documentNumber: projectRefNo || 'PhilGEPS-2026-001',
+                            documentName: 'Mother Envelope Outer Packaging Cover',
+                            projectName: projectTitle,
+                            dateTimeSubmitted: submissionDeadline,
+                            companyName: currentTenant?.companyName,
+                            solicitationNo: activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'
+                          }}
+                          size={65}
+                          className="border-2 border-black p-1 bg-white shrink-0"
+                        />
                       </div>
                     </div>
 
-                    {/* Large Envelope Identifier */}
-                    <div className="p-3 border-4 border-black bg-black text-white text-center rounded-xl space-y-0.5 shadow-md">
-                      <div className="font-mono font-black text-base uppercase tracking-wider text-amber-300">
-                        {activeEnvelope === 'ENVELOPE_1' 
-                          ? 'ENVELOPE NO. 1: TECHNICAL & ELIGIBILITY COMPONENT'
-                          : 'ENVELOPE NO. 2: FINANCIAL BID PROPOSAL COMPONENT'}
-                      </div>
-                      <div className="text-[10px] font-sans font-semibold text-slate-200 uppercase">
-                        Official Sealed Envelope Submission pursuant to RA 12009 / RA 9184
-                      </div>
-                    </div>
+                  </div>
+                )}
 
-                    {/* Prominent Red Warning Box */}
-                    <div className="p-2.5 border-2 border-red-600 bg-red-50 text-center rounded-xl space-y-0.5">
-                      <h4 className="text-xs sm:text-sm font-black text-red-600 uppercase tracking-wide leading-tight">
-                        ⚠️ WARNING: DO NOT OPEN BEFORE SCHEDULED BID OPENING DATE & TIME!
-                      </h4>
-                      <p className="text-[11px] font-black text-red-900 font-mono uppercase">
-                        SCHEDULED BID OPENING: <span className="bg-red-600 text-white px-2 py-0.2 rounded font-black">{submissionDeadline}</span>
+                {/* ============================================================ */}
+                {/* VIEW 2: ENVELOPE OUTER COVER (ENVELOPE 1 OR ENVELOPE 2)      */}
+                {/* ============================================================ */}
+                {coverModalTab === 'ENVELOPE' && (
+                  <div className="landscape-unified-cover w-[13in] max-w-[1200px] min-h-[780px] aspect-[13/8.5] bg-white text-black p-6 sm:p-8 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 box-border">
+                    
+                    {/* Inner Frame */}
+                    <div className="absolute inset-2.5 border-2 border-black rounded-xl pointer-events-none" />
+
+                    {/* TOP HEADER: Bidder Corporate Info */}
+                    <div className="text-center border-b-2 border-black pb-2.5 space-y-0.5 relative z-10">
+                      <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide text-black leading-tight">
+                        {currentTenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}
+                      </h1>
+                      <p className="text-xs text-slate-700 font-medium">
+                        {currentTenant?.address || 'Metro Manila, Philippines'} • TIN: <span className="font-mono font-bold">{currentTenant?.tin || '000-000-000-000'}</span> • PhilGEPS Reg. No.: <span className="font-bold text-blue-950">{currentTenant?.philgepsPlatinumNo || 'PLAT-2026-ACTIVE'}</span>
                       </p>
                     </div>
 
-                  </div>
-
-                </div>
-
-                {/* BOTTOM FOOTER: Signatory & QR Code */}
-                <div className="border-t-2 border-black pt-2 flex items-center justify-between relative z-10 text-xs">
-                  <div className="space-y-0.5 text-left">
-                    <p className="text-[9.5px] font-mono font-bold uppercase text-slate-600">Authorized Managing Officer / Bidder Signatory:</p>
-                    <p className="text-sm font-black uppercase text-black underline tracking-wide">
-                      {currentTenant?.authorizedSignatory?.name || 'AUTHORIZED MANAGING OFFICER'}
-                    </p>
-                    <p className="text-[10.5px] text-slate-700 font-medium">
-                      {currentTenant?.authorizedSignatory?.title || 'President & Authorized Signatory'}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="text-right text-[9.5px] font-mono text-slate-600">
-                      <div className="font-bold text-black">Official Submission QR</div>
-                      <div>{projectRefNo || 'PhilGEPS-2026-001'}</div>
-                    </div>
-                    <DocumentQrCode
-                      details={{
-                        documentNumber: projectRefNo || 'PhilGEPS-2026-001',
-                        documentName: activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1 Technical Outer Cover' : 'Envelope 2 Financial Outer Cover',
-                        projectName: projectTitle,
-                        dateTimeSubmitted: submissionDeadline,
-                        companyName: currentTenant?.companyName,
-                        solicitationNo: activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'
-                      }}
-                      size={65}
-                      className="border-2 border-black p-0.5 bg-white shrink-0"
-                    />
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* 3. FOLDER COVER PAGE MODAL (ORIGINAL / COPY 1 / COPY 2 - LANDSCAPE)        */}
-      {/* ========================================================================= */}
-      {showFolderCoverModal && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-6xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white">
-            <style>{`
-              @media print {
-                @page {
-                  size: 13in 8.5in landscape;
-                  margin: 0.25in;
-                }
-                * {
-                  -webkit-print-color-adjust: exact !important;
-                  print-color-adjust: exact !important;
-                }
-                header, nav, aside, button, .print\\:hidden, .no-print, .no-export {
-                  display: none !important;
-                }
-                html, body, #root, .fixed, .backdrop-blur-md, .bg-slate-900, .bg-slate-950 {
-                  position: static !important;
-                  background: #ffffff !important;
-                  color: #000000 !important;
-                  margin: 0 !important;
-                  padding: 0 !important;
-                  width: 100% !important;
-                  height: auto !important;
-                  overflow: visible !important;
-                  border: none !important;
-                  box-shadow: none !important;
-                }
-                .landscape-folder-cover {
-                  box-shadow: none !important;
-                  border: 3px solid #000000 !important;
-                  margin: 0 auto !important;
-                  padding: 0.35in !important;
-                  width: 13in !important;
-                  min-height: 8.5in !important;
-                  box-sizing: border-box !important;
-                  page-break-after: avoid !important;
-                }
-              }
-            `}</style>
-
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 print:hidden">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Folder className="w-4 h-4 text-emerald-400" />
-                <span>Folder Cover Page (Landscape Legal 13" × 8.5") — {activeFolderCopy} ({activeEnvelope === 'ENVELOPE_1' ? 'Technical' : 'Financial'})</span>
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.print()}
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 cursor-pointer shadow"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Folder Cover</span>
-                </button>
-                <button onClick={() => setShowFolderCoverModal(false)} className="text-slate-400 hover:text-white p-1">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-950 flex justify-center print:p-0 print:bg-white">
-              <div className="landscape-folder-cover w-[13in] max-w-[1200px] min-h-[780px] aspect-[13/8.5] bg-white text-black p-6 sm:p-8 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 box-border">
-                
-                {/* Inner Frame */}
-                <div className="absolute inset-2.5 border-2 border-black rounded-xl pointer-events-none" />
-
-                {/* Header */}
-                <div className="text-center border-b-2 border-black pb-2 space-y-0.5 relative z-10">
-                  <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide text-black">
-                    {currentTenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}
-                  </h1>
-                  <p className="text-xs text-slate-700 font-medium">
-                    {currentTenant?.address || 'Metro Manila, Philippines'} • TIN: <span className="font-mono font-bold">{currentTenant?.tin || '000-000-000-000'}</span> • PhilGEPS Platinum: <span className="font-bold text-blue-950">{currentTenant?.philgepsPlatinumNo || 'PLAT-2026-ACTIVE'}</span>
-                  </p>
-                </div>
-
-                {/* Main 2-Column Section */}
-                <div className="grid grid-cols-12 gap-4 my-2 relative z-10 flex-1">
-                  
-                  {/* Left Column: Project Details & Folder Badge */}
-                  <div className="col-span-5 space-y-2.5 text-left">
-                    <div className="p-3 border-2 border-black bg-slate-50 rounded-xl space-y-1.5">
-                      <p className="text-[10px] uppercase font-mono font-black text-slate-500">SUBMITTED TO:</p>
-                      <h3 className="text-sm font-black uppercase text-blue-950 leading-tight">
-                        THE BIDS AND AWARDS COMMITTEE
-                      </h3>
-                      <p className="text-xs font-bold text-slate-800 uppercase">{procuringEntity}</p>
-                    </div>
-
-                    <div className="p-3 border-2 border-black bg-slate-50 rounded-xl space-y-1.5">
-                      <div>
-                        <span className="text-[9.5px] font-mono font-bold text-slate-500 uppercase block">Project Title:</span>
-                        <p className="text-xs font-black text-black uppercase leading-tight">{projectTitle}</p>
-                      </div>
-                      <div className="pt-1.5 border-t border-slate-300 grid grid-cols-2 gap-1 text-[11px] font-mono">
-                        <div>
-                          <span className="text-[9px] text-slate-500 block uppercase">PhilGEPS Ref:</span>
-                          <strong className="text-blue-950 font-bold">{projectRefNo}</strong>
+                    {/* MIDDLE SECTION: 2-Column Grid */}
+                    <div className="grid grid-cols-12 gap-4 my-2 relative z-10">
+                      
+                      {/* Left Column (5 cols): Addressee & Envelope Breakdown */}
+                      <div className="col-span-5 space-y-3">
+                        <div className="p-3 border-2 border-black bg-slate-50 rounded-xl space-y-1 text-left">
+                          <p className="text-[10px] uppercase font-mono font-black tracking-widest text-slate-600">SUBMITTED TO:</p>
+                          <h2 className="text-lg font-black uppercase text-blue-950 leading-tight">
+                            THE BIDS AND AWARDS COMMITTEE (BAC)
+                          </h2>
+                          <h3 className="text-sm font-black text-slate-900 uppercase">
+                            {procuringEntity}
+                          </h3>
                         </div>
-                        <div>
-                          <span className="text-[9px] text-slate-500 block uppercase">ABC:</span>
-                          <strong className="text-emerald-800 font-bold">{activeProject?.abc || '₱0.00'}</strong>
+
+                        <div className="p-3 border-2 border-slate-900 bg-slate-100 rounded-xl text-left space-y-1 font-sans text-xs">
+                          <p className="font-black text-black uppercase border-b border-slate-400 pb-1 text-[11px]">
+                            📦 INCLUDED FOLDERS IN THIS ENVELOPE:
+                          </p>
+                          <ul className="text-[11px] text-slate-800 space-y-0.5 pt-0.5 font-medium">
+                            <li>• <strong>Original Copy</strong> ({coverEnvelopeChoice === 'ENVELOPE_1' ? 'Technical & Legal' : 'Financial'})</li>
+                            <li>• <strong>Copy 1</strong> (First Certified True Duplicate Copy)</li>
+                            <li>• <strong>Copy 2</strong> (Second Certified True Triplicate Copy)</li>
+                          </ul>
                         </div>
                       </div>
+
+                      {/* Right Column (7 cols): Full Project Details, Envelope Title, and Warning */}
+                      <div className="col-span-7 space-y-2.5 text-left">
+                        
+                        {/* Project Details Box */}
+                        <div className="border-2 border-black p-3.5 bg-slate-50 rounded-xl space-y-2">
+                          <div>
+                            <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">Project Title / Description:</span>
+                            <p className="text-sm font-black text-black uppercase leading-tight">
+                              {projectTitle || 'INFRASTRUCTURE & IT MODERNIZATION PROJECT'}
+                            </p>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-300 grid grid-cols-3 gap-2 text-xs font-mono">
+                            <div>
+                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">PhilGEPS Ref No.</span>
+                              <strong className="text-blue-950 font-black truncate block">{projectRefNo || 'PhilGEPS-2026-001'}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Solicitation No.</span>
+                              <strong className="text-blue-950 font-black truncate block">{activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Approved Budget (ABC)</span>
+                              <strong className="text-emerald-800 font-black block">{activeProject?.abc || '₱12,500,000.00'}</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Large Envelope Identifier */}
+                        <div className="p-3 border-4 border-black bg-black text-white text-center rounded-xl space-y-0.5 shadow-md">
+                          <div className="font-mono font-black text-base uppercase tracking-wider text-amber-300">
+                            {coverEnvelopeChoice === 'ENVELOPE_1' 
+                              ? 'ENVELOPE NO. 1: TECHNICAL & ELIGIBILITY COMPONENT'
+                              : 'ENVELOPE NO. 2: FINANCIAL BID PROPOSAL COMPONENT'}
+                          </div>
+                          <div className="text-[10px] font-sans font-semibold text-slate-200 uppercase">
+                            Official Sealed Envelope Submission pursuant to RA 12009 / RA 9184
+                          </div>
+                        </div>
+
+                        {/* Prominent Red Warning Box */}
+                        <div className="p-2.5 border-2 border-red-600 bg-red-50 text-center rounded-xl space-y-0.5">
+                          <h4 className="text-xs sm:text-sm font-black text-red-600 uppercase tracking-wide leading-tight">
+                            ⚠️ WARNING: DO NOT OPEN BEFORE SCHEDULED BID OPENING DATE & TIME!
+                          </h4>
+                          <p className="text-[11px] font-black text-red-900 font-mono uppercase">
+                            SCHEDULED BID OPENING: <span className="bg-red-600 text-white px-2 py-0.2 rounded font-black">{submissionDeadline}</span>
+                          </p>
+                        </div>
+
+                      </div>
+
                     </div>
 
-                    {/* Folder Badge */}
-                    <div className="p-3 border-3 border-black bg-slate-900 text-white rounded-xl text-center space-y-0.5">
-                      <div className="font-mono font-black text-lg text-amber-300 uppercase tracking-widest">
-                        {activeFolderCopy}
+                    {/* BOTTOM FOOTER: Signatory & QR Code */}
+                    <div className="border-t-2 border-black pt-2 flex items-center justify-between relative z-10 text-xs">
+                      <div className="space-y-0.5 text-left">
+                        <p className="text-[9.5px] font-mono font-bold uppercase text-slate-600">Authorized Managing Officer / Bidder Signatory:</p>
+                        <p className="text-sm font-black uppercase text-black underline tracking-wide">
+                          {currentTenant?.authorizedSignatory?.name || 'AUTHORIZED MANAGING OFFICER'}
+                        </p>
+                        <p className="text-[10.5px] text-slate-700 font-medium">
+                          {currentTenant?.authorizedSignatory?.title || 'President & Authorized Signatory'}
+                        </p>
                       </div>
-                      <div className="text-[10px] font-bold text-slate-200 uppercase">
-                        {activeEnvelope === 'ENVELOPE_1' ? 'ELIGIBILITY & TECHNICAL COMPONENT' : 'FINANCIAL BID PROPOSAL'}
+
+                      <div className="flex items-center gap-3">
+                        <div className="text-right text-[9.5px] font-mono text-slate-600">
+                          <div className="font-bold text-black">Official Submission QR</div>
+                          <div>{projectRefNo || 'PhilGEPS-2026-001'}</div>
+                        </div>
+                        <DocumentQrCode
+                          details={{
+                            documentNumber: projectRefNo || 'PhilGEPS-2026-001',
+                            documentName: coverEnvelopeChoice === 'ENVELOPE_1' ? 'Envelope 1 Technical Outer Cover' : 'Envelope 2 Financial Outer Cover',
+                            projectName: projectTitle,
+                            dateTimeSubmitted: submissionDeadline,
+                            companyName: currentTenant?.companyName,
+                            solicitationNo: activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'
+                          }}
+                          size={65}
+                          className="border-2 border-black p-0.5 bg-white shrink-0"
+                        />
                       </div>
                     </div>
+
                   </div>
+                )}
 
-                  {/* Right Column: Table of Contents Matrix */}
-                  <div className="col-span-7 flex flex-col justify-between text-left">
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
-                        Table of Contents / Documents Included in this {activeFolderCopy} Folder:
+                {/* ============================================================ */}
+                {/* VIEW 3: FOLDER COVER PAGE (ORIGINAL / COPY 1 / COPY 2)       */}
+                {/* ============================================================ */}
+                {coverModalTab === 'FOLDER' && (
+                  <div className="landscape-unified-cover w-[13in] max-w-[1200px] min-h-[780px] aspect-[13/8.5] bg-white text-black p-8 sm:p-10 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-8 print:m-0 box-border">
+                    
+                    {/* Inner Frame */}
+                    <div className="absolute inset-3 border-2 border-black rounded-xl pointer-events-none" />
+
+                    {/* Header */}
+                    <div className="text-center border-b-2 border-black pb-3 space-y-1 relative z-10">
+                      <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-wider text-black">
+                        {currentTenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}
+                      </h1>
+                      <p className="text-xs text-slate-700 font-medium">
+                        {currentTenant?.address || 'Metro Manila, Philippines'} • TIN: <span className="font-mono font-bold">{currentTenant?.tin || '000-000-000-000'}</span> • PhilGEPS Platinum: <span className="font-bold text-blue-950">{currentTenant?.philgepsPlatinumNo || 'PLAT-2026-ACTIVE'}</span>
                       </p>
+                    </div>
 
-                      <div className="border-2 border-black overflow-hidden rounded-lg">
-                        <table className="w-full text-left text-xs border-collapse font-sans">
-                          <thead>
-                            <tr className="bg-black text-white font-mono font-bold text-[10px]">
-                              <th className="p-1.5 border-r border-slate-700 w-10 text-center">#</th>
-                              <th className="p-1.5 border-r border-slate-700">Document Title / Specification</th>
-                              <th className="p-1.5 border-r border-slate-700 w-24 text-center">Category</th>
-                              <th className="p-1.5 w-16 text-center">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {currentFolderItems.length === 0 ? (
-                              <tr>
-                                <td colSpan={4} className="p-4 text-center text-slate-400 italic text-xs">
-                                  (No documents attached to this folder yet)
-                                </td>
+                    {/* Main Stately 2-Column Section */}
+                    <div className="grid grid-cols-12 gap-6 my-4 relative z-10 flex-1 items-stretch">
+                      
+                      {/* Left Column: Project Details */}
+                      <div className="col-span-6 space-y-4 text-left flex flex-col justify-between">
+                        <div className="p-4 border-2 border-black bg-slate-50 rounded-xl space-y-1.5 shadow-sm">
+                          <p className="text-[11px] uppercase font-mono font-black text-slate-500">SUBMITTED TO:</p>
+                          <h3 className="text-base font-black uppercase text-blue-950 leading-tight">
+                            THE BIDS AND AWARDS COMMITTEE
+                          </h3>
+                          <p className="text-xs font-bold text-slate-800 uppercase">{procuringEntity}</p>
+                        </div>
+
+                        <div className="p-4 border-2 border-black bg-slate-50 rounded-xl space-y-2 shadow-sm flex-1 flex flex-col justify-center">
+                          <div>
+                            <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">Project Title / Name:</span>
+                            <p className="text-sm font-black text-black uppercase leading-tight">{projectTitle}</p>
+                          </div>
+                          <div className="pt-2 border-t border-slate-300 grid grid-cols-2 gap-2 text-xs font-mono">
+                            <div>
+                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">PhilGEPS Ref:</span>
+                              <strong className="text-blue-950 font-black">{projectRefNo}</strong>
+                            </div>
+                            <div>
+                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Approved Budget (ABC):</span>
+                              <strong className="text-emerald-800 font-black">{activeProject?.abc || '₱0.00'}</strong>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right Column: Prominent Folder Designation Box */}
+                      <div className="col-span-6 flex flex-col justify-between text-left space-y-4">
+                        
+                        {/* Large Folder Badge */}
+                        <div className="p-6 border-4 border-black bg-slate-950 text-white rounded-2xl text-center space-y-2 shadow-md flex-1 flex flex-col justify-center">
+                          <div className="font-mono font-black text-3xl text-amber-300 uppercase tracking-widest">
+                            📁 {coverFolderCopyChoice}
+                          </div>
+                          <div className="text-xs font-black text-slate-200 uppercase tracking-wider py-1 border-y border-slate-700">
+                            {coverEnvelopeChoice === 'ENVELOPE_1' ? 'ENVELOPE 1: ELIGIBILITY & TECHNICAL COMPONENT' : 'ENVELOPE 2: FINANCIAL BID PROPOSAL'}
+                          </div>
+                          <p className="text-[11px] text-slate-400 font-mono">
+                            Official Certified Submission pursuant to RA 12009 / RA 9184 Standard PBDs
+                          </p>
+                        </div>
+
+                        {/* Scheduled Bid Opening Box */}
+                        <div className="p-3 border-2 border-red-600 bg-red-50 rounded-xl text-center">
+                          <p className="text-xs font-bold text-red-800 uppercase">
+                            Scheduled Bid Opening Deadline: <span className="font-black underline">{submissionDeadline}</span>
+                          </p>
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                    {/* Footer */}
+                    <div className="border-t-2 border-black pt-3 flex items-center justify-between relative z-10 text-xs">
+                      <div className="space-y-0.5 text-left">
+                        <p className="text-[10px] font-mono font-bold uppercase text-slate-600">Certified Complete & Authentic By:</p>
+                        <p className="text-sm font-black uppercase underline text-black tracking-wide">{currentTenant?.authorizedSignatory?.name || 'AUTHORIZED MANAGING OFFICER'}</p>
+                        <p className="text-[11px] text-slate-700 font-medium">{currentTenant?.authorizedSignatory?.title || 'President'}</p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="text-right text-[10px] font-mono text-slate-600">
+                          <div className="font-bold text-black">{coverFolderCopyChoice} Cover QR</div>
+                          <div>{projectRefNo}</div>
+                        </div>
+                        <DocumentQrCode
+                          details={{
+                            documentNumber: projectRefNo || 'PhilGEPS-2026-001',
+                            documentName: `${coverFolderCopyChoice} — ${coverEnvelopeChoice === 'ENVELOPE_1' ? 'Envelope 1 Folder Cover' : 'Envelope 2 Folder Cover'}`,
+                            projectName: projectTitle,
+                            dateTimeSubmitted: submissionDeadline,
+                            companyName: currentTenant?.companyName,
+                            solicitationNo: activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'
+                          }}
+                          size={65}
+                          className="border-2 border-black p-0.5 bg-white shrink-0"
+                        />
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+
+                {/* ============================================================ */}
+                {/* VIEW 4: TABLE OF CONTENTS (TOC - DEDICATED FULL PAGE)        */}
+                {/* ============================================================ */}
+                {coverModalTab === 'TOC' && (() => {
+                  const targetFolderDocs = packageItems.filter(
+                    i => i.envelope === coverEnvelopeChoice && i.folderCopy === coverFolderCopyChoice
+                  );
+
+                  return (
+                    <div className="landscape-unified-cover w-[13in] max-w-[1200px] min-h-[780px] aspect-[13/8.5] bg-white text-black p-6 sm:p-8 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 box-border">
+                      
+                      {/* Inner Frame */}
+                      <div className="absolute inset-2.5 border-2 border-black rounded-xl pointer-events-none" />
+
+                      {/* Header */}
+                      <div className="text-center border-b-2 border-black pb-2 space-y-0.5 relative z-10">
+                        <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide text-black">
+                          {currentTenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}
+                        </h1>
+                        <p className="text-xs text-slate-700 font-medium">
+                          {currentTenant?.address || 'Metro Manila, Philippines'} • TIN: <span className="font-mono font-bold">{currentTenant?.tin || '000-000-000-000'}</span> • PhilGEPS Platinum: <span className="font-bold text-blue-950">{currentTenant?.philgepsPlatinumNo || 'PLAT-2026-ACTIVE'}</span>
+                        </p>
+                      </div>
+
+                      {/* Table of Contents Banner & Metadata Strip */}
+                      <div className="relative z-10 space-y-2 my-2">
+                        <div className="p-3 border-2 border-black bg-slate-900 text-white rounded-xl flex items-center justify-between gap-4 text-left">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-amber-300">
+                                TABLE OF CONTENTS & STATUTORY CHECKLIST
+                              </h2>
+                              <span className={`px-2.5 py-0.5 rounded border text-[11px] font-mono font-black uppercase tracking-wider shadow-sm ${
+                                coverFolderCopyChoice === 'ORIGINAL'
+                                  ? 'bg-amber-400 text-slate-950 border-amber-300'
+                                  : coverFolderCopyChoice === 'COPY_1'
+                                  ? 'bg-blue-500 text-white border-blue-400'
+                                  : 'bg-purple-500 text-white border-purple-400'
+                              }`}>
+                                ★ {coverFolderCopyChoice === 'ORIGINAL' ? 'ORIGINAL COPY' : coverFolderCopyChoice === 'COPY_1' ? 'COPY 1 (DUPLICATE)' : 'COPY 2 (TRIPLICATE)'}
+                              </span>
+                            </div>
+                            <p className="text-[10.5px] text-slate-300 font-medium">
+                              {coverEnvelopeChoice === 'ENVELOPE_1' ? 'ENVELOPE 1: ELIGIBILITY & TECHNICAL COMPONENT' : 'ENVELOPE 2: FINANCIAL BID PROPOSAL'} • Official Submission Schedule
+                            </p>
+                          </div>
+
+                          <div className="text-right text-[11px] font-mono text-slate-300 border-l border-slate-700 pl-4 shrink-0">
+                            <div><strong className="text-white">PhilGEPS Ref:</strong> {projectRefNo}</div>
+                            <div><strong className="text-emerald-400">ABC:</strong> {activeProject?.abc || '₱0.00'}</div>
+                          </div>
+                        </div>
+
+                        {/* Full-Width Comprehensive Table of Contents Matrix */}
+                        <div className="border-2 border-black overflow-hidden rounded-xl">
+                          <table className="w-full text-left text-xs border-collapse font-sans">
+                            <thead>
+                              <tr className="bg-black text-white font-mono font-bold text-[10.5px]">
+                                <th className="p-2 border-r border-slate-700 w-12 text-center">Tab #</th>
+                                <th className="p-2 border-r border-slate-700">Document Title & Statutory Specification</th>
+                                <th className="p-2 border-r border-slate-700 w-36 text-center">Reference Code</th>
+                                <th className="p-2 border-r border-slate-700 w-28 text-center">Category</th>
+                                <th className="p-2 border-r border-slate-700 w-28 text-center">Folder Copy</th>
+                                <th className="p-2 w-36 text-center">Page Range in Bundle</th>
                               </tr>
-                            ) : (
-                              currentFolderItems.slice(0, 10).map((item, idx) => (
-                                <tr key={item.id} className="border-t border-slate-300 hover:bg-slate-50 text-[10.5px]">
-                                  <td className="p-1 border-r border-slate-300 text-center font-mono font-bold">{idx + 1}</td>
-                                  <td className="p-1 border-r border-slate-300 font-semibold truncate max-w-[280px]">{item.documentName}</td>
-                                  <td className="p-1 border-r border-slate-300 text-center font-mono text-[9.5px]">{item.category}</td>
-                                  <td className="p-1 text-center font-bold text-emerald-700 text-[9.5px]">PRESENT</td>
+                            </thead>
+                            <tbody>
+                              {targetFolderDocs.length === 0 ? (
+                                <tr>
+                                  <td colSpan={6} className="p-8 text-center text-slate-400 italic text-xs">
+                                    (No documents attached to this {coverFolderCopyChoice} folder yet. Please use "Add Documents" in Bid Package to add completed forms.)
+                                  </td>
                                 </tr>
-                              ))
-                            )}
-                            {currentFolderItems.length > 10 && (
-                              <tr className="border-t border-slate-300 bg-slate-50 text-[10px] italic text-slate-600">
-                                <td colSpan={4} className="p-1 text-center">
-                                  + and {currentFolderItems.length - 10} more documents in this folder
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
+                              ) : (
+                                targetFolderDocs.map((item, idx) => {
+                                  let startP = 2;
+                                  for (let k = 0; k < idx; k++) {
+                                    startP += 1 + (targetFolderDocs[k].pageCount || 1);
+                                  }
+                                  const endP = startP + (1 + (item.pageCount || 1)) - 1;
+                                  const rangeText = startP === endP ? `Page ${startP}` : `Page ${startP} to ${endP}`;
+
+                                  return (
+                                    <tr key={item.id} className="border-t border-slate-300 hover:bg-slate-50 text-[11px]">
+                                      <td className="p-1.5 border-r border-slate-300 text-center font-mono font-bold bg-slate-100">
+                                        TAB {idx + 1}
+                                      </td>
+                                      <td className="p-1.5 border-r border-slate-300 font-bold text-slate-950">
+                                        {item.documentName}
+                                      </td>
+                                      <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[10px] text-blue-950 font-bold">
+                                        {item.documentNumber || projectRefNo || 'STAT-REF'}
+                                      </td>
+                                      <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[10px] text-slate-700 font-semibold">
+                                        {item.category}
+                                      </td>
+                                      <td className="p-1.5 border-r border-slate-300 text-center font-mono text-[10px] font-bold text-slate-900 bg-slate-50">
+                                        {coverFolderCopyChoice}
+                                      </td>
+                                      <td className="p-1.5 text-center font-mono font-black text-slate-950 text-[10.5px] bg-amber-50/50">
+                                        <span className="px-2 py-0.5 rounded border border-black/40 bg-white shadow-xs">
+                                          {rangeText}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="border-t-2 border-black pt-2 flex items-center justify-between relative z-10 text-xs">
+                        <div className="space-y-0.5 text-left">
+                          <p className="text-[9.5px] font-mono font-bold uppercase text-slate-600">
+                            Table of Contents Certified Correct ({coverFolderCopyChoice}) By:
+                          </p>
+                          <p className="text-sm font-black uppercase underline text-black tracking-wide">{currentTenant?.authorizedSignatory?.name || 'AUTHORIZED MANAGING OFFICER'}</p>
+                          <p className="text-[10.5px] text-slate-700 font-medium">{currentTenant?.authorizedSignatory?.title || 'President'}</p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="text-right text-[9.5px] font-mono text-slate-600">
+                            <div className="font-bold text-black">{coverFolderCopyChoice} TOC QR</div>
+                            <div>{projectRefNo}</div>
+                          </div>
+                          <DocumentQrCode
+                            details={{
+                              documentNumber: projectRefNo || 'PhilGEPS-2026-001',
+                              documentName: `${coverFolderCopyChoice} — ${coverEnvelopeChoice === 'ENVELOPE_1' ? 'Envelope 1 Table of Contents' : 'Envelope 2 Table of Contents'}`,
+                              projectName: projectTitle,
+                              dateTimeSubmitted: submissionDeadline,
+                              companyName: currentTenant?.companyName,
+                              solicitationNo: activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'
+                            }}
+                            size={60}
+                            className="border-2 border-black p-0.5 bg-white shrink-0"
+                          />
+                        </div>
+                      </div>
+
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* OFFSCREEN & PRINT-ALL COMPLETE 15-ITEM PACKAGING SET */}
+              <div 
+                id="print-all-covers-section"
+                className="print-all-covers-section fixed -left-[9999px] -top-[9999px] print:static print:block pointer-events-none opacity-0 print:opacity-100 overflow-hidden print:overflow-visible"
+                aria-hidden={!isPrintingAllCovers}
+              >
+                {/* 1. Mother Box Label Cover */}
+                <div id="cover-render-mother" className="landscape-unified-cover print-page">
+                  <div className="text-center border-b-2 border-black pb-2 space-y-0.5">
+                    <h1 className="text-xl font-black uppercase text-black">{currentTenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}</h1>
+                    <p className="text-xs text-slate-700">{currentTenant?.address} • TIN: {currentTenant?.tin} • PhilGEPS: {currentTenant?.philgepsPlatinumNo}</p>
+                  </div>
+                  <div className="grid grid-cols-12 gap-4 my-2 text-left">
+                    <div className="col-span-5 space-y-2">
+                      <div className="p-3 border-2 border-black bg-slate-50 rounded-xl">
+                        <p className="text-[10px] font-mono uppercase font-bold text-slate-600">SUBMITTED TO:</p>
+                        <h2 className="text-base font-black uppercase text-blue-950">THE BIDS AND AWARDS COMMITTEE</h2>
+                        <h3 className="text-xs font-black uppercase text-slate-900">{procuringEntity}</h3>
+                      </div>
+                      <div className="p-2.5 border-2 border-slate-900 bg-slate-100 rounded-xl text-xs">
+                        <p className="font-bold text-black uppercase border-b border-slate-400 pb-1">📦 ENCLOSED ENVELOPES:</p>
+                        <p className="pt-1 font-bold text-blue-950">1. ENVELOPE 1: LEGAL & TECHNICAL DOCUMENTS</p>
+                        <p className="font-bold text-emerald-950">2. ENVELOPE 2: FINANCIAL BID PROPOSAL</p>
                       </div>
                     </div>
-
-                    <div className="p-2 border border-red-500 bg-red-50 rounded-lg text-center mt-2">
-                      <p className="text-[10px] font-bold text-red-800 uppercase">
-                        Scheduled Bid Opening Deadline: <span className="font-black underline">{submissionDeadline}</span>
-                      </p>
+                    <div className="col-span-7 space-y-2">
+                      <div className="border-2 border-black p-3 bg-slate-50 rounded-xl">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block">Project Title:</span>
+                        <p className="text-sm font-black text-black uppercase">{projectTitle}</p>
+                        <div className="pt-1.5 border-t border-slate-300 grid grid-cols-2 gap-2 text-xs font-mono">
+                          <div><strong>PhilGEPS:</strong> {projectRefNo}</div>
+                          <div><strong>ABC:</strong> {activeProject?.abc || '₱0.00'}</div>
+                        </div>
+                      </div>
+                      <div className="p-3 border-4 border-black bg-black text-white text-center rounded-xl font-mono font-black text-sm uppercase text-amber-300">
+                        MOTHER ENVELOPE: OFFICIAL BID PROPOSAL
+                      </div>
+                      <div className="p-2 border-2 border-red-600 bg-red-50 text-center rounded-xl text-xs font-black text-red-700 uppercase">
+                        ⚠️ WARNING: DO NOT OPEN BEFORE BID OPENING: {submissionDeadline}
+                      </div>
                     </div>
                   </div>
-
-                </div>
-
-                {/* Footer */}
-                <div className="border-t-2 border-black pt-2 flex items-center justify-between relative z-10 text-xs">
-                  <div className="space-y-0.5 text-left">
-                    <p className="text-[9.5px] font-mono font-bold uppercase text-slate-600">Certified Complete & Authentic By:</p>
-                    <p className="text-sm font-black uppercase underline text-black tracking-wide">{currentTenant?.authorizedSignatory?.name || 'AUTHORIZED MANAGING OFFICER'}</p>
-                    <p className="text-[10.5px] text-slate-700 font-medium">{currentTenant?.authorizedSignatory?.title || 'President'}</p>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="text-right text-[9.5px] font-mono text-slate-600">
-                      <div className="font-bold text-black">{activeFolderCopy} Cover QR</div>
-                      <div>{projectRefNo}</div>
+                  <div className="border-t-2 border-black pt-2 flex items-center justify-between text-xs">
+                    <div className="text-left">
+                      <p className="text-[9px] font-mono uppercase text-slate-600">Authorized Managing Officer:</p>
+                      <p className="text-sm font-black uppercase underline">{currentTenant?.authorizedSignatory?.name}</p>
                     </div>
                     <DocumentQrCode
-                      details={{
-                        documentNumber: projectRefNo || 'PhilGEPS-2026-001',
-                        documentName: `${activeFolderCopy} — ${activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1 Folder Cover' : 'Envelope 2 Folder Cover'}`,
-                        projectName: projectTitle,
-                        dateTimeSubmitted: submissionDeadline,
-                        companyName: currentTenant?.companyName,
-                        solicitationNo: activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'
-                      }}
-                      size={60}
-                      className="border-2 border-black p-0.5 bg-white shrink-0"
+                      details={{ documentNumber: projectRefNo || 'PhilGEPS-2026-001', documentName: 'Mother Envelope Outer Cover', projectName: projectTitle, dateTimeSubmitted: submissionDeadline, companyName: currentTenant?.companyName }}
+                      size={55}
+                      className="border-2 border-black p-0.5 bg-white"
                     />
                   </div>
                 </div>
 
+                {/* 2 & 3: Envelope 1 & Envelope 2 Outer Covers */}
+                {(['ENVELOPE_1', 'ENVELOPE_2'] as ('ENVELOPE_1' | 'ENVELOPE_2')[]).map((env) => (
+                  <div key={`cover-render-${env}`} id={env === 'ENVELOPE_1' ? 'cover-render-env1' : 'cover-render-env2'} className="landscape-unified-cover print-page">
+                    <div className="text-center border-b-2 border-black pb-2 space-y-0.5">
+                      <h1 className="text-xl font-black uppercase text-black">{currentTenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}</h1>
+                      <p className="text-xs text-slate-700">{currentTenant?.address} • TIN: {currentTenant?.tin} • PhilGEPS: {currentTenant?.philgepsPlatinumNo}</p>
+                    </div>
+                    <div className="grid grid-cols-12 gap-4 my-2 text-left">
+                      <div className="col-span-5 space-y-2">
+                        <div className="p-3 border-2 border-black bg-slate-50 rounded-xl">
+                          <p className="text-[10px] font-mono uppercase font-bold text-slate-600">SUBMITTED TO:</p>
+                          <h2 className="text-base font-black uppercase text-blue-950">THE BIDS AND AWARDS COMMITTEE</h2>
+                          <h3 className="text-xs font-black uppercase text-slate-900">{procuringEntity}</h3>
+                        </div>
+                        <div className="p-2.5 border-2 border-slate-900 bg-slate-100 rounded-xl text-xs">
+                          <p className="font-bold text-black uppercase border-b border-slate-400 pb-1">📦 INCLUDED FOLDERS:</p>
+                          <p className="pt-1 font-semibold">• Original Copy</p>
+                          <p className="font-semibold">• Copy 1 (Duplicate)</p>
+                          <p className="font-semibold">• Copy 2 (Triplicate)</p>
+                        </div>
+                      </div>
+                      <div className="col-span-7 space-y-2">
+                        <div className="border-2 border-black p-3 bg-slate-50 rounded-xl">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase block">Project Title:</span>
+                          <p className="text-sm font-black text-black uppercase">{projectTitle}</p>
+                          <div className="pt-1.5 border-t border-slate-300 grid grid-cols-2 gap-2 text-xs font-mono">
+                            <div><strong>PhilGEPS:</strong> {projectRefNo}</div>
+                            <div><strong>ABC:</strong> {activeProject?.abc || '₱0.00'}</div>
+                          </div>
+                        </div>
+                        <div className="p-3 border-4 border-black bg-black text-white text-center rounded-xl font-mono font-black text-sm uppercase text-amber-300">
+                          {env === 'ENVELOPE_1' ? 'ENVELOPE NO. 1: TECHNICAL & ELIGIBILITY COMPONENT' : 'ENVELOPE NO. 2: FINANCIAL BID PROPOSAL'}
+                        </div>
+                        <div className="p-2 border-2 border-red-600 bg-red-50 text-center rounded-xl text-xs font-black text-red-700 uppercase">
+                          ⚠️ WARNING: DO NOT OPEN BEFORE BID OPENING: {submissionDeadline}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="border-t-2 border-black pt-2 flex items-center justify-between text-xs">
+                      <div className="text-left">
+                        <p className="text-[9px] font-mono uppercase text-slate-600">Authorized Managing Officer:</p>
+                        <p className="text-sm font-black uppercase underline">{currentTenant?.authorizedSignatory?.name}</p>
+                      </div>
+                      <DocumentQrCode
+                        details={{ documentNumber: projectRefNo || 'PhilGEPS-2026-001', documentName: `${env} Outer Cover`, projectName: projectTitle, dateTimeSubmitted: submissionDeadline, companyName: currentTenant?.companyName }}
+                        size={55}
+                        className="border-2 border-black p-0.5 bg-white"
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                {/* 4 to 9: Folder Covers (Env 1 & Env 2 × Original, Copy 1, Copy 2) */}
+                {(['ENVELOPE_1', 'ENVELOPE_2'] as ('ENVELOPE_1' | 'ENVELOPE_2')[]).map((env) =>
+                  (['ORIGINAL', 'COPY_1', 'COPY_2'] as FolderCopyType[]).map((c) => (
+                    <div key={`folder-${env}-${c}`} id={`cover-render-folder-${env === 'ENVELOPE_1' ? 'env1' : 'env2'}-${c.toLowerCase()}`} className="landscape-unified-cover print-page">
+                      <div className="text-center border-b-2 border-black pb-3 space-y-1">
+                        <h1 className="text-2xl font-black uppercase text-black">{currentTenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}</h1>
+                        <p className="text-xs text-slate-700">{currentTenant?.address} • TIN: {currentTenant?.tin} • PhilGEPS: {currentTenant?.philgepsPlatinumNo}</p>
+                      </div>
+                      <div className="grid grid-cols-12 gap-6 my-4 text-left flex-1 items-stretch">
+                        <div className="col-span-6 space-y-3 flex flex-col justify-between">
+                          <div className="p-3 border-2 border-black bg-slate-50 rounded-xl">
+                            <p className="text-[10px] font-mono uppercase font-bold text-slate-600">SUBMITTED TO:</p>
+                            <h2 className="text-base font-black uppercase text-blue-950">THE BIDS AND AWARDS COMMITTEE</h2>
+                            <h3 className="text-xs font-black uppercase text-slate-900">{procuringEntity}</h3>
+                          </div>
+                          <div className="p-3 border-2 border-black bg-slate-50 rounded-xl flex-1 flex flex-col justify-center">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase block">Project Title:</span>
+                            <p className="text-sm font-black text-black uppercase">{projectTitle}</p>
+                            <div className="pt-2 border-t border-slate-300 grid grid-cols-2 gap-2 text-xs font-mono">
+                              <div><strong>PhilGEPS:</strong> {projectRefNo}</div>
+                              <div><strong>ABC:</strong> {activeProject?.abc || '₱0.00'}</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col-span-6 flex flex-col justify-between space-y-3">
+                          <div className="p-5 border-4 border-black bg-slate-950 text-white rounded-2xl text-center space-y-2 flex-1 flex flex-col justify-center">
+                            <div className="font-mono font-black text-2xl text-amber-300 uppercase tracking-widest">📁 {c}</div>
+                            <div className="text-xs font-black text-slate-200 uppercase">{env === 'ENVELOPE_1' ? 'ENVELOPE 1: ELIGIBILITY & TECHNICAL' : 'ENVELOPE 2: FINANCIAL PROPOSAL'}</div>
+                          </div>
+                          <div className="p-2 border-2 border-red-600 bg-red-50 text-center rounded-xl text-xs font-bold text-red-800">
+                            Bid Opening Deadline: {submissionDeadline}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="border-t-2 border-black pt-2 flex items-center justify-between text-xs">
+                        <div className="text-left">
+                          <p className="text-[9px] font-mono uppercase text-slate-600">Certified Complete & Authentic By:</p>
+                          <p className="text-sm font-black uppercase underline">{currentTenant?.authorizedSignatory?.name}</p>
+                        </div>
+                        <DocumentQrCode
+                          details={{ documentNumber: projectRefNo || 'PhilGEPS-2026-001', documentName: `${c} Folder Cover — ${env}`, projectName: projectTitle, dateTimeSubmitted: submissionDeadline, companyName: currentTenant?.companyName }}
+                          size={55}
+                          className="border-2 border-black p-0.5 bg-white"
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {/* 10 to 15: Table of Contents (Env 1 & Env 2 × Original, Copy 1, Copy 2) */}
+                {(['ENVELOPE_1', 'ENVELOPE_2'] as ('ENVELOPE_1' | 'ENVELOPE_2')[]).map((env) =>
+                  (['ORIGINAL', 'COPY_1', 'COPY_2'] as FolderCopyType[]).map((c) => {
+                    const fDocs = packageItems.filter(i => i.envelope === env && i.folderCopy === c);
+                    return (
+                      <div key={`toc-${env}-${c}`} id={`cover-render-toc-${env === 'ENVELOPE_1' ? 'env1' : 'env2'}-${c.toLowerCase()}`} className="landscape-unified-cover print-page">
+                        <div className="text-center border-b-2 border-black pb-2 space-y-0.5">
+                          <h1 className="text-xl font-black uppercase text-black">{currentTenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}</h1>
+                          <p className="text-xs text-slate-700">{currentTenant?.address} • TIN: {currentTenant?.tin} • PhilGEPS: {currentTenant?.philgepsPlatinumNo}</p>
+                        </div>
+                        <div className="space-y-2 my-2 text-left">
+                          <div className="p-2.5 border-2 border-black bg-slate-900 text-white rounded-xl flex items-center justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h2 className="text-sm font-black uppercase tracking-wider text-amber-300">TABLE OF CONTENTS & STATUTORY CHECKLIST</h2>
+                                <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 text-[10px] font-mono font-black uppercase">★ {c}</span>
+                              </div>
+                              <p className="text-[10px] text-slate-300">{env === 'ENVELOPE_1' ? 'ENVELOPE 1: ELIGIBILITY & TECHNICAL COMPONENT' : 'ENVELOPE 2: FINANCIAL BID PROPOSAL'}</p>
+                            </div>
+                            <div className="text-right text-[10.5px] font-mono text-slate-300">
+                              <div><strong>PhilGEPS:</strong> {projectRefNo}</div>
+                              <div><strong>ABC:</strong> {activeProject?.abc || '₱0.00'}</div>
+                            </div>
+                          </div>
+                          <div className="border-2 border-black overflow-hidden rounded-xl">
+                            <table className="w-full text-left text-xs border-collapse font-sans">
+                              <thead>
+                                <tr className="bg-black text-white font-mono font-bold text-[10px]">
+                                  <th className="p-1.5 border-r border-slate-700 w-12 text-center">Tab #</th>
+                                  <th className="p-1.5 border-r border-slate-700">Document Title / Specification</th>
+                                  <th className="p-1.5 border-r border-slate-700 w-28 text-center">Category</th>
+                                  <th className="p-1.5 border-r border-slate-700 w-20 text-center">Copy</th>
+                                  <th className="p-1.5 w-32 text-center">Page Range in Bundle</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {fDocs.length === 0 ? (
+                                  <tr><td colSpan={5} className="p-6 text-center text-slate-400 italic text-xs">(No documents attached)</td></tr>
+                                ) : (
+                                  fDocs.map((item, idx) => {
+                                    let startP = 2;
+                                    for (let k = 0; k < idx; k++) {
+                                      startP += 1 + (fDocs[k].pageCount || 1);
+                                    }
+                                    const endP = startP + (1 + (item.pageCount || 1)) - 1;
+                                    const rangeText = startP === endP ? `Page ${startP}` : `Page ${startP} to ${endP}`;
+
+                                    return (
+                                      <tr key={item.id} className="border-t border-slate-300 text-[10.5px]">
+                                        <td className="p-1 border-r border-slate-300 text-center font-mono font-bold bg-slate-100">TAB {idx + 1}</td>
+                                        <td className="p-1 border-r border-slate-300 font-bold">{item.documentName}</td>
+                                        <td className="p-1 border-r border-slate-300 text-center font-mono text-[9.5px]">{item.category}</td>
+                                        <td className="p-1 border-r border-slate-300 text-center font-mono text-[9.5px] font-bold">{c}</td>
+                                        <td className="p-1 text-center font-mono font-black text-slate-950 text-[10px] bg-amber-50/50">
+                                          <span className="px-2 py-0.5 rounded border border-black/40 bg-white">
+                                            {rangeText}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                        <div className="border-t-2 border-black pt-2 flex items-center justify-between text-xs">
+                          <div className="text-left">
+                            <p className="text-[9px] font-mono uppercase text-slate-600">Table of Contents Certified Correct ({c}) By:</p>
+                            <p className="text-sm font-black uppercase underline">{currentTenant?.authorizedSignatory?.name}</p>
+                          </div>
+                          <DocumentQrCode
+                            details={{ documentNumber: projectRefNo || 'PhilGEPS-2026-001', documentName: `${c} Table of Contents — ${env}`, projectName: projectTitle, dateTimeSubmitted: submissionDeadline, companyName: currentTenant?.companyName }}
+                            size={55}
+                            className="border-2 border-black p-0.5 bg-white"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
+
             </div>
           </div>
         </div>

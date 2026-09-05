@@ -19,7 +19,8 @@ import {
   Percent,
   CheckCircle2,
   Calendar,
-  ShieldCheck
+  ShieldCheck,
+  FolderKanban
 } from 'lucide-react';
 
 export interface DiscountOfferRow {
@@ -101,6 +102,18 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
   const [bidValidityDays, setBidValidityDays] = useState('120');
   const [completionCalendarDays, setCompletionCalendarDays] = useState('180');
 
+  // Performance Security Option Selector Helper
+  const handlePerformanceSecurityChange = (option: 'PERFORMANCE_BOND' | 'PSD' | 'MANAGERS_CHECK') => {
+    setPerformanceSecurityOption(option);
+    if (option === 'PERFORMANCE_BOND') {
+      setPerformanceSecurityPercent('thirty (30)');
+    } else if (option === 'MANAGERS_CHECK') {
+      setPerformanceSecurityPercent('ten (10)');
+    } else {
+      setPerformanceSecurityPercent('N/A');
+    }
+  };
+
   // Discounts Offered
   const [discountsOffered, setDiscountsOffered] = useState('No discounts offered');
   const [hasDiscounts, setHasDiscounts] = useState(false);
@@ -114,16 +127,48 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
   const [showMetadataInputs, setShowMetadataInputs] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Helper to sync from Form L / Detailed Estimates / BOQ
+  // Helper to sync strictly from this specific project's Form L / Detailed Estimates / BOQ
   const syncFromDetailedEstimates = (targetRefNo?: string, targetOppId?: string) => {
     const tenantId = tenant?.id || 'default';
+    if (!targetRefNo && !targetOppId) {
+      setTotalBidAmountFigures('0.00');
+      setTotalBidAmountWords('ZERO PESOS ONLY');
+      return;
+    }
+
+    // 1. Primary Statutory Authority for Duration / Delivery Schedule: Section VI Schedule of Requirements
+    const secViKeys = [
+      targetRefNo ? `bidocs_sec_vi_${tenantId}_${targetRefNo}` : '',
+      targetOppId ? `bidocs_sec_vi_${tenantId}_${targetOppId}` : ''
+    ].filter(Boolean);
+
+    for (const key of secViKeys) {
+      const savedSec = localStorage.getItem(key);
+      if (savedSec) {
+        try {
+          const parsed = JSON.parse(savedSec);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const validDelivered = parsed
+              .map((it: any) => (it.delivered || '').trim())
+              .filter(Boolean);
+
+            if (validDelivered.length > 0) {
+              const uniqueSchedules = Array.from(new Set(validDelivered));
+              setCompletionCalendarDays(uniqueSchedules.join(', '));
+              break;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
     const keysToCheck = [
       targetRefNo ? `bidocs_detailed_estimates_${tenantId}_${targetRefNo}` : '',
       targetOppId ? `bidocs_detailed_estimates_${tenantId}_${targetOppId}` : '',
       targetRefNo ? `bidocs_boq_${tenantId}_${targetRefNo}` : '',
       targetOppId ? `bidocs_boq_${tenantId}_${targetOppId}` : '',
-      `bidocs_detailed_estimates_${tenantId}_default`,
-      `bidocs_boq_${tenantId}_default`
+      targetRefNo ? `bidocs_detailed_estimates_${targetRefNo}` : '',
+      targetOppId ? `bidocs_detailed_estimates_${targetOppId}` : ''
     ].filter(Boolean);
 
     for (const key of keysToCheck) {
@@ -131,18 +176,68 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
         const stored = localStorage.getItem(key);
         if (stored) {
           const parsed = JSON.parse(stored);
-          const totalVal = parsed.grandTotal || parsed.totalBidAmount || parsed.totalAmount || parsed.totalPrice;
-          if (typeof totalVal === 'number' && totalVal > 0) {
-            setTotalBidAmountFigures(formatCurrency(totalVal));
-            setTotalBidAmountWords(numberToWords(totalVal));
-            return;
+          if (parsed) {
+            // Verify project scope match
+            if (targetRefNo && parsed.projectRefNo && parsed.projectRefNo !== targetRefNo && parsed.projectRefNo !== targetOppId) {
+              continue;
+            }
+
+            if (parsed.ownerName && parsed.ownerName.trim()) {
+              setProcuringEntity(parsed.ownerName.trim().toUpperCase());
+            }
+            if (parsed.projectLocation && parsed.projectLocation.trim()) {
+              setProcuringEntityAddress(parsed.projectLocation.trim());
+            }
+            if (parsed.solicitationNumber && parsed.solicitationNumber !== 'N/A') {
+              setSolicitationNumber(parsed.solicitationNumber);
+            }
+            if (parsed.estimateDate) {
+              const d = new Date(parsed.estimateDate);
+              if (!isNaN(d.getTime())) {
+                setDateSubmitted(d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }));
+              }
+            }
+            if (parsed.projectName && parsed.projectName.trim()) {
+              setProjectTitle(parsed.projectName.trim());
+            }
+            if (parsed.deliverySchedule && parsed.deliverySchedule.trim()) {
+              setCompletionCalendarDays(parsed.deliverySchedule.trim());
+            }
+
+            let num = 0;
+            if (typeof parsed.totalEstimatedProjectCost === 'number' && parsed.totalEstimatedProjectCost > 0) {
+              num = parsed.totalEstimatedProjectCost;
+            } else if (typeof parsed.grandTotal === 'number' && parsed.grandTotal > 0) {
+              num = parsed.grandTotal;
+            } else if (typeof parsed.totalBidAmount === 'number' && parsed.totalBidAmount > 0) {
+              num = parsed.totalBidAmount;
+            } else if (parsed.totalBidAmountFigures) {
+              num = parseFloat(`${parsed.totalBidAmountFigures}`.replace(/,/g, '')) || 0;
+            } else if (Array.isArray(parsed) && parsed.length > 0) {
+              // Array of BOQ rows
+              num = parsed.reduce((sum: number, r: any) => sum + (Number(r.amount || r.totalAmount || (r.quantity * r.unitPrice)) || 0), 0);
+            } else if (parsed.materials && Array.isArray(parsed.materials)) {
+              num = parsed.materials.reduce((sum: number, m: any) => sum + (Number(m.quantity) || 0) * (Number(m.unitPrice) || 0), 0);
+            }
+
+            if (num > 0) {
+              const formattedFig = num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              const words = parsed.totalBidAmountWords || numberToWords(num);
+              setTotalBidAmountFigures(formattedFig);
+              setTotalBidAmountWords(words);
+              return;
+            }
           }
         }
       } catch (_) {}
     }
+
+    // Fallback if not yet estimated: reset to 0.00
+    setTotalBidAmountFigures('0.00');
+    setTotalBidAmountWords('ZERO PESOS ONLY');
   };
 
-  // Load Opportunity Projects and auto-fill
+  // Load Opportunity Projects and auto-fill + saved settings
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
@@ -184,6 +279,27 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
     }
 
     const targetRef = currentRefNo || projectRefNo || selectedOppId;
+    const tenantId = tenant?.id || 'default';
+
+    // Restore saved user selections for this project
+    try {
+      const savedRaw = localStorage.getItem(`bidocs_bidform_infra_${tenantId}_${targetRef}`);
+      if (savedRaw) {
+        const saved = JSON.parse(savedRaw);
+        if (saved.performanceSecurityOption) setPerformanceSecurityOption(saved.performanceSecurityOption);
+        if (saved.performanceSecurityPercent) setPerformanceSecurityPercent(saved.performanceSecurityPercent);
+        if (saved.bidValidityDays) setBidValidityDays(saved.bidValidityDays);
+        if (saved.completionCalendarDays) setCompletionCalendarDays(saved.completionCalendarDays);
+        if (saved.discountsOffered) setDiscountsOffered(saved.discountsOffered);
+        if (saved.bidBulletins) setBidBulletins(saved.bidBulletins);
+        if (saved.totalBidAmountFigures && saved.totalBidAmountFigures !== '0.00') {
+          setTotalBidAmountFigures(saved.totalBidAmountFigures);
+          setTotalBidAmountWords(saved.totalBidAmountWords || numberToWords(parseNum(saved.totalBidAmountFigures)));
+          return;
+        }
+      }
+    } catch (_) {}
+
     syncFromDetailedEstimates(targetRef, currentOppId || selectedOppId);
   }, [tenant?.id, activeProjectRefNo]);
 
@@ -201,6 +317,27 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
       if (found.dateTimeSubmitted) {
         setDateSubmitted(formatDateOnly(found.dateTimeSubmitted));
       }
+
+      // Check saved for this opportunity
+      const tenantId = tenant?.id || 'default';
+      try {
+        const savedRaw = localStorage.getItem(`bidocs_bidform_infra_${tenantId}_${found.refNo}`);
+        if (savedRaw) {
+          const saved = JSON.parse(savedRaw);
+          if (saved.performanceSecurityOption) setPerformanceSecurityOption(saved.performanceSecurityOption);
+          if (saved.performanceSecurityPercent) setPerformanceSecurityPercent(saved.performanceSecurityPercent);
+          if (saved.bidValidityDays) setBidValidityDays(saved.bidValidityDays);
+          if (saved.completionCalendarDays) setCompletionCalendarDays(saved.completionCalendarDays);
+          if (saved.discountsOffered) setDiscountsOffered(saved.discountsOffered);
+          if (saved.bidBulletins) setBidBulletins(saved.bidBulletins);
+          if (saved.totalBidAmountFigures && saved.totalBidAmountFigures !== '0.00') {
+            setTotalBidAmountFigures(saved.totalBidAmountFigures);
+            setTotalBidAmountWords(saved.totalBidAmountWords || numberToWords(parseNum(saved.totalBidAmountFigures)));
+            return;
+          }
+        }
+      } catch (_) {}
+
       syncFromDetailedEstimates(found.refNo, found.id);
     }
   };
@@ -226,6 +363,34 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      const tenantKey = tenant?.id || 'default';
+      const scopeKey = projectRefNo || selectedOppId || 'default';
+
+      // Save form state to local storage
+      try {
+        const payload = {
+          projectRefNo,
+          projectTitle,
+          procuringEntity,
+          procuringEntityAddress,
+          solicitationNumber,
+          dateSubmitted,
+          performanceSecurityOption,
+          performanceSecurityPercent,
+          bidValidityDays,
+          completionCalendarDays,
+          totalBidAmountFigures,
+          totalBidAmountWords,
+          discountsOffered,
+          bidBulletins
+        };
+        localStorage.setItem(`bidocs_bidform_infra_${tenantKey}_${scopeKey}`, JSON.stringify(payload));
+        if (projectRefNo) localStorage.setItem(`bidocs_bidform_infra_${tenantKey}_${projectRefNo}`, JSON.stringify(payload));
+        if (selectedOppId) localStorage.setItem(`bidocs_bidform_infra_${tenantKey}_${selectedOppId}`, JSON.stringify(payload));
+      } catch (lsErr) {
+        console.warn('[BidFormInfra] localStorage cache note:', lsErr);
+      }
+
       const elem = document.getElementById('bidform-infra-paper-container');
       let dataUrl: string | undefined = undefined;
       if (elem) {
@@ -237,8 +402,6 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
       }
 
       if (dataUrl) {
-        const tenantKey = tenant?.id || 'default';
-        const scopeKey = projectRefNo || selectedOppId || 'default';
         try {
           await savePdfData(`bidform_infra_${tenantKey}_${scopeKey}`, dataUrl);
           await savePdfData(`bidform_${tenantKey}_${scopeKey}`, dataUrl);
@@ -313,6 +476,39 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
           </div>
         </div>
 
+        {/* PROMINENT ACTIVE TARGET INFRASTRUCTURE PROJECT SELECTOR */}
+        {oppProjects.length > 0 && (
+          <div className="flex items-center gap-2 bg-slate-950 border border-amber-500/50 rounded-xl px-3 py-1.5 shadow-inner">
+            <FolderKanban className="w-4 h-4 text-amber-400 shrink-0" />
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-mono font-bold text-amber-300 uppercase">
+                  Target Bidding Project:
+                </span>
+                {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                  <span className="text-[8.5px] text-amber-400 font-bold font-mono flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
+                    <Lock className="w-2.5 h-2.5 text-amber-400" />
+                    <span>Locked</span>
+                  </span>
+                )}
+              </div>
+              <select
+                value={selectedOppId}
+                disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
+                onChange={(e) => handleSelectOpportunity(e.target.value)}
+                className="bg-transparent text-white font-mono font-bold text-xs focus:outline-none cursor-pointer pr-2 max-w-[280px] truncate disabled:opacity-85 disabled:cursor-not-allowed"
+              >
+                <option value="" className="bg-slate-900 text-slate-400">-- Select Opportunity Project --</option>
+                {oppProjects.map((p) => (
+                  <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                    [{p.refNo}] {p.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-2">
           <button
             onClick={handleExportPdf}
@@ -327,7 +523,7 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
             className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium flex items-center gap-1.5 transition cursor-pointer border border-slate-700"
           >
             <Edit3 className="w-3.5 h-3.5" />
-            <span>{showMetadataInputs ? 'Hide Controls' : 'Edit Bid Controls'}</span>
+            <span>{showMetadataInputs ? 'Hide Full Controls' : 'Edit Full Bid Controls'}</span>
           </button>
 
           <button
@@ -359,7 +555,87 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-950 flex flex-col items-center">
 
-        {/* Opportunity Project Picker & Bid Controls Drawer */}
+        {/* ALWAYS-VISIBLE PROMINENT PERFORMANCE SECURITY SELECTOR BAR */}
+        <div className="w-full max-w-4xl bg-slate-900 border border-amber-500/40 rounded-2xl p-3.5 sm:p-4 mb-4 shadow-xl print:hidden no-export space-y-2.5">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="text-xs font-bold text-amber-300 uppercase tracking-wide">
+                Clause (g) Performance Security Form Selector:
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400">
+              Click an option below to update the legal text instantly
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+            {/* Option 1: PSD */}
+            <button
+              type="button"
+              onClick={() => handlePerformanceSecurityChange('PSD')}
+              className={`p-3 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                performanceSecurityOption === 'PSD'
+                  ? 'bg-amber-500/20 border-amber-400 text-white shadow-lg ring-2 ring-amber-400/50'
+                  : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-bold text-xs text-amber-300 flex items-center gap-1.5">
+                  🛡️ Option 1: PSD
+                </span>
+                {performanceSecurityOption === 'PSD' && <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />}
+              </div>
+              <p className="text-[11px] leading-tight text-slate-300 font-sans">
+                Performance Securing Declaration (In lieu of cash/surety bond)
+              </p>
+            </button>
+
+            {/* Option 2: Performance Bond (30%) */}
+            <button
+              type="button"
+              onClick={() => handlePerformanceSecurityChange('PERFORMANCE_BOND')}
+              className={`p-3 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                performanceSecurityOption === 'PERFORMANCE_BOND'
+                  ? 'bg-amber-500/20 border-amber-400 text-white shadow-lg ring-2 ring-amber-400/50'
+                  : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-bold text-xs text-amber-300 flex items-center gap-1.5">
+                  📄 Option 2: Performance Bond (30%)
+                </span>
+                {performanceSecurityOption === 'PERFORMANCE_BOND' && <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />}
+              </div>
+              <p className="text-[11px] leading-tight text-slate-300 font-sans">
+                Surety Bond callable upon demand (thirty percent of Contract Price)
+              </p>
+            </button>
+
+            {/* Option 3: Manager's Check (10%) */}
+            <button
+              type="button"
+              onClick={() => handlePerformanceSecurityChange('MANAGERS_CHECK')}
+              className={`p-3 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
+                performanceSecurityOption === 'MANAGERS_CHECK'
+                  ? 'bg-amber-500/20 border-amber-400 text-white shadow-lg ring-2 ring-amber-400/50'
+                  : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-bold text-xs text-amber-300 flex items-center gap-1.5">
+                  🏦 Option 3: Check / Cash (10%)
+                </span>
+                {performanceSecurityOption === 'MANAGERS_CHECK' && <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />}
+              </div>
+              <p className="text-[11px] leading-tight text-slate-300 font-sans">
+                Cash / Manager&apos;s Check / Bank Guarantee (ten percent)
+              </p>
+            </button>
+          </div>
+        </div>
+
+        {/* Opportunity Project Picker & Full Bid Controls Drawer */}
         {showMetadataInputs && (
           <div className="w-full max-w-4xl bg-slate-900 border border-amber-500/40 rounded-2xl p-4 sm:p-5 mb-6 shadow-xl space-y-4 animate-scaleIn">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -417,6 +693,59 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
               </div>
 
               <div>
+                <label className="block text-slate-400 font-semibold mb-1">Procuring Entity Address</label>
+                <input
+                  type="text"
+                  value={procuringEntityAddress}
+                  onChange={(e) => setProcuringEntityAddress(e.target.value)}
+                  placeholder="e.g. Provincial Capitol, Tagbilaran City"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white font-medium focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">Project Ref / ID Number</label>
+                <input
+                  type="text"
+                  value={projectRefNo}
+                  onChange={(e) => setProjectRefNo(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">Solicitation Number</label>
+                <input
+                  type="text"
+                  value={solicitationNumber}
+                  onChange={(e) => setSolicitationNumber(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">Date of Bid Submission</label>
+                <input
+                  type="text"
+                  value={dateSubmitted}
+                  onChange={(e) => setDateSubmitted(e.target.value)}
+                  placeholder="e.g. March 19, 2026"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white font-medium focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">Discounts Offered (Clause d)</label>
+                <input
+                  type="text"
+                  value={discountsOffered}
+                  onChange={(e) => setDiscountsOffered(e.target.value)}
+                  placeholder="e.g. No discounts offered (or 5% discount on total bid)"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white font-medium focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
                 <label className="block text-slate-400 font-semibold mb-1">Supplemental / Bid Bulletins</label>
                 <input
                   type="text"
@@ -443,7 +772,20 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
                   type="text"
                   value={completionCalendarDays}
                   onChange={(e) => setCompletionCalendarDays(e.target.value)}
+                  placeholder="e.g. 180 Calendar Days"
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white font-mono focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">Performance Security %</label>
+                <input
+                  type="text"
+                  value={performanceSecurityOption === 'PSD' ? 'In lieu of security' : performanceSecurityPercent}
+                  onChange={(e) => setPerformanceSecurityPercent(e.target.value)}
+                  disabled={performanceSecurityOption === 'PSD'}
+                  placeholder="e.g. thirty (30)"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white font-mono text-xs focus:border-amber-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -469,18 +811,19 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
           {/* Outer Legal Frame Border Box */}
           <div className="w-full h-full border-2 border-black rounded-xl p-4 sm:p-5 flex flex-col justify-between relative bg-white overflow-hidden space-y-1.5">
 
-            {/* Centered Header Title Block */}
-            <div className="text-center border-b-2 border-black pb-1 shrink-0">
-              <h1 className="text-xs sm:text-sm font-bold font-serif uppercase tracking-wider text-black">
+            {/* 1. Centered Header Title Block */}
+            <div className="text-center pb-1 shrink-0">
+              <h1 className="text-sm font-bold font-serif uppercase tracking-wider text-black">
                 Bid Form for the Procurement of Infrastructure Projects
               </h1>
-              <p className="text-[9.5px] italic text-black font-serif font-semibold">
+              <p className="text-[10px] italic text-black font-serif font-semibold">
                 [shall be submitted with the Bid]
               </p>
+              <hr className="border-t border-black my-1" />
             </div>
 
-            {/* Header Metadata Row */}
-            <div className="py-0.5 border-b border-black/60 font-serif text-[10.5px] leading-tight space-y-0.5 shrink-0">
+            {/* 2. Header Metadata Row */}
+            <div className="py-0.5 font-serif text-[10.5px] leading-tight space-y-0.5 shrink-0 text-black">
               <div className="text-center">
                 <h2 className="font-bold text-xs sm:text-sm tracking-wider uppercase text-black font-serif">
                   BID FORM
@@ -488,7 +831,7 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
               </div>
               <div className="text-right space-y-0.5 text-[10px] text-black font-serif font-medium">
                 <div>
-                  <span className="font-bold">Date of Submission : </span>
+                  <span className="font-bold">Date : </span>
                   <span className="font-bold underline">{dateSubmitted}</span>
                 </div>
                 <div>
@@ -504,9 +847,9 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
               </div>
             </div>
 
-            {/* Addressed To */}
+            {/* 3. Addressed To */}
             <div className="text-[10.5px] font-serif space-y-0.5 text-black shrink-0">
-              <p><span className="font-bold">To: </span> <span className="font-bold uppercase underline">{procuringEntity}</span></p>
+              <p><span className="font-bold">To: </span> <span className="font-bold uppercase underline text-black">{procuringEntity}</span></p>
               {procuringEntityAddress && (
                 <p className="text-black font-semibold text-[10px] uppercase">{procuringEntityAddress}</p>
               )}
@@ -515,15 +858,15 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
               </p>
             </div>
 
-            {/* Opening Preamble */}
+            {/* 4. Opening Preamble */}
             <p className="text-[10px] font-serif text-black text-justify leading-snug font-normal">
               Having examined the Philippine Bidding Documents (PBDs) including the Supplemental or Bid Bulletin Numbers{' '}
-              <span className="font-bold underline">{bidBulletins || 'None'}</span>
+              <span className="font-bold underline text-black">{bidBulletins || 'None'}</span>
               , the receipt of which is hereby duly acknowledged, we, the undersigned, declare that:
             </p>
 
-            {/* Statutory Clauses (Points a to i Verbatim from GPPB Resolution 09-2020 for Infrastructure) */}
-            <div className="space-y-1 text-[10px] font-serif text-black leading-tight">
+            {/* 5. Statutory Clauses (Points a to l Verbatim from GPPB Resolution 09-2020) */}
+            <div className="space-y-1 text-[9.5px] font-serif text-black leading-snug">
               <div className="flex gap-1.5 items-start">
                 <span className="font-bold shrink-0">a.</span>
                 <p className="text-justify font-normal text-black">
@@ -545,11 +888,11 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
                   <p className="text-justify font-normal text-black">
                     The total price of our Bid in words and figures, excluding any discounts offered below is:
                   </p>
-                  <div className="p-1.5 rounded bg-slate-50 border-2 border-black font-serif space-y-0.5 my-0.5">
-                    <p className="font-bold text-[10.5px] uppercase underline tracking-wide text-black">
+                  <div className="p-1 rounded bg-slate-50 border border-black font-serif space-y-0.5 my-0.5">
+                    <p className="font-bold text-[10px] uppercase underline tracking-wide text-black">
                       {totalBidAmountWords || 'ZERO PESOS ONLY'}
                     </p>
-                    <p className="font-bold text-[11px] text-black font-mono">
+                    <p className="font-bold text-[10.5px] text-black font-mono">
                       (Php {totalBidAmountFigures || '0.00'})
                     </p>
                   </div>
@@ -560,30 +903,39 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
                 <span className="font-bold shrink-0">d.</span>
                 <p className="text-justify font-normal text-black">
                   The discounts offered and the methodology for their application are:{' '}
-                  <span className="font-bold underline">{discountsOffered}</span>;
+                  <span className="font-bold underline text-black">{discountsOffered || 'None'}</span>;
                 </p>
               </div>
 
               <div className="flex gap-1.5 items-start">
                 <span className="font-bold shrink-0">e.</span>
                 <p className="text-justify font-normal text-black">
-                  The total bid price includes the cost of all taxes, such as, but not limited to: value added tax (VAT), income tax, local taxes, and other fiscal levies and duties, which are itemized in the Bill of Quantities;
+                  The total bid price includes the cost of all taxes, such as, but not limited to: <span className="italic font-semibold text-black">(i) value added tax (VAT), (ii) income tax, (iii) local taxes, and (iv) other fiscal levies and duties</span>, which are itemized herein and reflected in the detailed estimates;
                 </p>
               </div>
 
               <div className="flex gap-1.5 items-start">
                 <span className="font-bold shrink-0">f.</span>
                 <p className="text-justify font-normal text-black">
-                  Our Bid shall be valid within the period stated in the PBDs (<span className="font-bold underline">{bidValidityDays} calendar days</span> from the date of the Bid opening), and it shall remain binding upon us and may be accepted at any time before the expiration of that period;
+                  Our Bid shall be valid within the a period stated in the PBDs (<span className="font-bold underline text-black">{bidValidityDays} calendar days</span> from the date of the Bid opening), and it shall remain binding upon us at any time before the expiration of that period;
                 </p>
               </div>
 
               <div className="flex gap-1.5 items-start">
                 <span className="font-bold shrink-0">g.</span>
-                <p className="text-justify font-normal text-black">
-                  If our Bid is accepted, we commit to obtain a Performance Security in the amount of{' '}
-                  <span className="font-bold underline">{performanceSecurityPercent} percent</span> of the Contract Price for the due performance of the Contract, or a Performance Securing Declaration in lieu of the allowable forms of Performance Security;
-                </p>
+                {performanceSecurityOption === 'PSD' ? (
+                  <p className="text-justify font-normal text-black">
+                    If our Bid is accepted, we commit to submit a <span className="font-bold underline uppercase text-black">Performance Securing Declaration</span> in lieu of the allowable forms of Performance Security for the due performance of the Contract, subject to the terms and conditions of issued GPPB guidelines¹ for this purpose;
+                  </p>
+                ) : performanceSecurityOption === 'MANAGERS_CHECK' ? (
+                  <p className="text-justify font-normal text-black">
+                    If our Bid is accepted, we commit to obtain a Performance Security in the form of <span className="font-bold underline text-black">Cash, Cashier&apos;s / Manager&apos;s Check, Bank Draft/Guarantee or Irrevocable Letter of Credit</span> in the amount of <span className="font-bold underline text-black">{performanceSecurityPercent || 'ten (10)'} percent</span> of the Contract Price for the due performance of the Contract, subject to the terms and conditions of issued GPPB guidelines¹ for this purpose;
+                  </p>
+                ) : (
+                  <p className="text-justify font-normal text-black">
+                    If our Bid is accepted, we commit to obtain a Performance Security in the form of a <span className="font-bold underline text-black">Performance Bond / Surety Bond</span> callable upon demand in the amount of <span className="font-bold underline text-black">{performanceSecurityPercent || 'thirty (30)'} percent</span> of the Contract Price for the due performance of the Contract, subject to the terms and conditions of issued GPPB guidelines¹ for this purpose;
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-1.5 items-start">
@@ -610,27 +962,50 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
               <div className="flex gap-1.5 items-start">
                 <span className="font-bold shrink-0">k.</span>
                 <p className="text-justify font-normal text-black">
+                  We likewise certify/confirm that the undersigned, is the duly authorized representative of the bidder, and granted full power and authority to do, execute and perform any and all acts necessary to participate, submit the bid, and to sign and execute the ensuing contract for the <span className="font-bold uppercase underline text-black">{projectTitle}</span> of the <span className="font-bold uppercase underline text-black">{procuringEntity}</span>.
+                </p>
+              </div>
+
+              <div className="flex gap-1.5 items-start">
+                <span className="font-bold shrink-0">l.</span>
+                <p className="text-justify font-bold text-black">
                   We acknowledge that failure to sign each and every page of this Bid Form, including the Bill of Quantities, shall be a ground for the rejection of our bid.
                 </p>
               </div>
             </div>
 
-            {/* Bottom Signatory & QR Block */}
-            <div className="pt-2 border-t-2 border-black flex items-end justify-between shrink-0 font-serif">
-              <div className="space-y-0.5 text-left text-[10px]">
-                <p className="text-slate-600 font-semibold uppercase text-[9px]">Duly authorized to sign the Bid for and on behalf of:</p>
-                <p className="font-bold text-xs uppercase text-black">{companyName || 'BIDDING ENTERPRISE CORP.'}</p>
-                <p className="text-slate-700 text-[9.5px]">{companyAddress}</p>
-                
-                <div className="pt-2">
-                  <p className="font-bold text-xs uppercase underline text-black tracking-wide">{signatoryName}</p>
-                  <p className="text-black font-semibold text-[9.5px]">{signatoryTitle}</p>
-                  <p className="text-slate-600 text-[9px]">Authority: <span className="font-semibold">{writtenAuthority}</span></p>
-                </div>
+            {/* Footnote */}
+            <div className="text-[8.5px] font-serif italic text-black/80 pt-0.5 border-t border-black/40">
+              ¹ currently based on GPPB Resolution No. 09-2020
+            </div>
+
+            {/* 6. Statutory Signatory & QR Block */}
+            <div className="pt-1 font-serif text-[9.5px] text-black border-t border-slate-300 flex items-end justify-between">
+              <div className="grid grid-cols-1 gap-0.5">
+                <p>
+                  <span className="font-bold">Name: </span>
+                  <span className="font-bold uppercase underline text-black">{signatoryName}</span>
+                </p>
+                <p>
+                  <span className="font-bold">Legal Capacity: </span>
+                  <span className="font-semibold underline text-black">{signatoryTitle}</span>
+                </p>
+                <p>
+                  <span className="font-bold">Signature: </span>
+                  <span className="inline-block border-b border-black w-72"></span>
+                </p>
+                <p>
+                  <span className="font-bold">Duly authorized to sign the Bid for and behalf of: </span>
+                  <span className="font-bold uppercase underline text-black">{companyName || 'BIDDING ENTERPRISE CORP.'}</span>
+                </p>
+                <p>
+                  <span className="font-bold">Date: </span>
+                  <span className="font-bold underline text-black">{dateSubmitted}</span>
+                </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="text-right text-[8.5px] font-mono text-slate-500">
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="text-right text-[8px] font-mono text-slate-500">
                   <div className="font-bold text-black uppercase">GPPB INFR-01</div>
                   <div>Ref: {projectRefNo}</div>
                 </div>
@@ -642,7 +1017,7 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
                     companyName: companyName,
                     solicitationNo: solicitationNumber
                   }}
-                  size={65}
+                  size={58}
                   className="border border-black p-0.5 bg-white shrink-0"
                 />
               </div>

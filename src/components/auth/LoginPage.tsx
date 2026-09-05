@@ -69,13 +69,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      const success = login(email, password, selectedRole, selectedTenantId);
-      setIsLoading(false);
-      if (!success) {
-        setError('Invalid email or password. Please check your credentials and try again.');
-      }
-    }, 600);
+    const success = login(email, password, selectedRole, selectedTenantId);
+    setIsLoading(false);
+    if (!success) {
+      setError('Invalid email or password. Please check your credentials and try again.');
+    }
   };
 
   return (

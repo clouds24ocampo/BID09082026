@@ -29,6 +29,17 @@ const blobToDataUrl = async (blob: Blob): Promise<string> => {
 
 const normalizePdfSourceToArrayBuffer = async (source: PdfAttachmentSource): Promise<ArrayBuffer> => {
   if (typeof source === 'string') {
+    if (source.startsWith('data:')) {
+      const commaIdx = source.indexOf(',');
+      const base64 = commaIdx !== -1 ? source.substring(commaIdx + 1) : source;
+      const binaryString = atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
     const response = await fetch(source);
     return await response.arrayBuffer();
   }
@@ -87,15 +98,23 @@ const processClonedDocForHtml2Canvas = (clonedDoc: Document) => {
   }
 };
 
+export interface PdfProgressInfo {
+  percent: number;
+  status: string;
+  currentDoc: number;
+  totalDocs: number;
+}
+
 /**
  * Senior PDF Rendering Engine
  * Preserves vector quality for uploaded PDFs using direct copyPages().
  * Strictly enforces Landscape Legal (13" x 8.5") orientation for all generated pages.
  * Strictly enforces Cover Page -> Uploaded PDF -> Next Cover Page sequence.
  */
-async function buildMergedThreeLayerPdfBytes(
+export async function buildMergedThreeLayerPdfBytes(
   units: ExportDocumentUnit[],
-  outputFileName: string = 'merged_document.pdf'
+  outputFileName: string = 'merged_document.pdf',
+  onProgress?: (progress: PdfProgressInfo) => void
 ): Promise<Uint8Array> {
   console.log('=====================================================');
   console.log('🚀 SENIOR PDF RENDERING ENGINE: STARTING COMPILATION');
@@ -109,11 +128,30 @@ async function buildMergedThreeLayerPdfBytes(
   const legalLandscape: [number, number] = [936, 612];
 
   for (let index = 0; index < units.length; index++) {
+    // Yield event loop to allow garbage collection and keep UI responsive
+    await new Promise((resolve) => setTimeout(resolve, 40));
+
     const unit = units[index];
-    console.log(`\n--- [Unit ${index + 1}/${units.length}] Processing: ${unit.title} ---`);
+    const currentDoc = index + 1;
+    const totalDocs = units.length;
+    const docTitle = unit.title || unit.documentName || `Document ${currentDoc}`;
+    
+    onProgress?.({
+      percent: Math.max(5, Math.round((index / totalDocs) * 85)),
+      status: `Processing (${currentDoc}/${totalDocs}): ${docTitle}`,
+      currentDoc,
+      totalDocs
+    });
+
+    console.log(`\n--- [Unit ${currentDoc}/${totalDocs}] Processing: ${unit.title} ---`);
 
     if (unit.coverElement) {
-      console.log(`📸 Generating Cover Page for: ${unit.title}`);
+      onProgress?.({
+        percent: Math.max(5, Math.round(((index + 0.3) / totalDocs) * 85)),
+        status: `Generating Cover Separator for ${docTitle}...`,
+        currentDoc,
+        totalDocs
+      });
       try {
         const qrImages = unit.coverElement.querySelectorAll('img[alt*="QR"], img[alt*="qr"]');
         const qrLoadingPlaceholders = unit.coverElement.querySelectorAll(':scope *');
@@ -136,7 +174,7 @@ async function buildMergedThreeLayerPdfBytes(
         const targetWindowWidth = isExplicitLandscapeElem ? 1248 : 816;
 
         const canvas = await html2canvas(unit.coverElement, {
-          scale: 3,
+          scale: 1.7,
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
@@ -153,41 +191,41 @@ async function buildMergedThreeLayerPdfBytes(
             );
           }
         });
-        const imgData = canvas.toDataURL('image/png');
-        const pngImage = await pdfDoc.embedPng(imgData);
+        const imgData = canvas.toDataURL('image/jpeg', 0.92);
+        const embeddedImage = await pdfDoc.embedJpg(imgData);
+
+        // Immediately release canvas bitmap memory
+        canvas.width = 1;
+        canvas.height = 1;
 
         const legalLandscape: [number, number] = [936, 612];
         const legalPortrait: [number, number] = [612, 936];
 
         const isPortrait = !isExplicitLandscapeElem && (
-          canvas.height > canvas.width ||
           unit.coverElement.classList.contains('portrait') ||
-          unit.coverElement.classList.contains('aspect-[8.5/13]')
+          unit.coverElement.classList.contains('aspect-[8.5/13]') ||
+          unit.coverElement.offsetHeight >= unit.coverElement.offsetWidth
         );
 
         const pageSize: [number, number] = isPortrait ? legalPortrait : legalLandscape;
         const coverPage = pdfDoc.addPage(pageSize);
 
         // Proportional aspect fit to guarantee 100% of cover page is rendered inside page bounds
-        const scaleX = pageSize[0] / canvas.width;
-        const scaleY = pageSize[1] / canvas.height;
+        const scaleX = pageSize[0] / (targetWindowWidth || 816);
+        const scaleY = pageSize[1] / (isPortrait ? 1248 : 816);
         const fitScale = Math.min(scaleX, scaleY);
-        const drawWidth = canvas.width * fitScale;
-        const drawHeight = canvas.height * fitScale;
-        const offsetX = (pageSize[0] - drawWidth) / 2;
-        const offsetY = (pageSize[1] - drawHeight) / 2;
+        const drawWidth = pageSize[0];
+        const drawHeight = pageSize[1];
 
-        coverPage.drawImage(pngImage, {
-          x: offsetX,
-          y: offsetY,
+        coverPage.drawImage(embeddedImage, {
+          x: 0,
+          y: 0,
           width: drawWidth,
           height: drawHeight
         });
         console.log(`✅ Cover Page Appended (${isPortrait ? 'Portrait' : 'Landscape'}) for: ${unit.title}`);
         debugLog('pdfExportEngine.ts:cover', 'Cover page capture succeeded', {
           unitTitle: unit.title,
-          canvasWidth: canvas.width,
-          canvasHeight: canvas.height,
           isPortrait
         }, 'C');
       } catch (err) {
@@ -227,14 +265,28 @@ async function buildMergedThreeLayerPdfBytes(
           const targetWindowWidth = isExplicitLandscapeElem ? 1248 : 816;
 
           const canvas = await html2canvas(elem, {
-            scale: 3,
+            scale: 2.0,
             useCORS: true,
             logging: false,
             backgroundColor: '#ffffff',
             scrollX: 0,
             scrollY: 0,
             windowWidth: targetWindowWidth,
-            onclone: processClonedDocForHtml2Canvas,
+            onclone: (clonedDoc) => {
+              const papers = clonedDoc.querySelectorAll('.single-page-paper, .print-document-sheet, .priceschedule-paper');
+              papers.forEach((p) => {
+                const htmlP = p as HTMLElement;
+                const isPortraitP = htmlP.classList.contains('portrait') || htmlP.classList.contains('aspect-[8.5/13]');
+                htmlP.style.width = isPortraitP ? '816px' : '1248px';
+                htmlP.style.minHeight = isPortraitP ? '1248px' : '816px';
+                htmlP.style.maxHeight = isPortraitP ? '1248px' : '816px';
+                htmlP.style.height = isPortraitP ? '1248px' : '816px';
+                htmlP.style.margin = '0';
+                htmlP.style.overflow = 'hidden';
+                htmlP.style.boxSizing = 'border-box';
+              });
+              processClonedDocForHtml2Canvas(clonedDoc);
+            },
             ignoreElements: (element: Element) => {
               return (
                 element.classList.contains('no-export') ||
@@ -278,21 +330,12 @@ async function buildMergedThreeLayerPdfBytes(
             const pngImage = await pdfDoc.embedPng(imgData);
 
             const formPage = pdfDoc.addPage(pageSize);
-            // Proportional fit into page bounds (never overflow, never slice)
-            const scaleX = pageSize[0] / canvas.width;
-            const scaleY = pageSize[1] / canvas.height;
-            const scale = Math.min(scaleX, scaleY);
-
-            const drawWidth = canvas.width * scale;
-            const drawHeight = canvas.height * scale;
-            const drawX = (pageSize[0] - drawWidth) / 2;
-            const drawY = pageSize[1] - drawHeight; // Top-aligned in PDF coordinate system
-
+            // Exact 100% full-bleed placement onto Legal dimensions (0 empty gap, 0 offset)
             formPage.drawImage(pngImage, {
-              x: drawX,
-              y: drawY,
-              width: drawWidth,
-              height: drawHeight
+              x: 0,
+              y: 0,
+              width: pageSize[0],
+              height: pageSize[1]
             });
             console.log(`✅ Pre-paginated Form Page ${elemIdx + 1}/${formElements.length} Appended (${isPortrait ? 'Portrait' : 'Landscape'} Legal) for: ${unit.title}`);
           } else {
@@ -499,8 +542,23 @@ async function buildMergedThreeLayerPdfBytes(
     }
   }
 
+  onProgress?.({
+    percent: 92,
+    status: 'Stamping official pagination and verification seals...',
+    currentDoc: units.length,
+    totalDocs: units.length
+  });
+
   console.log('\n💾 Compiling final PDF document byte stream...');
   const pdfBytes = await pdfDoc.save();
+
+  onProgress?.({
+    percent: 100,
+    status: 'Merged Package Ready!',
+    currentDoc: units.length,
+    totalDocs: units.length
+  });
+
   console.log('=====================================================');
   console.log(`✨ PDF BUILD COMPLETE: "${outputFileName}" (${(pdfBytes.length / 1024).toFixed(1)} KB)`);
   console.log('=====================================================');
@@ -513,41 +571,57 @@ async function buildMergedThreeLayerPdfBytes(
   return pdfBytes;
 }
 
-export async function buildMergedThreeLayerPdfDataUrl(
+export async function buildMergedThreeLayerPdfBlobUrl(
   units: ExportDocumentUnit[],
-  outputFileName: string = 'merged_document.pdf'
-): Promise<string> {
-  const pdfBytes = await buildMergedThreeLayerPdfBytes(units, outputFileName);
+  outputFileName: string = 'merged_document.pdf',
+  onProgress?: (progress: PdfProgressInfo) => void
+): Promise<{ blobUrl: string; byteSize: number }> {
+  const pdfBytes = await buildMergedThreeLayerPdfBytes(units, outputFileName, onProgress);
   const rawPdfBuffer = new ArrayBuffer(pdfBytes.length);
   new Uint8Array(rawPdfBuffer).set(pdfBytes);
   const blob = new Blob([rawPdfBuffer], { type: 'application/pdf' });
-  return await blobToDataUrl(blob);
+  const blobUrl = URL.createObjectURL(blob);
+  return { blobUrl, byteSize: pdfBytes.length };
+}
+
+export async function buildMergedThreeLayerPdfDataUrl(
+  units: ExportDocumentUnit[],
+  outputFileName: string = 'merged_document.pdf',
+  onProgress?: (progress: PdfProgressInfo) => void
+): Promise<string> {
+  const { blobUrl } = await buildMergedThreeLayerPdfBlobUrl(units, outputFileName, onProgress);
+  return blobUrl;
 }
 
 export async function exportMergedThreeLayerPdf(
   units: ExportDocumentUnit[],
-  outputFileName: string = 'merged_document.pdf'
+  outputFileName: string = 'merged_document.pdf',
+  onProgress?: (progress: PdfProgressInfo) => void
 ): Promise<void> {
   try {
-    const pdfBytes = await buildMergedThreeLayerPdfBytes(units, outputFileName);
+    const pdfBytes = await buildMergedThreeLayerPdfBytes(units, outputFileName, onProgress);
     const rawPdfBuffer = new ArrayBuffer(pdfBytes.length);
     new Uint8Array(rawPdfBuffer).set(pdfBytes);
     const blob = new Blob([rawPdfBuffer], { type: 'application/pdf' });
 
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = outputFileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    if (typeof document !== 'undefined') {
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = outputFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    }
   } catch (globalErr) {
     console.error('💥 FATAL ERROR IN PDF EXPORT ENGINE:', globalErr);
     debugLog('pdfExportEngine.ts:fatal', 'PDF export fatal error', {
       error: String(globalErr)
     }, 'C');
-    window.print();
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
   }
 }
 

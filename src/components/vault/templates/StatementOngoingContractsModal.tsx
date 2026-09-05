@@ -23,7 +23,8 @@ import {
   Calendar,
   DollarSign,
   ShieldCheck,
-  Clock
+  Clock,
+  Lock
 } from 'lucide-react';
 
 export interface OngoingContractRow {
@@ -583,12 +584,21 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
 
             {/* Opportunity Finder Project Dropdown */}
             <div>
-              <label className="block text-slate-300 font-mono text-[11px] mb-1 flex items-center justify-between">
-                <span className="font-bold text-blue-300">Select Project from Opportunity Finder:</span>
-                <span className="text-[10px] text-emerald-400 font-semibold">⚡ Auto-populates template header from real saved opportunities</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-slate-300 font-mono text-[11px] font-bold text-blue-300 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Target Bidding Project:</span>
+                </label>
+                {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                  <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                    <Lock className="w-3 h-3 text-amber-400" />
+                    <span>Project Locked (Strict Isolation Active)</span>
+                  </span>
+                )}
+              </div>
               <select
                 value={selectedOppId}
+                disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                 onChange={(e) => {
                   const val = e.target.value;
                   setSelectedOppId(val);
@@ -607,7 +617,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                     }
                   }
                 }}
-                className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3 py-2 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner"
+                className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3 py-2 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-900/90"
               >
                 {oppProjects.length === 0 ? (
                   <option value="">-- No Active Bidding Projects Saved in Opportunity Finder. Add a Project in Opportunity Finder --</option>

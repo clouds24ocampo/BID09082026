@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, generateThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
+import { autoFitPageChunks, calculateRowHeight } from '../../../utils/autoFitEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import VaultErrorBoundary from '../../common/VaultErrorBoundary';
@@ -272,29 +273,28 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
   }, [tenant]);
 
   // Auto-sync items, quantities, delivery schedule AND unit prices 100% identically from SECTION VI (Schedule of Requirements)
-  const syncFromSectionVIAndVII = (forceRefreshPrices: boolean = false, targetScopeKey?: string) => {
-    const scopeKey = targetScopeKey || projectScopeKey;
-    if (!scopeKey) {
+  const syncFromSectionVIAndVII = (forceRefreshPrices: boolean = false, targetScopeKey?: string, targetOppId?: string) => {
+    const scopeKey = targetScopeKey || projectRefNo || activeProjectRefNo;
+    const oppKey = targetOppId || selectedOppId;
+    if (!scopeKey && !oppKey) {
       setMaterials([]);
       return false;
     }
     const tenantKey = tenant?.id || 'default';
     
-    // Check all possible keys for Section VI for this project
+    // Check ONLY the specific project keys for Section VI for this project
     const secViKeys = [
-      `bidocs_sec_vi_${tenantKey}_${scopeKey}`,
-      selectedOppId ? `bidocs_sec_vi_${tenantKey}_${selectedOppId}` : '',
-      projectRefNo ? `bidocs_sec_vi_${tenantKey}_${projectRefNo}` : ''
+      scopeKey ? `bidocs_sec_vi_${tenantKey}_${scopeKey}` : '',
+      oppKey ? `bidocs_sec_vi_${tenantKey}_${oppKey}` : ''
     ].filter(Boolean);
 
     const techSpecsKeys = [
-      `bidocs_tech_specs_${tenantKey}_${scopeKey}`,
-      selectedOppId ? `bidocs_tech_specs_${tenantKey}_${selectedOppId}` : '',
-      projectRefNo ? `bidocs_tech_specs_${tenantKey}_${projectRefNo}` : ''
+      scopeKey ? `bidocs_tech_specs_${tenantKey}_${scopeKey}` : '',
+      oppKey ? `bidocs_tech_specs_${tenantKey}_${oppKey}` : ''
     ].filter(Boolean);
 
     // Load existing saved unit prices to preserve bidder inputs unless force refresh
-    const detailedKey = `bidocs_detailed_estimates_${tenantKey}_${scopeKey}`;
+    const detailedKey = `bidocs_detailed_estimates_${tenantKey}_${scopeKey || oppKey}`;
     let existingPricesMap = new Map<string, number>();
     if (!forceRefreshPrices) {
       const savedDet = localStorage.getItem(detailedKey);
@@ -427,8 +427,21 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
     }
 
     const tenantKey = tenant?.id || 'default';
-    const detailedKey = `bidocs_detailed_estimates_${tenantKey}_${projectScopeKey}`;
-    const savedDet = localStorage.getItem(detailedKey);
+    const candidateDetKeys = [
+      `bidocs_detailed_estimates_${tenantKey}_${projectScopeKey}`,
+      projectRefNo ? `bidocs_detailed_estimates_${tenantKey}_${projectRefNo}` : '',
+      selectedOppId ? `bidocs_detailed_estimates_${tenantKey}_${selectedOppId}` : ''
+    ].filter(Boolean);
+
+    let savedDet: string | null = null;
+    for (const key of candidateDetKeys) {
+      const val = localStorage.getItem(key);
+      if (val) {
+        savedDet = val;
+        break;
+      }
+    }
+
     if (savedDet) {
       try {
         const parsed = JSON.parse(savedDet);
@@ -464,7 +477,7 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
 
     // Fallback: sync from Section VII / VI if no detailed estimate saved yet
     syncFromSectionVIAndVII(false);
-  }, [projectScopeKey, tenant?.id]);
+  }, [projectScopeKey, projectRefNo, selectedOppId, tenant?.id]);
 
   // Save current Detailed Estimates state to localStorage so Financial Bid Form can sync
   const saveToLocalStorage = (
@@ -529,37 +542,156 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
     const found = oppProjects.find(p => p.id === oppId || p.refNo === oppId);
     if (found) {
       applyFixedProjectHeader(found);
-      const targetScopeKey = found.refNo || found.id;
+      const targetScopeKey = found.refNo;
+      const targetOppId = found.id;
       const tenantKey = tenant?.id || 'default';
-      const detailedKey = `bidocs_detailed_estimates_${tenantKey}_${targetScopeKey}`;
-      const savedDet = localStorage.getItem(detailedKey);
+      const candidateDetKeys = [
+        targetScopeKey ? `bidocs_detailed_estimates_${tenantKey}_${targetScopeKey}` : '',
+        targetOppId ? `bidocs_detailed_estimates_${tenantKey}_${targetOppId}` : ''
+      ].filter(Boolean);
+      
+      let savedDet: string | null = null;
+      for (const k of candidateDetKeys) {
+        const val = localStorage.getItem(k);
+        if (val) {
+          savedDet = val;
+          break;
+        }
+      }
+
       if (savedDet) {
         try {
           const parsed = JSON.parse(savedDet);
-          if (parsed.materials && Array.isArray(parsed.materials)) setMaterials(parsed.materials);
-          else setMaterials([]);
-          if (parsed.labors && Array.isArray(parsed.labors)) setLabors(parsed.labors);
-          else setLabors([]);
-          if (parsed.logistics && Array.isArray(parsed.logistics)) setLogistics(parsed.logistics);
-          else setLogistics([]);
-          if (parsed.equipments && Array.isArray(parsed.equipments)) {
-            setEquipments(parsed.equipments);
-            setNoEquipmentNeeded(parsed.equipments.length === 0);
-          } else {
-            setEquipments([]);
-            setNoEquipmentNeeded(true);
+          if (parsed.materials && Array.isArray(parsed.materials) && parsed.materials.length > 0) {
+            setMaterials(parsed.materials);
+            if (parsed.labors && Array.isArray(parsed.labors)) setLabors(parsed.labors);
+            else setLabors([]);
+            if (parsed.logistics && Array.isArray(parsed.logistics)) setLogistics(parsed.logistics);
+            else setLogistics([]);
+            if (parsed.equipments && Array.isArray(parsed.equipments)) {
+              setEquipments(parsed.equipments);
+              setNoEquipmentNeeded(parsed.equipments.length === 0);
+            } else {
+              setEquipments([]);
+              setNoEquipmentNeeded(true);
+            }
+            return;
           }
-          syncFromSectionVIAndVII(false, targetScopeKey);
-          return;
         } catch (e) {}
       }
 
+      // If no saved detailed estimate with materials exists for this specific project:
       setLabors([]);
       setLogistics([]);
       setEquipments([]);
       setNoEquipmentNeeded(true);
-      syncFromSectionVIAndVII(false, targetScopeKey);
+
+      const synced = syncFromSectionVIAndVII(false, targetScopeKey, targetOppId);
+      if (!synced) {
+        setMaterials([]);
+      }
     }
+  };
+
+  // Section VI Target Amount: Strictly derived from the Section VI Service / Installation / Workmanship / Maintenance / Warranty amount (e.g. Row 14)
+  const getSectionViTargetAmount = (): number => {
+    const tenantKey = tenant?.id || 'default';
+    const scopeKey = projectRefNo || activeProjectRefNo || selectedOppId;
+
+    // 1. Check if Section VI has a customServicesAmount in saved services config
+    const candidateServiceKeys = [
+      scopeKey ? `bidocs_sec_vi_services_${tenantKey}_${scopeKey}` : '',
+      selectedOppId ? `bidocs_sec_vi_services_${tenantKey}_${selectedOppId}` : '',
+      projectRefNo ? `bidocs_sec_vi_services_${tenantKey}_${projectRefNo}` : ''
+    ].filter(Boolean);
+
+    for (const sKey of candidateServiceKeys) {
+      const rawSvc = localStorage.getItem(sKey);
+      if (rawSvc) {
+        try {
+          const parsedSvc = JSON.parse(rawSvc);
+          if (parsedSvc && parsedSvc.customAmount) {
+            const clean = parseFloat(`${parsedSvc.customAmount}`.replace(/[^0-9.]/g, ''));
+            if (!isNaN(clean) && clean > 0) return clean;
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 2. Check if any item in materials is a Service / Labor / Installation / Warranty / Maintenance / Lot / Lump Sum item
+    const isServiceOrLumpSumItem = (m: MaterialEstimateRow): boolean => {
+      const desc = (m.description || '').toLowerCase();
+      const u = (m.unit || '').toLowerCase();
+      return (
+        desc.includes('workmanship') ||
+        desc.includes('preventive maintenance') ||
+        desc.includes('service and technical support') ||
+        desc.includes('technical support') ||
+        desc.includes('installation') ||
+        desc.includes('warranty') ||
+        desc.includes('commissioning') ||
+        desc.includes('cable pulling') ||
+        desc.includes('rough-in') ||
+        desc.includes('service agreement') ||
+        desc.includes('labor') ||
+        desc.includes('services') ||
+        desc.includes('lump sum') ||
+        (u === 'lot' && (desc.includes('service') || desc.includes('work') || desc.includes('maintenance') || desc.includes('warranty') || desc.includes('install')))
+      );
+    };
+
+    const serviceItem = materials.find(m => isServiceOrLumpSumItem(m));
+    if (serviceItem) {
+      const itemTotal = computeMaterialTotal(serviceItem);
+      if (itemTotal > 0) return itemTotal;
+      if (serviceItem.unitPrice && serviceItem.unitPrice > 0) return serviceItem.unitPrice;
+    }
+
+    // 3. Also check the saved raw Section VI items if not found in materials
+    const secViKeys = [
+      scopeKey ? `bidocs_sec_vi_${tenantKey}_${scopeKey}` : '',
+      selectedOppId ? `bidocs_sec_vi_${tenantKey}_${selectedOppId}` : '',
+      projectRefNo ? `bidocs_sec_vi_${tenantKey}_${projectRefNo}` : ''
+    ].filter(Boolean);
+
+    for (const k of secViKeys) {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        try {
+          const secItems = JSON.parse(raw);
+          if (Array.isArray(secItems) && secItems.length > 0) {
+            const matched = secItems.find((it: any) => {
+              const desc = (it.description || '').toLowerCase();
+              return (
+                desc.includes('workmanship') ||
+                desc.includes('preventive maintenance') ||
+                desc.includes('service') ||
+                desc.includes('installation') ||
+                desc.includes('warranty') ||
+                desc.includes('labor')
+              );
+            });
+            if (matched) {
+              const amtStr = matched.total || matched.unitAmount || '';
+              const clean = parseFloat(`${amtStr}`.replace(/[^0-9.]/g, ''));
+              if (!isNaN(clean) && clean > 0) return clean;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 4. If no explicit service row exists, check the last item of materials if unit is Lot or qty is 1 Lot
+    if (materials.length > 0) {
+      const lastItem = materials[materials.length - 1];
+      const lastUnit = (lastItem.unit || '').toLowerCase();
+      if (lastUnit === 'lot' || lastUnit.includes('lot')) {
+        const lastTotal = computeMaterialTotal(lastItem);
+        if (lastTotal > 0) return lastTotal;
+      }
+    }
+
+    return 0;
   };
 
   // Materials Unit Price Update ONLY (Quantity, Description, Unit are 100% fixed to Section VI / VII)
@@ -689,39 +821,23 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
     }
   };
 
-  // Dynamic Pagination Engine: Paginate materials cleanly so EVERY page is evenly full with NO empty space!
-  const paginateMaterials = (items: MaterialEstimateRow[]) => {
-    if (items.length === 0) return [[]];
-    const total = items.length;
-    
-    // If 8 or fewer items, all fit cleanly on Page 1 with the statutory header
-    if (total <= 8) return [items];
-    
-    // Calculate total material pages needed based on 8 items for Page 1 and ~9 for subsequent pages
-    const numPages = Math.max(1, Math.ceil((total - 8) / 9) + 1);
-    
-    // Balance items evenly across subsequent pages so no page is left sparse
-    const itemsPerContinuationPage = Math.ceil((total - 8) / (numPages - 1));
-    const page1Count = Math.min(8, Math.max(6, Math.ceil(total / numPages)));
-    const remainingCount = total - page1Count;
-    const actualSubPages = Math.max(1, numPages - 1);
-    const subPageChunkSize = Math.ceil(remainingCount / actualSubPages);
-    
-    const pages: MaterialEstimateRow[][] = [];
-    pages.push(items.slice(0, page1Count));
-    
-    let currentIdx = page1Count;
-    while (currentIdx < total) {
-      const nextChunk = items.slice(currentIdx, currentIdx + subPageChunkSize);
-      pages.push(nextChunk);
-      currentIdx += subPageChunkSize;
-    }
-    
-    return pages;
-  };
+  // Dynamic Auto-Fit Pagination Engine: Computes exact line-wrapping geometry per item so pages have NO gaps and NO overlap
+  const materialPages = useMemo(() => {
+    if (materials.length === 0) return [[]];
+    return autoFitPageChunks(
+      materials,
+      (item) => calculateRowHeight(item.description || '', 65, 13, 8, 22),
+      {
+        orientation: 'portrait',
+        columnCharWidth: 65,
+        headerHeightPx: 170,
+        footerHeightPx: 520,
+        runningFooterPx: 30
+      }
+    );
+  }, [materials]);
 
-  const materialPages = paginateMaterials(materials);
-  const totalPages = materialPages.length + 1;
+  const totalPages = materialPages.length;
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -826,11 +942,20 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
           {/* PROMINENT PROJECT SELECTOR DROPDOWN */}
           <div className="flex items-center gap-2 bg-slate-950 border border-purple-500/50 rounded-xl px-3 py-1.5 shadow-inner">
             <FolderKanban className="w-4 h-4 text-purple-400 shrink-0" />
-            <span className="text-[11px] font-mono font-bold text-slate-300 uppercase shrink-0">Bidding Project:</span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[11px] font-mono font-bold text-slate-300 uppercase">Bidding Project:</span>
+              {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                <span className="text-[8.5px] text-amber-400 font-bold font-mono flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
+                  <Lock className="w-2.5 h-2.5 text-amber-400" />
+                  <span>Locked</span>
+                </span>
+              )}
+            </div>
             <select
               value={selectedOppId}
+              disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
               onChange={(e) => handleSelectOpportunity(e.target.value)}
-              className="bg-transparent text-white font-mono text-xs font-bold focus:outline-none cursor-pointer border-none max-w-xs sm:max-w-md truncate"
+              className="bg-transparent text-white font-mono text-xs font-bold focus:outline-none cursor-pointer border-none max-w-xs sm:max-w-md truncate disabled:opacity-85 disabled:cursor-not-allowed"
             >
               {oppProjects.length === 0 ? (
                 <option value="">[{projectRefNo}] {projectName}</option>
@@ -989,6 +1114,553 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
                           )}
                         </tbody>
                       </table>
+                      {/* EMBEDDED SUMMARY SECTIONS ON LAST PAGE */}
+                      {isLastMaterialPage && (
+                        <div className="space-y-2 pt-1">
+                          
+                          {/* SECTION VI LABOR / SERVICES REFERENCE AMOUNT (Screen Only - Excluded on Paper/Print) */}
+                          {(() => {
+                            const secViTarget = getSectionViTargetAmount();
+                            const currentTotal = totalLaborCost + totalLogisticsCost + totalEquipmentCost;
+                            const diff = secViTarget - currentTotal;
+                            return (
+                              <div className="print:hidden no-export bg-amber-50/90 border border-amber-300 rounded p-1.5 flex items-center justify-between text-[7.5pt] font-mono text-amber-950 shadow-sm gap-2">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-200 text-amber-950 font-extrabold text-[6.5pt] uppercase border border-amber-300">
+                                    Section VI Target
+                                  </span>
+                                  <strong className="text-slate-950 font-black text-[8.5pt]">
+                                    PHP {fmtPeso(secViTarget)}
+                                  </strong>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-white border border-amber-300 shadow-xs">
+                                  <span className="text-slate-600 font-bold text-[6.5pt] uppercase">Difference:</span>
+                                  <strong className={`font-black text-[8.5pt] ${diff < 0 ? 'text-rose-600' : diff === 0 ? 'text-emerald-700' : 'text-blue-700'}`}>
+                                    PHP {fmtPeso(diff)}
+                                  </strong>
+                                </div>
+
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-slate-600 font-bold text-[7pt]">Current Total (II+III+IV):</span>
+                                  <strong className="text-slate-950 font-black text-[8.5pt]">
+                                    PHP {fmtPeso(currentTotal)}
+                                  </strong>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* SECTION II: LABOR RATE / LABOR COST TABLE */}
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-[8pt] uppercase">II. LABOR RATE</span>
+                                <button
+                                  type="button"
+                                  onClick={handleAddLabor}
+                                  className="px-1.5 py-0.2 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 text-[6pt] font-bold border border-blue-200 transition flex items-center gap-0.5 cursor-pointer print:hidden no-export"
+                                >
+                                  <Plus className="w-2 h-2" /> Add Labor Line
+                                </button>
+                              </div>
+                              <span className="text-[6.5pt] font-mono text-slate-500 print:hidden">Directly edit roles, workers, days, and daily rates below</span>
+                            </div>
+                            <table className="w-full border-collapse border-2 border-slate-950 text-[7pt] font-sans">
+                              <thead>
+                                <tr className="bg-slate-100 border-b-2 border-slate-950 text-center font-bold">
+                                  <th className="border border-slate-950 p-0.5 w-8">ITEM</th>
+                                  <th className="border border-slate-950 p-0.5 text-left">DESIGNATED TITLE</th>
+                                  <th className="border border-slate-950 p-0.5 w-14">Workers</th>
+                                  <th className="border border-slate-950 p-0.5 w-12">Unit</th>
+                                  <th className="border border-slate-950 p-0.5 w-12">Days</th>
+                                  <th className="border border-slate-950 p-0.5 w-20">Daily Rate</th>
+                                  <th className="border border-slate-950 p-0.5 w-24">Total Labor Cost</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {labors.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={7} className="border border-slate-950 p-1 text-center font-mono text-slate-500">
+                                      (No labor items listed) &mdash;{' '}
+                                      <button
+                                        type="button"
+                                        onClick={handleAddLabor}
+                                        className="text-blue-700 font-bold underline cursor-pointer print:hidden no-export"
+                                      >
+                                        + Add Labor Line
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  labors.map((l, index) => {
+                                    const itemNum = materials.length + index + 1;
+                                    const rowTotal = computeLaborTotal(l);
+                                    return (
+                                      <tr key={l.id} className="border-b border-slate-950 hover:bg-blue-50/20 transition group">
+                                        <td className="border border-slate-950 p-0.5 text-center font-bold font-mono align-middle relative">
+                                          {itemNum}
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveLabor(l.id)}
+                                            title="Delete row"
+                                            className="absolute left-0.5 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition print:hidden no-export cursor-pointer"
+                                          >
+                                            <Trash2 className="w-2.5 h-2.5" />
+                                          </button>
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 font-medium align-middle">
+                                          <input
+                                            type="text"
+                                            value={l.description || ''}
+                                            onChange={(e) => handleUpdateLabor(l.id, 'description', e.target.value)}
+                                            placeholder="Role / Title"
+                                            className="w-full font-sans bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text font-medium"
+                                          />
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 text-center font-mono align-middle">
+                                          <input
+                                            type="number"
+                                            value={l.noOfWorkers || ''}
+                                            onChange={(e) => handleUpdateLabor(l.id, 'noOfWorkers', parseInt(e.target.value) || 0)}
+                                            className="w-10 text-center font-mono bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
+                                          />
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 text-center align-middle">{l.unit}</td>
+                                        <td className="border border-slate-950 p-0.5 text-center font-mono align-middle">
+                                          <input
+                                            type="number"
+                                            value={l.noOfDays || ''}
+                                            onChange={(e) => handleUpdateLabor(l.id, 'noOfDays', parseInt(e.target.value) || 0)}
+                                            className="w-10 text-center font-mono bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
+                                          />
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 text-right font-mono align-middle bg-blue-50/20">
+                                          <EditableCurrencyCell
+                                            value={l.dailyPrice}
+                                            onChange={(newRate) => handleUpdateLabor(l.id, 'dailyPrice', newRate)}
+                                            className="w-16 text-right font-mono font-semibold bg-transparent border-b border-dashed border-blue-400 hover:border-blue-600 focus:border-blue-600 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
+                                            title="Click to edit daily rate"
+                                            pesoColor="text-slate-400"
+                                          />
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 text-right font-mono font-bold align-middle text-slate-950">
+                                          ₱{fmtPeso(rowTotal)}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })
+                                )}
+                                <tr className="bg-slate-100 font-bold border-t-2 border-slate-950">
+                                  <td colSpan={6} className="border border-slate-950 p-0.5 text-right font-extrabold uppercase">
+                                    Total Labor Cost:
+                                  </td>
+                                  <td className="border border-slate-950 p-0.5 text-right font-mono font-extrabold text-[7.5pt]">
+                                    ₱{fmtPeso(totalLaborCost)}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* SECTION III: LOGISTICS / MOBILIZATION TABLE */}
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-[8pt] uppercase">III. LOGISTICS / MOBILIZATION</span>
+                                <button
+                                  type="button"
+                                  onClick={handleAddLogistics}
+                                  className="px-1.5 py-0.2 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 text-[6pt] font-bold border border-amber-200 transition flex items-center gap-0.5 cursor-pointer print:hidden no-export"
+                                >
+                                  <Plus className="w-2 h-2" /> Add Logistics Line
+                                </button>
+                              </div>
+                              <span className="text-[6.5pt] font-mono text-slate-500 print:hidden">Directly edit equipment, days, and daily rates</span>
+                            </div>
+                            <table className="w-full border-collapse border-2 border-slate-950 text-[7pt] font-sans">
+                              <thead>
+                                <tr className="bg-slate-100 border-b-2 border-slate-950 text-center font-bold">
+                                  <th className="border border-slate-950 p-0.5 w-8">ITEM</th>
+                                  <th className="border border-slate-950 p-0.5 text-left">DESIGNATED TITLE</th>
+                                  <th className="border border-slate-950 p-0.5 w-18">No. of Units</th>
+                                  <th className="border border-slate-950 p-0.5 w-12">Unit</th>
+                                  <th className="border border-slate-950 p-0.5 w-12">Days</th>
+                                  <th className="border border-slate-950 p-0.5 w-20">Daily Rate</th>
+                                  <th className="border border-slate-950 p-0.5 w-24">Total Logistics Cost</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {logistics.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={7} className="border border-slate-950 p-1 text-center font-mono text-slate-500">
+                                      (No logistics or mobilization items listed) &mdash;{' '}
+                                      <button
+                                        type="button"
+                                        onClick={handleAddLogistics}
+                                        className="text-amber-700 font-bold underline cursor-pointer print:hidden no-export"
+                                      >
+                                        + Add Logistics Line
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  logistics.map((lg, index) => {
+                                    const itemNum = materials.length + labors.length + index + 1;
+                                    const rowTotal = computeLogisticsTotal(lg);
+                                    return (
+                                      <tr key={lg.id} className="border-b border-slate-950 hover:bg-amber-50/20 transition group">
+                                        <td className="border border-slate-950 p-0.5 text-center font-bold font-mono align-middle relative">
+                                          {itemNum}
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveLogistics(lg.id)}
+                                            title="Delete row"
+                                            className="absolute left-0.5 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition print:hidden no-export cursor-pointer"
+                                          >
+                                            <Trash2 className="w-2.5 h-2.5" />
+                                          </button>
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 font-medium align-middle">
+                                          <input
+                                            type="text"
+                                            value={lg.description || ''}
+                                            onChange={(e) => handleUpdateLogistics(lg.id, 'description', e.target.value)}
+                                            placeholder="Logistics description"
+                                            className="w-full font-sans bg-transparent border-b border-dashed border-slate-300 focus:border-amber-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text font-medium"
+                                          />
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 text-center font-mono align-middle">
+                                          <input
+                                            type="number"
+                                            value={lg.noOfVehicles || ''}
+                                            onChange={(e) => handleUpdateLogistics(lg.id, 'noOfVehicles', parseInt(e.target.value) || 0)}
+                                            className="w-10 text-center font-mono bg-transparent border-b border-dashed border-slate-300 focus:border-amber-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
+                                          />
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 text-center align-middle">{lg.unit}</td>
+                                        <td className="border border-slate-950 p-0.5 text-center font-mono align-middle">
+                                          <input
+                                            type="number"
+                                            value={lg.noOfDays || ''}
+                                            onChange={(e) => handleUpdateLogistics(lg.id, 'noOfDays', parseInt(e.target.value) || 0)}
+                                            className="w-10 text-center font-mono bg-transparent border-b border-dashed border-slate-300 focus:border-amber-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
+                                          />
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 text-right font-mono align-middle bg-amber-50/20">
+                                          <EditableCurrencyCell
+                                            value={lg.dailyRate}
+                                            onChange={(newRate) => handleUpdateLogistics(lg.id, 'dailyRate', newRate)}
+                                            className="w-16 text-right font-mono font-semibold bg-transparent border-b border-dashed border-amber-400 hover:border-amber-600 focus:border-amber-600 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
+                                            title="Click to edit daily rate"
+                                            pesoColor="text-slate-400"
+                                          />
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 text-right font-mono font-bold align-middle text-slate-950">
+                                          ₱{fmtPeso(rowTotal)}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })
+                                )}
+                                <tr className="bg-slate-100 font-bold border-t-2 border-slate-950">
+                                  <td colSpan={6} className="border border-slate-950 p-0.5 text-right font-extrabold uppercase">
+                                    Total Logistics / Mobilization:
+                                  </td>
+                                  <td className="border border-slate-950 p-0.5 text-right font-mono font-extrabold text-[7.5pt]">
+                                    ₱{fmtPeso(totalLogisticsCost)}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* SECTION IV: EQUIPMENT RENTAL ESTIMATES */}
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-[8pt] uppercase">IV. EQUIPMENT RENTAL ESTIMATES</span>
+                                <button
+                                  type="button"
+                                  onClick={handleAddEquipment}
+                                  className="px-1.5 py-0.2 rounded bg-purple-50 hover:bg-purple-100 text-purple-700 text-[6pt] font-bold border border-purple-200 transition flex items-center gap-0.5 cursor-pointer print:hidden no-export"
+                                >
+                                  <Plus className="w-2 h-2" /> Add Equipment Line
+                                </button>
+                              </div>
+                              <div className="flex items-center gap-2 print:hidden no-export">
+                                <button
+                                  type="button"
+                                  onClick={() => setNoEquipmentNeeded(!noEquipmentNeeded)}
+                                  className="text-[6.5pt] font-mono text-purple-700 hover:underline cursor-pointer"
+                                >
+                                  {noEquipmentNeeded ? 'Switch to: Use Rental Equipment' : 'Switch to: No Equipment Needed'}
+                                </button>
+                              </div>
+                            </div>
+                            <table className="w-full border-collapse border-2 border-slate-950 text-[7pt] font-sans">
+                              <thead>
+                                <tr className="bg-slate-100 border-b-2 border-slate-950 text-center font-bold">
+                                  <th className="border border-slate-950 p-0.5 w-8">ITEM</th>
+                                  <th className="border border-slate-950 p-0.5 text-left">DESCRIPTION / CAPACITIES</th>
+                                  <th className="border border-slate-950 p-0.5 w-18">No. of Units</th>
+                                  <th className="border border-slate-950 p-0.5 w-12">Unit</th>
+                                  <th className="border border-slate-950 p-0.5 w-12">Days</th>
+                                  <th className="border border-slate-950 p-0.5 w-20">Daily Rate</th>
+                                  <th className="border border-slate-950 p-0.5 w-24">Total Rental Cost</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {noEquipmentNeeded ? (
+                                  <tr>
+                                    <td colSpan={7} className="border border-slate-950 p-1 text-center font-bold text-slate-700 uppercase">
+                                      NO EQUIPMENT NEEDED NO HEAVY EQUIPMENT RENTALS
+                                    </td>
+                                  </tr>
+                                ) : equipments.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={7} className="border border-slate-950 p-1 text-center font-mono text-slate-500">
+                                      (No rental equipment listed) &mdash;{' '}
+                                      <button
+                                        type="button"
+                                        onClick={handleAddEquipment}
+                                        className="text-purple-700 font-bold underline cursor-pointer print:hidden no-export"
+                                      >
+                                        + Add Equipment Line
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  equipments.map((e, index) => {
+                                    const itemNum = materials.length + labors.length + logistics.length + index + 1;
+                                    const rowTotal = computeEquipmentTotal(e);
+                                    return (
+                                      <tr key={e.id} className="border-b border-slate-950 hover:bg-purple-50/20 transition group">
+                                        <td className="border border-slate-950 p-0.5 text-center font-bold font-mono align-middle relative">
+                                          {itemNum}
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveEquipment(e.id)}
+                                            title="Delete row"
+                                            className="absolute left-0.5 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition print:hidden no-export cursor-pointer"
+                                          >
+                                            <Trash2 className="w-2.5 h-2.5" />
+                                          </button>
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 font-medium align-middle">
+                                          <input
+                                            type="text"
+                                            value={e.description || ''}
+                                            onChange={(ev) => handleUpdateEquipment(e.id, 'description', ev.target.value)}
+                                            placeholder="Equipment description"
+                                            className="w-full font-sans bg-transparent border-b border-dashed border-slate-300 focus:border-purple-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text font-medium"
+                                          />
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 text-center font-mono align-middle">1</td>
+                                        <td className="border border-slate-950 p-0.5 text-center align-middle">{e.unit}</td>
+                                        <td className="border border-slate-950 p-0.5 text-center font-mono align-middle">
+                                          <input
+                                            type="number"
+                                            value={e.noOfDays || ''}
+                                            onChange={(ev) => handleUpdateEquipment(e.id, 'noOfDays', parseInt(ev.target.value) || 0)}
+                                            className="w-10 text-center font-mono bg-transparent border-b border-dashed border-slate-300 focus:border-purple-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
+                                          />
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 text-right font-mono align-middle bg-purple-50/20">
+                                          <EditableCurrencyCell
+                                            value={e.dailyPrice}
+                                            onChange={(newRate) => handleUpdateEquipment(e.id, 'dailyPrice', newRate)}
+                                            className="w-16 text-right font-mono font-semibold bg-transparent border-b border-dashed border-purple-400 hover:border-purple-600 focus:border-purple-600 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
+                                            title="Click to edit daily rate"
+                                            pesoColor="text-slate-400"
+                                          />
+                                        </td>
+                                        <td className="border border-slate-950 p-0.5 text-right font-mono font-bold align-middle text-slate-950">
+                                          ₱{fmtPeso(rowTotal)}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })
+                                )}
+                                <tr className="bg-slate-100 font-bold border-t-2 border-slate-950">
+                                  <td colSpan={6} className="border border-slate-950 p-0.5 text-right font-extrabold uppercase">
+                                    Total Equipment Rental Estimates:
+                                  </td>
+                                  <td className="border border-slate-950 p-0.5 text-right font-mono font-extrabold text-[7.5pt]">
+                                    ₱{fmtPeso(totalEquipmentCost)}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* SECTION V: A. SUMMARY SHEET BOX */}
+                          <div>
+                            <div className="border-2 border-slate-950">
+                              <div className="bg-slate-100 p-0.5 font-extrabold text-[8pt] uppercase text-center border-b-2 border-slate-950">
+                                A. SUMMARY SHEET
+                              </div>
+                              <table className="w-full border-collapse text-[7.5pt] font-sans">
+                                <tbody>
+                                  <tr className="border-b border-slate-950">
+                                    <td className="p-1 font-bold">Total Materials Cost</td>
+                                    <td className="p-1 text-right font-mono font-bold w-44">₱{fmtPeso(totalMaterialsCost)}</td>
+                                  </tr>
+                                  <tr className="border-b border-slate-950">
+                                    <td className="p-1 font-bold">Total Labor Cost</td>
+                                    <td className="p-1 text-right font-mono font-bold">₱{fmtPeso(totalLaborCost)}</td>
+                                  </tr>
+                                  <tr className="border-b border-slate-950">
+                                    <td className="p-1 font-bold">Total Logistics and Mobilization</td>
+                                    <td className="p-1 text-right font-mono font-bold">₱{fmtPeso(totalLogisticsCost)}</td>
+                                  </tr>
+                                  <tr className="border-b-2 border-slate-950">
+                                    <td className="p-1 font-bold">Total Equipment Rental Cost</td>
+                                    <td className="p-1 text-right font-mono font-bold">₱{fmtPeso(totalEquipmentCost)}</td>
+                                  </tr>
+                                  <tr className="bg-slate-100 font-extrabold text-[8.5pt]">
+                                    <td className="p-1.5 uppercase font-black">Total Estimated Project Cost:</td>
+                                    <td className="p-1.5 text-right font-mono font-black text-slate-950 text-[9pt]">₱{fmtPeso(totalEstimatedProjectCost)}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
+                          {/* Declarations Block */}
+                          <div className="border-2 border-slate-950 p-2 space-y-1 font-mono text-[7.5pt]">
+                            <p>
+                              <strong>AMOUNT IN WORDS:</strong>{' '}
+                              <span className="font-bold border-b border-slate-950 pb-0.5 uppercase text-[8pt]">
+                                {totalBidAmountWords || 'ZERO PESOS ONLY'}
+                              </span>
+                            </p>
+                            <p>
+                              <strong>TOTAL BID SECURITY:</strong>{' '}
+                              <span className="font-bold uppercase">
+                                {bidSecurityType.includes('SECURED') || bidSecurityType.includes('DECLARATION')
+                                  ? 'BID SECURING DECLARATION'
+                                  : bidSecurityAmount > 0
+                                    ? `₱${fmtPeso(bidSecurityAmount)} (${numberToWords(bidSecurityAmount)})`
+                                    : '₱0.00'}
+                              </span>
+                              {(!bidSecurityType.includes('SECURED') && !bidSecurityType.includes('DECLARATION')) && (
+                                <span className="print:hidden no-export ml-2 inline-flex items-center gap-1 font-normal text-[6.5pt] text-purple-700 bg-purple-50 px-1 py-0.5 rounded border border-purple-200">
+                                  <span>Exact (₱):</span>
+                                  <input
+                                    type="number"
+                                    value={bidSecurityAmount || ''}
+                                    onChange={(e) => {
+                                      setBidSecurityAmount(parseFloat(e.target.value) || 0);
+                                      saveToLocalStorage();
+                                    }}
+                                    placeholder="0.00"
+                                    className="w-24 text-right font-mono font-bold bg-white border border-purple-300 rounded px-1 text-slate-900 text-[7pt] focus:border-purple-600 focus:outline-none"
+                                  />
+                                </span>
+                              )}
+                            </p>
+                            <p>
+                              <strong>FORM OF BID SECURITY:</strong> <span className="font-bold uppercase">{bidSecurityType}</span>
+                            </p>
+                            <p className="flex items-center gap-1">
+                              <strong>SCHEDULE OF COMPLETE DELIVERY:</strong>{' '}
+                              <input
+                                type="text"
+                                value={deliverySchedule || ''}
+                                onChange={(e) => {
+                                  setDeliverySchedule(e.target.value);
+                                  saveToLocalStorage();
+                                }}
+                                placeholder="e.g. 30 Calendar Days upon receipt of NTP"
+                                className="font-mono font-bold uppercase bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 focus:outline-none text-[7.5pt] w-72 text-slate-900 print:border-none p-0 cursor-text"
+                              />
+                            </p>
+
+                            {/* Bid Security Selection Buttons (Screen Only - Excluded on Paper/Print) */}
+                            <div className="flex flex-wrap items-center gap-1 pt-1.5 border-t border-dashed border-slate-300 print:hidden no-export text-[6.5pt]">
+                              <span className="text-slate-500 font-bold uppercase">Security Type:</span>
+                              <button
+                                type="button"
+                                onClick={() => handleBidSecurityTypeChange('BID SECURING DECLARATION')}
+                                className={`px-2 py-0.5 rounded transition cursor-pointer font-bold ${
+                                  bidSecurityType === 'BID SECURING DECLARATION'
+                                    ? 'bg-emerald-700 text-white shadow'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                                }`}
+                              >
+                                Bid Securing Declaration (BSD)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleBidSecurityTypeChange('SURETY BOND')}
+                                className={`px-2 py-0.5 rounded transition cursor-pointer font-bold ${
+                                  bidSecurityType === 'SURETY BOND'
+                                    ? 'bg-purple-700 text-white shadow'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                                }`}
+                              >
+                                Surety Bond / Insurance (5%)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleBidSecurityTypeChange('CASH OR CASHIER\'S/MANAGER\'S CHECK')}
+                                className={`px-2 py-0.5 rounded transition cursor-pointer font-bold ${
+                                  bidSecurityType === 'CASH OR CASHIER\'S/MANAGER\'S CHECK'
+                                    ? 'bg-blue-700 text-white shadow'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                                }`}
+                              >
+                                Cash / Manager's Check (2%)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleBidSecurityTypeChange('BANK DRAFT/GUARANTEE OR IRREVOCABLE LETTER OF CREDIT')}
+                                className={`px-2 py-0.5 rounded transition cursor-pointer font-bold ${
+                                  bidSecurityType === 'BANK DRAFT/GUARANTEE OR IRREVOCABLE LETTER OF CREDIT'
+                                    ? 'bg-indigo-700 text-white shadow'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                                }`}
+                              >
+                                Bank Guarantee (2%)
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* BAC Conforme Statutory Letter */}
+                          <div className="space-y-1.5 text-[7.5pt] leading-snug">
+                            <div className="space-y-0.5 font-bold uppercase text-[7.5pt]">
+                              <p>TO THE B.A.C. Chairman/Chairwoman and B.A.C. Members</p>
+                              <p>BIDS AND AWARDS COMMITTEE OF {ownerName} — {projectLocation}</p>
+                            </div>
+
+                            <p className="text-justify text-[7.5pt]">
+                              I offer the aforesaid, hereby certifying under honor that I am a citizen that I, representing <strong className="uppercase">{contractorName}</strong>, that at least 60% of my capital owned by Filipino citizens; that I am engaged in the business of selling the aforesaid materials with a store/warehouse at <strong className="uppercase">{companyAddress}</strong>; that I am an authorized distributor/merchant with <strong>{getRegistrationText()}</strong>.
+                            </p>
+
+                            <p className="text-justify text-[7.5pt]">
+                              I further certify that the materials, which I offer in this bid, is ready in my supplier's warehouse and ready for delivery within the time required by the government without extension of time to be wasted.
+                            </p>
+                          </div>
+
+                          {/* Signatory Conforme Block */}
+                          <div className="pt-2 flex items-end justify-between text-[7.5pt]">
+                            <div className="space-y-0.5">
+                              <p className="font-bold">VERY TRULY YOURS,</p>
+                              <p className="font-black text-[8.5pt] uppercase text-slate-950 inline-block pb-0.5 mt-2">
+                                {signatoryName || 'MARK-VIN F. OCAMPO'}
+                              </p>
+                              <p className="font-bold uppercase text-[7pt]">{signatoryTitle || 'AUTHORIZED REPRESENTATIVE'}</p>
+                              <p className="font-extrabold uppercase text-[7.5pt]">{contractorName || 'QUANTUM CLOUD CORPORATION'}</p>
+                            </div>
+                            <div className="text-right font-mono text-[7pt] text-slate-700">
+                              <p>Submission Date:</p>
+                              <p className="font-bold text-slate-950">{estimateDate ? new Date(estimateDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''} at 11:00 AM</p>
+                            </div>
+                          </div>
+
+                        </div>
+                      )}
                     </div>
 
                   </div>
@@ -1013,7 +1685,11 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
                       />
                       <div className="space-y-0.5">
                         <p className="font-bold text-slate-950 uppercase">{contractorName || 'BIDDING ENTITY'}</p>
-                        <p>PROJECT: <strong>{projectName || 'N/A'}</strong></p>
+                        {isLastMaterialPage ? (
+                          <p>TOTAL ESTIMATED PROJECT COST: <strong>₱{fmtPeso(totalEstimatedProjectCost)}</strong></p>
+                        ) : (
+                          <p>PROJECT: <strong>{projectName || 'N/A'}</strong></p>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
@@ -1025,588 +1701,6 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
                 </div>
               );
             })}
-
-            {/* FINAL PAGE: LABOR, LOGISTICS, EQUIPMENT RENTALS, SUMMARY SHEET & CONFORME DECLARATION */}
-            <div className="detailed-estimates-paper single-page-paper w-[8.5in] min-h-[13in] bg-white text-slate-950 p-[0.4in] shadow-2xl font-sans text-[7.5pt] leading-tight flex flex-col justify-between mx-auto border border-slate-300">
-              <div className="space-y-2.5">
-                
-                {/* SECTION VI LABOR / SERVICES REFERENCE AMOUNT (Screen Only - Excluded on Paper/Print) */}
-                {(() => {
-                  const secViTarget = totalMaterialsCost * 0.35;
-                  const currentTotal = totalLaborCost + totalLogisticsCost + totalEquipmentCost;
-                  const diff = secViTarget - currentTotal;
-                  return (
-                    <div className="print:hidden no-export bg-amber-50/90 border border-amber-300 rounded p-1.5 flex items-center justify-between text-[7.5pt] font-mono text-amber-950 shadow-sm gap-2">
-                      {/* Left: Section VI Target */}
-                      <div className="flex items-center gap-1.5">
-                        <span className="px-1.5 py-0.5 rounded bg-amber-200 text-amber-950 font-extrabold text-[6.5pt] uppercase border border-amber-300">
-                          Section VI Target (35%)
-                        </span>
-                        <strong className="text-slate-950 font-black text-[8.5pt]">
-                          PHP {fmtPeso(secViTarget)}
-                        </strong>
-                      </div>
-
-                      {/* Middle: Difference (Left minus Right) */}
-                      <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-white border border-amber-300 shadow-xs">
-                        <span className="text-slate-600 font-bold text-[6.5pt] uppercase">Difference:</span>
-                        <strong className={`font-black text-[8.5pt] ${diff < 0 ? 'text-rose-600' : diff === 0 ? 'text-emerald-700' : 'text-blue-700'}`}>
-                          PHP {fmtPeso(diff)}
-                        </strong>
-                      </div>
-
-                      {/* Right: Current Sub-schedules Total */}
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-slate-600 font-bold text-[7pt]">Current Total (II+III+IV):</span>
-                        <strong className="text-slate-950 font-black text-[8.5pt]">
-                          PHP {fmtPeso(currentTotal)}
-                        </strong>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* SECTION II: LABOR RATE / LABOR COST TABLE */}
-                <div className="space-y-0.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-[8pt] uppercase">II. LABOR RATE</span>
-                      <button
-                        type="button"
-                        onClick={handleAddLabor}
-                        className="px-1.5 py-0.2 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 text-[6pt] font-bold border border-blue-200 transition flex items-center gap-0.5 cursor-pointer print:hidden no-export"
-                      >
-                        <Plus className="w-2 h-2" /> Add Labor Line
-                      </button>
-                    </div>
-                    <span className="text-[6.5pt] font-mono text-slate-500 print:hidden">Directly edit roles, workers, days, and daily rates below</span>
-                  </div>
-                  <table className="w-full border-collapse border-2 border-slate-950 text-[7pt] font-sans">
-                    <thead>
-                      <tr className="bg-slate-100 border-b-2 border-slate-950 text-center font-bold">
-                        <th className="border border-slate-950 p-0.5 w-8">ITEM</th>
-                        <th className="border border-slate-950 p-0.5 text-left">DESIGNATED TITLE</th>
-                        <th className="border border-slate-950 p-0.5 w-14">Workers</th>
-                        <th className="border border-slate-950 p-0.5 w-12">Unit</th>
-                        <th className="border border-slate-950 p-0.5 w-12">Days</th>
-                        <th className="border border-slate-950 p-0.5 w-20">Daily Rate</th>
-                        <th className="border border-slate-950 p-0.5 w-24">Total Labor Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {labors.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="border border-slate-950 p-1.5 text-center font-mono text-slate-500">
-                            (No labor items listed) &mdash;{' '}
-                            <button
-                              type="button"
-                              onClick={handleAddLabor}
-                              className="text-blue-700 font-bold underline cursor-pointer print:hidden no-export"
-                            >
-                              + Add Labor Line
-                            </button>
-                          </td>
-                        </tr>
-                      ) : (
-                        labors.map((l, index) => {
-                          const itemNum = materials.length + index + 1;
-                          const rowTotal = computeLaborTotal(l);
-                          return (
-                            <tr key={l.id} className="border-b border-slate-950 hover:bg-blue-50/20 transition group">
-                              <td className="border border-slate-950 p-0.5 text-center font-bold font-mono align-middle relative">
-                                {itemNum}
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveLabor(l.id)}
-                                  title="Delete row"
-                                  className="absolute left-0.5 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition print:hidden no-export cursor-pointer"
-                                >
-                                  <Trash2 className="w-2.5 h-2.5" />
-                                </button>
-                              </td>
-                              <td className="border border-slate-950 p-0.5 font-medium align-middle">
-                                <input
-                                  type="text"
-                                  value={l.description || ''}
-                                  onChange={(e) => handleUpdateLabor(l.id, 'description', e.target.value)}
-                                  placeholder="Role / Title"
-                                  className="w-full font-sans bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text font-medium"
-                                />
-                              </td>
-                              <td className="border border-slate-950 p-0.5 text-center font-mono align-middle">
-                                <input
-                                  type="number"
-                                  value={l.noOfWorkers || ''}
-                                  onChange={(e) => handleUpdateLabor(l.id, 'noOfWorkers', parseInt(e.target.value) || 0)}
-                                  className="w-10 text-center font-mono bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
-                                />
-                              </td>
-                              <td className="border border-slate-950 p-0.5 text-center align-middle">{l.unit}</td>
-                              <td className="border border-slate-950 p-0.5 text-center font-mono align-middle">
-                                <input
-                                  type="number"
-                                  value={l.noOfDays || ''}
-                                  onChange={(e) => handleUpdateLabor(l.id, 'noOfDays', parseInt(e.target.value) || 0)}
-                                  className="w-10 text-center font-mono bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
-                                />
-                              </td>
-                              <td className="border border-slate-950 p-0.5 text-right font-mono align-middle bg-blue-50/20">
-                                <EditableCurrencyCell
-                                  value={l.dailyPrice}
-                                  onChange={(newRate) => handleUpdateLabor(l.id, 'dailyPrice', newRate)}
-                                  className="w-16 text-right font-mono font-semibold bg-transparent border-b border-dashed border-blue-400 hover:border-blue-600 focus:border-blue-600 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
-                                  title="Click to edit daily rate"
-                                  pesoColor="text-slate-400"
-                                />
-                              </td>
-                              <td className="border border-slate-950 p-0.5 text-right font-mono font-bold align-middle text-slate-950">
-                                ₱{fmtPeso(rowTotal)}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                      <tr className="bg-slate-100 font-bold border-t-2 border-slate-950">
-                        <td colSpan={6} className="border border-slate-950 p-0.5 text-right font-extrabold uppercase">
-                          Total Labor Cost:
-                        </td>
-                        <td className="border border-slate-950 p-0.5 text-right font-mono font-extrabold text-[7.5pt]">
-                          ₱{fmtPeso(totalLaborCost)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* SECTION III: LOGISTICS / MOBILIZATION TABLE */}
-                <div className="space-y-0.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-[8pt] uppercase">III. LOGISTICS / MOBILIZATION</span>
-                      <button
-                        type="button"
-                        onClick={handleAddLogistics}
-                        className="px-1.5 py-0.2 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 text-[6pt] font-bold border border-amber-200 transition flex items-center gap-0.5 cursor-pointer print:hidden no-export"
-                      >
-                        <Plus className="w-2 h-2" /> Add Logistics Line
-                      </button>
-                    </div>
-                    <span className="text-[6.5pt] font-mono text-slate-500 print:hidden">Directly edit equipment, days, and daily rates</span>
-                  </div>
-                  <table className="w-full border-collapse border-2 border-slate-950 text-[7pt] font-sans">
-                    <thead>
-                      <tr className="bg-slate-100 border-b-2 border-slate-950 text-center font-bold">
-                        <th className="border border-slate-950 p-0.5 w-8">ITEM</th>
-                        <th className="border border-slate-950 p-0.5 text-left">DESIGNATED TITLE</th>
-                        <th className="border border-slate-950 p-0.5 w-18">No. of Units</th>
-                        <th className="border border-slate-950 p-0.5 w-12">Unit</th>
-                        <th className="border border-slate-950 p-0.5 w-12">Days</th>
-                        <th className="border border-slate-950 p-0.5 w-20">Daily Rate</th>
-                        <th className="border border-slate-950 p-0.5 w-24">Total Logistics Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {logistics.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="border border-slate-950 p-1.5 text-center font-mono text-slate-500">
-                            (No logistics or mobilization items listed) &mdash;{' '}
-                            <button
-                              type="button"
-                              onClick={handleAddLogistics}
-                              className="text-amber-700 font-bold underline cursor-pointer print:hidden no-export"
-                            >
-                              + Add Logistics Line
-                            </button>
-                          </td>
-                        </tr>
-                      ) : (
-                        logistics.map((lg, index) => {
-                          const itemNum = materials.length + labors.length + index + 1;
-                          const rowTotal = computeLogisticsTotal(lg);
-                          return (
-                            <tr key={lg.id} className="border-b border-slate-950 hover:bg-amber-50/20 transition group">
-                              <td className="border border-slate-950 p-0.5 text-center font-bold font-mono align-middle relative">
-                                {itemNum}
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveLogistics(lg.id)}
-                                  title="Delete row"
-                                  className="absolute left-0.5 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition print:hidden no-export cursor-pointer"
-                                >
-                                  <Trash2 className="w-2.5 h-2.5" />
-                                </button>
-                              </td>
-                              <td className="border border-slate-950 p-0.5 font-medium align-middle">
-                                <input
-                                  type="text"
-                                  value={lg.description || ''}
-                                  onChange={(e) => handleUpdateLogistics(lg.id, 'description', e.target.value)}
-                                  placeholder="Logistics description"
-                                  className="w-full font-sans bg-transparent border-b border-dashed border-slate-300 focus:border-amber-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text font-medium"
-                                />
-                              </td>
-                              <td className="border border-slate-950 p-0.5 text-center font-mono align-middle">
-                                <input
-                                  type="number"
-                                  value={lg.noOfVehicles || ''}
-                                  onChange={(e) => handleUpdateLogistics(lg.id, 'noOfVehicles', parseInt(e.target.value) || 0)}
-                                  className="w-10 text-center font-mono bg-transparent border-b border-dashed border-slate-300 focus:border-amber-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
-                                />
-                              </td>
-                              <td className="border border-slate-950 p-0.5 text-center align-middle">{lg.unit}</td>
-                              <td className="border border-slate-950 p-0.5 text-center font-mono align-middle">
-                                <input
-                                  type="number"
-                                  value={lg.noOfDays || ''}
-                                  onChange={(e) => handleUpdateLogistics(lg.id, 'noOfDays', parseInt(e.target.value) || 0)}
-                                  className="w-10 text-center font-mono bg-transparent border-b border-dashed border-slate-300 focus:border-amber-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
-                                />
-                              </td>
-                              <td className="border border-slate-950 p-0.5 text-right font-mono align-middle bg-amber-50/20">
-                                <EditableCurrencyCell
-                                  value={lg.dailyRate}
-                                  onChange={(newRate) => handleUpdateLogistics(lg.id, 'dailyRate', newRate)}
-                                  className="w-16 text-right font-mono font-semibold bg-transparent border-b border-dashed border-amber-400 hover:border-amber-600 focus:border-amber-600 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
-                                  title="Click to edit daily rate"
-                                  pesoColor="text-slate-400"
-                                />
-                              </td>
-                              <td className="border border-slate-950 p-0.5 text-right font-mono font-bold align-middle text-slate-950">
-                                ₱{fmtPeso(rowTotal)}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                      <tr className="bg-slate-100 font-bold border-t-2 border-slate-950">
-                        <td colSpan={6} className="border border-slate-950 p-0.5 text-right font-extrabold uppercase">
-                          Total Logistics / Mobilization:
-                        </td>
-                        <td className="border border-slate-950 p-0.5 text-right font-mono font-extrabold text-[7.5pt]">
-                          ₱{fmtPeso(totalLogisticsCost)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* SECTION IV: EQUIPMENT RENTAL ESTIMATES */}
-                <div className="space-y-0.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-[8pt] uppercase">IV. EQUIPMENT RENTAL ESTIMATES</span>
-                      <button
-                        type="button"
-                        onClick={handleAddEquipment}
-                        className="px-1.5 py-0.2 rounded bg-purple-50 hover:bg-purple-100 text-purple-700 text-[6pt] font-bold border border-purple-200 transition flex items-center gap-0.5 cursor-pointer print:hidden no-export"
-                      >
-                        <Plus className="w-2 h-2" /> Add Equipment Line
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2 print:hidden no-export">
-                      <button
-                        type="button"
-                        onClick={() => setNoEquipmentNeeded(!noEquipmentNeeded)}
-                        className="text-[6.5pt] font-mono text-purple-700 hover:underline cursor-pointer"
-                      >
-                        {noEquipmentNeeded ? 'Switch to: Use Rental Equipment' : 'Switch to: No Equipment Needed'}
-                      </button>
-                    </div>
-                  </div>
-                  <table className="w-full border-collapse border-2 border-slate-950 text-[7pt] font-sans">
-                    <thead>
-                      <tr className="bg-slate-100 border-b-2 border-slate-950 text-center font-bold">
-                        <th className="border border-slate-950 p-0.5 w-8">ITEM</th>
-                        <th className="border border-slate-950 p-0.5 text-left">DESCRIPTION / CAPACITIES</th>
-                        <th className="border border-slate-950 p-0.5 w-18">No. of Units</th>
-                        <th className="border border-slate-950 p-0.5 w-12">Unit</th>
-                        <th className="border border-slate-950 p-0.5 w-12">Days</th>
-                        <th className="border border-slate-950 p-0.5 w-20">Daily Rate</th>
-                        <th className="border border-slate-950 p-0.5 w-24">Total Rental Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {noEquipmentNeeded ? (
-                        <tr>
-                          <td colSpan={7} className="border border-slate-950 p-1 text-center font-bold text-slate-700 uppercase">
-                            NO EQUIPMENT NEEDED NO HEAVY EQUIPMENT RENTALS
-                          </td>
-                        </tr>
-                      ) : equipments.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="border border-slate-950 p-1.5 text-center font-mono text-slate-500">
-                            (No rental equipment listed) &mdash;{' '}
-                            <button
-                              type="button"
-                              onClick={handleAddEquipment}
-                              className="text-purple-700 font-bold underline cursor-pointer print:hidden no-export"
-                            >
-                              + Add Equipment Line
-                            </button>
-                          </td>
-                        </tr>
-                      ) : (
-                        equipments.map((e, index) => {
-                          const itemNum = materials.length + labors.length + logistics.length + index + 1;
-                          const rowTotal = computeEquipmentTotal(e);
-                          return (
-                            <tr key={e.id} className="border-b border-slate-950 hover:bg-purple-50/20 transition group">
-                              <td className="border border-slate-950 p-0.5 text-center font-bold font-mono align-middle relative">
-                                {itemNum}
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveEquipment(e.id)}
-                                  title="Delete row"
-                                  className="absolute left-0.5 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition print:hidden no-export cursor-pointer"
-                                >
-                                  <Trash2 className="w-2.5 h-2.5" />
-                                </button>
-                              </td>
-                              <td className="border border-slate-950 p-0.5 font-medium align-middle">
-                                <input
-                                  type="text"
-                                  value={e.description || ''}
-                                  onChange={(ev) => handleUpdateEquipment(e.id, 'description', ev.target.value)}
-                                  placeholder="Equipment description"
-                                  className="w-full font-sans bg-transparent border-b border-dashed border-slate-300 focus:border-purple-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text font-medium"
-                                />
-                              </td>
-                              <td className="border border-slate-950 p-0.5 text-center font-mono align-middle">1</td>
-                              <td className="border border-slate-950 p-0.5 text-center align-middle">{e.unit}</td>
-                              <td className="border border-slate-950 p-0.5 text-center font-mono align-middle">
-                                <input
-                                  type="number"
-                                  value={e.noOfDays || ''}
-                                  onChange={(ev) => handleUpdateEquipment(e.id, 'noOfDays', parseInt(ev.target.value) || 0)}
-                                  className="w-10 text-center font-mono bg-transparent border-b border-dashed border-slate-300 focus:border-purple-500 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
-                                />
-                              </td>
-                              <td className="border border-slate-950 p-0.5 text-right font-mono align-middle bg-purple-50/20">
-                                <EditableCurrencyCell
-                                  value={e.dailyPrice}
-                                  onChange={(newRate) => handleUpdateEquipment(e.id, 'dailyPrice', newRate)}
-                                  className="w-16 text-right font-mono font-semibold bg-transparent border-b border-dashed border-purple-400 hover:border-purple-600 focus:border-purple-600 focus:bg-white focus:outline-none p-0 text-[7pt] text-slate-900 print:border-none cursor-text"
-                                  title="Click to edit daily rate"
-                                  pesoColor="text-slate-400"
-                                />
-                              </td>
-                              <td className="border border-slate-950 p-0.5 text-right font-mono font-bold align-middle text-slate-950">
-                                ₱{fmtPeso(rowTotal)}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                      <tr className="bg-slate-100 font-bold border-t-2 border-slate-950">
-                        <td colSpan={6} className="border border-slate-950 p-0.5 text-right font-extrabold uppercase">
-                          Total Equipment Rental Estimates:
-                        </td>
-                        <td className="border border-slate-950 p-0.5 text-right font-mono font-extrabold text-[7.5pt]">
-                          ₱{fmtPeso(totalEquipmentCost)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* SECTION V: A. SUMMARY SHEET BOX */}
-                <div>
-                  <div className="border-2 border-slate-950">
-                    <div className="bg-slate-100 p-0.5 font-extrabold text-[8pt] uppercase text-center border-b-2 border-slate-950">
-                      A. SUMMARY SHEET
-                    </div>
-                    <table className="w-full border-collapse text-[7.5pt] font-sans">
-                      <tbody>
-                        <tr className="border-b border-slate-950">
-                          <td className="p-1 font-bold">Total Materials Cost</td>
-                          <td className="p-1 text-right font-mono font-bold w-44">₱{fmtPeso(totalMaterialsCost)}</td>
-                        </tr>
-                        <tr className="border-b border-slate-950">
-                          <td className="p-1 font-bold">Total Labor Cost</td>
-                          <td className="p-1 text-right font-mono font-bold">₱{fmtPeso(totalLaborCost)}</td>
-                        </tr>
-                        <tr className="border-b border-slate-950">
-                          <td className="p-1 font-bold">Total Logistics and Mobilization</td>
-                          <td className="p-1 text-right font-mono font-bold">₱{fmtPeso(totalLogisticsCost)}</td>
-                        </tr>
-                        <tr className="border-b-2 border-slate-950">
-                          <td className="p-1 font-bold">Total Equipment Rental Cost</td>
-                          <td className="p-1 text-right font-mono font-bold">₱{fmtPeso(totalEquipmentCost)}</td>
-                        </tr>
-                        <tr className="bg-slate-100 font-extrabold text-[8.5pt]">
-                          <td className="p-1.5 uppercase font-black">Total Estimated Project Cost:</td>
-                          <td className="p-1.5 text-right font-mono font-black text-slate-950 text-[9pt]">₱{fmtPeso(totalEstimatedProjectCost)}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Declarations Block */}
-                <div className="border-2 border-slate-950 p-2 space-y-1 font-mono text-[7.5pt]">
-                  <p>
-                    <strong>AMOUNT IN WORDS:</strong>{' '}
-                    <span className="font-bold border-b border-slate-950 pb-0.5 uppercase text-[8pt]">
-                      {totalBidAmountWords || 'ZERO PESOS ONLY'}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>TOTAL BID SECURITY:</strong>{' '}
-                    <span className="font-bold uppercase">
-                      {bidSecurityType.includes('SECURED') || bidSecurityType.includes('DECLARATION')
-                        ? 'BID SECURING DECLARATION'
-                        : bidSecurityAmount > 0
-                          ? `₱${fmtPeso(bidSecurityAmount)} (${numberToWords(bidSecurityAmount)})`
-                          : '₱0.00'}
-                    </span>
-                    {(!bidSecurityType.includes('SECURED') && !bidSecurityType.includes('DECLARATION')) && (
-                      <span className="print:hidden no-export ml-2 inline-flex items-center gap-1 font-normal text-[6.5pt] text-purple-700 bg-purple-50 px-1 py-0.5 rounded border border-purple-200">
-                        <span>Exact (₱):</span>
-                        <input
-                          type="number"
-                          value={bidSecurityAmount || ''}
-                          onChange={(e) => {
-                            setBidSecurityAmount(parseFloat(e.target.value) || 0);
-                            saveToLocalStorage();
-                          }}
-                          placeholder="0.00"
-                          className="w-24 text-right font-mono font-bold bg-white border border-purple-300 rounded px-1 text-slate-900 text-[7pt] focus:border-purple-600 focus:outline-none"
-                        />
-                      </span>
-                    )}
-                  </p>
-                  <p>
-                    <strong>FORM OF BID SECURITY:</strong> <span className="font-bold uppercase">{bidSecurityType}</span>
-                  </p>
-                  <p className="flex items-center gap-1">
-                    <strong>SCHEDULE OF COMPLETE DELIVERY:</strong>{' '}
-                    <input
-                      type="text"
-                      value={deliverySchedule || ''}
-                      onChange={(e) => {
-                        setDeliverySchedule(e.target.value);
-                        saveToLocalStorage();
-                      }}
-                      placeholder="e.g. 30 Calendar Days upon receipt of NTP"
-                      className="font-mono font-bold uppercase bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 focus:outline-none text-[7.5pt] w-72 text-slate-900 print:border-none p-0 cursor-text"
-                    />
-                  </p>
-
-                  {/* Bid Security Selection Buttons (Screen Only - Excluded on Paper/Print) */}
-                  <div className="flex flex-wrap items-center gap-1 pt-1.5 border-t border-dashed border-slate-300 print:hidden no-export text-[6.5pt]">
-                    <span className="text-slate-500 font-bold uppercase">Security Type:</span>
-                    <button
-                      type="button"
-                      onClick={() => handleBidSecurityTypeChange('BID SECURING DECLARATION')}
-                      className={`px-2 py-0.5 rounded transition cursor-pointer font-bold ${
-                        bidSecurityType === 'BID SECURING DECLARATION'
-                          ? 'bg-emerald-700 text-white shadow'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
-                      }`}
-                    >
-                      Bid Securing Declaration (BSD)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleBidSecurityTypeChange('SURETY BOND')}
-                      className={`px-2 py-0.5 rounded transition cursor-pointer font-bold ${
-                        bidSecurityType === 'SURETY BOND'
-                          ? 'bg-purple-700 text-white shadow'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
-                      }`}
-                    >
-                      Surety Bond / Insurance (5%)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleBidSecurityTypeChange('CASH OR CASHIER\'S/MANAGER\'S CHECK')}
-                      className={`px-2 py-0.5 rounded transition cursor-pointer font-bold ${
-                        bidSecurityType === 'CASH OR CASHIER\'S/MANAGER\'S CHECK'
-                          ? 'bg-blue-700 text-white shadow'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
-                      }`}
-                    >
-                      Cash / Manager's Check (2%)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleBidSecurityTypeChange('BANK DRAFT/GUARANTEE OR IRREVOCABLE LETTER OF CREDIT')}
-                      className={`px-2 py-0.5 rounded transition cursor-pointer font-bold ${
-                        bidSecurityType === 'BANK DRAFT/GUARANTEE OR IRREVOCABLE LETTER OF CREDIT'
-                          ? 'bg-indigo-700 text-white shadow'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
-                      }`}
-                    >
-                      Bank Guarantee (2%)
-                    </button>
-                  </div>
-                </div>
-
-                {/* BAC Conforme Statutory Letter */}
-                <div className="space-y-1.5 text-[7.5pt] leading-snug">
-                  <div className="space-y-0.5 font-bold uppercase text-[7.5pt]">
-                    <p>TO THE B.A.C. Chairman/Chairwoman and B.A.C. Members</p>
-                    <p>BIDS AND AWARDS COMMITTEE OF {ownerName} — {projectLocation}</p>
-                  </div>
-
-                  <p className="text-justify text-[7.5pt]">
-                    I offer the aforesaid, hereby certifying under honor that I am a citizen that I, representing <strong className="uppercase">{contractorName}</strong>, that at least 60% of my capital owned by Filipino citizens; that I am engaged in the business of selling the aforesaid materials with a store/warehouse at <strong className="uppercase">{companyAddress}</strong>; that I am an authorized distributor/merchant with <strong>{getRegistrationText()}</strong>.
-                  </p>
-
-                  <p className="text-justify text-[7.5pt]">
-                    I further certify that the materials, which I offer in this bid, is ready in my supplier's warehouse and ready for delivery within the time required by the government without extension of time to be wasted.
-                  </p>
-                </div>
-
-                {/* Signatory Conforme Block */}
-                <div className="pt-2 flex items-end justify-between text-[7.5pt]">
-                  <div className="space-y-0.5">
-                    <p className="font-bold">VERY TRULY YOURS,</p>
-                    <p className="font-black text-[8.5pt] uppercase text-slate-950 border-b-2 border-slate-950 inline-block pb-0.5 mt-2">
-                      {signatoryName || '____________________'}
-                    </p>
-                    <p className="font-bold uppercase text-[7pt]">{signatoryTitle || 'AUTHORIZED REPRESENTATIVE'}</p>
-                    <p className="font-extrabold uppercase text-[7.5pt]">{contractorName || 'QUANTUM CLOUD CORPORATION'}</p>
-                  </div>
-                  <div className="text-right font-mono text-[7pt] text-slate-700">
-                    <p>Submission Date:</p>
-                    <p className="font-bold text-slate-950">{estimateDate ? new Date(estimateDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''} at 11:00 AM</p>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Document Footer Final Page */}
-              <div className="pt-2 border-t border-slate-300 flex items-center justify-between text-[7.5pt] font-mono text-slate-700">
-                <div className="flex items-center gap-3">
-                  <DocumentQrCode
-                    details={{
-                      companyName: contractorName || 'Bidding Entity',
-                      documentName: `(L) Detailed Estimates Form - Page ${totalPages}`,
-                      documentNumber: `FIN-DETEST-${projectRefNo || 'INFRA'}`,
-                      projectTitle: projectName,
-                      projectRefNo: projectRefNo,
-                      procuringEntity: ownerName,
-                      dateTimeSubmitted: estimateDate || 'March 19, 2026',
-                      documentCategory: 'Financial Documents',
-                      generatedBy: contractorName || 'Bidding Entity'
-                    }}
-                    size={36}
-                    showCaption={false}
-                  />
-                  <div className="space-y-0.5">
-                    <p className="font-bold text-slate-950 uppercase">{contractorName || 'BIDDING ENTITY'}</p>
-                    <p>TOTAL ESTIMATED PROJECT COST: <strong>₱{fmtPeso(totalEstimatedProjectCost)}</strong></p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="font-bold font-mono">Page {totalPages} of {totalPages}</span>
-                  <p className="text-[7pt] text-slate-500">Statutory Form (L) Detailed Estimates</p>
-                </div>
-              </div>
-
-            </div>
-
           </div>
         </div>
 

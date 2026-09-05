@@ -27,6 +27,18 @@ debugLog('main.tsx:boot', 'Application bootstrap started', {
 }, 'A');
 // #endregion
 
+// Automatic Browser Refresh on any Code Revision / Edit
+const hot = (import.meta as any).hot;
+if (hot) {
+  hot.on('vite:beforeUpdate', () => {
+    console.log('[Auto-Refresh] Code revision detected, reloading browser automatically...');
+    window.location.reload();
+  });
+  hot.accept(() => {
+    window.location.reload();
+  });
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <GlobalErrorBoundary>

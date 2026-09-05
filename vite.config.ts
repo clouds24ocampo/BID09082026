@@ -3,7 +3,20 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    {
+      name: 'auto-browser-refresh-on-revision',
+      handleHotUpdate({ server }) {
+        // Instantly triggers automatic browser refresh on every code revision/save
+        server.ws.send({
+          type: 'full-reload',
+          path: '*'
+        });
+      }
+    }
+  ],
   build: {
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
@@ -26,8 +39,13 @@ export default defineConfig({
     port: 3001,
     strictPort: true,
     open: false,
+    hmr: {
+      overlay: true
+    },
     watch: {
-      ignored: ['**/AntigravitySkills/**', '**/.agents/**']
+      usePolling: true,
+      interval: 100,
+      ignored: ['**/AntigravitySkills/**', '**/.agents/**', '**/dist/**', '**/.git/**']
     }
   },
   test: {

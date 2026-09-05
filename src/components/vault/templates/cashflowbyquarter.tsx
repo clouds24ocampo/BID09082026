@@ -14,7 +14,8 @@ import {
   Loader2,
   Save,
   CheckCircle2,
-  FolderKanban
+  FolderKanban,
+  Lock
 } from 'lucide-react';
 
 export interface CashFlowByQuarterModalProps {
@@ -270,16 +271,18 @@ export const CashFlowByQuarterModal: React.FC<CashFlowByQuarterModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
       
-      {/* LANDSCAPE LEGAL 13" x 8.5" PRINT STYLESHEET */}
+      {/* PORTRAIT LEGAL 8.5" x 13" PRINT STYLESHEET */}
       <style>{`
         @media print {
           @page {
-            size: 13in 8.5in landscape;
+            size: 8.5in 13in portrait;
             margin: 0mm;
           }
           body {
             background-color: #ffffff !important;
             color: #000000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           .no-print {
             display: none !important;
@@ -288,9 +291,9 @@ export const CashFlowByQuarterModal: React.FC<CashFlowByQuarterModalProps> = ({
             box-shadow: none !important;
             border: none !important;
             margin: 0 !important;
-            padding: 0.6in !important;
-            width: 13in !important;
-            min-h: 8.5in !important;
+            padding: 0.45in 0.5in !important;
+            width: 8.5in !important;
+            min-height: 13in !important;
             page-break-after: always !important;
           }
           .cashflow-paper:last-child {
@@ -314,7 +317,7 @@ export const CashFlowByQuarterModal: React.FC<CashFlowByQuarterModalProps> = ({
                   Statutory Form SF-INFR-56
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                  Legal 13" × 8.5" Landscape
+                  Legal 8.5" × 13" Portrait
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5">
@@ -326,11 +329,20 @@ export const CashFlowByQuarterModal: React.FC<CashFlowByQuarterModalProps> = ({
           {/* PROMINENT PROJECT SELECTOR DROPDOWN */}
           <div className="flex items-center gap-2 bg-slate-950 border border-purple-500/50 rounded-xl px-3 py-1.5 shadow-inner">
             <FolderKanban className="w-4 h-4 text-purple-400 shrink-0" />
-            <span className="text-[11px] font-mono font-bold text-slate-300 uppercase shrink-0">Bidding Project:</span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[11px] font-mono font-bold text-slate-300 uppercase">Bidding Project:</span>
+              {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                <span className="text-[8.5px] text-amber-400 font-bold font-mono flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
+                  <Lock className="w-2.5 h-2.5 text-amber-400" />
+                  <span>Locked</span>
+                </span>
+              )}
+            </div>
             <select
               value={selectedOppId}
+              disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
               onChange={(e) => handleSelectOpportunity(e.target.value)}
-              className="bg-transparent text-white font-mono text-xs font-bold focus:outline-none cursor-pointer border-none max-w-xs sm:max-w-md truncate"
+              className="bg-transparent text-white font-mono text-xs font-bold focus:outline-none cursor-pointer border-none max-w-xs sm:max-w-md truncate disabled:opacity-85 disabled:cursor-not-allowed"
             >
               {oppProjects.length === 0 ? (
                 <option value="">[{contractRefNo}] {contractName}</option>
@@ -639,10 +651,10 @@ export const CashFlowByQuarterModal: React.FC<CashFlowByQuarterModalProps> = ({
             </div>
           </div>
 
-          {/* EXACT STATUTORY LEGAL LANDSCAPE PAPER LAYOUT PREVIEW (SF-INFR-56) */}
+          {/* EXACT STATUTORY LEGAL PORTRAIT PAPER LAYOUT PREVIEW (SF-INFR-56) */}
           <div className="space-y-8 flex flex-col items-center">
 
-            <div className="cashflow-paper single-page-paper print-document-sheet w-[13in] min-w-[13in] max-w-[13in] min-h-[8.5in] aspect-[13/8.5] bg-white text-slate-950 p-[0.4in] shadow-2xl font-sans text-[10pt] leading-normal flex flex-col justify-between mx-auto border-2 border-slate-950 box-border">
+            <div className="cashflow-paper single-page-paper print-document-sheet w-[8.5in] min-w-[8.5in] max-w-[8.5in] min-h-[13in] bg-white text-slate-950 p-[0.45in] shadow-2xl font-sans text-[9pt] leading-normal flex flex-col justify-between mx-auto border-2 border-slate-950 box-border shrink-0">
               <div className="space-y-4">
                 
                 {/* 1. OFFICIAL DOCUMENT TITLE */}

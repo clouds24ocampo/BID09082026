@@ -15,7 +15,8 @@ import {
   ShieldCheck,
   CheckCircle2,
   RotateCcw,
-  Edit3
+  Edit3,
+  Lock
 } from 'lucide-react';
 
 export interface WarrantyLotItem {
@@ -464,7 +465,8 @@ export const AfterSaleModalContent: React.FC<AfterSaleModalProps> = ({
                         saveState();
                       }
                     }}
-                    className="bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none focus:border-blue-500 max-w-[320px] truncate cursor-pointer"
+                    disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
+                    className="bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none focus:border-blue-500 max-w-[320px] truncate disabled:opacity-80 disabled:cursor-not-allowed cursor-pointer"
                   >
                     {oppProjects.map(p => (
                       <option key={p.id} value={p.id}>
@@ -474,6 +476,13 @@ export const AfterSaleModalContent: React.FC<AfterSaleModalProps> = ({
                   </select>
                 ) : (
                   <span className="text-xs text-slate-400 italic">No opportunity projects registered</span>
+                )}
+
+                {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                  <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                    <Lock className="w-3 h-3 text-amber-400" />
+                    <span>Project Locked</span>
+                  </span>
                 )}
 
                 <button

@@ -158,22 +158,22 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
   const saveOpportunitiesSafely = async (opsList: PhilGEPSOpportunity[]) => {
     if (!tenantId) return;
 
-    // 1. Offload heavy PDF binaries to IndexedDB (supports 200MB+)
+    // 1. Offload heavy PDF binaries to IndexedDB in parallel (supports 200MB+)
+    const saveTasks: Promise<void>[] = [];
     for (const op of opsList) {
       if (op.pdfFileDataUrl && op.pdfFileDataUrl.length > 500) {
-        try {
-          await savePdfData(`op_pdf_${op.id}`, op.pdfFileDataUrl);
-        } catch (e) {}
+        saveTasks.push(savePdfData(`op_pdf_${op.id}`, op.pdfFileDataUrl).catch(() => {}));
       }
       if (op.pdfAttachments) {
         for (const [slotKey, att] of Object.entries(op.pdfAttachments)) {
           if (att?.fileDataUrl && att.fileDataUrl.length > 500) {
-            try {
-              await savePdfData(`op_att_${op.id}_${slotKey}`, att.fileDataUrl);
-            } catch (e) {}
+            saveTasks.push(savePdfData(`op_att_${op.id}_${slotKey}`, att.fileDataUrl).catch(() => {}));
           }
         }
       }
+    }
+    if (saveTasks.length > 0) {
+      await Promise.all(saveTasks);
     }
 
     // 2. Prepare clean metadata without heavy base64 strings for localStorage

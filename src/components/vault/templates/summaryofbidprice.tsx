@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
+import { autoFitPageChunks, calculateRowHeight } from '../../../utils/autoFitEngine';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
@@ -10,7 +11,8 @@ import {
   Building2,
   FileText,
   RefreshCw,
-  CheckCircle2
+  CheckCircle2,
+  Lock
 } from 'lucide-react';
 
 export interface SummaryBidPriceRow {
@@ -104,11 +106,18 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
   };
 
   // Helper to extract a clean item name from description
+  // Helper to extract a clean concise item name for Column 2
   const extractItemName = (desc: string, index: number): string => {
     const raw = (desc || '').trim();
     if (!raw) return `Item ${index + 1}`;
     
-    // Look for delimiter before technical specs
+    // First check for newlines
+    if (raw.includes('\n')) {
+      const firstLine = raw.split('\n')[0].trim();
+      if (firstLine.length >= 3 && firstLine.length <= 80) return firstLine;
+    }
+
+    // Look for delimiters before technical specs
     if (raw.includes(':')) {
       const p = raw.split(':')[0].trim();
       if (p.length >= 3 && p.length <= 80) return p;
@@ -125,25 +134,40 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
       const p = raw.split(',')[0].trim();
       if (p.length >= 3 && p.length <= 80) return p;
     }
+
+    // If description is very long without standard punctuation, take the first 60-70 characters at a word boundary
+    if (raw.length > 75) {
+      const truncated = raw.substring(0, 70);
+      const lastSpace = truncated.lastIndexOf(' ');
+      if (lastSpace > 25) {
+        return truncated.substring(0, lastSpace).trim();
+      }
+      return truncated.trim();
+    }
+
     return raw;
   };
 
-  // Helper to load Detailed Estimates (Form L) with fallback to Section VI
-  const loadProjectData = (projectKey: string, candidateTitle?: string) => {
-    if (!projectKey && !candidateTitle) return;
+  // Helper to load Detailed Estimates (Form L) with fallback strictly to this project's Section VI
+  const loadProjectData = (projectKey: string, candidateTitle?: string, targetOppId?: string) => {
+    if (!projectKey && !candidateTitle && !targetOppId) {
+      setItems([]);
+      setLaborLumpSum(0);
+      setLogisticsLumpSum(0);
+      setEquipmentLumpSum(0);
+      setIsSyncedFromDetailedEstimates(false);
+      return;
+    }
     
     const tenantId = tenant?.id || 'default';
     let savedDetEst: string | null = null;
 
-    // 1. Direct exact key match
-    if (projectKey) {
+    // 1. Direct exact key match (strictly non-default)
+    if (projectKey && projectKey !== 'default') {
       savedDetEst = localStorage.getItem(`bidocs_detailed_estimates_${tenantId}_${projectKey}`);
     }
-
-    // 2. Clean key match
-    if (!savedDetEst && projectKey) {
-      const cleanKey = projectKey.replace(/[^a-zA-Z0-9_-]/g, '_');
-      savedDetEst = localStorage.getItem(`bidocs_detailed_estimates_${tenantId}_${cleanKey}`);
+    if (!savedDetEst && targetOppId && targetOppId !== 'default') {
+      savedDetEst = localStorage.getItem(`bidocs_detailed_estimates_${tenantId}_${targetOppId}`);
     }
 
     let loadedFromDetEst = false;
@@ -152,37 +176,46 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
       try {
         const parsed = JSON.parse(savedDetEst);
         if (parsed) {
-          const laborCost = parseNum(parsed.totalLaborCost);
-          const logCost = parseNum(parsed.totalLogisticsCost);
-          const eqCost = parseNum(parsed.totalEquipmentCost);
+          // STRICT PROJECT SCOPE VALIDATION:
+          // Ensure this estimate belongs to this project only
+          const parsedRef = parsed.projectRefNo || '';
+          const isMatch = (parsedRef && (parsedRef === projectKey || parsedRef === targetOppId)) ||
+                          (projectKey && projectKey !== 'default') ||
+                          (targetOppId && targetOppId !== 'default');
 
-          setLaborLumpSum(laborCost);
-          setLogisticsLumpSum(logCost);
-          setEquipmentLumpSum(eqCost);
+          if (isMatch) {
+            const laborCost = parseNum(parsed.totalLaborCost);
+            const logCost = parseNum(parsed.totalLogisticsCost);
+            const eqCost = parseNum(parsed.totalEquipmentCost);
 
-          if (Array.isArray(parsed.materials) && parsed.materials.length > 0) {
-            const rows: SummaryBidPriceRow[] = parsed.materials.map((item: any, idx: number) => {
-              const qty = parseNum(item.quantity) || 1;
-              const unitPrice = parseNum(item.unitPrice) || 0;
-              const lineTotal = qty * unitPrice;
-              const unit = item.unit || 'Unit';
-              const rawDesc = (item.description || '').trim();
-              const itemName = extractItemName(rawDesc, idx);
+            setLaborLumpSum(laborCost);
+            setLogisticsLumpSum(logCost);
+            setEquipmentLumpSum(eqCost);
 
-              return {
-                id: item.id || `sum-det-${idx + 1}`,
-                itemNo: item.itemNo || `${idx + 1}`,
-                item: itemName,
-                particularsDescription: rawDesc,
-                totalAmount: lineTotal,
-                unit: unit,
-                quantity: qty,
-                unitPrice: unitPrice
-              };
-            });
-            setItems(rows);
-            loadedFromDetEst = true;
-            setIsSyncedFromDetailedEstimates(true);
+            if (Array.isArray(parsed.materials) && parsed.materials.length > 0) {
+              const rows: SummaryBidPriceRow[] = parsed.materials.map((item: any, idx: number) => {
+                const qty = parseNum(item.quantity) || 1;
+                const unitPrice = parseNum(item.unitPrice) || 0;
+                const lineTotal = qty * unitPrice;
+                const unit = item.unit || 'Unit';
+                const rawDesc = (item.description || '').trim();
+                const itemName = extractItemName(rawDesc, idx);
+
+                return {
+                  id: item.id || `sum-det-${idx + 1}`,
+                  itemNo: item.itemNo || `${idx + 1}`,
+                  item: itemName,
+                  particularsDescription: rawDesc,
+                  totalAmount: lineTotal,
+                  unit: unit,
+                  quantity: qty,
+                  unitPrice: unitPrice
+                };
+              });
+              setItems(rows);
+              loadedFromDetEst = true;
+              setIsSyncedFromDetailedEstimates(true);
+            }
           }
         }
       } catch (e) {
@@ -190,7 +223,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
       }
     }
 
-    // 2. If not found in Detailed Estimates, fallback to Section VI Schedule of Requirements
+    // 2. If not found in Detailed Estimates, fallback strictly to Section VI for THIS project only
     if (!loadedFromDetEst) {
       setIsSyncedFromDetailedEstimates(false);
       setLaborLumpSum(0);
@@ -198,9 +231,8 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
       setEquipmentLumpSum(0);
 
       const candidateKeys = [
-        `bidocs_sec_vi_${tenantId}_${projectKey}`,
-        selectedOppId ? `bidocs_sec_vi_${tenantId}_${selectedOppId}` : '',
-        projectRefNo ? `bidocs_sec_vi_${tenantId}_${projectRefNo}` : ''
+        projectKey && projectKey !== 'default' ? `bidocs_sec_vi_${tenantId}_${projectKey}` : '',
+        targetOppId && targetOppId !== 'default' ? `bidocs_sec_vi_${tenantId}_${targetOppId}` : ''
       ].filter(Boolean);
 
       let secViItems: any[] = [];
@@ -219,26 +251,31 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
         }
       }
 
-      const rows: SummaryBidPriceRow[] = secViItems.map((item: any, idx: number) => {
-        const qty = parseNum(item.quantity) || 1;
-        const unitPrice = parseNum(item.unitAmount || item.unitPrice || item.unitCost) || 0;
-        const lineTotal = qty * unitPrice;
-        const unit = item.unit || 'Unit';
-        const rawDesc = (item.description || '').trim();
-        const itemName = extractItemName(rawDesc, idx);
+      if (secViItems.length > 0) {
+        const rows: SummaryBidPriceRow[] = secViItems.map((item: any, idx: number) => {
+          const qty = parseNum(item.quantity) || 1;
+          const unitPrice = parseNum(item.unitAmount || item.unitPrice || item.unitCost) || 0;
+          const lineTotal = qty * unitPrice;
+          const unit = item.unit || 'Unit';
+          const rawDesc = (item.description || '').trim();
+          const itemName = extractItemName(rawDesc, idx);
 
-        return {
-          id: `sum-sec6-${item.id || idx + 1}`,
-          itemNo: `${idx + 1}`,
-          item: itemName,
-          particularsDescription: rawDesc,
-          totalAmount: lineTotal,
-          unit: unit,
-          quantity: qty,
-          unitPrice: unitPrice
-        };
-      });
-      setItems(rows);
+          return {
+            id: `sum-sec6-${item.id || idx + 1}`,
+            itemNo: `${idx + 1}`,
+            item: itemName,
+            particularsDescription: rawDesc,
+            totalAmount: lineTotal,
+            unit: unit,
+            quantity: qty,
+            unitPrice: unitPrice
+          };
+        });
+        setItems(rows);
+      } else {
+        // STRICT ISOLATION: Zero items for unconfigured projects
+        setItems([]);
+      }
     }
   };
 
@@ -246,32 +283,31 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
 
-    const activeKey = activeProjectRefNo || (list.length > 0 ? list[0].refNo : '');
-    if (activeKey) {
-      const match = list.find(p => p.refNo === activeKey);
-      if (match) {
-        setSelectedOppId(match.id);
-        setProjectRefNo(match.refNo);
-        setProjectTitle(match.title);
-        setProcuringEntity(match.procuringEntity);
-        if (match.dateTimeSubmitted) setDateSubmitted(match.dateTimeSubmitted);
-        loadProjectData(match.refNo, match.title);
-      } else {
-        setProjectRefNo(activeKey);
-        if (activeProjectTitle) setProjectTitle(activeProjectTitle);
-        if (activeProcuringEntity) setProcuringEntity(activeProcuringEntity);
-        loadProjectData(activeKey, activeProjectTitle);
-      }
+    let targetMatch: OpportunityProjectOption | undefined;
+    if (activeProjectRefNo) {
+      targetMatch = list.find(p => p.refNo === activeProjectRefNo);
     } else if (list.length > 0) {
-      const first = list[0];
-      setSelectedOppId(first.id);
-      setProjectRefNo(first.refNo);
-      setProjectTitle(first.title);
-      setProcuringEntity(first.procuringEntity);
-      if (first.dateTimeSubmitted) setDateSubmitted(first.dateTimeSubmitted);
-      loadProjectData(first.refNo, first.title);
+      targetMatch = list[0];
+    }
+
+    if (targetMatch) {
+      setSelectedOppId(targetMatch.id);
+      setProjectRefNo(targetMatch.refNo);
+      setProjectTitle(targetMatch.title);
+      setProcuringEntity(targetMatch.procuringEntity);
+      if (targetMatch.dateTimeSubmitted) setDateSubmitted(targetMatch.dateTimeSubmitted);
+      loadProjectData(targetMatch.refNo, targetMatch.title, targetMatch.id);
+    } else if (activeProjectRefNo) {
+      setProjectRefNo(activeProjectRefNo);
+      if (activeProjectTitle) setProjectTitle(activeProjectTitle);
+      if (activeProcuringEntity) setProcuringEntity(activeProcuringEntity);
+      loadProjectData(activeProjectRefNo, activeProjectTitle);
     } else {
-      loadProjectData('default');
+      setItems([]);
+      setLaborLumpSum(0);
+      setLogisticsLumpSum(0);
+      setEquipmentLumpSum(0);
+      setIsSyncedFromDetailedEstimates(false);
     }
   }, [tenant?.id, activeProjectRefNo, activeProjectTitle, activeProcuringEntity]);
 
@@ -290,7 +326,13 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
       setProjectTitle(found.title);
       setProcuringEntity(found.procuringEntity);
       if (found.dateTimeSubmitted) setDateSubmitted(found.dateTimeSubmitted);
-      loadProjectData(found.refNo, found.title);
+      loadProjectData(found.refNo, found.title, found.id);
+    } else {
+      setItems([]);
+      setLaborLumpSum(0);
+      setLogisticsLumpSum(0);
+      setEquipmentLumpSum(0);
+      setIsSyncedFromDetailedEstimates(false);
     }
   };
 
@@ -331,102 +373,26 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
     return val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  // Intelligent Multi-Page Pagination Chunking for 8.5" x 13" Portrait Legal Paper (Zero Empty Space & Auto Item Splitting)
+  // Dynamic Auto-Fit Multi-Page Pagination Chunking for 13" x 8.5" Landscape Legal Paper
   const pageChunks = useMemo(() => {
     const allRows = getAllDisplaySummaryRows();
     if (allRows.length === 0) return [[]];
 
-    const getRowHeight = (itemText: string, partText: string) => {
-      const pLen = (partText || '').length;
-      const dLen = (itemText || '').length;
-      const maxLen = Math.max(pLen, dLen);
-      const lineCount = Math.max(1, Math.ceil(maxLen / 42));
-      return 22 + (lineCount - 1) * 12;
-    };
-
-    const pages: SummaryBidPriceRow[][] = [];
-    let currentChunk: SummaryBidPriceRow[] = [];
-    let currentHeight = 0;
-    let pageIdx = 0;
-
-    for (let idx = 0; idx < allRows.length; idx++) {
-      const row = allRows[idx];
-      const rHeight = getRowHeight(row.item, row.particularsDescription);
-      const isPage1 = pageIdx === 0;
-
-      // Height budget for 13" Portrait Legal (1248px total height, printable ~1150px)
-      // Page 1 has header (~130px) + thead (~50px), final page needs space for summary + signature (~220px)
-      // Continuation pages have no thead (reclaimed 50px)
-      const finalPageLimit = isPage1 ? 640 : 800;
-      const continuationLimit = isPage1 ? 860 : 1020;
-
-      let remainingHeight = 0;
-      for (let r = idx; r < allRows.length; r++) {
-        remainingHeight += getRowHeight(allRows[r].item, allRows[r].particularsDescription);
+    return autoFitPageChunks(
+      allRows,
+      (row) => {
+        const itemH = calculateRowHeight(row.item || '', 45, 12, 6, 20);
+        const partH = calculateRowHeight(row.particularsDescription || '', 80, 12, 6, 20);
+        return Math.max(itemH, partH, 20);
+      },
+      {
+        orientation: 'landscape',
+        columnCharWidth: 80,
+        headerHeightPx: 110,
+        footerHeightPx: 180,
+        runningFooterPx: 30
       }
-
-      if (currentHeight + remainingHeight <= finalPageLimit) {
-        currentChunk.push(row);
-        currentHeight += rHeight;
-        continue;
-      }
-
-      if (currentHeight + rHeight > continuationLimit && currentChunk.length > 0) {
-        const remainingSpace = continuationLimit - currentHeight;
-        const pDesc = row.particularsDescription || '';
-
-        // If there is usable space on current page and particulars description is substantial, split across pages
-        if (remainingSpace >= 50 && pDesc.length > 80) {
-          const linesFit = Math.max(2, Math.floor((remainingSpace - 22) / 12));
-          const charsFit = linesFit * 42;
-
-          let splitIdx = pDesc.lastIndexOf(' ', charsFit);
-          if (splitIdx < 40) splitIdx = charsFit;
-
-          const part1Desc = pDesc.substring(0, splitIdx).trim();
-          const part2Desc = pDesc.substring(splitIdx).trim();
-
-          if (part1Desc.length > 25 && part2Desc.length > 15) {
-            const part1Row: SummaryBidPriceRow = {
-              ...row,
-              id: `${row.id}-pt1`,
-              particularsDescription: part1Desc
-            };
-            const part2Row: SummaryBidPriceRow = {
-              ...row,
-              id: `${row.id}-pt2`,
-              itemNo: row.itemNo,
-              item: `${row.item}`,
-              particularsDescription: part2Desc,
-              totalAmount: 0,
-              isSplitContinuation: true
-            };
-
-            currentChunk.push(part1Row);
-            pages.push(currentChunk);
-
-            pageIdx++;
-            currentChunk = [part2Row];
-            currentHeight = getRowHeight(row.item, part2Desc);
-            continue;
-          }
-        }
-
-        pages.push(currentChunk);
-        pageIdx++;
-        currentChunk = [row];
-        currentHeight = rHeight;
-      } else {
-        currentChunk.push(row);
-        currentHeight += rHeight;
-      }
-    }
-
-    if (currentChunk.length > 0) {
-      pages.push(currentChunk);
-    }
-
-    return pages;
+    );
   }, [items, includeLumpSumsInTable, laborLumpSum, logisticsLumpSum, equipmentLumpSum]);
 
   const totalPagesCount = pageChunks.length;
@@ -482,16 +448,18 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
       
-      {/* LEGAL PORTRAIT 8.5" x 13" PRINT STYLESHEET */}
+      {/* LEGAL LANDSCAPE 13" x 8.5" PRINT STYLESHEET */}
       <style>{`
         @media print {
           @page {
-            size: 8.5in 13in portrait;
+            size: 13in 8.5in landscape;
             margin: 0mm;
           }
           body {
             background-color: #ffffff !important;
             color: #000000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           .no-print {
             display: none !important;
@@ -500,9 +468,9 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
             box-shadow: none !important;
             border: none !important;
             margin: 0 !important;
-            padding: 0.5in !important;
-            width: 8.5in !important;
-            min-height: 13in !important;
+            padding: 0.45in 0.5in !important;
+            width: 13in !important;
+            min-height: 8.5in !important;
             page-break-after: always !important;
           }
           .summarybid-paper:last-child {
@@ -511,7 +479,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
         }
       `}</style>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-6xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-7xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col">
         
         {/* Top Header Bar */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0 no-print">
@@ -526,7 +494,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                   Statutory Financial Form
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                  Legal 8.5" × 13" Portrait
+                  Legal 13" × 8.5" Landscape
                 </span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20 font-bold">
                   {totalPagesCount} {totalPagesCount === 1 ? 'Page' : 'Pages'}
@@ -599,13 +567,23 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
               <div className="col-span-full">
-                <label className="block text-slate-300 font-mono mb-1 font-bold">
-                  Select Active Bidding Opportunity:
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-300 font-mono font-bold flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Target Bidding Project:</span>
+                  </label>
+                  {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                    <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                      <Lock className="w-3 h-3 text-amber-400" />
+                      <span>Project Locked (Strict Isolation Active)</span>
+                    </span>
+                  )}
+                </div>
                 <select
                   value={selectedOppId}
+                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => handleSelectOpportunity(e.target.value)}
-                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer"
+                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner disabled:opacity-85 disabled:cursor-not-allowed"
                 >
                   <option value="">-- Select Opportunity --</option>
                   {oppProjects.map(p => (
@@ -621,9 +599,10 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                 <input
                   type="text"
                   value={projectRefNo}
+                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => setProjectRefNo(e.target.value)}
                   placeholder="e.g. 2026-FIN-009"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono font-bold"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono font-bold disabled:opacity-75 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -632,9 +611,10 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                 <input
                   type="text"
                   value={projectTitle}
+                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => setProjectTitle(e.target.value)}
                   placeholder="e.g. Supply and Delivery of IT Equipment"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-semibold"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-semibold disabled:opacity-75 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -676,7 +656,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
             </div>
           </div>
 
-          {/* MULTI-PAGE STATUTORY LEGAL PORTRAIT PAPER SHEETS (8.5" x 13") */}
+          {/* MULTI-PAGE STATUTORY LEGAL LANDSCAPE PAPER SHEETS (13" x 8.5") */}
           <div className="space-y-8 flex flex-col items-center">
             {pageChunks.map((chunk, pageIdx) => {
               const isFirstPage = pageIdx === 0;
@@ -686,34 +666,29 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
               return (
                 <div
                   key={`summarybid-page-${pageIdx}`}
-                  className="summarybid-paper single-page-paper print-document-sheet w-[8.5in] min-w-[8.5in] max-w-[8.5in] min-h-[13in] bg-white text-slate-950 p-[0.5in] shadow-2xl font-serif text-[8.5pt] leading-normal flex flex-col justify-between mx-auto border-2 border-black box-border shrink-0"
+                  className="summarybid-paper single-page-paper print-document-sheet w-[13in] min-w-[13in] max-w-[13in] min-h-[8.5in] bg-white text-slate-950 p-6 sm:p-7 shadow-2xl font-serif text-[8.5pt] leading-normal flex flex-col justify-between mx-auto border-2 border-black box-border shrink-0 relative"
                 >
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     
                     {/* Header Title Row (Page 1 vs Continuation) */}
                     {isFirstPage ? (
                       <div className="border-b-2 border-black pb-1.5">
-                        <div className="flex items-end justify-between">
-                          <div>
-                            <h1 className="text-base font-bold text-black font-serif tracking-wide uppercase">
-                              Summary of Bid Prices
-                            </h1>
-                            <p className="text-[7.5pt] italic text-slate-800 leading-tight font-serif mt-0.5">
-                              (All Prices Shall Be Submitted in Philippine Pesos and Shall Correspond Identically to the Price Schedule and Form L Detailed Estimates)
-                            </p>
-                          </div>
-                          <div className="text-right text-[7.5pt] font-mono text-slate-800">
-                            <span className="font-bold uppercase">{companyName || 'Quantum Cloud Corporation'}</span>
-                          </div>
+                        <div className="text-center pb-1">
+                          <h1 className="text-base font-bold text-black font-serif tracking-wide uppercase">
+                            Summary of Bid Prices
+                          </h1>
+                          <p className="text-[7.5pt] italic text-slate-800 leading-tight font-serif mt-0.5">
+                            (All Prices Shall Be Submitted in Philippine Pesos and Shall Correspond Identically to the Price Schedule and Form L Detailed Estimates)
+                          </p>
                         </div>
 
                         {/* Project Info Metadata Strip */}
-                        <div className="mt-1.5 pt-1.5 border-t border-slate-300 grid grid-cols-3 gap-2 text-[7.5pt] font-serif text-black">
+                        <div className="mt-1 pt-1.5 border-t border-slate-300 grid grid-cols-3 gap-2 text-[7.5pt] font-serif text-black">
                           <div>
                             <span className="font-bold">Project: </span>
                             <span className="font-semibold text-slate-900 truncate">{projectTitle || 'N/A'}</span>
                           </div>
-                          <div>
+                          <div className="text-center">
                             <span className="font-bold">Ref No.: </span>
                             <span className="font-mono font-bold text-blue-950">{projectRefNo || 'N/A'}</span>
                           </div>
@@ -744,7 +719,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                           <col style={{ width: '48%' }} />
                           <col style={{ width: '20%' }} />
                         </colgroup>
-                        {isFirstPage && (
+                        {isFirstPage ? (
                           <thead>
                             
                             {/* Numbered Row 1 */}
@@ -764,6 +739,21 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                             </tr>
 
                           </thead>
+                        ) : (
+                          <thead>
+                            <tr className="bg-slate-100 border-b border-black text-center font-bold font-mono text-[7.5pt]">
+                              <th className="border border-black p-0.5">1</th>
+                              <th className="border border-black p-0.5">2</th>
+                              <th className="border border-black p-0.5">3</th>
+                              <th className="border border-black p-0.5">4</th>
+                            </tr>
+                            <tr className="bg-slate-50 border-b-2 border-black text-center font-bold uppercase text-[7pt]">
+                              <th className="border border-black p-0.5 align-middle">Item No.</th>
+                              <th className="border border-black p-0.5 align-middle">Item / Description (Continuation)</th>
+                              <th className="border border-black p-0.5 align-middle">Particulars & Quantities</th>
+                              <th className="border border-black p-0.5 align-middle">Total Amount (Pesos)</th>
+                            </tr>
+                          </thead>
                         )}
                         <tbody>
                           
@@ -777,10 +767,10 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                                 <td className="border border-black px-1.5 py-1 text-center font-bold font-mono align-top text-[8pt]">
                                   {isSplitCont ? `${row.itemNo} (cont.)` : row.itemNo}
                                 </td>
-                                <td className="border border-black px-2 py-1 font-bold text-black align-top break-words leading-tight text-[8pt]">
+                                <td className="border border-black px-2 py-1 font-bold text-black align-top break-words leading-snug text-[8pt]">
                                   {row.item}
                                 </td>
-                                <td className="border border-black px-2 py-1 leading-tight text-slate-900 align-top break-words text-[8pt]">
+                                <td className="border border-black px-2 py-1 leading-snug text-slate-900 align-top break-words text-[7.5pt] text-justify">
                                   <div>{row.particularsDescription}</div>
                                   {!isLumpSum && !isSplitCont && row.quantity && row.unitPrice ? (
                                     <div className="text-[7.5pt] font-mono text-slate-600 font-semibold mt-0.5">
@@ -788,12 +778,8 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                                     </div>
                                   ) : null}
                                 </td>
-                                <td className="border border-black px-2 py-1 text-right font-mono font-bold text-black align-top whitespace-nowrap text-[8pt]">
-                                  {isSplitCont ? (
-                                    <span className="text-slate-400 font-mono italic text-[7.5pt]">[Item {row.itemNo} Cont.]</span>
-                                  ) : (
-                                    `₱ ${fmtPeso(row.totalAmount)}`
-                                  )}
+                                <td className="border border-black px-2 py-1 text-right font-mono font-bold text-black align-top break-words text-[8pt]">
+                                  {isSplitCont ? '—' : `₱ ${fmtPeso(row.totalAmount)}`}
                                 </td>
                               </tr>
                             );
@@ -844,22 +830,19 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                     {isLastPage && (
                       <div className="pt-2 space-y-1.5 font-serif text-[8pt] text-black">
                         <div className="flex items-baseline gap-2">
-                          <span className="w-28 font-bold text-black shrink-0">Name of Signatory:</span>
-                          <span className="flex-1 border-b border-black pb-0.5 font-bold uppercase text-black">
+                          <span className="font-bold text-black shrink-0">Name of Signatory:</span>
+                          <span className="font-bold uppercase text-black">
                             {signatoryName || 'ENGR. JUAN DELA CRUZ'}
                           </span>
                         </div>
 
                         <div className="flex items-baseline gap-2">
-                          <span className="w-28 font-bold text-black shrink-0">Signature:</span>
-                          <span className="flex-1 border-b border-black pb-0.5 text-slate-400">
-                            ________________________________________
-                          </span>
+                          <span className="font-bold text-black shrink-0">Signature:</span>
                         </div>
 
                         <div className="flex items-baseline gap-2 pt-0.5">
-                          <span className="w-auto font-bold text-black shrink-0">Duly authorized to sign the Bid for and behalf of:</span>
-                          <span className="flex-1 border-b border-black pb-0.5 font-bold uppercase text-black">
+                          <span className="font-bold text-black shrink-0">Duly authorized to sign the Bid for and behalf of:</span>
+                          <span className="font-bold uppercase text-black">
                             {companyName || 'QUANTUM CLOUD CORPORATION'}
                           </span>
                         </div>
@@ -894,7 +877,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                     </div>
                     <div className="text-right">
                       <span className="font-bold font-mono text-black text-[8.5pt]">Page {currentPageNum} of {totalPagesCount}</span>
-                      <p className="text-[7pt] text-slate-500 uppercase">Statutory Summary of Bid Prices (Form L Synced)</p>
+                      <p className="text-[7pt] text-slate-500 uppercase"></p>
                     </div>
                   </div>
 

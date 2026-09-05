@@ -13,12 +13,25 @@ export interface OpportunityProjectOption {
   dateTimeSubmitted: string;
 }
 
+// High-speed in-memory cache for ultra-fast zero-latency project lookups
+let oppCache: { tenantId?: string; data: OpportunityProjectOption[]; timestamp: number } | null = null;
+const CACHE_TTL_MS = 2000;
+
+export const invalidateOpportunityProjectsCache = () => {
+  oppCache = null;
+};
+
 /**
  * Fetches real active bidding projects saved in Opportunity Finder (localStorage: bidocs_opportunities).
  * Scans tenant-scoped keys, un-scoped keys, and all bidocs_opportunities_* keys to ensure 100% project retrieval.
  * Strictly deduplicates projects by ID and Reference Number.
  */
 export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOption[] => {
+  const now = Date.now();
+  if (oppCache && oppCache.tenantId === tenantId && (now - oppCache.timestamp) < CACHE_TTL_MS) {
+    return oppCache.data;
+  }
+
   try {
     let rawItems: any[] = [];
 
@@ -108,14 +121,32 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
           abc: item.approvedBudgetStr || (item.approvedBudgetValue ? `₱${Number(item.approvedBudgetValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : (item.approvedBudget ? `₱${Number(item.approvedBudget).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '₱0.00')),
           category: (() => {
             const rawCat = (item.procurementType || item.projectType || item.category || item.classification || '').toString().toUpperCase();
-            const titleLower = (item.title || '').toLowerCase();
+            
+            // 1. Primary Authority: Explicit procurement type or category from PhilGEPS / Opportunity Setup
+            if (rawCat.includes('INFRA') || rawCat.includes('CIVIL')) return 'Infrastructure';
+            if (rawCat.includes('CONSULT')) return 'Consulting';
+            if (rawCat.includes('GOOD')) return 'Goods';
+
+            // 2. Fallback: Title or Reference Number inference if category was not explicitly specified
+            const titleLower = (item.title || item.biddingProjectTitle || '').toLowerCase();
             const refUpper = (item.philgepsRefNo || item.refNo || '').toUpperCase();
-            if (rawCat.includes('INFRA') || refUpper.includes('INFRA') || titleLower.includes('infra') || titleLower.includes('construction') || titleLower.includes('civil') || titleLower.includes('building') || titleLower.includes('road')) {
+
+            if (
+              refUpper.includes('INFRA') ||
+              titleLower.includes('construction') ||
+              titleLower.includes('civil works') ||
+              titleLower.includes('road opening') ||
+              titleLower.includes('drainage system') ||
+              titleLower.includes('building') ||
+              titleLower.includes('renovation') ||
+              titleLower.includes('rehabilitation')
+            ) {
               return 'Infrastructure';
             }
-            if (rawCat.includes('CONSULT') || titleLower.includes('consult')) {
+            if (titleLower.includes('consult') || titleLower.includes('feasibility')) {
               return 'Consulting';
             }
+
             return 'Goods';
           })(),
           dateTimeSubmitted: formattedDateTime
@@ -142,6 +173,11 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
       }, 'E');
       // #endregion
 
+      oppCache = {
+        tenantId,
+        data: uniqueProjects,
+        timestamp: Date.now()
+      };
       return uniqueProjects;
     }
   } catch (e) {

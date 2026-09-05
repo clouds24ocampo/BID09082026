@@ -14,7 +14,8 @@ import {
   DollarSign,
   Lock,
   Edit3,
-  HardHat
+  HardHat,
+  FolderKanban
 } from 'lucide-react';
 
 export interface AgentCommissionRow {
@@ -96,6 +97,9 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
   const [performanceSecurityOption, setPerformanceSecurityOption] = useState<'PERFORMANCE_BOND' | 'PSD' | 'MANAGERS_CHECK'>('PERFORMANCE_BOND');
   const [performanceSecurityPercent, setPerformanceSecurityPercent] = useState('thirty (30)');
 
+  // Delivery Schedule / Contract Duration Parameters
+  const [deliverySchedule, setDeliverySchedule] = useState('30 Calendar Days upon receipt of Notice to Proceed');
+
   // Infrastructure-Specific Bid Parameters
   const [discountsOffered, setDiscountsOffered] = useState('No discounts offered');
 
@@ -126,26 +130,42 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
   const [isSaving, setIsSaving] = useState(false);
 
   const detectCategoryFromProject = (titleStr: string, refNoStr: string, catStr?: string): 'Goods' | 'Infrastructure' | 'Consulting' => {
+    const titleLower = (titleStr || '').toLowerCase();
+    if (
+      titleLower.includes('public address') ||
+      titleLower.includes('supply') ||
+      titleLower.includes('equipment') ||
+      titleLower.includes('cctv') ||
+      titleLower.includes('ict') ||
+      titleLower.includes('hardware') ||
+      titleLower.includes('software') ||
+      titleLower.includes('goods') ||
+      titleLower.includes('supplies') ||
+      titleLower.includes('furniture') ||
+      titleLower.includes('appliances') ||
+      titleLower.includes('vehicle') ||
+      titleLower.includes('medicine') ||
+      titleLower.includes('medical') ||
+      titleLower.includes('food') ||
+      titleLower.includes('catering')
+    ) {
+      return 'Goods';
+    }
+
     const catUpper = (catStr || '').toUpperCase();
-    if (catUpper.includes('INFRA')) return 'Infrastructure';
-    if (catUpper.includes('CONSULT')) return 'Consulting';
     if (catUpper.includes('GOOD')) return 'Goods';
+    if (catUpper.includes('CONSULT') || titleLower.includes('consult')) return 'Consulting';
+    if (catUpper.includes('INFRA')) return 'Infrastructure';
 
     const combined = `${titleStr || ''} ${refNoStr || ''}`.toLowerCase();
     if (
-      combined.includes('infra') ||
       combined.includes('construction') ||
-      combined.includes('civil') ||
-      combined.includes('building') ||
-      combined.includes('road') ||
-      combined.includes('paving') ||
-      combined.includes('bridge') ||
-      combined.includes('drainage')
+      combined.includes('civil works') ||
+      combined.includes('concreting') ||
+      combined.includes('road opening') ||
+      combined.includes('drainage system')
     ) {
       return 'Infrastructure';
-    }
-    if (combined.includes('consult')) {
-      return 'Consulting';
     }
     return 'Goods';
   };
@@ -178,9 +198,39 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
       return false;
     }
 
+    // 1. Primary Statutory Authority for Delivery Schedule: Section VI Schedule of Requirements
+    const secViKeys = [
+      refNo ? `bidocs_sec_vi_${tenantId}_${refNo}` : '',
+      oppId ? `bidocs_sec_vi_${tenantId}_${oppId}` : ''
+    ].filter(Boolean);
+
+    let deliveryFound = false;
+    for (const key of secViKeys) {
+      const savedSec = localStorage.getItem(key);
+      if (savedSec) {
+        try {
+          const parsed = JSON.parse(savedSec);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const validDelivered = parsed
+              .map((it: any) => (it.delivered || '').trim())
+              .filter(Boolean);
+
+            if (validDelivered.length > 0) {
+              const uniqueSchedules = Array.from(new Set(validDelivered));
+              setDeliverySchedule(uniqueSchedules.join(', '));
+              deliveryFound = true;
+              break;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
     const keysToCheck = [
       refNo ? `bidocs_detailed_estimates_${tenantId}_${refNo}` : '',
-      oppId ? `bidocs_detailed_estimates_${tenantId}_${oppId}` : ''
+      oppId ? `bidocs_detailed_estimates_${tenantId}_${oppId}` : '',
+      refNo ? `bidocs_detailed_estimates_${refNo}` : '',
+      oppId ? `bidocs_detailed_estimates_${oppId}` : ''
     ].filter(Boolean);
 
     for (const key of keysToCheck) {
@@ -214,11 +264,17 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
               setGoodsDescription(parsed.projectName.trim());
             }
 
+            if (!deliveryFound && parsed.deliverySchedule && parsed.deliverySchedule.trim()) {
+              setDeliverySchedule(parsed.deliverySchedule.trim());
+            }
+
             let num = 0;
             if (typeof parsed.totalEstimatedProjectCost === 'number' && parsed.totalEstimatedProjectCost > 0) {
               num = parsed.totalEstimatedProjectCost;
             } else if (parsed.totalBidAmountFigures) {
               num = parseFloat(`${parsed.totalBidAmountFigures}`.replace(/,/g, '')) || 0;
+            } else if (parsed.materials && Array.isArray(parsed.materials)) {
+              num = parsed.materials.reduce((sum: number, m: any) => sum + (Number(m.quantity) || 0) * (Number(m.unitPrice) || 0), 0);
             }
 
             if (num > 0) {
@@ -232,6 +288,8 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
         } catch (e) {}
       }
     }
+
+    if (deliveryFound) return true;
 
     // No detailed estimates exist for this specific project
     setTotalBidAmountFigures('0.00');
@@ -431,6 +489,57 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
               Statutory Financial Envelope Bid Form for {projectCategory === 'Infrastructure' ? 'Infrastructure Projects' : (projectCategory === 'Consulting' ? 'Consulting Services' : 'Goods Procurement')} (Auto-Classified from Opportunity Finder)
             </p>
           </div>
+        </div>
+
+        {/* PROMINENT ACTIVE TARGET PROJECT SELECTOR */}
+        {oppProjects.length > 0 && (
+          <div className={`flex items-center gap-2 bg-slate-950 border rounded-xl px-3 py-1.5 shadow-inner ${projectCategory === 'Infrastructure' ? 'border-amber-500/50' : (projectCategory === 'Consulting' ? 'border-emerald-500/50' : 'border-blue-500/50')}`}>
+            <FolderKanban className={`w-4 h-4 shrink-0 ${projectCategory === 'Infrastructure' ? 'text-amber-400' : (projectCategory === 'Consulting' ? 'text-emerald-400' : 'text-blue-400')}`} />
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <span className={`text-[9px] font-mono font-bold uppercase ${projectCategory === 'Infrastructure' ? 'text-amber-300' : (projectCategory === 'Consulting' ? 'text-emerald-300' : 'text-blue-300')}`}>
+                  Target Bidding Project:
+                </span>
+                {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                  <span className="text-[8.5px] text-amber-400 font-bold font-mono flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
+                    <Lock className="w-2.5 h-2.5 text-amber-400" />
+                    <span>Locked</span>
+                  </span>
+                )}
+              </div>
+              <select
+                value={selectedOppId}
+                disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
+                onChange={(e) => handleSelectOpportunity(e.target.value)}
+                className="bg-transparent text-white font-mono font-bold text-xs focus:outline-none cursor-pointer pr-2 max-w-[280px] truncate disabled:opacity-85 disabled:cursor-not-allowed"
+              >
+                <option value="" className="bg-slate-900 text-slate-400">-- Select Opportunity Project --</option>
+                {oppProjects.map((p) => (
+                  <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                    [{p.refNo}] {p.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* STATUTORY TEMPLATE FORMAT TOGGLE */}
+        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <button
+            onClick={() => setProjectCategory('Goods')}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${projectCategory === 'Goods' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+            title="Switch to Statutory Goods Bid Form (Appendix 1)"
+          >
+            📦 For Goods
+          </button>
+          <button
+            onClick={() => setProjectCategory('Infrastructure')}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${projectCategory === 'Infrastructure' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}
+            title="Switch to Statutory Infrastructure Bid Form (GPPB Res. 09-2020)"
+          >
+            🏗️ For Infra
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -639,6 +748,19 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
                   className="w-full bg-slate-950/80 border border-slate-800 rounded-lg px-2.5 py-1.5 text-amber-300 font-mono text-xs focus:outline-none cursor-not-allowed text-right font-medium"
                 />
               </div>
+
+              <div>
+                <label className="block text-slate-400 font-mono text-[10px] mb-1 font-bold text-cyan-300">
+                  Delivery Schedule (Calendar Days):
+                </label>
+                <input
+                  type="text"
+                  value={deliverySchedule}
+                  onChange={(e) => setDeliverySchedule(e.target.value)}
+                  placeholder="e.g. 30 Calendar Days upon receipt of NTP"
+                  className="w-full bg-slate-950 border border-cyan-500/60 rounded-lg px-2.5 py-1.5 text-cyan-200 font-mono text-xs focus:outline-none focus:border-cyan-400"
+                />
+              </div>
             </div>
 
             {/* Total Bid Price in Words Preview Banner */}
@@ -836,47 +958,54 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
                 </div>
 
                 {/* Signatory Block */}
-                <div className="pt-0.5 flex justify-end">
-                  <div className="space-y-0.5 text-[10px] font-serif text-black w-full max-w-[320px] text-right">
-                    <div>
-                      <p className="text-black text-[9px] font-bold">Name of Authorized Signatory:</p>
-                      <p className="font-bold text-[10.5px] uppercase text-black border-b border-black py-0.5">{signatoryName}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-black text-[9px] font-bold">Legal Capacity / Title:</p>
-                      <p className="font-semibold text-[10px] text-black border-b border-black py-0.5">{signatoryTitle}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-black text-[9px] font-bold">Duly authorized to sign Bid for and on behalf of:</p>
-                      <p className="font-bold text-[10px] uppercase text-black border-b border-black py-0.5">{companyName}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-black text-[9px] font-bold">Date Signed:</p>
-                      <p className="font-bold text-[10px] font-serif text-black border-b border-black py-0.5">{dateSubmitted}</p>
-                    </div>
+                <div className="pt-1 font-serif text-[9.5px] text-black space-y-1 border-t border-slate-300">
+                  <div className="grid grid-cols-1 gap-0.5">
+                    <p>
+                      <span className="font-bold">Name: </span>
+                      <span className="font-bold uppercase underline text-black">{signatoryName}</span>
+                    </p>
+                    <p>
+                      <span className="font-bold">Legal Capacity: </span>
+                      <span className="font-semibold underline text-black">{signatoryTitle}</span>
+                    </p>
+                    <p>
+                      <span className="font-bold">Signature: </span>
+                      <span className="inline-block border-b border-black w-72"></span>
+                    </p>
+                    <p>
+                      <span className="font-bold">Duly authorized to sign the Bid for and behalf of: </span>
+                      <span className="font-bold uppercase underline text-black">{companyName}</span>
+                    </p>
+                    <p>
+                      <span className="font-bold">Date: </span>
+                      <span className="font-bold underline text-black">{dateSubmitted}</span>
+                    </p>
                   </div>
                 </div>
               </div>
             ) : (
               /* =========================================================================
-                 100% UNTOUCHED STATUTORY GOODS / CONSULTING BID FORM (OFFICIAL GPPB STANDARD)
+                 100% UNTOUCHED STATUTORY GOODS / CONSULTING BID FORM (GPPB APPENDIX 1)
                  ========================================================================= */
               <div className="space-y-1.5 flex-1 text-black flex flex-col justify-between">
-                {/* 1. Centered Header Title Block */}
-                <div className="text-center border-b-2 border-black pb-1 shrink-0">
-                  <h1 className="text-xs sm:text-sm font-bold font-serif uppercase tracking-wider text-black">
-                    {projectCategory === 'Consulting' ? 'Bid Form for Consulting Services' : 'Bid Form for the Procurement of Goods'}
-                  </h1>
-                  <p className="text-[9.5px] italic text-black font-serif font-bold">
-                    [shall be submitted with the Bid]
-                  </p>
+                {/* 1. Top Right Appendix Tag & Centered Header Title Block */}
+                <div className="shrink-0">
+                  <div className="text-right text-[10px] font-serif font-bold text-black uppercase tracking-wider mb-0.5">
+                    APPENDIX &ldquo;1&rdquo;
+                  </div>
+                  <div className="text-center pb-1">
+                    <h1 className="text-sm font-bold font-serif uppercase tracking-wider text-black">
+                      {projectCategory === 'Consulting' ? 'Bid Form for Consulting Services' : 'Bid Form for the Procurement of Goods'}
+                    </h1>
+                    <p className="text-[10px] italic text-black font-serif font-semibold">
+                      [shall be submitted with the Bid]
+                    </p>
+                  </div>
+                  <hr className="border-t border-black my-1" />
                 </div>
 
                 {/* 2. Top Header Metadata Row */}
-                <div className="py-0.5 border-b border-black/60 font-serif text-[10.5px] leading-tight space-y-0.5 text-black shrink-0">
+                <div className="py-0.5 font-serif text-[10.5px] leading-tight space-y-0.5 text-black shrink-0">
                   <div className="text-center">
                     <h2 className="font-bold text-xs sm:text-sm tracking-wider uppercase text-black font-serif">
                       BID FORM
@@ -884,7 +1013,7 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
                   </div>
                   <div className="text-right space-y-0.5 text-[10px] text-black font-serif font-medium">
                     <div>
-                      <span className="font-bold">Date of Submission : </span>
+                      <span className="font-bold">Date : </span>
                       <span className="font-bold underline text-black">{dateSubmitted}</span>
                     </div>
                     <div>
@@ -940,18 +1069,18 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
                   <div className="flex gap-1.5 items-start pl-2">
                     <span className="font-bold text-black shrink-0">a.</span>
                     <p className="text-justify font-normal text-black">
-                      to deliver the goods in accordance with the delivery schedule specified in the Schedule of Requirements of the Philippine Bidding Documents (PBDs);
+                      to deliver the goods in accordance with the delivery schedule specified in the Schedule of Requirements of the Philippine Bidding Documents (PBDs) (<span className="font-bold underline text-black">{deliverySchedule}</span>);
                     </p>
                   </div>
                   <div className="flex gap-1.5 items-start pl-2">
                     <span className="font-bold text-black shrink-0">b.</span>
                     {performanceSecurityOption === 'PSD' ? (
                       <p className="text-justify font-normal text-black">
-                        to submit a <span className="font-bold underline uppercase text-black">Performance Securing Declaration</span> in lieu of the allowable forms of Performance Security for the due performance of the Contract, and within the times prescribed in the PBDs;
+                        to provide a performance security in the form of a <span className="font-bold underline uppercase text-black">Performance Securing Declaration</span> in lieu of the allowable forms of Performance Security for the due performance of the Contract, and within the times prescribed in the PBDs;
                       </p>
                     ) : performanceSecurityOption === 'MANAGERS_CHECK' ? (
                       <p className="text-justify font-normal text-black">
-                        to provide a performance security in the form of <span className="font-bold underline text-black">Cash, Cashier's / Manager's Check, Bank Draft/Guarantee or Irrevocable Letter of Credit</span> in the amount of <span className="font-bold underline text-black">{performanceSecurityPercent || 'five (5)'} percent</span> of the Contract Price, and within the times prescribed in the PBDs;
+                        to provide a performance security in the form of <span className="font-bold underline text-black">Cash, Cashier&apos;s / Manager&apos;s Check, Bank Draft/Guarantee or Irrevocable Letter of Credit</span> in the amount of <span className="font-bold underline text-black">{performanceSecurityPercent || 'five (5)'} percent</span> of the Contract Price, and within the times prescribed in the PBDs;
                       </p>
                     ) : (
                       <p className="text-justify font-normal text-black">
@@ -983,7 +1112,7 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
                   <div className="text-center font-bold italic py-0.5 text-black">
                     {commissionsText || 'None'}
                   </div>
-                  <p className="italic text-[8.5px] font-bold text-black">(if none, state "None")]</p>
+                  <p className="italic text-[8.5px] font-bold text-black">(if none, state &ldquo;None&rdquo;)]</p>
                 </div>
 
                 {/* 7. Closing Statutory Declarations */}
@@ -992,7 +1121,7 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
                     Until a formal Contract is prepared and executed, this Bid, together with your written acceptance thereof and your Notice of Award, shall be binding upon us.
                   </p>
                   <p className="text-justify font-normal text-black">
-                    We understand that you are not bound to accept the Lowest Calculated Bid or any other Bid you may receive.
+                    We understand that you are not bound to accept the Lowest Calculated Bid or any Bid you may receive.
                   </p>
                   <p className="text-justify font-normal text-black">
                     We certify/confirm that we comply with the eligibility requirements pursuant to the PBDs.
@@ -1005,28 +1134,29 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
                   </p>
                 </div>
 
-                {/* 8. RIGHT-ALIGNED STACKED SIGNATORY BLOCK */}
-                <div className="pt-0.5 flex justify-end">
-                  <div className="space-y-0.5 text-[10px] font-serif text-black w-full max-w-[320px] text-right">
-                    <div>
-                      <p className="text-black text-[9px] font-bold">Name of Authorized Signatory:</p>
-                      <p className="font-bold text-[10.5px] uppercase text-black border-b border-black py-0.5">{signatoryName}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-black text-[9px] font-bold">Legal Capacity / Title:</p>
-                      <p className="font-semibold text-[10px] text-black border-b border-black py-0.5">{signatoryTitle}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-black text-[9px] font-bold">Duly authorized to sign Bid for and on behalf of:</p>
-                      <p className="font-bold text-[10px] uppercase text-black border-b border-black py-0.5">{companyName}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-black text-[9px] font-bold">Date Signed:</p>
-                      <p className="font-bold text-[10px] font-serif text-black border-b border-black py-0.5">{dateSubmitted}</p>
-                    </div>
+                {/* 8. STATUTORY GPPB SIGNATORY BLOCK */}
+                <div className="pt-1 font-serif text-[9.5px] text-black space-y-1 border-t border-slate-300">
+                  <div className="grid grid-cols-1 gap-0.5">
+                    <p>
+                      <span className="font-bold">Name: </span>
+                      <span className="font-bold uppercase underline text-black">{signatoryName}</span>
+                    </p>
+                    <p>
+                      <span className="font-bold">Legal capacity: </span>
+                      <span className="font-semibold underline text-black">{signatoryTitle}</span>
+                    </p>
+                    <p>
+                      <span className="font-bold">Signature: </span>
+                      <span className="inline-block border-b border-black w-72"></span>
+                    </p>
+                    <p>
+                      <span className="font-bold">Duly authorized to sign the Bid for and behalf of: </span>
+                      <span className="font-bold uppercase underline text-black">{companyName}</span>
+                    </p>
+                    <p>
+                      <span className="font-bold">Date: </span>
+                      <span className="font-bold underline text-black">{dateSubmitted}</span>
+                    </p>
                   </div>
                 </div>
               </div>

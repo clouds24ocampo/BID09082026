@@ -8,6 +8,7 @@ import {
   ExportDocumentUnit 
 } from '../../utils/pdfExportEngine';
 import { loadPdfData } from '../../utils/vaultIndexedDB';
+import { PDFDocument } from 'pdf-lib';
 import { 
   X, 
   Folder, 
@@ -26,6 +27,7 @@ import {
   ShieldCheck,
   Maximize2
 } from 'lucide-react';
+import DocumentQrCode from '../common/DocumentQrCode';
 
 interface MergedPackageViewerModalProps {
   isOpen: boolean;
@@ -66,7 +68,19 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
     COPY_2: false
   });
   const [statusMessage, setStatusMessage] = useState<string>('');
+  const [compileProgress, setCompileProgress] = useState<{
+    percent: number;
+    status: string;
+    currentDoc: number;
+    totalDocs: number;
+  }>({
+    percent: 0,
+    status: '',
+    currentDoc: 0,
+    totalDocs: 0
+  });
   const [isExportingAll, setIsExportingAll] = useState<boolean>(false);
+  const [docPageCounts, setDocPageCounts] = useState<Record<string, number>>({});
 
   const tenantId = tenant?.id || '';
   const projectScopeKey = activeProject?.refNo || projectRefNo || 'PRJ-2026';
@@ -97,6 +111,27 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
       color: 'purple'
     }
   ];
+
+  // Helper to compute exact page range for each document item in the merged bundle
+  const getDocumentPageRange = (itemIndex: number) => {
+    // Page 1 is always the Table of Contents
+    let startPage = 2;
+    for (let i = 0; i < itemIndex; i++) {
+      const pastItem = items[i];
+      const attachedPages = docPageCounts[pastItem.id] || 1;
+      // 1 Cover Page + attachedPages
+      const totalPagesForPastItem = 1 + attachedPages;
+      startPage += totalPagesForPastItem;
+    }
+    const currentItem = items[itemIndex];
+    const currentAttachedPages = currentItem ? (docPageCounts[currentItem.id] || 1) : 1;
+    const endPage = startPage + (1 + currentAttachedPages) - 1;
+    return {
+      startPage,
+      endPage,
+      pageText: startPage === endPage ? `Page ${startPage}` : `Page ${startPage} to ${endPage}`
+    };
+  };
 
   // Comprehensive Resolver for Attached Document Streams (Section VII, Section VI, BSD, OSS, Vault & Templates)
   const resolveAttachmentForDoc = async (doc: PackageItem): Promise<string | null> => {
@@ -192,12 +227,17 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
       `summarybid_${tenantId}_${projectScopeKey}`
     ];
 
-    for (const k of candidateKeys) {
-      try {
-        const data = await loadPdfData(k);
-        if (data) return data;
-      } catch (_) {}
-    }
+    const idbResults = await Promise.all(
+      candidateKeys.map(async (k) => {
+        try {
+          const data = await loadPdfData(k);
+          if (data) return data;
+        } catch (_) {}
+        return null;
+      })
+    );
+    const foundData = idbResults.find(res => Boolean(res));
+    if (foundData) return foundData;
 
     return null;
   };
@@ -207,17 +247,31 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
     if (items.length === 0) return null;
 
     setIsCompiling(prev => ({ ...prev, [folderCopy]: true }));
-    setStatusMessage(`Compiling ${folderCopy} package with all cover separators & attachments...`);
+    setStatusMessage(`Compiling ${folderCopy} package...`);
 
     try {
       const units: ExportDocumentUnit[] = [];
 
+      // 1. FIRST PAGE: Table of Contents & Statutory Checklist for this Folder Copy
+      const tocElem = document.getElementById(`preview-toc-${folderCopy}`) as HTMLElement | null;
+      if (tocElem) {
+        units.push({
+          title: `Table of Contents (${folderCopy})`,
+          coverElement: tocElem,
+          fileDataUrl: null,
+          documentName: `Table of Contents — ${folderCopy}`
+        });
+      }
+
+      // Pre-resolve all attachments in parallel
+      const resolvedAttachments = await Promise.all(
+        items.map(doc => resolveAttachmentForDoc(doc))
+      );
+
+      // 2. Subsequent Pages: Included Documents with Cover Separators and Attached PDF Streams
       for (let i = 0; i < items.length; i++) {
         const doc = items[i];
-        setStatusMessage(`[${folderCopy}] Processing ${i + 1}/${items.length}: ${doc.documentName}...`);
-
-        // Attached Document Stream from Vault / IndexedDB / Forms Directory
-        const fileDataUrl = await resolveAttachmentForDoc(doc);
+        const fileDataUrl = resolvedAttachments[i];
 
         // Cover Page Element rendered specifically for this folder copy
         const coverElem = document.getElementById(`preview-cover-${folderCopy}-${doc.id}`) as HTMLElement | null;
@@ -230,46 +284,42 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
         });
       }
 
+      setCompileProgress(prev => ({
+        ...prev,
+        percent: 85,
+        status: `Stamping "Page X of Y" pagination on ${folderCopy} package...`
+      }));
       setStatusMessage(`Stamping "Page X of Y" pagination on ${folderCopy} package...`);
+      
       const outputFileName = `${cleanRef}_${folderCopy}_${envTag}_MERGED_PACKAGE.pdf`;
-      const dataUrl = await buildMergedThreeLayerPdfDataUrl(units, outputFileName);
+      const dataUrl = await buildMergedThreeLayerPdfDataUrl(
+        units,
+        outputFileName,
+        (progress) => {
+          setCompileProgress(progress);
+          setStatusMessage(progress.status);
+        }
+      );
 
       setCompiledPdfs(prev => ({ ...prev, [folderCopy]: dataUrl }));
-      setIsCompiling(prev => ({ ...prev, [folderCopy]: false }));
-      setStatusMessage('');
+      setStatusMessage(`Merged ${folderCopy} package ready.`);
       return dataUrl;
     } catch (err) {
-      console.error(`Failed to compile ${folderCopy} merged PDF:`, err);
-      setIsCompiling(prev => ({ ...prev, [folderCopy]: false }));
-      setStatusMessage(`Error compiling ${folderCopy}.`);
+      console.error(`Error compiling ${folderCopy} package:`, err);
+      setStatusMessage(`Error compiling ${folderCopy} package.`);
       return null;
+    } finally {
+      setIsCompiling(prev => ({ ...prev, [folderCopy]: false }));
     }
   };
 
-  // Compile on mount for the active folder copy, and pre-compile copies sequentially
+  // Compile on-demand ONLY for the currently active folder copy
   useEffect(() => {
     if (!isOpen) return;
 
-    const runCompilation = async () => {
-      // 1. First compile the currently selected folder
-      if (!compiledPdfs[activeFolder] && !isCompiling[activeFolder]) {
-        await compileFolderPdf(activeFolder);
-      }
-
-      // 2. Automatically generate Copy 1 and Copy 2 in the background
-      const otherCopies: FolderCopyType[] = (['ORIGINAL', 'COPY_1', 'COPY_2'] as FolderCopyType[]).filter(c => c !== activeFolder);
-      for (const copy of otherCopies) {
-        if (!compiledPdfs[copy] && !isCompiling[copy]) {
-          await compileFolderPdf(copy);
-        }
-      }
-    };
-
-    const timer = setTimeout(() => {
-      runCompilation();
-    }, 150);
-
-    return () => clearTimeout(timer);
+    if (!compiledPdfs[activeFolder] && !isCompiling[activeFolder]) {
+      compileFolderPdf(activeFolder);
+    }
   }, [isOpen, activeFolder]);
 
   if (!isOpen) return null;
@@ -486,15 +536,48 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
           {/* RIGHT VIEWPORT: Interactive Full PDF Previewer */}
           <div className="lg:col-span-8 bg-slate-950 flex flex-col items-center justify-center p-3 relative overflow-hidden">
             {isCurrentCompiling ? (
-              <div className="text-center space-y-3 p-8 animate-fadeIn">
-                <Loader2 className="w-10 h-10 text-purple-400 animate-spin mx-auto" />
-                <div>
-                  <p className="text-sm font-bold text-white">
-                    Compiling {activeFolder} Merged PDF...
-                  </p>
-                  <p className="text-xs text-slate-400 font-mono mt-1">
-                    {statusMessage || 'Stamping "Page X of Y" pagination on every single page...'}
-                  </p>
+              <div className="w-full max-w-md p-6 sm:p-8 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl space-y-5 animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 animate-pulse">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white leading-tight">
+                        Merging {activeFolder} Package...
+                      </h4>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                        {compileProgress.currentDoc > 0 
+                          ? `Document ${compileProgress.currentDoc} of ${compileProgress.totalDocs || items.length}` 
+                          : 'Preparing documents & cover sheets...'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-2xl font-black font-mono text-purple-400">
+                      {Math.min(100, Math.max(0, compileProgress.percent))}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* ANIMATED GLOWING PROGRESS BAR */}
+                <div className="space-y-1.5">
+                  <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5 relative shadow-inner">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 transition-all duration-300 ease-out shadow-[0_0_12px_rgba(168,85,247,0.6)]"
+                      style={{ width: `${Math.min(100, Math.max(5, compileProgress.percent))}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
+                    <span>PDF Merging Engine</span>
+                    <span>Legal 8.5" × 13" High-Speed</span>
+                  </div>
+                </div>
+
+                {/* CURRENT ACTIVE STEP STATUS */}
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-2.5 text-xs font-mono text-slate-300">
+                  <Loader2 className="w-4 h-4 text-purple-400 animate-spin shrink-0" />
+                  <span className="truncate">{compileProgress.status || statusMessage || 'Processing documents...'}</span>
                 </div>
               </div>
             ) : currentPdfDataUrl ? (
@@ -506,6 +589,16 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
                     <span>Live PDF Preview: <strong className="text-white">{activeFolder} COPY</strong></span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <a
+                      href={currentPdfDataUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-mono text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20 flex items-center gap-1.5 transition"
+                      title="Open PDF in new browser tab"
+                    >
+                      <Maximize2 className="w-3 h-3" />
+                      <span>Open in Tab</span>
+                    </a>
                     <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                       ✓ Complete 8.5" × 13" Legal Bundle
                     </span>
@@ -513,10 +606,10 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
                 </div>
 
                 {/* Embedded PDF Viewer */}
-                <div className="flex-1 w-full bg-slate-950 relative min-h-[500px]">
+                <div className="flex-1 w-full bg-slate-900 relative min-h-[500px]">
                   <iframe
                     src={`${currentPdfDataUrl}#toolbar=1&navpanes=0&scrollbar=1`}
-                    className="w-full h-full border-none"
+                    className="w-full h-full border-none bg-slate-900"
                     title={`Merged PDF Preview for ${activeFolder}`}
                   />
                 </div>
@@ -538,9 +631,134 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
         </div>
 
         {/* OFF-SCREEN HIDDEN CONTAINER FOR RENDERING FOLDER-SPECIFIC COVER PAGES */}
-        <div className="fixed -left-[9999px] -top-[9999px] pointer-events-none opacity-0 overflow-hidden" aria-hidden="true">
+        <div 
+          className="fixed left-0 top-0 pointer-events-none opacity-0 overflow-hidden" 
+          style={{ width: '816px', zIndex: -9999 }}
+          aria-hidden="true"
+        >
           {(['ORIGINAL', 'COPY_1', 'COPY_2'] as FolderCopyType[]).map((fCopy) => (
             <div key={`hidden-group-${fCopy}`}>
+              {/* Table of Contents DOM element for this folder copy */}
+              <div
+                id={`preview-toc-${fCopy}`}
+                style={{ width: '800px', minHeight: '1100px' }}
+                className="bg-white text-black p-8 border-4 border-black font-sans flex flex-col justify-between"
+              >
+                <div>
+                  {/* Company Header */}
+                  <div className="text-center border-b-2 border-black pb-3 space-y-1">
+                    <h1 className="text-2xl font-black uppercase tracking-wider text-black">
+                      {tenant?.companyName || 'BIDDING ENTERPRISE CORPORATION'}
+                    </h1>
+                    <p className="text-xs text-slate-700 font-medium">
+                      {tenant?.address || 'Metro Manila, Philippines'} • TIN: <span className="font-mono font-bold">{tenant?.tin || '000-000-000-000'}</span> • PhilGEPS: <span className="font-bold text-blue-950">{tenant?.philgepsPlatinumNo || 'PLAT-2026-ACTIVE'}</span>
+                    </p>
+                  </div>
+
+                  {/* TOC Banner */}
+                  <div className="my-4 space-y-2">
+                    <div className="p-3 border-2 border-black bg-slate-900 text-white rounded-xl flex items-center justify-between gap-3 text-left">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-base font-black uppercase tracking-wider text-amber-300">
+                            TABLE OF CONTENTS & STATUTORY CHECKLIST
+                          </h2>
+                          <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 text-[11px] font-mono font-black uppercase">
+                            ★ {fCopy === 'ORIGINAL' ? 'ORIGINAL COPY' : fCopy === 'COPY_1' ? 'COPY 1 (DUPLICATE)' : 'COPY 2 (TRIPLICATE)'}
+                          </span>
+                        </div>
+                        <p className="text-[10.5px] text-slate-300 font-medium">
+                          {activeEnvelope === 'ENVELOPE_1' ? 'ENVELOPE 1: ELIGIBILITY & TECHNICAL COMPONENT' : 'ENVELOPE 2: FINANCIAL BID PROPOSAL'}
+                        </p>
+                      </div>
+                      <div className="text-right text-[11px] font-mono text-slate-300">
+                        <div><strong>PhilGEPS Ref:</strong> {projectRefNo}</div>
+                        <div><strong className="text-emerald-400">ABC:</strong> {activeProject?.abc || '₱0.00'}</div>
+                      </div>
+                    </div>
+
+                    {/* Table */}
+                    <div className="border-2 border-black overflow-hidden rounded-xl">
+                      <table className="w-full text-left text-xs border-collapse font-sans">
+                        <thead>
+                          <tr className="bg-black text-white font-mono font-bold text-[11px]">
+                            <th className="p-2 border-r border-slate-700 w-16 text-center">Tab #</th>
+                            <th className="p-2 border-r border-slate-700">Document Title / Statutory Specification</th>
+                            <th className="p-2 border-r border-slate-700 w-28 text-center">Category</th>
+                            <th className="p-2 border-r border-slate-700 w-28 text-center">Copy</th>
+                            <th className="p-2 w-36 text-center">Page Range in Bundle</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {items.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="p-6 text-center text-slate-400 italic">
+                                (No documents attached)
+                              </td>
+                            </tr>
+                          ) : (
+                            items.map((doc, idx) => {
+                              const range = getDocumentPageRange(idx);
+                              return (
+                                <tr key={doc.id} className="border-t border-slate-300 text-[11px]">
+                                  <td className="p-2 border-r border-slate-300 text-center font-mono font-bold bg-slate-100">
+                                    TAB {idx + 1}
+                                  </td>
+                                  <td className="p-2 border-r border-slate-300 font-bold text-slate-950">
+                                    {doc.documentName}
+                                  </td>
+                                  <td className="p-2 border-r border-slate-300 text-center font-mono text-[10px] text-slate-700 font-semibold">
+                                    {doc.category}
+                                  </td>
+                                  <td className="p-2 border-r border-slate-300 text-center font-mono text-[10px] font-bold text-slate-950 bg-slate-50">
+                                    {fCopy === 'ORIGINAL' ? 'ORIGINAL COPY' : fCopy === 'COPY_1' ? 'COPY 1' : 'COPY 2'}
+                                  </td>
+                                  <td className="p-2 text-center font-mono font-black text-slate-950 text-[10.5px] bg-amber-50/50">
+                                    <span className="px-2 py-0.5 rounded border border-black/40 bg-white shadow-xs">
+                                      {range.pageText}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="border-t-2 border-black pt-3 flex items-center justify-between text-xs mt-6">
+                  <div className="space-y-0.5 text-left">
+                    <p className="text-[10px] font-mono font-bold uppercase text-slate-600">
+                      Table of Contents Certified Correct ({fCopy === 'ORIGINAL' ? 'ORIGINAL' : fCopy === 'COPY_1' ? 'COPY 1' : 'COPY 2'}) By:
+                    </p>
+                    <p className="text-sm font-black uppercase underline text-black tracking-wide">
+                      {tenant?.authorizedSignatory?.name || 'AUTHORIZED MANAGING OFFICER'}
+                    </p>
+                    <p className="text-[11px] text-slate-700 font-medium">
+                      {tenant?.authorizedSignatory?.title || 'President'}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <DocumentQrCode
+                      details={{
+                        documentNumber: projectRefNo || 'PhilGEPS-2026-001',
+                        documentName: `${fCopy} Table of Contents — ${activeEnvelope}`,
+                        projectName: projectTitle,
+                        dateTimeSubmitted: activeProject?.dateTimeSubmitted || (activeProject as any)?.submissionDeadline,
+                        companyName: tenant?.companyName,
+                        solicitationNo: activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'
+                      }}
+                      size={60}
+                      className="border-2 border-black p-0.5 bg-white shrink-0"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {items.map((doc, idx) => {
                 const linkedVaultDoc = vaultDocs.find(v => v.id === doc.vaultDocId) ||
                   vaultDocs.find(v => {

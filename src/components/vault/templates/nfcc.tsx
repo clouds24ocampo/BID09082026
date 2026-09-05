@@ -13,7 +13,8 @@ import {
   Calculator,
   CheckCircle2,
   FileText,
-  Edit3
+  Edit3,
+  Lock
 } from 'lucide-react';
 
 export interface NfccModalProps {
@@ -467,9 +468,18 @@ export const NfccModalContent: React.FC<NfccModalProps> = ({
               </span>
               {oppProjects.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-300">Quick Select Project:</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-300">Target Bidding Project:</span>
+                    {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                      <span className="text-[9px] text-amber-400 font-bold font-mono flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
+                        <Lock className="w-2.5 h-2.5 text-amber-400" />
+                        <span>Locked</span>
+                      </span>
+                    )}
+                  </div>
                   <select
                     value={selectedOppId}
+                    disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                     onChange={(e) => {
                       const id = e.target.value;
                       setSelectedOppId(id);
@@ -489,7 +499,7 @@ export const NfccModalContent: React.FC<NfccModalProps> = ({
                         saveState();
                       }
                     }}
-                    className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-emerald-500"
+                    className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-emerald-500 disabled:opacity-85 disabled:cursor-not-allowed"
                   >
                     <option value="">-- Select Opportunity Project --</option>
                     {oppProjects.map(p => (

@@ -79,7 +79,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
     setPwSuccess('Password updated successfully! System access secured.');
     setTimeout(() => {
       setMustChangePassword(false);
-    }, 1000);
+    }, 200);
   };
 
   const navItems = [

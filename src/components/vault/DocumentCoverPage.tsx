@@ -221,8 +221,63 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
             </p>
             <p>
               <span className="font-bold">PhilGEPS Platinum No:</span>{' '}
-              <span className="font-mono font-bold">{tenant?.philgepsPlatinumNo || '63a5sd1a3s168af47asd6f4'}</span>
+              <span className="font-mono font-bold">{tenant?.philgepsPlatinumNo || '202106-237062-883905538'}</span>
             </p>
+          </div>
+        </div>
+
+        {/* 5. STATUTORY VERIFICATION & BAC ATTESTATION BLOCK (Fills Empty Space Professionally) */}
+        <div className="p-3.5 rounded-xl bg-neutral-50 border-2 border-black space-y-2 text-black shadow-sm">
+          <div className="flex items-center justify-between border-b border-black pb-1.5">
+            <div className="flex items-center gap-1.5 font-black uppercase text-[10.5px] tracking-wide">
+              <ShieldCheck className="w-4 h-4 text-black" />
+              <span>Statutory Verification & BAC Submission Attestation</span>
+            </div>
+            <span className="font-mono text-[9px] font-bold px-2 py-0.5 rounded bg-black text-white">
+              RA 12009 / RA 9184 Standard
+            </span>
+          </div>
+
+          <p className="text-[10px] leading-relaxed text-justify font-serif text-black">
+            This document serves as the official statutory exhibit separator and verified cover sheet for <strong className="uppercase underline text-black">{item.documentName}</strong> forming an integral statutory component of <strong className="uppercase text-black">{envelopeName || officialEnvelopeName}</strong>. The attached document is certified true, authentic, valid, and legally binding as submitted to the Bids and Awards Committee (BAC) in full compliance with the Revised Implementing Rules and Regulations (IRR) of Republic Act No. 9184 and the New Government Procurement Act (RA 12009).
+          </p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 border-t border-black/30 font-mono text-[9.5px]">
+            <div className="bg-white p-2 rounded border border-black">
+              <span className="text-[8.5px] text-neutral-600 font-bold block uppercase">Exhibit Status</span>
+              <strong className="text-black font-black">LEGAL EXHIBIT — TAB {formattedInc}</strong>
+            </div>
+            <div className="bg-white p-2 rounded border border-black">
+              <span className="text-[8.5px] text-neutral-600 font-bold block uppercase">Legal Authority</span>
+              <strong className="text-black font-black">GPPB PBDs 6th Edition</strong>
+            </div>
+            <div className="bg-white p-2 rounded border border-black col-span-2 sm:col-span-1">
+              <span className="text-[8.5px] text-neutral-600 font-bold block uppercase">Copy Verification</span>
+              <strong className="text-black font-black">{normalizedCopy} VERIFIED</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* 6. AUTHORIZED SIGNATORY ATTESTATION SEAL */}
+        <div className="p-3 rounded-xl bg-white border-2 border-black flex items-center justify-between gap-4 shadow-sm">
+          <div className="space-y-0.5 text-left text-black">
+            <span className="text-[9px] font-mono font-bold uppercase text-neutral-600 block">
+              Certified True & Correct For Submission By:
+            </span>
+            <p className="text-xs font-black uppercase underline tracking-wide text-black">
+              {tenant?.authorizedSignatory?.name || 'Authorized Signatory'}
+            </p>
+            <p className="text-[10px] text-neutral-700 font-medium">
+              {tenant?.authorizedSignatory?.title || 'President / General Manager'} • {tenant?.companyName}
+            </p>
+          </div>
+          <div className="text-right shrink-0">
+            <span className="px-2.5 py-1 rounded bg-neutral-100 border border-black text-[9px] font-mono font-black uppercase text-black block text-center">
+              OFFICIAL SEAL
+            </span>
+            <span className="text-[8px] font-mono text-neutral-600 mt-0.5 block">
+              {verificationSealId}
+            </span>
           </div>
         </div>
 

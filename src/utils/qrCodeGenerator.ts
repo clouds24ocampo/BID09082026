@@ -77,11 +77,19 @@ Copy: ${copyFormatted}`;
 
 export const formatQrPayload = formatQrCodePayload;
 
+// In-memory LRU-style cache for generated QR codes (0ms instant retrieval)
+const qrDataUrlCache = new Map<string, string>();
+const qrSvgCache = new Map<string, string>();
+
 /**
  * Generates a high-resolution, 100% smartphone-scannable QR code Data URL.
  */
 export const generateQrCodeDataUrl = async (details: QrCodeDetails): Promise<string> => {
   const payload = formatQrCodePayload(details);
+  if (qrDataUrlCache.has(payload)) {
+    return qrDataUrlCache.get(payload)!;
+  }
+
   try {
     const dataUrl = await QRCode.toDataURL(payload, {
       errorCorrectionLevel: 'M',
@@ -92,6 +100,7 @@ export const generateQrCodeDataUrl = async (details: QrCodeDetails): Promise<str
         light: '#ffffff'
       }
     });
+    qrDataUrlCache.set(payload, dataUrl);
     return dataUrl;
   } catch (err) {
     console.error('Failed to generate QR Code Data URL:', err);
@@ -104,6 +113,10 @@ export const generateQrCodeDataUrl = async (details: QrCodeDetails): Promise<str
  */
 export const generateQrCodeSvg = async (details: QrCodeDetails): Promise<string> => {
   const payload = formatQrCodePayload(details);
+  if (qrSvgCache.has(payload)) {
+    return qrSvgCache.get(payload)!;
+  }
+
   try {
     const svgString = await QRCode.toString(payload, {
       type: 'svg',
@@ -114,6 +127,7 @@ export const generateQrCodeSvg = async (details: QrCodeDetails): Promise<string>
         light: '#ffffff'
       }
     });
+    qrSvgCache.set(payload, svgString);
     return svgString;
   } catch (err) {
     console.error('Failed to generate QR Code SVG:', err);

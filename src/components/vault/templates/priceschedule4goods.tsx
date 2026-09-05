@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
+import { autoFitPageChunks, calculateRowHeight } from '../../../utils/autoFitEngine';
 import { savePdfData } from '../../../utils/vaultIndexedDB';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import {
@@ -106,22 +107,26 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  // Helper to load Detailed Estimates (Form L) with fallback to Section VI Schedule of Requirements
-  const loadProjectData = (projectKey: string, candidateTitle?: string) => {
-    if (!projectKey && !candidateTitle) return;
+  // Helper to load Detailed Estimates (Form L) with fallback to Section VI strictly for this project
+  const loadProjectData = (projectKey: string, candidateTitle?: string, targetOppId?: string) => {
+    if (!projectKey && !candidateTitle && !targetOppId) {
+      setItems([]);
+      setLaborLumpSum(0);
+      setLogisticsLumpSum(0);
+      setEquipmentLumpSum(0);
+      setIsSyncedFromDetailedEstimates(false);
+      return;
+    }
     
     const tenantId = tenant?.id || 'default';
     let savedDetEst: string | null = null;
 
-    // 1. Direct exact key match
-    if (projectKey) {
+    // 1. Direct exact key match (strictly non-default)
+    if (projectKey && projectKey !== 'default') {
       savedDetEst = localStorage.getItem(`bidocs_detailed_estimates_${tenantId}_${projectKey}`);
     }
-
-    // 2. Clean key match
-    if (!savedDetEst && projectKey) {
-      const cleanKey = projectKey.replace(/[^a-zA-Z0-9_-]/g, '_');
-      savedDetEst = localStorage.getItem(`bidocs_detailed_estimates_${tenantId}_${cleanKey}`);
+    if (!savedDetEst && targetOppId && targetOppId !== 'default') {
+      savedDetEst = localStorage.getItem(`bidocs_detailed_estimates_${tenantId}_${targetOppId}`);
     }
 
     let loadedFromDetEst = false;
@@ -130,30 +135,39 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
       try {
         const parsed = JSON.parse(savedDetEst);
         if (parsed) {
-          const laborCost = parseNumeric(parsed.totalLaborCost);
-          const logCost = parseNumeric(parsed.totalLogisticsCost);
-          const eqCost = parseNumeric(parsed.totalEquipmentCost);
+          // STRICT PROJECT SCOPE VALIDATION:
+          // Ensure this estimate belongs to this project only
+          const parsedRef = parsed.projectRefNo || '';
+          const isMatch = (parsedRef && (parsedRef === projectKey || parsedRef === targetOppId)) ||
+                          (projectKey && projectKey !== 'default') ||
+                          (targetOppId && targetOppId !== 'default');
 
-          setLaborLumpSum(laborCost);
-          setLogisticsLumpSum(logCost);
-          setEquipmentLumpSum(eqCost);
+          if (isMatch) {
+            const laborCost = parseNumeric(parsed.totalLaborCost);
+            const logCost = parseNumeric(parsed.totalLogisticsCost);
+            const eqCost = parseNumeric(parsed.totalEquipmentCost);
 
-          if (Array.isArray(parsed.materials) && parsed.materials.length > 0) {
-            const rows: PriceScheduleItemRow[] = parsed.materials.map((item: any, idx: number) => {
-              const qty = parseNumeric(item.quantity);
-              const unitP = parseNumeric(item.unitPrice);
-              return {
-                id: item.id || `row-det-${idx + 1}`,
-                itemNo: item.itemNo || `${idx + 1}`,
-                description: item.description || `Material Item ${idx + 1}`,
-                countryOfOrigin: 'Philippines',
-                quantity: qty > 0 ? qty : 1,
-                unitPriceSec6: unitP > 0 ? unitP : 0
-              };
-            });
-            setItems(rows);
-            loadedFromDetEst = true;
-            setIsSyncedFromDetailedEstimates(true);
+            setLaborLumpSum(laborCost);
+            setLogisticsLumpSum(logCost);
+            setEquipmentLumpSum(eqCost);
+
+            if (Array.isArray(parsed.materials) && parsed.materials.length > 0) {
+              const rows: PriceScheduleItemRow[] = parsed.materials.map((item: any, idx: number) => {
+                const qty = parseNumeric(item.quantity);
+                const unitP = parseNumeric(item.unitPrice);
+                return {
+                  id: item.id || `row-det-${idx + 1}`,
+                  itemNo: item.itemNo || `${idx + 1}`,
+                  description: item.description || `Material Item ${idx + 1}`,
+                  countryOfOrigin: 'Philippines',
+                  quantity: qty > 0 ? qty : 1,
+                  unitPriceSec6: unitP > 0 ? unitP : 0
+                };
+              });
+              setItems(rows);
+              loadedFromDetEst = true;
+              setIsSyncedFromDetailedEstimates(true);
+            }
           }
         }
       } catch (e) {
@@ -161,7 +175,7 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
       }
     }
 
-    // 2. If not found in Detailed Estimates, fallback to Section VI Schedule of Requirements
+    // 2. If not found in Detailed Estimates, fallback strictly to Section VI for THIS project only
     if (!loadedFromDetEst) {
       setIsSyncedFromDetailedEstimates(false);
       setLaborLumpSum(0);
@@ -169,9 +183,8 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
       setEquipmentLumpSum(0);
 
       const candidateKeys = [
-        `bidocs_sec_vi_${tenantId}_${projectKey}`,
-        selectedOppId ? `bidocs_sec_vi_${tenantId}_${selectedOppId}` : '',
-        projectRefNo ? `bidocs_sec_vi_${tenantId}_${projectRefNo}` : ''
+        projectKey && projectKey !== 'default' ? `bidocs_sec_vi_${tenantId}_${projectKey}` : '',
+        targetOppId && targetOppId !== 'default' ? `bidocs_sec_vi_${tenantId}_${targetOppId}` : ''
       ].filter(Boolean);
 
       let secViItems: any[] = [];
@@ -190,21 +203,26 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
         }
       }
 
-      const rows: PriceScheduleItemRow[] = secViItems.map((item: any, idx: number) => {
-        const qtyNum = parseNumeric(item.quantity);
-        const unitNum = parseNumeric(item.unitAmount || item.unitCost);
+      if (secViItems.length > 0) {
+        const rows: PriceScheduleItemRow[] = secViItems.map((item: any, idx: number) => {
+          const qtyNum = parseNumeric(item.quantity);
+          const unitNum = parseNumeric(item.unitAmount || item.unitCost || item.unitPrice);
 
-        return {
-          id: `row-sec6-${item.id || idx + 1}`,
-          itemNo: `${idx + 1}`,
-          description: item.description || `Section VI Item ${idx + 1}`,
-          countryOfOrigin: 'Philippines',
-          quantity: qtyNum > 0 ? qtyNum : 1,
-          unitPriceSec6: unitNum > 0 ? unitNum : 140
-        };
-      });
+          return {
+            id: `row-sec6-${item.id || idx + 1}`,
+            itemNo: `${idx + 1}`,
+            description: item.description || `Section VI Item ${idx + 1}`,
+            countryOfOrigin: 'Philippines',
+            quantity: qtyNum > 0 ? qtyNum : 1,
+            unitPriceSec6: unitNum > 0 ? unitNum : 0
+          };
+        });
 
-      setItems(rows);
+        setItems(rows);
+      } else {
+        // STRICT ISOLATION: Zero items for unconfigured projects
+        setItems([]);
+      }
     }
   };
 
@@ -212,26 +230,43 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
   const [projectCategory, setProjectCategory] = useState<'Goods' | 'Infrastructure' | 'Consulting'>('Goods');
 
   const detectCategoryFromProject = (titleStr: string, refNoStr: string, catStr?: string): 'Goods' | 'Infrastructure' | 'Consulting' => {
+    const titleLower = (titleStr || '').toLowerCase();
+    if (
+      titleLower.includes('public address') ||
+      titleLower.includes('solar') ||
+      titleLower.includes('supply') ||
+      titleLower.includes('equipment') ||
+      titleLower.includes('cctv') ||
+      titleLower.includes('ict') ||
+      titleLower.includes('hardware') ||
+      titleLower.includes('software') ||
+      titleLower.includes('goods') ||
+      titleLower.includes('supplies') ||
+      titleLower.includes('furniture') ||
+      titleLower.includes('appliances') ||
+      titleLower.includes('vehicle') ||
+      titleLower.includes('medicine') ||
+      titleLower.includes('medical') ||
+      titleLower.includes('food') ||
+      titleLower.includes('catering')
+    ) {
+      return 'Goods';
+    }
+
     const catUpper = (catStr || '').toUpperCase();
-    if (catUpper.includes('INFRA')) return 'Infrastructure';
-    if (catUpper.includes('CONSULT')) return 'Consulting';
     if (catUpper.includes('GOOD')) return 'Goods';
+    if (catUpper.includes('CONSULT') || titleLower.includes('consult')) return 'Consulting';
+    if (catUpper.includes('INFRA')) return 'Infrastructure';
 
     const combined = `${titleStr || ''} ${refNoStr || ''}`.toLowerCase();
     if (
-      combined.includes('infra') ||
       combined.includes('construction') ||
-      combined.includes('civil') ||
-      combined.includes('building') ||
-      combined.includes('road') ||
-      combined.includes('paving') ||
-      combined.includes('bridge') ||
-      combined.includes('drainage')
+      combined.includes('civil works') ||
+      combined.includes('concreting') ||
+      combined.includes('road opening') ||
+      combined.includes('drainage system')
     ) {
       return 'Infrastructure';
-    }
-    if (combined.includes('consult')) {
-      return 'Consulting';
     }
     return 'Goods';
   };
@@ -241,35 +276,33 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
 
-    const activeKey = activeProjectRefNo || (list.length > 0 ? list[0].refNo : '');
-    if (activeKey) {
-      const match = list.find(p => p.refNo === activeKey);
-      if (match) {
-        setSelectedOppId(match.id);
-        setProjectRefNo(match.refNo);
-        setProjectTitle(match.title);
-        setProcuringEntity(match.procuringEntity);
-        if (match.dateTimeSubmitted) setDateSubmitted(match.dateTimeSubmitted);
-        setProjectCategory(detectCategoryFromProject(match.title, match.refNo, match.category));
-        loadProjectData(match.refNo, match.title);
-      } else {
-        setProjectRefNo(activeKey);
-        if (activeProjectTitle) setProjectTitle(activeProjectTitle);
-        if (activeProcuringEntity) setProcuringEntity(activeProcuringEntity);
-        setProjectCategory(detectCategoryFromProject(activeProjectTitle || '', activeKey));
-        loadProjectData(activeKey, activeProjectTitle);
-      }
+    let targetMatch: OpportunityProjectOption | undefined;
+    if (activeProjectRefNo) {
+      targetMatch = list.find(p => p.refNo === activeProjectRefNo);
     } else if (list.length > 0) {
-      const first = list[0];
-      setSelectedOppId(first.id);
-      setProjectRefNo(first.refNo);
-      setProjectTitle(first.title);
-      setProcuringEntity(first.procuringEntity);
-      if (first.dateTimeSubmitted) setDateSubmitted(first.dateTimeSubmitted);
-      setProjectCategory(detectCategoryFromProject(first.title, first.refNo, first.category));
-      loadProjectData(first.refNo, first.title);
+      targetMatch = list[0];
+    }
+
+    if (targetMatch) {
+      setSelectedOppId(targetMatch.id);
+      setProjectRefNo(targetMatch.refNo);
+      setProjectTitle(targetMatch.title);
+      setProcuringEntity(targetMatch.procuringEntity);
+      if (targetMatch.dateTimeSubmitted) setDateSubmitted(targetMatch.dateTimeSubmitted);
+      setProjectCategory(detectCategoryFromProject(targetMatch.title, targetMatch.refNo, targetMatch.category));
+      loadProjectData(targetMatch.refNo, targetMatch.title, targetMatch.id);
+    } else if (activeProjectRefNo) {
+      setProjectRefNo(activeProjectRefNo);
+      if (activeProjectTitle) setProjectTitle(activeProjectTitle);
+      if (activeProcuringEntity) setProcuringEntity(activeProcuringEntity);
+      setProjectCategory(detectCategoryFromProject(activeProjectTitle || '', activeProjectRefNo));
+      loadProjectData(activeProjectRefNo, activeProjectTitle);
     } else {
-      loadProjectData('default');
+      setItems([]);
+      setLaborLumpSum(0);
+      setLogisticsLumpSum(0);
+      setEquipmentLumpSum(0);
+      setIsSyncedFromDetailedEstimates(false);
     }
   }, [tenant?.id, activeProjectRefNo, activeProjectTitle, activeProcuringEntity]);
 
@@ -290,7 +323,13 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
       setProcuringEntity(found.procuringEntity);
       if (found.dateTimeSubmitted) setDateSubmitted(found.dateTimeSubmitted);
       setProjectCategory(detectCategoryFromProject(found.title, found.refNo, found.category));
-      loadProjectData(found.refNo, found.title);
+      loadProjectData(found.refNo, found.title, found.id);
+    } else {
+      setItems([]);
+      setLaborLumpSum(0);
+      setLogisticsLumpSum(0);
+      setEquipmentLumpSum(0);
+      setIsSyncedFromDetailedEstimates(false);
     }
   };
 
@@ -379,95 +418,22 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
   const totalLumpSums = (laborLumpSum || 0) + (logisticsLumpSum || 0) + (equipmentLumpSum || 0);
   const totalProjectCost = materialsSubtotal + totalLumpSums;
 
-  // Intelligent Multi-Page Pagination Chunking for 13" x 8.5" Landscape Paper (Zero Empty Space & Auto Item Splitting)
+  // Dynamic Auto-Fit Multi-Page Pagination Chunking for 13" x 8.5" Landscape Paper
   const pageChunks = useMemo(() => {
     const allRows = getAllDisplayRows();
     if (allRows.length === 0) return [[]];
 
-    const getRowHeight = (desc: string) => {
-      const dLen = (desc || '').length;
-      const lineCount = Math.max(1, Math.ceil(dLen / 42));
-      return 20 + (lineCount - 1) * 12;
-    };
-
-    const pages: PriceScheduleItemRow[][] = [];
-    let currentChunk: PriceScheduleItemRow[] = [];
-    let currentHeight = 0;
-    let pageIdx = 0;
-
-    for (let idx = 0; idx < allRows.length; idx++) {
-      const row = allRows[idx];
-      const rHeight = getRowHeight(row.description);
-      const isPage1 = pageIdx === 0;
-
-      const finalPageLimit = isPage1 ? 340 : 480;
-      const continuationLimit = isPage1 ? 560 : 700;
-
-      let remainingHeight = 0;
-      for (let r = idx; r < allRows.length; r++) {
-        remainingHeight += getRowHeight(allRows[r].description);
+    return autoFitPageChunks(
+      allRows,
+      (row) => calculateRowHeight(row.description || '', 55, 13, 8, 22),
+      {
+        orientation: 'landscape',
+        columnCharWidth: 55,
+        headerHeightPx: 110,
+        footerHeightPx: 180,
+        runningFooterPx: 30
       }
-
-      if (currentHeight + remainingHeight <= finalPageLimit) {
-        currentChunk.push(row);
-        currentHeight += rHeight;
-        continue;
-      }
-
-      if (currentHeight + rHeight > continuationLimit && currentChunk.length > 0) {
-        const remainingSpace = continuationLimit - currentHeight;
-        const desc = row.description || '';
-
-        // If there is usable space (>= 50px) on current page and description is substantial (>80 chars), split across pages
-        if (remainingSpace >= 50 && desc.length > 80) {
-          const linesFit = Math.max(2, Math.floor((remainingSpace - 20) / 12));
-          const charsFit = linesFit * 42;
-
-          let splitIdx = desc.lastIndexOf(' ', charsFit);
-          if (splitIdx < 40) splitIdx = charsFit;
-
-          const part1Desc = desc.substring(0, splitIdx).trim();
-          const part2Desc = desc.substring(splitIdx).trim();
-
-          if (part1Desc.length > 25 && part2Desc.length > 15) {
-            const part1Row: PriceScheduleItemRow = {
-              ...row,
-              id: `${row.id}-pt1`,
-              description: part1Desc
-            };
-            const part2Row: PriceScheduleItemRow = {
-              ...row,
-              id: `${row.id}-pt2`,
-              itemNo: row.itemNo,
-              description: part2Desc,
-              isSplitContinuation: true
-            };
-
-            currentChunk.push(part1Row);
-            pages.push(currentChunk);
-
-            pageIdx++;
-            currentChunk = [part2Row];
-            currentHeight = getRowHeight(part2Desc);
-            continue;
-          }
-        }
-
-        pages.push(currentChunk);
-        pageIdx++;
-        currentChunk = [row];
-        currentHeight = rHeight;
-      } else {
-        currentChunk.push(row);
-        currentHeight += rHeight;
-      }
-    }
-
-    if (currentChunk.length > 0) {
-      pages.push(currentChunk);
-    }
-
-    return pages;
+    );
   }, [items, includeLumpSumsInTable, laborLumpSum, logisticsLumpSum, equipmentLumpSum, transpoPercent, taxPercent, servicesPercent]);
 
   const totalPagesCount = pageChunks.length;
@@ -727,14 +693,23 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                     <div className="col-span-full">
-                      <label className="block text-slate-300 font-mono mb-1 font-bold flex items-center gap-1.5">
-                        <span>Select Active Bidding Opportunity from Opportunity Finder:</span>
-                        <span className="text-[10px] text-emerald-400 font-mono font-bold">⚡ (Auto-detects Goods vs Infrastructure)</span>
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-slate-300 font-mono font-bold flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Target Bidding Project:</span>
+                        </label>
+                        {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                          <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                            <Lock className="w-3 h-3 text-amber-400" />
+                            <span>Project Locked (Strict Isolation Active)</span>
+                          </span>
+                        )}
+                      </div>
                       <select
                         value={selectedOppId}
+                        disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                         onChange={(e) => handleSelectOpportunity(e.target.value)}
-                        className={`w-full bg-slate-950 border rounded-xl px-3.5 py-2 text-white font-mono text-xs font-bold focus:outline-none shadow-inner cursor-pointer ${isInfraTheme ? 'border-amber-500/60 focus:border-amber-400' : 'border-blue-500/60 focus:border-blue-400'}`}
+                        className={`w-full bg-slate-950 border rounded-xl px-3.5 py-2 text-white font-mono text-xs font-bold focus:outline-none shadow-inner disabled:opacity-85 disabled:cursor-not-allowed ${isInfraTheme ? 'border-amber-500/60 focus:border-amber-400' : 'border-blue-500/60 focus:border-blue-400'}`}
                       >
                         <option value="">-- Select Project --</option>
                         {oppProjects.map(p => (
@@ -761,9 +736,10 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
                       <input
                         type="text"
                         value={projectTitle}
+                        disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                         onChange={(e) => setProjectTitle(e.target.value)}
                         placeholder="e.g. Procurement and Installation of CCTV at Purok 1-6"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-semibold"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-semibold disabled:opacity-75 disabled:cursor-not-allowed"
                       />
                     </div>
 
@@ -964,40 +940,67 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
                                   <col style={{ width: '11.5%' }} />
                                 </colgroup>
 
-                                {/* Render Table Column Header Rows ONLY ON FIRST PAGE (Page 1) */}
-                                {isFirstPage && (
-                                  <thead className="table-header-group">
-                                    
-                                    {/* Numbered Header Row (Columns 1 to 10) */}
-                                    <tr className="bg-slate-100 border-b border-black text-center font-bold font-mono text-black text-[8.5pt]">
-                                      <th className="border border-black p-1">1</th>
-                                      <th className="border border-black p-1">2</th>
-                                      <th className="border border-black p-1">3</th>
-                                      <th className="border border-black p-1">4</th>
-                                      <th className="border border-black p-1">5</th>
-                                      <th className="border border-black p-1">6</th>
-                                      <th className="border border-black p-1">7</th>
-                                      <th className="border border-black p-1">8</th>
-                                      <th className={`border border-black p-1 ${themeCol9Header}`}>9</th>
-                                      <th className={`border border-black p-1 ${themeCol10Header}`}>10</th>
-                                    </tr>
+                                  {isFirstPage ? (
+                                    <thead className="table-header-group">
+                                      
+                                       {/* Numbered Header Row (Columns 1 to 10) */}
+                                       <tr className="bg-slate-100 border-b border-black text-center font-bold font-mono text-black text-[8.5pt]">
+                                         <th className="border border-black p-1">1</th>
+                                         <th className="border border-black p-1">2</th>
+                                         <th className="border border-black p-1">3</th>
+                                         <th className="border border-black p-1">4</th>
+                                         <th className="border border-black p-1">5</th>
+                                         <th className="border border-black p-1">6</th>
+                                         <th className="border border-black p-1">7</th>
+                                         <th className="border border-black p-1">8</th>
+                                         <th className={`border border-black p-1 ${themeCol9Header}`}>9</th>
+                                         <th className={`border border-black p-1 ${themeCol10Header}`}>10</th>
+                                       </tr>
 
-                                    {/* Column Names Header Row */}
-                                    <tr className="bg-slate-50 border-b-2 border-black text-center font-bold italic leading-tight text-black text-[7.5pt] uppercase">
-                                      <th className="border border-black p-1.5 align-middle">Item</th>
-                                      <th className="border border-black p-1.5 align-middle">Description</th>
-                                      <th className="border border-black p-1.5 align-middle">Country of Origin</th>
-                                      <th className="border border-black p-1.5 align-middle">QTY</th>
-                                      <th className="border border-black p-1.5 align-middle">Unit price EXW per item</th>
-                                      <th className="border border-black p-1.5 align-middle">Transportation and all other costs incidental to delivery, per item</th>
-                                      <th className="border border-black p-1.5 align-middle">Sales and other taxes payable if Contract is awarded, per item</th>
-                                      <th className="border border-black p-1.5 align-middle">Cost of Incidental Services, if applicable, per item</th>
-                                      <th className={`border border-black p-1.5 align-middle ${themeCol9Header}`}>Total Price, per unit (col 5+6+7+8)</th>
-                                      <th className={`border border-black p-1.5 align-middle ${themeCol10Header}`}>Total Price delivered Final Destination (col 9) x (col 4)</th>
-                                    </tr>
+                                       {/* Column Names Header Row */}
+                                       <tr className="bg-slate-50 border-b-2 border-black text-center font-bold italic leading-tight text-black text-[7.5pt] uppercase">
+                                         <th className="border border-black p-1.5 align-middle">Item</th>
+                                         <th className="border border-black p-1.5 align-middle">Description</th>
+                                         <th className="border border-black p-1.5 align-middle">Country of Origin</th>
+                                         <th className="border border-black p-1.5 align-middle">QTY</th>
+                                         <th className="border border-black p-1.5 align-middle">Unit price EXW per item</th>
+                                         <th className="border border-black p-1.5 align-middle">Transportation and all other costs incidental to delivery, per item</th>
+                                         <th className="border border-black p-1.5 align-middle">Sales and other taxes payable if Contract is awarded, per item</th>
+                                         <th className="border border-black p-1.5 align-middle">Cost of Incidental Services, if applicable, per item</th>
+                                         <th className={`border border-black p-1.5 align-middle ${themeCol9Header}`}>Total Price, per unit (col 5+6+7+8)</th>
+                                         <th className={`border border-black p-1.5 align-middle ${themeCol10Header}`}>Total Price delivered Final Destination (col 9) x (col 4)</th>
+                                       </tr>
 
-                                  </thead>
-                                )}
+                                     </thead>
+                                  ) : (
+                                    <thead className="table-header-group">
+                                      {/* Numbered Header Row (Columns 1 to 10) */}
+                                      <tr className="bg-slate-100 border-b border-black text-center font-bold font-mono text-black text-[8pt]">
+                                        <th className="border border-black p-0.5">1</th>
+                                        <th className="border border-black p-0.5">2</th>
+                                        <th className="border border-black p-0.5">3</th>
+                                        <th className="border border-black p-0.5">4</th>
+                                        <th className="border border-black p-0.5">5</th>
+                                        <th className="border border-black p-0.5">6</th>
+                                        <th className="border border-black p-0.5">7</th>
+                                        <th className="border border-black p-0.5">8</th>
+                                        <th className={`border border-black p-0.5 ${themeCol9Header}`}>9</th>
+                                        <th className={`border border-black p-0.5 ${themeCol10Header}`}>10</th>
+                                      </tr>
+                                      <tr className="bg-slate-50 border-b-2 border-black text-center font-bold italic leading-tight text-black text-[7pt] uppercase">
+                                        <th className="border border-black p-1 align-middle">Item</th>
+                                        <th className="border border-black p-1 align-middle">Description (Continuation)</th>
+                                        <th className="border border-black p-1 align-middle">Origin</th>
+                                        <th className="border border-black p-1 align-middle">QTY</th>
+                                        <th className="border border-black p-1 align-middle">Unit price EXW</th>
+                                        <th className="border border-black p-1 align-middle">Transportation</th>
+                                        <th className="border border-black p-1 align-middle">Sales Taxes</th>
+                                        <th className="border border-black p-1 align-middle">Incidental Services</th>
+                                        <th className={`border border-black p-1 align-middle ${themeCol9Header}`}>Total Unit Price</th>
+                                        <th className={`border border-black p-1 align-middle ${themeCol10Header}`}>Total Delivered</th>
+                                      </tr>
+                                    </thead>
+                                  )}
                                 <tbody>
                                   
                                   {/* Dynamic Data Rows for Page Subset */}
@@ -1121,23 +1124,23 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
                                 <div className="space-y-1 text-[10pt] w-full max-w-[360px] text-right">
                                   <div>
                                     <p className="text-black text-[9pt] font-bold">Name of Authorized Signatory:</p>
-                                    <p className="font-extrabold text-[11pt] uppercase text-black border-b border-black pb-0.5">{signatoryName || 'ENGR. JUAN DELA CRUZ'}</p>
+                                    <p className="font-extrabold text-[11pt] uppercase text-black">{signatoryName || 'ENGR. JUAN DELA CRUZ'}</p>
                                   </div>
 
                                   <div>
                                     <p className="text-black text-[9pt] font-bold">Legal Capacity / Title:</p>
-                                    <p className="font-bold text-[10pt] text-black border-b border-black pb-0.5">{signatoryTitle || 'Authorized Representative'}</p>
+                                    <p className="font-bold text-[10pt] text-black">{signatoryTitle || 'Authorized Representative'}</p>
                                   </div>
 
                                   <div>
                                     <p className="text-black text-[9pt] font-bold">Duly authorized to sign Bid for and on behalf of:</p>
-                                    <p className="font-extrabold text-[10pt] uppercase text-black border-b border-black pb-0.5">{bidderName || 'Quantum Cloud Corporation'}</p>
+                                    <p className="font-extrabold text-[10pt] uppercase text-black">{bidderName || 'Quantum Cloud Corporation'}</p>
                                   </div>
 
                                   <div>
                                     <p className="text-black text-[9pt] font-bold">Date Signed:</p>
-                                    <p className="font-bold text-[10pt] font-serif text-black border-b border-black pb-0.5">
-                                      {dateSubmitted ? new Date(dateSubmitted).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '____________________'}
+                                    <p className="font-bold text-[10pt] font-serif text-black">
+                                      {dateSubmitted ? new Date(dateSubmitted).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'March 19, 2026'}
                                     </p>
                                   </div>
                                 </div>
