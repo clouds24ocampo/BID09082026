@@ -317,7 +317,7 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
       if (savedSecVi) {
         try {
           const parsed = JSON.parse(savedSecVi);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             const mappedMaterials: MaterialEstimateRow[] = parsed.map((item: any, idx: number) => {
               const qtyStr = item.quantity || '1';
               const qtyMatch = qtyStr.match(/([\d,.]+)\s*(.*)/);
@@ -368,7 +368,7 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
       if (savedTechSpecs) {
         try {
           const parsedTech = JSON.parse(savedTechSpecs);
-          if (Array.isArray(parsedTech) && parsedTech.length > 0) {
+          if (Array.isArray(parsedTech)) {
             const mappedTech: MaterialEstimateRow[] = parsedTech.map((item: any, idx: number) => {
               const qtyStr = item.quantity || '1';
               const qtyMatch = qtyStr.match(/([\d,.]+)\s*(.*)/);
@@ -445,8 +445,11 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
     if (savedDet) {
       try {
         const parsed = JSON.parse(savedDet);
-        if (parsed.materials && Array.isArray(parsed.materials)) setMaterials(parsed.materials);
-        else setMaterials([]);
+        if (parsed.materials && Array.isArray(parsed.materials)) {
+          setMaterials(parsed.materials);
+        } else {
+          setMaterials([]);
+        }
         if (parsed.labors && Array.isArray(parsed.labors)) setLabors(parsed.labors);
         else setLabors([]);
         if (parsed.logistics && Array.isArray(parsed.logistics)) setLogistics(parsed.logistics);
@@ -462,9 +465,6 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
         if (parsed.bidSecurityAmount) setBidSecurityAmount(parsed.bidSecurityAmount);
         if (parsed.deliverySchedule) setDeliverySchedule(parsed.deliverySchedule);
         if (parsed.businessRegType) setBusinessRegType(parsed.businessRegType);
-        
-        // Auto-sync Section VII / VI items/quantities while populating/keeping unit prices
-        syncFromSectionVIAndVII(false);
         return;
       } catch (e) {}
     }
@@ -944,18 +944,11 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
             <FolderKanban className="w-4 h-4 text-purple-400 shrink-0" />
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="text-[11px] font-mono font-bold text-slate-300 uppercase">Bidding Project:</span>
-              {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
-                <span className="text-[8.5px] text-amber-400 font-bold font-mono flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
-                  <Lock className="w-2.5 h-2.5 text-amber-400" />
-                  <span>Locked</span>
-                </span>
-              )}
             </div>
             <select
               value={selectedOppId}
-              disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
               onChange={(e) => handleSelectOpportunity(e.target.value)}
-              className="bg-transparent text-white font-mono text-xs font-bold focus:outline-none cursor-pointer border-none max-w-xs sm:max-w-md truncate disabled:opacity-85 disabled:cursor-not-allowed"
+              className="bg-transparent text-white font-mono text-xs font-bold focus:outline-none cursor-pointer border-none max-w-xs sm:max-w-md truncate"
             >
               {oppProjects.length === 0 ? (
                 <option value="">[{projectRefNo}] {projectName}</option>

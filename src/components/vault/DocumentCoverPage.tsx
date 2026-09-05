@@ -28,7 +28,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
   const folderClean = normalizedCopy.replace(/\s+/g, '_');
   
   // Format Project Reference & Increments for Official Digital Seal
-  const projectNumClean = (item.philgepsRefNo || 'PRJ-2026-901283').replace(/^PhilGEPS-?/i, '');
+  const projectNumClean = (item.philgepsRefNo || item.documentNumber || 'PROJ').replace(/^PhilGEPS-?/i, '');
   const formattedInc = String(incrementNumber).padStart(3, '0');
   const verificationSealId = `${tenant?.brandCode || 'QCC'}-${folderClean}-${formattedInc}-${projectNumClean} Verified`;
 

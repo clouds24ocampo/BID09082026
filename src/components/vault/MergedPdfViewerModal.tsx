@@ -87,7 +87,8 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({ sele
     }));
 
     const today = new Date().toISOString().split('T')[0];
-    const fileName = `PRJ-2026-901283_${activeBundle.replace(/\s+/g, '_')}_${today}.pdf`;
+    const activeRef = items[0]?.philgepsRefNo || 'PACKAGE';
+    const fileName = `${activeRef}_${activeBundle.replace(/\s+/g, '_')}_${today}.pdf`;
 
     await exportMergedThreeLayerPdf(units, fileName);
   };

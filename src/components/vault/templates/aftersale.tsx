@@ -122,18 +122,20 @@ export const AfterSaleModalContent: React.FC<AfterSaleModalProps> = ({
 
     // Auto-fill from active opportunity project if available
     if (list.length > 0 && !selectedOppId) {
-      const match = activeProjectRefNo ? list.find(p => p.refNo === activeProjectRefNo) : list[0];
-      const target = match || list[0];
-      setSelectedOppId(target.id);
-      setProjectTitle(target.title);
-      setProjectRefNo(target.refNo);
-      setProcuringEntity(target.procuringEntity);
-      setSalutationEntity(target.procuringEntity);
-      const sol = (target as any).solicitationNo || (target as any).solicitationNumber;
-      if (sol) setSolicitationNumber(sol);
-      if (target.dateTimeSubmitted) setDateTimeSubmitted(target.dateTimeSubmitted);
-      const deliv = (target as any).deliveryAddress || (target as any).location || (target as any).provinceAddress;
-      if (deliv) setDeliveryAddress(deliv);
+      const match = activeProjectRefNo ? list.find(p => p.refNo === activeProjectRefNo) : null;
+      const target = match || (activeProjectRefNo ? null : list[0]);
+      if (target) {
+        setSelectedOppId(target.id);
+        setProjectTitle(target.title);
+        setProjectRefNo(target.refNo);
+        setProcuringEntity(target.procuringEntity);
+        setSalutationEntity(target.procuringEntity);
+        const sol = (target as any).solicitationNo || (target as any).solicitationNumber;
+        if (sol) setSolicitationNumber(sol);
+        if (target.dateTimeSubmitted) setDateTimeSubmitted(target.dateTimeSubmitted);
+        const deliv = (target as any).deliveryAddress || (target as any).location || (target as any).provinceAddress;
+        if (deliv) setDeliveryAddress(deliv);
+      }
     }
   }, [tenant, activeProjectRefNo, projectScopeKey]);
 
@@ -453,8 +455,8 @@ export const AfterSaleModalContent: React.FC<AfterSaleModalProps> = ({
                       setSelectedOppId(id);
                       const proj = oppProjects.find(p => p.id === id);
                       if (proj) {
-                        setProjectRefNo(proj.refNo);
                         setProjectTitle(proj.title);
+                        setProjectRefNo(proj.refNo);
                         setProcuringEntity(proj.procuringEntity);
                         setSalutationEntity(proj.procuringEntity);
                         const solNo = (proj as any).solicitationNo || (proj as any).solicitationNumber;
@@ -465,8 +467,7 @@ export const AfterSaleModalContent: React.FC<AfterSaleModalProps> = ({
                         saveState();
                       }
                     }}
-                    disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
-                    className="bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none focus:border-blue-500 max-w-[320px] truncate disabled:opacity-80 disabled:cursor-not-allowed cursor-pointer"
+                    className="bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs font-semibold focus:outline-none focus:border-blue-500 max-w-[320px] truncate cursor-pointer"
                   >
                     {oppProjects.map(p => (
                       <option key={p.id} value={p.id}>

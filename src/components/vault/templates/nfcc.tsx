@@ -470,16 +470,9 @@ export const NfccModalContent: React.FC<NfccModalProps> = ({
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-slate-300">Target Bidding Project:</span>
-                    {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
-                      <span className="text-[9px] text-amber-400 font-bold font-mono flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
-                        <Lock className="w-2.5 h-2.5 text-amber-400" />
-                        <span>Locked</span>
-                      </span>
-                    )}
                   </div>
                   <select
                     value={selectedOppId}
-                    disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                     onChange={(e) => {
                       const id = e.target.value;
                       setSelectedOppId(id);

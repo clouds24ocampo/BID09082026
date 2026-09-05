@@ -238,9 +238,9 @@ interface PageRow {
 export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequirementsProps> = ({
   item = { id: 'sec-6', code: 'SEC-VI', name: 'Section VI. Schedule of Requirements' },
   tenant,
-  activeProjectRefNo = 'PRJ-2026-901283',
-  activeProjectTitle = 'Infrastructure & IT Systems Modernization Project',
-  activeProcuringEntity = 'Department of Information & Communications Technology',
+  activeProjectRefNo = '',
+  activeProjectTitle = '',
+  activeProcuringEntity = '',
   onSaveAndComplete,
   onClose
 }) => {
@@ -282,17 +282,33 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
-    if (list.length > 0) {
-      const preferred = list.find((project) => project.refNo === activeProjectRefNo) || list[0];
-      if (preferred && (preferred.id !== selectedOppId || preferred.refNo !== projectRefNo)) {
-        setSelectedOppId(preferred.id);
-        setProjectRefNo(preferred.refNo);
-        setSolicitationNumber(preferred.solicitationNo || 'SOL-2026-001');
-        setProjectTitle(preferred.title);
-        setProcuringEntity(preferred.procuringEntity);
-        if (preferred.dateTimeSubmitted) {
-          setDateTimeSubmitted(preferred.dateTimeSubmitted);
+    if (activeProjectRefNo) {
+      const match = list.find((project) => project.refNo === activeProjectRefNo);
+      if (match) {
+        setSelectedOppId(match.id);
+        setProjectRefNo(match.refNo);
+        setSolicitationNumber(match.solicitationNo || 'SOL-2026-001');
+        setProjectTitle(match.title);
+        setProcuringEntity(match.procuringEntity);
+        if (match.dateTimeSubmitted) {
+          setDateTimeSubmitted(match.dateTimeSubmitted);
         }
+        return;
+      }
+      setSelectedOppId('');
+      setProjectRefNo(activeProjectRefNo);
+      setSolicitationNumber('SOL-2026-001');
+      setProjectTitle(activeProjectTitle || 'Target Bidding Project');
+      setProcuringEntity(activeProcuringEntity || '');
+    } else if (list.length > 0) {
+      const first = list[0];
+      setSelectedOppId(first.id);
+      setProjectRefNo(first.refNo);
+      setSolicitationNumber(first.solicitationNo || 'SOL-2026-001');
+      setProjectTitle(first.title);
+      setProcuringEntity(first.procuringEntity);
+      if (first.dateTimeSubmitted) {
+        setDateTimeSubmitted(first.dateTimeSubmitted);
       }
     } else {
       setSelectedOppId('');
@@ -301,12 +317,26 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       setProjectTitle('');
       setProcuringEntity('');
     }
-  }, [tenant?.id, activeProjectRefNo]);
+  }, [tenant?.id, activeProjectRefNo, activeProjectTitle, activeProcuringEntity]);
 
-  // Load shared Section VI data for current project (Instantaneous & Multi-Key Synced)
+  const handleSelectProject = (oppIdOrRef: string) => {
+    const found = oppProjects.find((p) => p.id === oppIdOrRef || p.refNo === oppIdOrRef);
+    if (found) {
+      setSelectedOppId(found.id);
+      setProjectRefNo(found.refNo);
+      setSolicitationNumber(found.solicitationNo || 'SOL-2026-001');
+      setProjectTitle(found.title);
+      setProcuringEntity(found.procuringEntity);
+      if (found.dateTimeSubmitted) {
+        setDateTimeSubmitted(found.dateTimeSubmitted);
+      }
+    }
+  };
+
+  // Load shared Section VI data for current project (Strict Project Isolation)
   useEffect(() => {
     if (!projectScopeKey) {
-      setItems(BLANK_SECTION_VI_ITEMS);
+      setItems([]);
       setServicesDescription('');
       setServicesPercentage(0);
       setServicesCustomAmount('');
@@ -323,17 +353,18 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     let foundItems: ScheduleItem[] | null = null;
     for (const key of candidateKeys) {
       const saved = localStorage.getItem(key);
-      if (saved) {
+      if (saved !== null) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
+            // Respect stored array even if empty (user deleted all rows)
             foundItems = parsed;
             break;
           }
         } catch (e) {}
       }
     }
-    setItems(foundItems || BLANK_SECTION_VI_ITEMS);
+    setItems(foundItems !== null ? foundItems : BLANK_SECTION_VI_ITEMS);
 
     const candidateServiceKeys = [
       `bidocs_sec_vi_services_${tenantKey}_${projectScopeKey}`,
@@ -344,13 +375,13 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     let foundServices = false;
     for (const sKey of candidateServiceKeys) {
       const savedServices = localStorage.getItem(sKey);
-      if (savedServices) {
+      if (savedServices !== null) {
         try {
           const parsedSvc = JSON.parse(savedServices);
           if (parsedSvc) {
-            if (parsedSvc.description !== undefined) setServicesDescription(parsedSvc.description);
-            if (parsedSvc.percentage !== undefined) setServicesPercentage(parsedSvc.percentage);
-            if (parsedSvc.customAmount !== undefined) setServicesCustomAmount(parsedSvc.customAmount);
+            setServicesDescription(parsedSvc.description || '');
+            setServicesPercentage(parsedSvc.percentage ?? 0);
+            setServicesCustomAmount(parsedSvc.customAmount || '');
             foundServices = true;
             break;
           }
@@ -441,8 +472,14 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   };
 
   const handleRemoveItem = (index: number) => {
-    if (items.length <= 1) return;
-    saveSharedItems(items.filter((_, idx) => idx !== index));
+    const updated = items.filter((_, idx) => idx !== index);
+    saveSharedItems(updated);
+  };
+
+  const handleClearAllItems = () => {
+    if (window.confirm('Are you sure you want to clear all item inputs for this project?')) {
+      saveSharedItems([]);
+    }
   };
 
   const handleSyncAllWithItem1 = () => {
@@ -558,6 +595,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   // --- DYNAMIC AUTO-FIT PAGE-PACKING ENGINE ---
   // Automatically measures and packs all information inside the minimum necessary number of pages with zero empty space
   const pageChunks = useMemo<PageRow[][]>(() => {
+    if (items.length === 0) return [[]];
     const indexedItems: PageRow[] = items.map((it, idx) => ({ item: it, index: idx }));
     return autoFitPageChunks(
       indexedItems,
@@ -665,24 +703,31 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
               </thead>
             )}
             <tbody>
-              {chunk.map(({ item: rowItem, index: itemIdx }) => (
-                <tr key={rowItem.id} className="border-b border-black hover:bg-amber-50/20 even:bg-slate-50/30 transition-colors">
-                  {/* 1. Item # */}
-                  <td className="border border-black px-1 py-1.5 text-center font-serif font-bold align-top text-slate-950">
-                    <div className="flex flex-col items-center justify-between h-full">
-                      <span className="block pt-0.5 font-bold text-xs">{itemIdx + 1}</span>
-                      {!isExporting && items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(itemIdx)}
-                          className="text-red-500 hover:text-red-700 mt-2 print:hidden no-export p-1"
-                          title="Delete row"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
+              {items.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="border border-black px-4 py-8 text-center font-serif text-slate-500 italic">
+                    No items in this schedule for this project. Click "+ Add Row Item" below to add an item.
                   </td>
+                </tr>
+              ) : (
+                chunk.map(({ item: rowItem, index: itemIdx }) => (
+                  <tr key={rowItem.id} className="border-b border-black hover:bg-amber-50/20 even:bg-slate-50/30 transition-colors">
+                    {/* 1. Item # */}
+                    <td className="border border-black px-1 py-1.5 text-center font-serif font-bold align-top text-slate-950">
+                      <div className="flex flex-col items-center justify-between h-full">
+                        <span className="block pt-0.5 font-bold text-xs">{itemIdx + 1}</span>
+                        {!isExporting && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(itemIdx)}
+                            className="text-red-500 hover:text-red-700 mt-2 print:hidden no-export p-1 hover:bg-red-50 rounded"
+                            title="Delete row"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
 
                   {/* 2. Description */}
                   <td className="border border-black px-2.5 py-1.5 font-serif align-top break-words">
@@ -787,7 +832,8 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+            )}
 
               {/* Statutory *** NOTHING FOLLOWS *** Security Seal (Final Page after items) */}
               {pIdx === totalPages - 1 && (
@@ -808,15 +854,28 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                     <div className="flex items-center justify-between">
                       <div>
                         {!isExporting && (
-                          <button
-                            type="button"
-                            onClick={handleAddItem}
-                            className="no-export print:hidden inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-sans font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-400 rounded shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95"
-                            title="Add a new row item to the requirements table"
-                          >
-                            <Plus className="w-3.5 h-3.5 text-emerald-700" />
-                            <span>Add Row Item</span>
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={handleAddItem}
+                              className="no-export print:hidden inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-sans font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-400 rounded shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95"
+                              title="Add a new row item to the requirements table"
+                            >
+                              <Plus className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>Add Row Item</span>
+                            </button>
+                            {items.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={handleClearAllItems}
+                                className="no-export print:hidden inline-flex items-center gap-1 px-2 py-0.5 text-xs font-sans font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-300 rounded shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95"
+                                title="Clear all row items for this project"
+                              >
+                                <Trash2 className="w-3 h-3 text-red-600" />
+                                <span>Clear Rows</span>
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                       <span className="uppercase tracking-wider text-black font-bold font-serif text-xs">
@@ -1095,31 +1154,17 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                     <Building2 className="w-4 h-4 text-blue-400" />
                     <span>Target Bidding Project:</span>
                   </label>
-                  {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
-                    <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                      <Lock className="w-3 h-3 text-amber-400" />
-                      <span>Project Locked (Strict Isolation Active)</span>
+                  {projectRefNo && (
+                    <span className="text-[10px] text-emerald-400 font-bold font-mono flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                      <Lock className="w-3 h-3 text-emerald-400" />
+                      <span>Strict Isolation Active ({projectRefNo})</span>
                     </span>
                   )}
                 </div>
                 <select
-                  value={selectedOppId}
-                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedOppId(val);
-                    const found = oppProjects.find((p) => p.id === val || p.refNo === val);
-                    if (found) {
-                      setProjectRefNo(found.refNo);
-                      setSolicitationNumber(found.solicitationNo || 'SOL-2026-001');
-                      setProjectTitle(found.title);
-                      setProcuringEntity(found.procuringEntity);
-                      if (found.dateTimeSubmitted) {
-                        setDateTimeSubmitted(found.dateTimeSubmitted);
-                      }
-                    }
-                  }}
-                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-900/90"
+                  value={selectedOppId || projectRefNo}
+                  onChange={(e) => handleSelectProject(e.target.value)}
+                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer"
                 >
                   {oppProjects.length === 0 ? (
                     <option value="">-- No Saved Projects in Opportunity Finder --</option>

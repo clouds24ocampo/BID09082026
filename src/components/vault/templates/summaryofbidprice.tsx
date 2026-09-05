@@ -241,7 +241,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
         if (savedSecVi) {
           try {
             const parsed = JSON.parse(savedSecVi);
-            if (Array.isArray(parsed) && parsed.length > 0) {
+            if (Array.isArray(parsed)) {
               secViItems = parsed;
               break;
             }
@@ -581,9 +581,8 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                 </div>
                 <select
                   value={selectedOppId}
-                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => handleSelectOpportunity(e.target.value)}
-                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner disabled:opacity-85 disabled:cursor-not-allowed"
+                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner"
                 >
                   <option value="">-- Select Opportunity --</option>
                   {oppProjects.map(p => (
@@ -599,10 +598,9 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                 <input
                   type="text"
                   value={projectRefNo}
-                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => setProjectRefNo(e.target.value)}
                   placeholder="e.g. 2026-FIN-009"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono font-bold disabled:opacity-75 disabled:cursor-not-allowed"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono font-bold"
                 />
               </div>
 
@@ -611,10 +609,9 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                 <input
                   type="text"
                   value={projectTitle}
-                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => setProjectTitle(e.target.value)}
                   placeholder="e.g. Supply and Delivery of IT Equipment"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-semibold disabled:opacity-75 disabled:cursor-not-allowed"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-semibold"
                 />
               </div>
 

@@ -175,17 +175,36 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
-    if (list.length > 0) {
-      const preferred = list.find((project) => project.refNo === activeProjectRefNo) || list[0];
-      if (preferred && (preferred.id !== selectedOppId || preferred.refNo !== projectRefNo)) {
-        setSelectedOppId(preferred.id);
-        setProjectRefNo(preferred.refNo);
-        setSolicitationNumber(preferred.solicitationNo || 'SOL-2026-001');
-        setProjectTitle(preferred.title);
-        setProcuringEntity(preferred.procuringEntity);
-        if (preferred.dateTimeSubmitted) {
-          setDateTimeSubmitted(preferred.dateTimeSubmitted);
+    if (activeProjectRefNo) {
+      const match = list.find((project) => project.refNo === activeProjectRefNo);
+      if (match) {
+        setSelectedOppId(match.id);
+        setProjectRefNo(match.refNo);
+        setPhilgepsRefNo(match.refNo);
+        setSolicitationNumber(match.solicitationNo || 'SOL-2026-001');
+        setProjectTitle(match.title);
+        setProcuringEntity(match.procuringEntity);
+        if (match.dateTimeSubmitted) {
+          setDateTimeSubmitted(match.dateTimeSubmitted);
         }
+        return;
+      }
+      setSelectedOppId('');
+      setProjectRefNo(activeProjectRefNo);
+      setPhilgepsRefNo(activeProjectRefNo);
+      setSolicitationNumber('SOL-2026-001');
+      setProjectTitle(activeProjectTitle || 'Target Bidding Project');
+      setProcuringEntity(activeProcuringEntity || '');
+    } else if (list.length > 0) {
+      const first = list[0];
+      setSelectedOppId(first.id);
+      setProjectRefNo(first.refNo);
+      setPhilgepsRefNo(first.refNo);
+      setSolicitationNumber(first.solicitationNo || 'SOL-2026-001');
+      setProjectTitle(first.title);
+      setProcuringEntity(first.procuringEntity);
+      if (first.dateTimeSubmitted) {
+        setDateTimeSubmitted(first.dateTimeSubmitted);
       }
     } else {
       setSelectedOppId('');
@@ -195,7 +214,22 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
       setProjectTitle('');
       setProcuringEntity('');
     }
-  }, [tenant?.id, activeProjectRefNo]);
+  }, [tenant?.id, activeProjectRefNo, activeProjectTitle, activeProcuringEntity]);
+
+  const handleSelectProject = (oppIdOrRef: string) => {
+    const found = oppProjects.find((p) => p.id === oppIdOrRef || p.refNo === oppIdOrRef);
+    if (found) {
+      setSelectedOppId(found.id);
+      setProjectRefNo(found.refNo);
+      setPhilgepsRefNo(found.refNo);
+      setSolicitationNumber(found.solicitationNo || 'SOL-2026-001');
+      setProjectTitle(found.title);
+      setProcuringEntity(found.procuringEntity);
+      if (found.dateTimeSubmitted) {
+        setDateTimeSubmitted(found.dateTimeSubmitted);
+      }
+    }
+  };
 
   useEffect(() => {
     if (!tenant?.id || !selectedOppId) return;
@@ -245,13 +279,15 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     ].filter(Boolean);
 
     let baseItems: TechSpecItem[] = [];
+    let secViLoaded = false;
 
     for (const key of candidateSecViKeys) {
       const savedSecVi = localStorage.getItem(key);
-      if (savedSecVi) {
+      if (savedSecVi !== null) {
         try {
           const parsedVi = JSON.parse(savedSecVi);
-          if (Array.isArray(parsedVi) && parsedVi.length > 0) {
+          if (Array.isArray(parsedVi)) {
+            secViLoaded = true;
             baseItems = parsedVi.map((viItem: any, idx: number) => ({
               id: viItem.id || String(idx + 1),
               itemNo: String(idx + 1),
@@ -268,11 +304,11 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
     for (const key of candidateTechKeys) {
       const savedTechSpecs = localStorage.getItem(key);
-      if (savedTechSpecs) {
+      if (savedTechSpecs !== null) {
         try {
           const parsedTech = JSON.parse(savedTechSpecs);
-          if (Array.isArray(parsedTech) && parsedTech.length > 0) {
-            if (baseItems.length === 0) {
+          if (Array.isArray(parsedTech)) {
+            if (!secViLoaded || baseItems.length === 0) {
               baseItems = parsedTech;
             } else {
               const techById = new Map(parsedTech.map((entry: any, idx: number) => [entry.id || String(idx + 1), entry]));
@@ -1040,31 +1076,17 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                     <Building2 className="w-4 h-4 text-blue-400" />
                     <span>Target Bidding Project:</span>
                   </label>
-                  {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
-                    <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                      <Lock className="w-3 h-3 text-amber-400" />
-                      <span>Project Locked (Strict Isolation Active)</span>
+                  {projectRefNo && (
+                    <span className="text-[10px] text-emerald-400 font-bold font-mono flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                      <Lock className="w-3 h-3 text-emerald-400" />
+                      <span>Strict Isolation Active ({projectRefNo})</span>
                     </span>
                   )}
                 </div>
                 <select
-                  value={selectedOppId}
-                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedOppId(val);
-                    const found = oppProjects.find((p) => p.id === val || p.refNo === val);
-                    if (found) {
-                      setProjectRefNo(found.refNo);
-                      setSolicitationNumber(found.solicitationNo || 'SOL-2026-001');
-                      setProjectTitle(found.title);
-                      setProcuringEntity(found.procuringEntity);
-                      if (found.dateTimeSubmitted) {
-                        setDateTimeSubmitted(found.dateTimeSubmitted);
-                      }
-                    }
-                  }}
-                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-900/90"
+                  value={selectedOppId || projectRefNo}
+                  onChange={(e) => handleSelectProject(e.target.value)}
+                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer"
                 >
                   {oppProjects.length === 0 ? (
                     <option value="">-- No Saved Projects in Opportunity Finder --</option>

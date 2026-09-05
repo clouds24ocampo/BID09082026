@@ -191,9 +191,9 @@ interface PageRow {
 export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
   item = { id: 'fal-01', code: 'FAL-01', name: 'Framework Agreement List' },
   tenant,
-  activeProjectRefNo = 'PRJ-2026-901283',
-  activeProjectTitle = 'Infrastructure & IT Systems Modernization Project',
-  activeProcuringEntity = 'Department of Information & Communications Technology',
+  activeProjectRefNo = '',
+  activeProjectTitle = '',
+  activeProcuringEntity = '',
   onSaveAndComplete,
   onClose
 }) => {
@@ -289,18 +289,33 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
-    if (list.length > 0) {
-      const preferred = list.find((project) => project.refNo === activeProjectRefNo) || list[0];
-      if (preferred && (preferred.id !== selectedOppId || preferred.refNo !== projectRefNo)) {
-        setSelectedOppId(preferred.id);
-        setProjectRefNo(preferred.refNo);
-        setSolicitationNumber(preferred.solicitationNo || 'SOL-2026-001');
-        setProjectTitle(preferred.title);
-        setProcuringEntity(preferred.procuringEntity);
-        if (preferred.dateTimeSubmitted) {
-          setDateTimeSubmitted(preferred.dateTimeSubmitted);
+    if (activeProjectRefNo) {
+      const match = list.find((project) => project.refNo === activeProjectRefNo);
+      if (match) {
+        setSelectedOppId(match.id);
+        setProjectRefNo(match.refNo);
+        setSolicitationNumber(match.solicitationNo || 'SOL-2026-001');
+        setProjectTitle(match.title);
+        setProcuringEntity(match.procuringEntity);
+        if (match.dateTimeSubmitted) {
+          setDateTimeSubmitted(match.dateTimeSubmitted);
         }
-        setItems([]);
+        return;
+      }
+      setSelectedOppId('');
+      setProjectRefNo(activeProjectRefNo);
+      setSolicitationNumber('SOL-2026-001');
+      setProjectTitle(activeProjectTitle || 'Target Bidding Project');
+      setProcuringEntity(activeProcuringEntity || '');
+    } else if (list.length > 0) {
+      const first = list[0];
+      setSelectedOppId(first.id);
+      setProjectRefNo(first.refNo);
+      setSolicitationNumber(first.solicitationNo || 'SOL-2026-001');
+      setProjectTitle(first.title);
+      setProcuringEntity(first.procuringEntity);
+      if (first.dateTimeSubmitted) {
+        setDateTimeSubmitted(first.dateTimeSubmitted);
       }
     } else {
       setSelectedOppId('');
@@ -308,9 +323,22 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       setSolicitationNumber('');
       setProjectTitle('');
       setProcuringEntity('');
-      setItems([]);
     }
-  }, [tenant?.id, activeProjectRefNo]);
+  }, [tenant?.id, activeProjectRefNo, activeProjectTitle, activeProcuringEntity]);
+
+  const handleSelectProject = (oppIdOrRef: string) => {
+    const found = oppProjects.find((p) => p.id === oppIdOrRef || p.refNo === oppIdOrRef);
+    if (found) {
+      setSelectedOppId(found.id);
+      setProjectRefNo(found.refNo);
+      setSolicitationNumber(found.solicitationNo || 'SOL-2026-001');
+      setProjectTitle(found.title);
+      setProcuringEntity(found.procuringEntity);
+      if (found.dateTimeSubmitted) {
+        setDateTimeSubmitted(found.dateTimeSubmitted);
+      }
+    }
+  };
 
   // Load shared Section VI data for current project (100% identical & read-only mirrored)
   useEffect(() => {
@@ -328,30 +356,30 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       projectRefNo ? `bidocs_sec_vi_${tenantKey}_${projectRefNo}` : ''
     ].filter(Boolean);
 
-    let loadedItems: ScheduleItem[] = [];
+    let loadedItems: ScheduleItem[] | null = null;
     for (const key of candidateSecViKeys) {
       const saved = localStorage.getItem(key);
-      if (saved) {
+      if (saved !== null) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
+          if (Array.isArray(parsed)) {
             loadedItems = parsed;
             break;
           }
         } catch (e) { }
       }
     }
-    setItems(loadedItems);
+    setItems(loadedItems !== null ? loadedItems : []);
 
     const servicesKey = `bidocs_sec_vi_services_${tenant?.id || 'default'}_${projectScopeKey}`;
     const savedServices = localStorage.getItem(servicesKey);
-    if (savedServices) {
+    if (savedServices !== null) {
       try {
         const parsedSvc = JSON.parse(savedServices);
         if (parsedSvc) {
-          if (parsedSvc.description !== undefined) setServicesDescription(parsedSvc.description);
-          if (parsedSvc.percentage !== undefined) setServicesPercentage(parsedSvc.percentage);
-          if (parsedSvc.customAmount !== undefined) setServicesCustomAmount(parsedSvc.customAmount);
+          setServicesDescription(parsedSvc.description || DEFAULT_SERVICES_DESCRIPTION);
+          setServicesPercentage(parsedSvc.percentage ?? 35);
+          setServicesCustomAmount(parsedSvc.customAmount || '');
         }
       } catch (e) {}
     } else {
@@ -359,7 +387,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       setServicesPercentage(35);
       setServicesCustomAmount('');
     }
-  }, [projectScopeKey, tenant?.id]);
+  }, [projectScopeKey, selectedOppId, projectRefNo, tenant?.id]);
 
   const handlePrint = () => {
     window.print();
@@ -874,31 +902,17 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                     <Building2 className="w-4 h-4 text-blue-400" />
                     <span>Target Bidding Project:</span>
                   </label>
-                  {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
-                    <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                      <Lock className="w-3 h-3 text-amber-400" />
-                      <span>Project Locked (Strict Isolation Active)</span>
+                  {projectRefNo && (
+                    <span className="text-[10px] text-emerald-400 font-bold font-mono flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                      <Lock className="w-3 h-3 text-emerald-400" />
+                      <span>Strict Isolation Active ({projectRefNo})</span>
                     </span>
                   )}
                 </div>
                 <select
-                  value={selectedOppId}
-                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedOppId(val);
-                    const found = oppProjects.find((p) => p.id === val || p.refNo === val);
-                    if (found) {
-                      setProjectRefNo(found.refNo);
-                      setSolicitationNumber(found.solicitationNo || 'SOL-2026-001');
-                      setProjectTitle(found.title);
-                      setProcuringEntity(found.procuringEntity);
-                      if (found.dateTimeSubmitted) {
-                        setDateTimeSubmitted(found.dateTimeSubmitted);
-                      }
-                    }
-                  }}
-                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-900/90"
+                  value={selectedOppId || projectRefNo}
+                  onChange={(e) => handleSelectProject(e.target.value)}
+                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer"
                 >
                   {oppProjects.length === 0 ? (
                     <option value="">-- No Saved Projects in Opportunity Finder --</option>

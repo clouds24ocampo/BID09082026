@@ -485,18 +485,11 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
                 <span className="text-[9px] font-mono font-bold text-amber-300 uppercase">
                   Target Bidding Project:
                 </span>
-                {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
-                  <span className="text-[8.5px] text-amber-400 font-bold font-mono flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
-                    <Lock className="w-2.5 h-2.5 text-amber-400" />
-                    <span>Locked</span>
-                  </span>
-                )}
               </div>
               <select
                 value={selectedOppId}
-                disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                 onChange={(e) => handleSelectOpportunity(e.target.value)}
-                className="bg-transparent text-white font-mono font-bold text-xs focus:outline-none cursor-pointer pr-2 max-w-[280px] truncate disabled:opacity-85 disabled:cursor-not-allowed"
+                className="bg-transparent text-white font-mono font-bold text-xs focus:outline-none cursor-pointer pr-2 max-w-[280px] truncate"
               >
                 <option value="" className="bg-slate-900 text-slate-400">-- Select Opportunity Project --</option>
                 {oppProjects.map((p) => (

@@ -32,9 +32,9 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
   onSaveAndComplete,
   onClose
 }) => {
-  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || 'PRJ-2026-901283');
-  const [projectTitle, setProjectTitle] = useState(activeProjectTitle || 'Supply, Delivery, and Installation of IT Infrastructure Systems');
-  const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity || 'Department of Information and Communications Technology');
+  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '');
+  const [projectTitle, setProjectTitle] = useState(activeProjectTitle || '');
+  const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity || '');
   const [companyName, setCompanyName] = useState(tenant?.companyName || 'Bidding Entity Corporate Name');
   const [companyAddress, setCompanyAddress] = useState(tenant?.address || 'Metro Manila, Philippines');
   const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || 'Juan Dela Cruz');
@@ -224,18 +224,11 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
                     <Building2 className="w-4 h-4 text-blue-400" />
                     <span>Target Bidding Project:</span>
                   </label>
-                  {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
-                    <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                      <Lock className="w-3 h-3 text-amber-400" />
-                      <span>Project Locked (Strict Isolation Active)</span>
-                    </span>
-                  )}
-                </div>
+                  </div>
                 <select
                   value={selectedOppId}
-                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => handleSelectOpportunity(e.target.value)}
-                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner disabled:opacity-85 disabled:cursor-not-allowed"
+                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner"
                 >
                   <option value="">-- Custom Inputs --</option>
                   {oppProjects.map(p => (
@@ -251,9 +244,8 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
                 <input
                   type="text"
                   value={projectRefNo}
-                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => setProjectRefNo(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono disabled:opacity-75 disabled:cursor-not-allowed"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono"
                 />
               </div>
 
@@ -262,9 +254,8 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
                 <input
                   type="text"
                   value={projectTitle}
-                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => setProjectTitle(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-medium disabled:opacity-75 disabled:cursor-not-allowed"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-medium"
                 />
               </div>
 

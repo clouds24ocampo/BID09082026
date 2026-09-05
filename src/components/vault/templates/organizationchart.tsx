@@ -614,16 +614,9 @@ export const OrganizationalChartModal: React.FC<OrganizationalChartModalProps> =
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-slate-300 font-mono">Target Bidding Project:</span>
-                {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
-                  <span className="text-[9px] text-amber-400 font-bold font-mono flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/30">
-                    <Lock className="w-2.5 h-2.5 text-amber-400" />
-                    <span>Locked</span>
-                  </span>
-                )}
               </div>
               <select
                 value={selectedOppId}
-                disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                 onChange={(e) => {
                   const opp = oppProjects.find(p => p.id === e.target.value);
                   if (opp) {
@@ -636,7 +629,7 @@ export const OrganizationalChartModal: React.FC<OrganizationalChartModalProps> =
                     if (opp.dateTimeSubmitted) setDateTimeSubmitted(opp.dateTimeSubmitted);
                   }
                 }}
-                className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500 disabled:opacity-85 disabled:cursor-not-allowed"
+                className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500"
               >
                 {oppProjects.map(opp => (
                   <option key={opp.id} value={opp.id}>

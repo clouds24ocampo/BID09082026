@@ -193,7 +193,7 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
         if (savedSecVi) {
           try {
             const parsed = JSON.parse(savedSecVi);
-            if (Array.isArray(parsed) && parsed.length > 0) {
+            if (Array.isArray(parsed)) {
               secViItems = parsed;
               break;
             }
@@ -707,9 +707,8 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
                       </div>
                       <select
                         value={selectedOppId}
-                        disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                         onChange={(e) => handleSelectOpportunity(e.target.value)}
-                        className={`w-full bg-slate-950 border rounded-xl px-3.5 py-2 text-white font-mono text-xs font-bold focus:outline-none shadow-inner disabled:opacity-85 disabled:cursor-not-allowed ${isInfraTheme ? 'border-amber-500/60 focus:border-amber-400' : 'border-blue-500/60 focus:border-blue-400'}`}
+                        className={`w-full bg-slate-950 border rounded-xl px-3.5 py-2 text-white font-mono text-xs font-bold focus:outline-none shadow-inner ${isInfraTheme ? 'border-amber-500/60 focus:border-amber-400' : 'border-blue-500/60 focus:border-blue-400'}`}
                       >
                         <option value="">-- Select Project --</option>
                         {oppProjects.map(p => (
@@ -736,10 +735,9 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
                       <input
                         type="text"
                         value={projectTitle}
-                        disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                         onChange={(e) => setProjectTitle(e.target.value)}
                         placeholder="e.g. Procurement and Installation of CCTV at Purok 1-6"
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-semibold disabled:opacity-75 disabled:cursor-not-allowed"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-semibold"
                       />
                     </div>
 

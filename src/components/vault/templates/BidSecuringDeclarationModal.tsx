@@ -31,9 +31,9 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
   onSaveAndComplete,
   onClose
 }) => {
-  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || 'PRJ-2026-901283');
-  const [projectTitle, setProjectTitle] = useState(activeProjectTitle || 'Supply, Delivery, and Installation of IT Infrastructure Systems');
-  const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity || 'Department of Information and Communications Technology');
+  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '');
+  const [projectTitle, setProjectTitle] = useState(activeProjectTitle || '');
+  const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity || '');
   const [companyName, setCompanyName] = useState(tenant?.companyName || 'Bidding Entity Corporate Name');
   const [companyAddress, setCompanyAddress] = useState(tenant?.address || 'Metro Manila, Philippines');
   const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || 'Juan Dela Cruz');

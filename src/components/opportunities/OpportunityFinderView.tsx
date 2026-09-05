@@ -227,13 +227,16 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
   const handleWorkOnProject = (op: PhilGEPSOpportunity) => {
     try {
+      const activeRef = op.projectReferenceNumber || op.philgepsRefNo;
       const activeData = {
-        refNo: op.projectReferenceNumber || op.philgepsRefNo,
+        refNo: activeRef,
         title: op.title,
         procuringEntity: op.procuringEntity
       };
       localStorage.setItem(`bidocs_active_project_${tenantId}`, JSON.stringify(activeData));
       localStorage.setItem('bidocs_active_project', JSON.stringify(activeData));
+      localStorage.setItem(`bidocs_active_vault_project_${tenantId}`, activeRef);
+      localStorage.setItem('bidocs_active_vault_project', activeRef);
     } catch (e) {
       console.error('[OpportunityFinder] Error setting active project:', e);
     }

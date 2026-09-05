@@ -238,9 +238,9 @@ const defaultKeyPersonnelCols: KeyPersonnelMatrixCol[] = [
 export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateModalProps> = ({
   item,
   tenant,
-  activeProjectRefNo = 'PRJ-2026-901283',
-  activeProjectTitle = 'Infrastructure & IT Systems Modernization Project',
-  activeProcuringEntity = 'Department of Information & Communications Technology',
+  activeProjectRefNo = '',
+  activeProjectTitle = '',
+  activeProcuringEntity = '',
   onSaveAndComplete,
   onClose
 }) => {
@@ -869,20 +869,13 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
             {/* Target Project Dropdown Selector */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-slate-200 font-mono text-xs font-bold flex items-center gap-1.5 text-blue-300">
-                  <Building2 className="w-4 h-4 text-blue-400" />
+                <label className="text-slate-300 font-mono text-xs font-bold text-blue-300 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-blue-400" />
                   <span>Target Bidding Project:</span>
                 </label>
-                {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
-                  <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                    <Lock className="w-3 h-3 text-amber-400" />
-                    <span>Project Locked (Strict Isolation Active)</span>
-                  </span>
-                )}
               </div>
               <select
                 value={selectedOppId}
-                disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                 onChange={(e) => {
                   const val = e.target.value;
                   setSelectedOppId(val);
@@ -893,7 +886,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                     setProcuringEntity(found.procuringEntity);
                   }
                 }}
-                className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-900/90"
+                className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner"
               >
                 {oppProjects.length === 0 ? (
                   <option value="">-- No Saved Projects in Opportunity Finder --</option>
@@ -916,9 +909,8 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                 <input
                   type="text"
                   value={projectRefNo}
-                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => setProjectRefNo(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500 disabled:opacity-75 disabled:cursor-not-allowed"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div>
@@ -926,9 +918,8 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                 <input
                   type="text"
                   value={projectTitle}
-                  disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                   onChange={(e) => setProjectTitle(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 disabled:opacity-75 disabled:cursor-not-allowed"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div>

@@ -52,7 +52,7 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
   };
 
   const handleExportPdf = async () => {
-    const projRef = item.documentNumber || 'PRJ-2026-901283';
+    const projRef = item.philgepsRefNo || item.documentNumber || 'DOCUMENT';
     const cleanDocName = item.documentName.replace(/[^a-zA-Z0-9]/g, '_');
     const today = new Date().toISOString().split('T')[0];
     const fileName = `${projRef}_${cleanDocName}_${today}.pdf`;

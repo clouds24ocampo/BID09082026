@@ -110,22 +110,44 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
-    if (list.length > 0) {
-      const preferred = list.find((project) => project.refNo === activeProjectRefNo) || list[0];
-      if (preferred && (preferred.id !== selectedOppId || preferred.refNo !== projectRefNo)) {
-        setSelectedOppId(preferred.id);
-        setProjectRefNo(preferred.refNo);
-        setSolicitationNumber(preferred.solicitationNo || 'N/A');
-        setProjectTitle(preferred.title);
-        setProcuringEntity(preferred.procuringEntity);
-        if (preferred.dateTimeSubmitted) {
-          setDateTimeSubmitted(preferred.dateTimeSubmitted);
+    if (activeProjectRefNo) {
+      const match = list.find((project) => project.refNo === activeProjectRefNo);
+      if (match) {
+        setSelectedOppId(match.id);
+        setProjectRefNo(match.refNo);
+        setSolicitationNumber(match.solicitationNo || 'N/A');
+        setProjectTitle(match.title);
+        setProcuringEntity(match.procuringEntity);
+        if (match.dateTimeSubmitted) {
+          setDateTimeSubmitted(match.dateTimeSubmitted);
         }
         setEditingRow(null);
         setIsNoSlcc(false);
         setIsNoPrivateSlcc(false);
+        return;
       }
-    } else if (list.length === 0) {
+      setSelectedOppId('');
+      setProjectRefNo(activeProjectRefNo);
+      setSolicitationNumber('N/A');
+      setProjectTitle(activeProjectTitle || 'Target Bidding Project');
+      setProcuringEntity(activeProcuringEntity || '');
+      setEditingRow(null);
+      setIsNoSlcc(false);
+      setIsNoPrivateSlcc(false);
+    } else if (list.length > 0) {
+      const first = list[0];
+      setSelectedOppId(first.id);
+      setProjectRefNo(first.refNo);
+      setSolicitationNumber(first.solicitationNo || 'N/A');
+      setProjectTitle(first.title);
+      setProcuringEntity(first.procuringEntity);
+      if (first.dateTimeSubmitted) {
+        setDateTimeSubmitted(first.dateTimeSubmitted);
+      }
+      setEditingRow(null);
+      setIsNoSlcc(false);
+      setIsNoPrivateSlcc(false);
+    } else {
       setSelectedOppId('');
       setProjectRefNo('');
       setSolicitationNumber('');
@@ -134,7 +156,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
       setEditingRow(null);
       setContracts([]);
     }
-  }, [tenant?.id, activeProjectRefNo]);
+  }, [tenant?.id, activeProjectRefNo, activeProjectTitle, activeProcuringEntity]);
 
   // Form Editor Modal state for editing or creating an SLCC contract row
   const [editingRow, setEditingRow] = useState<SlccContractRow | null>(null);
@@ -156,7 +178,11 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
     if (saved) {
       try {
         const parsed: SlccContractRow[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
+          if (parsed.length === 0) {
+            if (!cancelled) setContracts([]);
+            return;
+          }
           // Asynchronously hydrate PDF data URLs from IndexedDB (supports 200MB+)
           Promise.all(parsed.map(async (row) => {
             if (row.pdfFile && !row.pdfFile.fileDataUrl) {
@@ -187,20 +213,16 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
       const nextContracts = updater(prev);
       if (projectScopeKey && tenant?.id) {
         const storageKey = `bidocs_slcc_${tenant.id}_${projectScopeKey}`;
-        if (nextContracts.length === 0) {
-          localStorage.removeItem(storageKey);
-        } else {
-          // Strip heavy base64 fileDataUrl from localStorage payload to keep metadata under 1KB
-          const sanitized = nextContracts.map(row => {
-            if (!row.pdfFile) return row;
-            const { fileDataUrl, ...meta } = row.pdfFile;
-            return { ...row, pdfFile: meta };
-          });
-          try {
-            localStorage.setItem(storageKey, JSON.stringify(sanitized));
-          } catch (e) {
-            console.error('[SLCC] Error saving sanitized metadata to localStorage:', e);
-          }
+        // Strip heavy base64 fileDataUrl from localStorage payload to keep metadata under 1KB
+        const sanitized = nextContracts.map(row => {
+          if (!row.pdfFile) return row;
+          const { fileDataUrl, ...meta } = row.pdfFile;
+          return { ...row, pdfFile: meta };
+        });
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(sanitized));
+        } catch (e) {
+          console.error('[SLCC] Error saving sanitized metadata to localStorage:', e);
         }
       }
       return nextContracts;
@@ -571,16 +593,9 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   <Building2 className="w-3.5 h-3.5 text-blue-400" />
                   <span>Target Bidding Project:</span>
                 </label>
-                {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
-                  <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                    <Lock className="w-3 h-3 text-amber-400" />
-                    <span>Project Locked (Strict Isolation Active)</span>
-                  </span>
-                )}
               </div>
               <select
                 value={selectedOppId}
-                disabled={Boolean(activeProjectRefNo || (selectedOppId && selectedOppId !== ''))}
                 onChange={(e) => {
                   const val = e.target.value;
                   setSelectedOppId(val);
@@ -599,7 +614,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                     }
                   }
                 }}
-                className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3 py-2 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-900/90"
+                className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3 py-2 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner"
               >
                 {oppProjects.length === 0 ? (
                   <option value="">-- No Active Bidding Projects Saved in Opportunity Finder. Add a Project in Opportunity Finder --</option>

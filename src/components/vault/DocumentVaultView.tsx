@@ -3293,6 +3293,7 @@ export const DocumentVaultView: React.FC = () => {
           tenant={currentTenant}
           activeProjectRefNo={activeProjectRefNo}
           activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
           onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
             handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
           }}
@@ -3306,6 +3307,7 @@ export const DocumentVaultView: React.FC = () => {
           tenant={currentTenant}
           activeProjectRefNo={activeProjectRefNo}
           activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
           onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
             handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
           }}
@@ -3322,6 +3324,7 @@ export const DocumentVaultView: React.FC = () => {
           tenant={currentTenant}
           activeProjectRefNo={activeProjectRefNo}
           activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
           onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
             handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
           }}
@@ -3363,6 +3366,7 @@ export const DocumentVaultView: React.FC = () => {
           tenant={currentTenant}
           activeProjectRefNo={activeProjectRefNo}
           activeProjectTitle={activeProjectTitle}
+          activeProcuringEntity={activeProcuringEntity}
           onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
             handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
           }}
