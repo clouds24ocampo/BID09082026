@@ -3721,6 +3721,7 @@ export const DocumentVaultView: React.FC = () => {
         <MergedPdfViewerModal
           selectedItems={selectedVaultObjects}
           tenant={currentTenant}
+          vaultDocs={vaultItems}
           onClose={() => setShowMergeModal(false)}
         />
       )}

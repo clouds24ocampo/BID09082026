@@ -7,6 +7,7 @@ import {
   exportMergedThreeLayerPdf, 
   ExportDocumentUnit 
 } from '../../utils/pdfExportEngine';
+import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
 import { loadPdfData } from '../../utils/vaultIndexedDB';
 import { PDFDocument } from 'pdf-lib';
 import { 
@@ -133,113 +134,17 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
     };
   };
 
-  // Comprehensive Resolver for Attached Document Streams (Section VII, Section VI, BSD, OSS, Vault & Templates)
+  // Comprehensive Resolver for Attached Document Streams (Section VII, Section VI, BSD, OSS, Vault & System-Generated Documents)
   const resolveAttachmentForDoc = async (doc: PackageItem): Promise<string | null> => {
-    const dName = (doc.documentName || '').toLowerCase();
-    
-    // 1. Direct Vault Item match by ID
-    if (doc.vaultDocId) {
-      const linked = vaultDocs.find(v => v.id === doc.vaultDocId);
-      if (linked?.fileDataUrl) return linked.fileDataUrl;
-      try {
-        const data = await loadPdfData(doc.vaultDocId);
-        if (data) return data;
-      } catch (_) {}
-    }
-
-    // 2. Direct match by doc.id
-    if (doc.id) {
-      try {
-        const data = await loadPdfData(doc.id);
-        if (data) return data;
-      } catch (_) {}
-    }
-
-    // 3. Vault Item match by Name
-    const matchedVault = vaultDocs.find(v => {
-      const vName = (v.documentName || '').toLowerCase();
-      return vName === dName || vName.includes(dName) || dName.includes(vName);
+    return resolveDocumentPdfAttachment(doc, {
+      vaultDocs,
+      tenant,
+      tenantId,
+      projectRefNo,
+      projectTitle,
+      procuringEntity,
+      activeProject
     });
-    if (matchedVault?.fileDataUrl) return matchedVault.fileDataUrl;
-    if (matchedVault?.id) {
-      try {
-        const data = await loadPdfData(matchedVault.id);
-        if (data) return data;
-      } catch (_) {}
-    }
-
-    // 4. Check completed notarized & statutory forms in localStorage
-    try {
-      const raw = localStorage.getItem(`bidocs_completed_notarized_${tenantId || 'default'}`);
-      if (raw) {
-        const parsed: any[] = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          const found = parsed.find(f => {
-            const fTitle = (f.title || '').toLowerCase();
-            const fCode = (f.formCode || '').toUpperCase();
-            if (f.id === doc.vaultDocId || f.id === doc.id) return true;
-            if (fTitle === dName || fTitle.includes(dName) || dName.includes(fTitle)) return true;
-
-            if ((dName.includes('section vii') || dName.includes('technical specifications') || dName.includes('tech spec')) &&
-                (fCode === 'SEC-VII' || fTitle.includes('section vii') || fTitle.includes('technical specifications'))) {
-              return true;
-            }
-            if ((dName.includes('section vi') || dName.includes('schedule of requirements')) &&
-                (fCode === 'SEC-VI' || fTitle.includes('section vi') || fTitle.includes('schedule of requirements'))) {
-              return true;
-            }
-            if ((dName.includes('omnibus') || dName.includes('oss')) && (fCode === 'GPPB-OSS-2025' || fTitle.includes('omnibus'))) return true;
-            if ((dName.includes('bid securing') || dName.includes('bsd')) && (fCode === 'GPPB-BSD-2025' || fTitle.includes('bid securing'))) return true;
-            if (dName.includes('slcc') && (fCode.includes('SLCC') || fTitle.includes('slcc'))) return true;
-            if (dName.includes('ongoing') && (fCode.includes('ONGOING') || fTitle.includes('ongoing'))) return true;
-            if (dName.includes('nfcc') && (fCode.includes('NFCC') || fTitle.includes('nfcc'))) return true;
-            if (dName.includes('framework') && (fCode.includes('FAL') || fTitle.includes('framework'))) return true;
-            return false;
-          });
-
-          if (found) {
-            if (found.fileDataUrl) return found.fileDataUrl;
-            if (found.id) {
-              const data = await loadPdfData(found.id);
-              if (data) return data;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-
-    // 5. Check project-scoped indexedDB keys
-    const candidateKeys = [
-      `tech_specs_${tenantId}_${projectScopeKey}`,
-      `tech_specs_${tenantId}_${projectRefNo}`,
-      `sec_vi_${tenantId}_${projectScopeKey}`,
-      `fal_${tenantId}_${projectScopeKey}`,
-      `nfcc_${tenantId}_${projectScopeKey}`,
-      `slcc_${tenantId}_${projectScopeKey}`,
-      `ongoing_${tenantId}_${projectScopeKey}`,
-      `bsd_${tenantId}_${projectScopeKey}`,
-      `oss_${tenantId}_${projectScopeKey}`,
-      `priceschedule_${tenantId}_${projectScopeKey}`,
-      `bidform_${tenantId}_${projectScopeKey}`,
-      `boq_${tenantId}_${projectScopeKey}`,
-      `estimates_${tenantId}_${projectScopeKey}`,
-      `cashflow_${tenantId}_${projectScopeKey}`,
-      `summarybid_${tenantId}_${projectScopeKey}`
-    ];
-
-    const idbResults = await Promise.all(
-      candidateKeys.map(async (k) => {
-        try {
-          const data = await loadPdfData(k);
-          if (data) return data;
-        } catch (_) {}
-        return null;
-      })
-    );
-    const foundData = idbResults.find(res => Boolean(res));
-    if (foundData) return foundData;
-
-    return null;
   };
 
   // Helper to compile a specific folder copy into a merged PDF Data URL
@@ -252,6 +157,44 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
     try {
       const units: ExportDocumentUnit[] = [];
 
+      // Pre-resolve all attachments in parallel
+      const resolvedAttachments = await Promise.all(
+        items.map(doc => resolveAttachmentForDoc(doc))
+      );
+
+      // Measure attached PDF page counts and update state
+      const counts: { [docId: string]: number } = {};
+      for (let i = 0; i < items.length; i++) {
+        const doc = items[i];
+        const attachment = resolvedAttachments[i];
+        if (attachment) {
+          try {
+            if (attachment.startsWith('data:')) {
+              const base64Part = attachment.includes(',') ? attachment.split(',')[1] : attachment;
+              const binaryString = atob(base64Part);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let b = 0; b < binaryString.length; b++) {
+                bytes[b] = binaryString.charCodeAt(b);
+              }
+              const pdfDoc = await PDFDocument.load(bytes);
+              counts[doc.id] = pdfDoc.getPageCount();
+            } else {
+              const res = await fetch(attachment);
+              const arrayBuf = await res.arrayBuffer();
+              const pdfDoc = await PDFDocument.load(arrayBuf);
+              counts[doc.id] = pdfDoc.getPageCount();
+            }
+          } catch (_) {
+            counts[doc.id] = 1;
+          }
+        } else {
+          counts[doc.id] = 1;
+        }
+      }
+      setDocPageCounts(prev => ({ ...prev, ...counts }));
+      // Yield to allow React DOM to re-render TOC with exact page ranges
+      await new Promise(r => setTimeout(r, 60));
+
       // 1. FIRST PAGE: Table of Contents & Statutory Checklist for this Folder Copy
       const tocElem = document.getElementById(`preview-toc-${folderCopy}`) as HTMLElement | null;
       if (tocElem) {
@@ -262,11 +205,6 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
           documentName: `Table of Contents — ${folderCopy}`
         });
       }
-
-      // Pre-resolve all attachments in parallel
-      const resolvedAttachments = await Promise.all(
-        items.map(doc => resolveAttachmentForDoc(doc))
-      );
 
       // 2. Subsequent Pages: Included Documents with Cover Separators and Attached PDF Streams
       for (let i = 0; i < items.length; i++) {

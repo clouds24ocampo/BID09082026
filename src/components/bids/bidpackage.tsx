@@ -9,6 +9,7 @@ import DocumentQrCode from '../common/DocumentQrCode';
 import { loadVaultItems, loadPdfData } from '../../utils/vaultIndexedDB';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../utils/opportunityProjects';
 import { generateAndDownloadThreeLayerPdf, exportMergedThreeLayerPdf, buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit } from '../../utils/pdfExportEngine';
+import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
 import { 
   ChevronDown, 
   Briefcase, 
@@ -563,8 +564,9 @@ export const BidPackageBuilderView: React.FC = () => {
 
       if (foundInStorage) return;
 
-      // 2. Check vault items (Class A/B Corporate vs Strictly Isolated Project Exhibits)
+      // 2. Check vault items (Class A/B Corporate vs Isolated Project Exhibits)
       const isCorporateClassAOrB = [
+        'PHILGEPS_CERTIFICATE',
         'PHILGEPS_PLATINUM',
         'SEC_DTI_REG',
         'MAYORS_PERMIT',
@@ -576,6 +578,7 @@ export const BidPackageBuilderView: React.FC = () => {
       ].includes(doc.id);
 
       const matchingVault = vaultDocs.find(v => {
+        if (!v) return false;
         const vName = (v.documentName || '').toLowerCase();
         const vCode = (v.documentCode || '').toUpperCase();
         const vRef = (v.philgepsRefNo || '').trim().toLowerCase();
@@ -583,89 +586,79 @@ export const BidPackageBuilderView: React.FC = () => {
 
         if (isCorporateClassAOrB) {
           // Class A / B Corporate Credentials belong to the company/tenant in Vault
-          if (doc.id === 'PHILGEPS_PLATINUM') {
-            return vCode === 'DOC-1' || vName.includes('philgeps') || vName.includes('platinum');
+          if (doc.id === 'PHILGEPS_CERTIFICATE' || doc.id === 'PHILGEPS_PLATINUM') {
+            return vCode === 'DOC-1' || vCode.includes('PHILGEPS') || vName.includes('philgeps');
           }
           if (doc.id === 'SEC_DTI_REG') {
-            return vCode === 'DOC-2' || vName.includes('sec') || vName.includes('dti') || vName.includes('cda');
+            return vCode === 'DOC-2' || vCode.includes('SEC') || vCode.includes('DTI') || vName.includes('sec') || vName.includes('dti') || vName.includes('cda');
           }
           if (doc.id === 'MAYORS_PERMIT') {
-            return vCode === 'DOC-3' || vName.includes('mayor') || vName.includes('business permit');
+            return vCode === 'DOC-3' || vCode.includes('MAYOR') || vName.includes('mayor') || vName.includes('business permit');
           }
           if (doc.id === 'TAX_CLEARANCE') {
-            return vCode === 'DOC-4' || vName.includes('tax clearance') || vName.includes('bir');
+            return vCode === 'DOC-4' || vCode.includes('TAX') || vName.includes('tax clearance') || vName.includes('bir');
           }
           if (doc.id === 'AUDITED_FS') {
-            return vCode === 'DOC-5' || vName.includes('audited') || vName.includes('financial statement') || vName.includes('afs');
+            return vCode === 'DOC-5' || vCode.includes('AFS') || vCode.includes('AUDITED') || vName.includes('audited') || vName.includes('financial statement') || vName.includes('afs');
           }
           if (doc.id === 'PCAB_LICENSE') {
-            return vCode === 'DOC-6' || vName.includes('pcab') || vName.includes('contractor license');
+            return vCode === 'DOC-6' || vCode.includes('PCAB') || vName.includes('pcab') || vName.includes('contractor license');
           }
           if (doc.id === 'SECRETARY_CERTIFICATE') {
-            return vCode === 'DOC-13' || vCode.includes('SPA') || vName.includes('secretary') || vName.includes('board resolution') || vName.includes('power of attorney') || vName.includes('spa');
+            return vCode === 'DOC-13' || vCode.includes('SEC_CERT') || vCode.includes('BOARD_RES') || vCode.includes('SPA') || vName.includes('secretary') || vName.includes('board resolution') || vName.includes('power of attorney') || vName.includes('spa');
           }
           if (doc.id === 'JOINT_VENTURE_AGREEMENT') {
-            return vCode === 'DOC-14' || vCode.includes('JVA') || vName.includes('joint venture') || vName.includes('jva');
+            return vCode === 'DOC-14' || vCode.includes('JVA') || vCode.includes('JOINT_VENTURE') || vName.includes('joint venture') || vName.includes('jva');
           }
           return false;
         }
 
-        // Project-Specific Technical Exhibits & Financial Documents MUST match THIS active project!
-        const isStrictlyForThisProject = !!(
-          currentRef && vRef && (
-            vRef === currentRef ||
-            (currentRefDigits.length >= 6 && vRefDigits === currentRefDigits)
-          )
+        // Project-Specific Technical Exhibits & Financial Documents
+        const isStrictlyForThisProject = !vRef || !currentRef || (
+          vRef === currentRef ||
+          (currentRefDigits.length >= 6 && vRefDigits === currentRefDigits) ||
+          (selectedOppId && v.projectId === selectedOppId) ||
+          (projectTitle && v.projectTitle && v.projectTitle.toLowerCase().trim() === projectTitle.toLowerCase().trim())
         );
 
         if (!isStrictlyForThisProject) return false;
 
         // Technical Exhibits & Statements Matching
-        if (doc.id === 'SLCC_STATEMENT') {
-          return vCode.includes('SLCC') || vCode.includes('(C)') || vName.includes('slcc') || vName.includes('single largest');
+        if (doc.id === 'STATEMENT_SLCC' || doc.id === 'SLCC_STATEMENT') {
+          return vCode === 'DOC-3' || vCode.includes('SLCC') || vCode.includes('(C)') || vName.includes('slcc') || vName.includes('single largest');
         }
-        if (doc.id === 'ONGOING_CONTRACTS') {
-          return vCode.includes('ONGOING') || vCode.includes('(B)') || vName.includes('ongoing');
+        if (doc.id === 'STATEMENT_ONGOING_CONTRACTS' || doc.id === 'ONGOING_CONTRACTS') {
+          return vCode === 'DOC-2' || vCode.includes('ONGOING') || vCode.includes('(B)') || vName.includes('ongoing');
         }
         if (doc.id === 'NFCC_COMPUTATION') {
-          return vCode.includes('NFCC') || vName.includes('nfcc') || vName.includes('contracting capacity');
-          return vCode.includes('NFCC') || vCode.includes('CL-08') || vCode.includes('(K)') || vName.includes('nfcc') || vName.includes('net financial contracting');
-        }
-        if (doc.id === 'PCAB_LICENSE') {
-          return vCode.includes('PCAB') || vName.includes('pcab');
-        }
-        if (doc.id === 'SECRETARY_CERTIFICATE') {
-          return vCode.includes('SEC_CERT') || vCode.includes('BOARD_RES') || vCode.includes('SPA') || vName.includes('secretary') || vName.includes('special power of attorney');
-        }
-        if (doc.id === 'JOINT_VENTURE_AGREEMENT') {
-          return vCode.includes('JVA') || vCode.includes('JOINT_VENTURE') || vName.includes('joint venture');
-        }
-        if (doc.id === 'STATEMENT_ONGOING_CONTRACTS') {
-          return vCode.includes('STATEMENT-ONGOING') || vCode.includes('ONGOING') || vName.includes('ongoing contracts');
-        }
-        if (doc.id === 'STATEMENT_SLCC') {
-          return vCode.includes('STATEMENT-SLCC') || vCode.includes('SLCC') || vName.includes('single largest completed');
+          return vCode === 'DOC-13' || vCode.includes('NFCC') || vCode.includes('CL-08') || vCode.includes('(K)') || vName.includes('nfcc') || vName.includes('net financial contracting') || vName.includes('contracting capacity');
         }
         if (doc.id === 'BID_SECURING_DECLARATION') {
-          return vCode.includes('BSD') || vCode.includes('BID_SECURITY') || vCode.includes('GPPB-BSD-2020') || vName.includes('bid securing declaration') || vName.includes('bid security');
+          return vCode === 'DOC-5' || vCode.includes('BSD') || vCode.includes('BID_SECURITY') || vCode.includes('GPPB-BSD-2020') || vName.includes('bid securing declaration') || vName.includes('bid security');
         }
-        if (doc.id === 'OMNIBUS_SWORN_STATEMENT') {
-          return vCode.includes('OSS') || vCode.includes('OMNIBUS') || vCode.includes('GPPB-OSS-2020') || vName.includes('omnibus sworn statement');
+        if (doc.id === 'SECTION_VI_SCHEDULE_OF_REQUIREMENTS') {
+          return vCode === 'DOC-6' || vCode === 'SEC-VI' || vCode === '(F.D)' || vCode.includes('SEC-VI') || vName.includes('section vi') || vName.includes('schedule of requirement');
         }
-        if (doc.id === 'ORGANIZATIONAL_CHART') {
-          return vCode.includes('ORG_CHART') || vCode.includes('FC-2024') || vCode.includes('(F.A)') || vCode === '(F)' || vName.includes('organizational chart') || vName.includes('org chart');
-        }
-        if (doc.id === 'LIST_KEY_PERSONNEL') {
-          return vCode.includes('KEY_PERSONNEL') || vCode.includes('FC-2025') || vCode.includes('(F.B)') || vCode === '(F)' || vName.includes('key personnel') || vName.includes('project manager') || vName.includes('manpower');
-        }
-        if (doc.id === 'MAJOR_EQUIPMENT') {
-          return vCode.includes('EQUIPMENT') || vCode.includes('FC-2026') || vCode.includes('(F.C)') || vCode === '(F)' || vName.includes('equipment') || vName.includes('machinery');
-        }
-        if (doc.id === 'AFTERSALES_WARRANTY') {
-          return vCode.includes('AFTER') || vCode.includes('(H)') || vName.includes('after-sales') || vName.includes('aftersales') || vName.includes('warranty');
+        if (doc.id === 'SECTION_VII_TECHNICAL_SPECS') {
+          return vCode === 'DOC-7' || vCode === 'SEC-VII' || vCode === '(G)' || vCode.includes('SEC-VII') || vName.includes('section vii') || vName.includes('technical specification');
         }
         if (doc.id === 'FRAMEWORK_AGREEMENT_LIST') {
-          return vCode.includes('FAL') || vName.includes('framework agreement');
+          return vCode === 'FAL' || vCode === 'FAL-01' || vCode === 'SEC-VI-FAL' || vName.includes('framework agreement') || vName.includes('fal');
+        }
+        if (doc.id === 'OMNIBUS_SWORN_STATEMENT') {
+          return vCode === 'DOC-12' || vCode.includes('OSS') || vCode.includes('OMNIBUS') || vCode.includes('GPPB-OSS-2020') || vName.includes('omnibus sworn statement');
+        }
+        if (doc.id === 'ORGANIZATIONAL_CHART') {
+          return vCode === 'DOC-8' || vCode.includes('ORG_CHART') || vCode.includes('FC-2024') || vCode.includes('(F.A)') || vCode === '(F)' || vName.includes('organizational chart') || vName.includes('org chart');
+        }
+        if (doc.id === 'LIST_KEY_PERSONNEL') {
+          return vCode === 'DOC-9' || vCode.includes('KEY_PERSONNEL') || vCode.includes('FC-2025') || vCode.includes('(F.B)') || vCode === '(F)' || vName.includes('key personnel') || vName.includes('project manager') || vName.includes('manpower');
+        }
+        if (doc.id === 'MAJOR_EQUIPMENT') {
+          return vCode === 'DOC-10' || vCode.includes('EQUIPMENT') || vCode.includes('FC-2026') || vCode.includes('(F.C)') || vCode === '(F)' || vName.includes('equipment') || vName.includes('machinery');
+        }
+        if (doc.id === 'AFTERSALES_WARRANTY') {
+          return vCode === 'DOC-11' || vCode.includes('AFTER') || vCode.includes('(H)') || vName.includes('after-sales') || vName.includes('aftersales') || vName.includes('warranty');
         }
 
         // Financial Proposals Matching
@@ -682,19 +675,19 @@ export const BidPackageBuilderView: React.FC = () => {
           return vCode.includes('BOQ') || vName.includes('bill of quantities') || vName.includes('boq');
         }
         if (doc.id === 'DETAILED_ESTIMATES_FORM_L') {
-          return vCode.includes('DETAILED-ESTIMATES') || vName.includes('detailed estimate') || vName.includes('form l') || vName.includes('form (l)');
+          return vCode.includes('DETAILED-ESTIMATES') || vCode.includes('ESTIMATES') || vName.includes('detailed estimate') || vName.includes('form l') || vName.includes('form (l)');
         }
         if (doc.id === 'PRICE_SCHEDULE_GOODS') {
           return vCode.includes('PRICESCHED') || vCode.includes('PRICE-SCHEDULE') || vName.includes('price schedule');
         }
         if (doc.id === 'SUMMARY_BID_PRICES') {
-          return vCode.includes('SUMMARY-BIDPRICE') || vName.includes('summary of bid price');
+          return vCode.includes('SUMMARY-BIDPRICE') || vCode.includes('SUMMARY_BID') || vName.includes('summary of bid price');
         }
         if (doc.id === 'CASH_FLOW_BY_QUARTER') {
           return vCode.includes('SF-INFR-56') || vCode.includes('CASHFLOW') || vName.includes('cash flow') || vName.includes('sf-infr-56');
         }
 
-        return false;
+        return vName === (doc.name || '').toLowerCase() || vName.includes((doc.name || '').toLowerCase());
       });
 
       if (matchingVault) {
@@ -976,49 +969,6 @@ export const BidPackageBuilderView: React.FC = () => {
       item => !(item.id === id || (item.documentName === target.documentName && item.envelope === target.envelope))
     );
     savePackageItems(updatedOriginal);
-
-    // Also clean up any lingering project-scoped storage or completed forms for this document
-    try {
-      const ref = (projectRefNo || '').trim();
-      if (ref && target.documentName) {
-        const dName = target.documentName.toLowerCase();
-        if (dName.includes('schedule of requirements') || dName.includes('section vi')) {
-          localStorage.removeItem(`bidocs_sec_vi_${tenantId}_${ref}`);
-          localStorage.removeItem(`bidocs_sec_vi_services_${tenantId}_${ref}`);
-        }
-        if (dName.includes('technical specifications') || dName.includes('section vii')) {
-          localStorage.removeItem(`bidocs_tech_specs_${tenantId}_${ref}`);
-        }
-        if (dName.includes('framework agreement')) {
-          localStorage.removeItem(`bidocs_fal_${tenantId}_${ref}`);
-        }
-        if (dName.includes('ongoing')) {
-          localStorage.removeItem(`bidocs_ongoing_${tenantId}_${ref}`);
-        }
-        if (dName.includes('slcc')) {
-          localStorage.removeItem(`bidocs_slcc_${tenantId}_${ref}`);
-        }
-        if (dName.includes('bid securing') || dName.includes('bsd')) {
-          localStorage.removeItem(`bidocs_bsd_${tenantId}_${ref}`);
-        }
-        if (dName.includes('omnibus') || dName.includes('oss')) {
-          localStorage.removeItem(`bidocs_oss_${tenantId}_${ref}`);
-        }
-
-        const rawCompleted = localStorage.getItem(`bidocs_completed_notarized_${tenantId}`);
-        if (rawCompleted) {
-          const parsed = JSON.parse(rawCompleted);
-          if (Array.isArray(parsed)) {
-            const filtered = parsed.filter((f: any) => {
-              const fRef = (f.projectRefNo || '').trim().toLowerCase();
-              const fTitle = (f.title || f.formCode || '').toLowerCase();
-              return !(fRef === ref.toLowerCase() && (fTitle.includes(dName) || dName.includes(fTitle)));
-            });
-            localStorage.setItem(`bidocs_completed_notarized_${tenantId}`, JSON.stringify(filtered));
-          }
-        }
-      }
-    } catch (_) {}
   };
 
   const handleResetDocReadiness = (doc: StatutoryDocDefinition) => {
@@ -1235,132 +1185,15 @@ export const BidPackageBuilderView: React.FC = () => {
 
   // Comprehensive Resolver for Attached Document Streams (Section VII, Section VI, BSD, OSS, Vault & Templates)
   const resolveAttachmentForDoc = async (doc: PackageItem): Promise<string | null> => {
-    const dName = (doc.documentName || '').toLowerCase();
-    
-    // 1. Direct Vault Item match by ID
-    if (doc.vaultDocId) {
-      const linked = vaultDocs.find(v => v.id === doc.vaultDocId);
-      if (linked?.fileDataUrl) return linked.fileDataUrl;
-      try {
-        const data = await loadPdfData(doc.vaultDocId);
-        if (data) return data;
-      } catch (_) {}
-    }
-
-    // 2. Direct match by doc.id
-    if (doc.id) {
-      try {
-        const data = await loadPdfData(doc.id);
-        if (data) return data;
-      } catch (_) {}
-    }
-
-    // 3. Vault Item match by Name (Strictly verify project reference for technical docs)
-    const currRef = (projectRefNo || '').trim().toLowerCase();
-    const isCorporate = doc.category === 'LEGAL' && !dName.includes('affidavit') && !dName.includes('sworn');
-    const matchedVault = vaultDocs.find(v => {
-      const vName = (v.documentName || '').toLowerCase();
-      const vRef = (v.philgepsRefNo || '').trim().toLowerCase();
-      if (!isCorporate && currRef && vRef && vRef !== currRef) return false;
-      return vName === dName || vName.includes(dName) || dName.includes(vName);
+    return await resolveDocumentPdfAttachment(doc, {
+      tenant: currentTenant,
+      activeProject,
+      projectRefNo,
+      projectTitle,
+      procuringEntity,
+      vaultDocs,
+      folderCopy: doc.folderCopy || activeFolderCopy
     });
-    if (matchedVault?.fileDataUrl) return matchedVault.fileDataUrl;
-    if (matchedVault?.id) {
-      try {
-        const data = await loadPdfData(matchedVault.id);
-        if (data) return data;
-      } catch (_) {}
-    }
-
-    // 4. Check completed notarized & statutory forms in localStorage (Strictly enforce projectRefNo match)
-    try {
-      const raw = localStorage.getItem(`bidocs_completed_notarized_${tenantId || 'default'}`);
-      if (raw) {
-        const parsed: any[] = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          const found = parsed.find(f => {
-            const fTitle = (f.title || '').toLowerCase();
-            const fCode = (f.formCode || '').toUpperCase();
-            const fRef = (f.projectRefNo || '').trim().toLowerCase();
-
-            // Strict Project Isolation: Do not attach completed forms belonging to another project
-            if (currRef && fRef && fRef !== currRef) return false;
-
-            if (f.id === doc.vaultDocId || f.id === doc.id) return true;
-            if (fTitle === dName || fTitle.includes(dName) || dName.includes(fTitle)) return true;
-
-            if ((dName.includes('section vii') || dName.includes('technical specifications') || dName.includes('tech spec')) &&
-                (fCode === 'SEC-VII' || fTitle.includes('section vii') || fTitle.includes('technical specifications'))) {
-              return true;
-            }
-            if ((dName.includes('section vi') || dName.includes('schedule of requirements')) &&
-                (fCode === 'SEC-VI' || fTitle.includes('section vi') || fTitle.includes('schedule of requirements'))) {
-              return true;
-            }
-            if ((dName.includes('omnibus') || dName.includes('oss')) && (fCode === 'GPPB-OSS-2025' || fTitle.includes('omnibus'))) return true;
-            if ((dName.includes('bid securing') || dName.includes('bsd')) && (fCode === 'GPPB-BSD-2025' || fTitle.includes('bid securing'))) return true;
-            if (dName.includes('slcc') && (fCode.includes('SLCC') || fTitle.includes('slcc'))) return true;
-            if (dName.includes('ongoing') && (fCode.includes('ONGOING') || fTitle.includes('ongoing'))) return true;
-            if (dName.includes('nfcc') && (fCode.includes('NFCC') || fTitle.includes('nfcc'))) return true;
-            if (dName.includes('framework') && (fCode.includes('FAL') || fTitle.includes('framework'))) return true;
-            return false;
-          });
-
-          if (found) {
-            if (found.fileDataUrl) return found.fileDataUrl;
-            if (found.id) {
-              const data = await loadPdfData(found.id);
-              if (data) return data;
-            }
-          }
-        }
-      }
-    } catch (_) {}
-
-    // 5. Check project-scoped indexedDB keys
-    const candidateKeys = [
-      `tech_specs_${tenantId}_${projectScopeKey}`,
-      `tech_specs_${tenantId}_${projectRefNo}`,
-      `sec_vi_${tenantId}_${projectScopeKey}`,
-      `fal_${tenantId}_${projectScopeKey}`,
-      `nfcc_${tenantId}_${projectScopeKey}`,
-      `slcc_${tenantId}_${projectScopeKey}`,
-      `ongoing_${tenantId}_${projectScopeKey}`,
-      `bsd_${tenantId}_${projectScopeKey}`,
-      `oss_${tenantId}_${projectScopeKey}`,
-      `priceschedule_${tenantId}_${projectScopeKey}`,
-      `pricesched_${tenantId}_${projectScopeKey}`,
-      `priceschedule_${tenantId}_${projectRefNo}`,
-      `bidform_${tenantId}_${projectScopeKey}`,
-      `boq_${tenantId}_${projectScopeKey}`,
-      `boq_${tenantId}_${projectRefNo}`,
-      `estimates_${tenantId}_${projectScopeKey}`,
-      `cashflow_${tenantId}_${projectScopeKey}`,
-      `summarybid_${tenantId}_${projectScopeKey}`
-    ];
-
-    // Check memory cache first (0ms)
-    for (const k of candidateKeys) {
-      if (pdfDataCache.current[k]) return pdfDataCache.current[k];
-    }
-
-    // Parallel load from IndexedDB
-    const idbResults = await Promise.all(
-      candidateKeys.map(async (k) => {
-        try {
-          const data = await loadPdfData(k);
-          if (data) {
-            pdfDataCache.current[k] = data;
-            return data;
-          }
-        } catch (_) {}
-        return null;
-      })
-    );
-    const foundData = idbResults.find(res => Boolean(res));
-    if (foundData) return foundData;
-
-    return null;
   };
 
   // ─── ONE-CLICK MERGE ALL DOCUMENTS WITH "PAGE X OF Y" PAGINATION ───
@@ -3854,6 +3687,11 @@ export const BidPackageBuilderView: React.FC = () => {
             };
           })}
           tenant={currentTenant}
+          activeProject={activeProject}
+          projectRefNo={projectRefNo}
+          projectTitle={projectTitle}
+          procuringEntity={procuringEntity}
+          vaultDocs={vaultDocs}
           onClose={() => setShowOrganizeModal(false)}
         />
       )}
