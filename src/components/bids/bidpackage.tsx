@@ -208,25 +208,32 @@ export const BidPackageBuilderView: React.FC = () => {
       { id: 'SECRETARY_CERTIFICATE', name: "Secretary's Certificate / Board Resolution / Special Power of Attorney (SPA)", category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'SECRETARY_CERTIFICATE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
       { id: 'JOINT_VENTURE_AGREEMENT', name: 'Joint Venture Agreement (JVA) / Class B Legal Documents', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'JOINT_VENTURE_AGREEMENT', vaultMatchCategory: 'ELIGIBILITY_CLASS_B' },
 
-      // Envelope 2: Financial Proposal Documents (1st: Detailed Estimates, 2nd: Bid Form, 3rd: BOQ, 4th: Price Schedule, 5th: Summary of Bid Prices, 6th: Cash Flow)
-      { id: 'DETAILED_ESTIMATES_FORM_L', name: '(Form L) Detailed Estimates (Direct Labor, Logistics & Equipment)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'DETAILED_ESTIMATES_FORM_L', storageKey: `bidocs_detailed_estimates_${tenantId}_${projectScopeKey}` },
     ];
 
-    // Dynamic 2nd Document: Only the relevant Bid Form matching the Project Type
+    // Envelope 2: Financial Proposal Documents (1: Bid Form, 2: BOQ, 3: Form L, 4: Price Schedule, 5: Bid Summary, 6: Cash Flow)
+    // 1. Bid Form (Dynamic naming strictly aligned to project classification)
     if (isInfraProject) {
-      list.push({ id: 'FINANCIAL_BID_FORM_INFRA', name: 'Official Financial Bid Form (for Infrastructure Projects)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'GPPB-BIDFORM-INFRASTRUCTURE', storageKey: `bidocs_bidform_infra_${tenantId}_${projectScopeKey}` });
+      list.push({ id: 'FINANCIAL_BID_FORM_INFRA', name: 'Financial Bid Form (Infrastructure)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'GPPB-BIDFORM-INFRASTRUCTURE', storageKey: `bidocs_bidform_infra_${tenantId}_${projectScopeKey}` });
     } else if (isConsultingProject) {
-      list.push({ id: 'FINANCIAL_BID_FORM_CONSULTING', name: 'Financial Proposal Submission Form (for Consulting Services)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'GPPB-BIDFORM-CONSULTING', storageKey: `bidocs_bidform_consulting_${tenantId}_${projectScopeKey}` });
+      list.push({ id: 'FINANCIAL_BID_FORM_CONSULTING', name: 'Financial Bid Form (Consulting)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'GPPB-BIDFORM-CONSULTING', storageKey: `bidocs_bidform_consulting_${tenantId}_${projectScopeKey}` });
     } else {
-      list.push({ id: 'FINANCIAL_BID_FORM_GOODS', name: 'Official Financial Bid Form (for Goods & General Support)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'GPPB-BIDFORM-GOODS', storageKey: `bidocs_bidform_goods_${tenantId}_${projectScopeKey}` });
+      list.push({ id: 'FINANCIAL_BID_FORM_GOODS', name: 'Financial Bid Form (Goods)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'GPPB-BIDFORM-GOODS', storageKey: `bidocs_bidform_goods_${tenantId}_${projectScopeKey}` });
     }
 
-    list.push(
-      { id: 'BILL_OF_QUANTITIES', name: 'Bill of Quantities (BOQ Breakdown)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'BILL_OF_QUANTITIES', storageKey: `bidocs_boq_${tenantId}_${projectScopeKey}` },
-      { id: 'PRICE_SCHEDULE_GOODS', name: 'Detailed Price Schedule for Goods (Offered from Abroad / Within Philippines)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'PRICE_SCHEDULE_GOODS', storageKey: `bidocs_pricesched_${tenantId}_${projectScopeKey}` },
-      { id: 'SUMMARY_BID_PRICES', name: 'Summary of Bid Prices & Lump-Sum Breakdown', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'SUMMARY_BID_PRICES', storageKey: `bidocs_summary_bid_price_${tenantId}_${projectScopeKey}` },
-      { id: 'CASH_FLOW_BY_QUARTER', name: 'Cash Flow by Quarter and Payment Schedule (SF-INFR-56)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'CASH_FLOW_BY_QUARTER', storageKey: `bidocs_cash_flow_${tenantId}_${projectScopeKey}` }
-    );
+    // 2. Bill of Quantities
+    list.push({ id: 'BILL_OF_QUANTITIES', name: 'Bill of Quantities (BOQ Breakdown)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'BILL_OF_QUANTITIES', storageKey: `bidocs_boq_${tenantId}_${projectScopeKey}` });
+
+    // 3. Form L - Detailed Estimates
+    list.push({ id: 'DETAILED_ESTIMATES_FORM_L', name: '(Form L) Detailed Estimates (Direct Labor, Logistics & Equipment)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'DETAILED_ESTIMATES_FORM_L', storageKey: `bidocs_detailed_estimates_${tenantId}_${projectScopeKey}` });
+
+    // 4. Detailed Price Schedule
+    list.push({ id: 'PRICE_SCHEDULE_GOODS', name: 'Detailed Price Schedule for Goods (Offered from Abroad / Within Philippines)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'PRICE_SCHEDULE_GOODS', storageKey: `bidocs_pricesched_${tenantId}_${projectScopeKey}` });
+
+    // 5. Summary of Bid Prices
+    list.push({ id: 'SUMMARY_BID_PRICES', name: 'Summary of Bid Prices & Lump-Sum Breakdown', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'SUMMARY_BID_PRICES', storageKey: `bidocs_summary_bid_price_${tenantId}_${projectScopeKey}` });
+
+    // 6. Cash Flow by Quarter
+    list.push({ id: 'CASH_FLOW_BY_QUARTER', name: 'Cash Flow by Quarter and Payment Schedule (SF-INFR-56)', category: 'FINANCIAL', envelope: 'ENVELOPE_2', code: 'CASH_FLOW_BY_QUARTER', storageKey: `bidocs_cash_flow_${tenantId}_${projectScopeKey}` });
 
     return list;
   }, [tenantId, projectScopeKey, isInfraProject, isConsultingProject]);
@@ -622,24 +629,34 @@ export const BidPackageBuilderView: React.FC = () => {
         }
         if (doc.id === 'NFCC_COMPUTATION') {
           return vCode.includes('NFCC') || vName.includes('nfcc') || vName.includes('contracting capacity');
+          return vCode.includes('NFCC') || vCode.includes('CL-08') || vCode.includes('(K)') || vName.includes('nfcc') || vName.includes('net financial contracting');
         }
-        if (doc.id === 'SECTION_VI_REQUIREMENTS') {
-          return vCode.includes('SEC-VI') || vCode.includes('(F.D)') || vName.includes('section vi') || vName.includes('schedule of requirements');
+        if (doc.id === 'PCAB_LICENSE') {
+          return vCode.includes('PCAB') || vName.includes('pcab');
         }
-        if (doc.id === 'TECH_SPECS_SECTION_VII') {
-          return vCode.includes('SEC-VII') || vCode.includes('(G)') || vName.includes('section vii') || vName.includes('technical specifications');
+        if (doc.id === 'SECRETARY_CERTIFICATE') {
+          return vCode.includes('SEC_CERT') || vCode.includes('BOARD_RES') || vCode.includes('SPA') || vName.includes('secretary') || vName.includes('special power of attorney');
+        }
+        if (doc.id === 'JOINT_VENTURE_AGREEMENT') {
+          return vCode.includes('JVA') || vCode.includes('JOINT_VENTURE') || vName.includes('joint venture');
+        }
+        if (doc.id === 'STATEMENT_ONGOING_CONTRACTS') {
+          return vCode.includes('STATEMENT-ONGOING') || vCode.includes('ONGOING') || vName.includes('ongoing contracts');
+        }
+        if (doc.id === 'STATEMENT_SLCC') {
+          return vCode.includes('STATEMENT-SLCC') || vCode.includes('SLCC') || vName.includes('single largest completed');
         }
         if (doc.id === 'BID_SECURING_DECLARATION') {
-          return vCode.includes('BSD') || vCode.includes('(E)') || vName.includes('bid securing') || vName.includes('bsd') || vName.includes('bid security');
+          return vCode.includes('BSD') || vCode.includes('BID_SECURITY') || vCode.includes('GPPB-BSD-2020') || vName.includes('bid securing declaration') || vName.includes('bid security');
         }
         if (doc.id === 'OMNIBUS_SWORN_STATEMENT') {
-          return vCode.includes('OSS') || vCode.includes('(I)') || vName.includes('omnibus') || vName.includes('oss');
+          return vCode.includes('OSS') || vCode.includes('OMNIBUS') || vCode.includes('GPPB-OSS-2020') || vName.includes('omnibus sworn statement');
         }
         if (doc.id === 'ORGANIZATIONAL_CHART') {
-          return vCode.includes('ORG') || vCode.includes('FA-2026') || vCode.includes('(F.A)') || vCode === '(F)' || vName.includes('organizational chart') || vName.includes('org chart');
+          return vCode.includes('ORG_CHART') || vCode.includes('FC-2024') || vCode.includes('(F.A)') || vCode === '(F)' || vName.includes('organizational chart') || vName.includes('org chart');
         }
-        if (doc.id === 'KEY_PERSONNEL') {
-          return vCode.includes('PERSONNEL') || vCode.includes('FB-2026') || vCode.includes('(F.B)') || vCode === '(F)' || vName.includes('key personnel') || vName.includes('bio-data') || vName.includes('manpower');
+        if (doc.id === 'LIST_KEY_PERSONNEL') {
+          return vCode.includes('KEY_PERSONNEL') || vCode.includes('FC-2025') || vCode.includes('(F.B)') || vCode === '(F)' || vName.includes('key personnel') || vName.includes('project manager') || vName.includes('manpower');
         }
         if (doc.id === 'MAJOR_EQUIPMENT') {
           return vCode.includes('EQUIPMENT') || vCode.includes('FC-2026') || vCode.includes('(F.C)') || vCode === '(F)' || vName.includes('equipment') || vName.includes('machinery');
@@ -653,19 +670,22 @@ export const BidPackageBuilderView: React.FC = () => {
 
         // Financial Proposals Matching
         if (doc.id === 'FINANCIAL_BID_FORM_GOODS') {
-          return (vCode.includes('GOODS') || vName.includes('goods')) && (vCode.includes('BIDFORM') || vName.includes('bid form'));
+          return (vCode.includes('GOODS') || vName.includes('goods')) && (vCode.includes('BIDFORM') || vName.includes('bid form') || vCode.includes('FINANCIAL_BID_FORM'));
         }
         if (doc.id === 'FINANCIAL_BID_FORM_INFRA') {
-          return (vCode.includes('INFRA') || vName.includes('infrastructure')) && (vCode.includes('BIDFORM') || vName.includes('bid form'));
+          return (vCode.includes('INFRA') || vName.includes('infra') || vName.includes('infrastructure')) && (vCode.includes('BIDFORM') || vName.includes('bid form') || vCode.includes('FINANCIAL_BID_FORM'));
         }
-        if (doc.id === 'PRICE_SCHEDULE_GOODS') {
-          return vCode.includes('PRICESCHED') || vCode.includes('PRICE-SCHEDULE') || vName.includes('price schedule');
+        if (doc.id === 'FINANCIAL_BID_FORM_CONSULTING') {
+          return (vCode.includes('CONSULT') || vName.includes('consult')) && (vCode.includes('BIDFORM') || vName.includes('bid form') || vCode.includes('FINANCIAL_BID_FORM'));
         }
         if (doc.id === 'BILL_OF_QUANTITIES') {
           return vCode.includes('BOQ') || vName.includes('bill of quantities') || vName.includes('boq');
         }
         if (doc.id === 'DETAILED_ESTIMATES_FORM_L') {
           return vCode.includes('DETAILED-ESTIMATES') || vName.includes('detailed estimate') || vName.includes('form l') || vName.includes('form (l)');
+        }
+        if (doc.id === 'PRICE_SCHEDULE_GOODS') {
+          return vCode.includes('PRICESCHED') || vCode.includes('PRICE-SCHEDULE') || vName.includes('price schedule');
         }
         if (doc.id === 'SUMMARY_BID_PRICES') {
           return vCode.includes('SUMMARY-BIDPRICE') || vName.includes('summary of bid price');
@@ -678,11 +698,13 @@ export const BidPackageBuilderView: React.FC = () => {
       });
 
       if (matchingVault) {
-        map[doc.id] = { isReady: true, vaultId: matchingVault.id };
-        return;
+        map[doc.id] = {
+          isReady: true,
+          vaultId: matchingVault.id
+        };
+      } else if (!foundInStorage) {
+        map[doc.id] = { isReady: false };
       }
-
-      map[doc.id] = { isReady: false };
     });
 
     return map;
@@ -693,25 +715,26 @@ export const BidPackageBuilderView: React.FC = () => {
     return docReadinessMap[doc.id] || { isReady: false };
   };
 
-  // Master Document Checklist Rank Matcher (Strictly 1-17 Order for Envelope 1, followed by 18-24 for Envelope 2)
-  const getDocumentChecklistRank = (doc: PackageItem): number => {
-    const name = (doc.documentName || '').toLowerCase();
+  // Master Document Checklist Rank Matcher (Strictly 1-20 Order for Envelope 1, followed by 21-26 for Envelope 2)
+  const getDocumentChecklistRank = (doc: PackageItem | StatutoryDocDefinition | DocumentVaultItem): number => {
+    const name = ((doc as any).documentName || (doc as any).name || '').toLowerCase();
+    const docCode = ((doc as any).documentCode || (doc as any).code || '').toUpperCase();
 
-    // Check defined statutory list
-    const def = statutoryDocsList.find(
-      d => d.name.toLowerCase() === name || name.includes(d.name.toLowerCase()) || d.name.toLowerCase().includes(name)
-    );
-    if (def) {
+    // 0. Highest Priority: exact match with statutory code or definition ID
+    if ((doc as any).id) {
+      const def = statutoryDocsList.find(
+        d => d.id === (doc as any).id || (d.code && (doc as any).documentCode && d.code.toUpperCase() === (doc as any).documentCode.toUpperCase())
+      );
       const STATUTORY_ORDER_RANK: Record<string, number> = {
-        'PHILGEPS_PLATINUM': 1,
-        'ONGOING_CONTRACTS': 2,
-        'SLCC_STATEMENT': 3,
+        'PHILGEPS_CERTIFICATE': 1,
+        'STATEMENT_ONGOING_CONTRACTS': 2,
+        'STATEMENT_SLCC': 3,
         'BID_SECURING_DECLARATION': 4,
-        'SECTION_VI_REQUIREMENTS': 5,
-        'TECH_SPECS_SECTION_VII': 6,
+        'SECTION_VI_SCHEDULE_OF_REQUIREMENTS': 5,
+        'SECTION_VII_TECHNICAL_SPECS': 6,
         'FRAMEWORK_AGREEMENT_LIST': 7,
         'ORGANIZATIONAL_CHART': 8,
-        'KEY_PERSONNEL': 9,
+        'LIST_KEY_PERSONNEL': 9,
         'MAJOR_EQUIPMENT': 10,
         'AFTERSALES_WARRANTY': 11,
         'OMNIBUS_SWORN_STATEMENT': 12,
@@ -723,18 +746,31 @@ export const BidPackageBuilderView: React.FC = () => {
         'TAX_CLEARANCE': 18,
         'SECRETARY_CERTIFICATE': 19,
         'JOINT_VENTURE_AGREEMENT': 20,
+        // Envelope 2: 1. Bid Form, 2. BOQ, 3. Form L, 4. Price Schedule, 5. Bid Summary, 6. Cash Flow
         'FINANCIAL_BID_FORM_GOODS': 21,
-        'FINANCIAL_BID_FORM_INFRA': 22,
-        'PRICE_SCHEDULE_GOODS': 23,
-        'BILL_OF_QUANTITIES': 24,
-        'DETAILED_ESTIMATES_FORM_L': 25,
-        'SUMMARY_BID_PRICES': 26,
-        'CASH_FLOW_BY_QUARTER': 27,
+        'FINANCIAL_BID_FORM_INFRA': 21,
+        'FINANCIAL_BID_FORM_CONSULTING': 21,
+        'BILL_OF_QUANTITIES': 22,
+        'DETAILED_ESTIMATES_FORM_L': 23,
+        'PRICE_SCHEDULE_GOODS': 24,
+        'SUMMARY_BID_PRICES': 25,
+        'CASH_FLOW_BY_QUARTER': 26,
       };
-      if (STATUTORY_ORDER_RANK[def.id]) {
+      if (def && STATUTORY_ORDER_RANK[def.id]) {
         return STATUTORY_ORDER_RANK[def.id];
       }
+      if (STATUTORY_ORDER_RANK[(doc as any).id]) {
+        return STATUTORY_ORDER_RANK[(doc as any).id];
+      }
     }
+
+    // Direct Code Fallback Ranking
+    if (docCode.includes('BIDFORM') || docCode.includes('FINANCIAL_BID_FORM')) return 21;
+    if (docCode.includes('BOQ') || docCode.includes('BILL_OF_QUANTITIES')) return 22;
+    if (docCode.includes('DETAILED_ESTIMATES') || docCode.includes('FORM_L')) return 23;
+    if (docCode.includes('PRICE_SCHEDULE') || docCode.includes('PRICESCHED')) return 24;
+    if (docCode.includes('SUMMARY_BID') || docCode.includes('SUMMARY-BIDPRICE')) return 25;
+    if (docCode.includes('CASH_FLOW') || docCode.includes('SF-INFR-56')) return 26;
 
     // 1. PhilGEPS Platinum Certificate of Registration
     if (name.includes('philgeps')) return 1;
@@ -755,7 +791,7 @@ export const BidPackageBuilderView: React.FC = () => {
     if (name.includes('key personnel') || name.includes('manpower') || name.includes('bio-data') || name.includes('prc')) return 9;
     if (name.includes('major equipment') || name.includes('equipment utilization') || name.includes('equipment matrix')) return 10;
     // 9. After Sales Services & Warranty
-    if (name.includes('after-sale') || name.includes('aftersale') || name.includes('warranty')) return 11;
+    if (name.includes('after-sale') || name.includes('aftersales') || name.includes('warranty')) return 11;
     // 10. Omnibus Sworn Statement (OSS)
     if (name.includes('omnibus') || name.includes('oss')) return 12;
     // 11. Net Financial Contracting Capacity (NFCC)
@@ -774,19 +810,17 @@ export const BidPackageBuilderView: React.FC = () => {
     if (name.includes('secretary') || name.includes('board resolution') || name.includes('special power of attorney') || name.includes('spa')) return 19;
     if (name.includes('joint venture') || name.includes('jva')) return 20;
 
-    // Envelope 2: Financial Proposal Items (1st: Detailed Estimates, 2nd: Bid Form, 3rd: BOQ, 4th: Price Schedule, 5th: Summary of Bid Prices, 6th: Cash Flow)
-    if (name.includes('detailed estimate') || name.includes('form l') || name.includes('form (l)')) return 21;
-    if (name.includes('bid form') && (name.includes('goods') || name.includes('supply'))) return 22;
-    if (name.includes('bid form') && (name.includes('infra') || name.includes('civil works'))) return 22;
-    if (name.includes('bid form') || name.includes('financial proposal')) return 22;
-    if (name.includes('bill of quantities') || name.includes('boq')) return 23;
+    // Envelope 2: Financial Proposal Items (1st: Bid Form, 2nd: BOQ, 3rd: Form L, 4th: Price Schedule, 5th: Summary of Bid Prices, 6th: Cash Flow)
+    if (name.includes('bid form') || name.includes('financial proposal')) return 21;
+    if (name.includes('bill of quantities') || name.includes('boq')) return 22;
+    if (name.includes('detailed estimate') || name.includes('form l') || name.includes('form (l)')) return 23;
     if (name.includes('price schedule')) return 24;
     if (name.includes('summary of bid') || name.includes('summary bid')) return 25;
     if (name.includes('cash flow') || name.includes('sf-infr-56')) return 26;
 
     if (doc.category === 'LEGAL') return 16;
     if (doc.category === 'TECHNICAL') return 8;
-    if (doc.category === 'FINANCIAL') return 22;
+    if (doc.category === 'FINANCIAL') return 21;
     return 50;
   };
 
