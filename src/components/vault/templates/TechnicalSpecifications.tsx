@@ -1271,12 +1271,18 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
               </div>
             </div>
 
-            <div className="flex-1 bg-slate-950 p-2 overflow-hidden">
-              <iframe
-                src={previewPdfUrl}
+            <div className="flex-1 bg-slate-950 p-2 overflow-hidden relative flex flex-col">
+              <object
+                data={`${previewPdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                type="application/pdf"
                 className="w-full h-full rounded-xl border border-slate-800 bg-white"
-                title="Section VII PDF Preview"
-              />
+              >
+                <iframe
+                  src={`${previewPdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                  className="w-full h-full rounded-xl border border-slate-800 bg-white"
+                  title="Section VII PDF Preview"
+                />
+              </object>
             </div>
           </div>
         </div>

@@ -14,7 +14,8 @@ import {
   Check,
   CheckCircle2,
   Award,
-  Briefcase
+  Briefcase,
+  Sparkles
 } from 'lucide-react';
 
 interface RegisterPageProps {
@@ -62,6 +63,35 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
 
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleQuickFillDemo = () => {
+    registerTenantAndUser(
+      {
+        companyName: 'Apex Cloud & Infrastructure Builders Corp.',
+        brandCode: 'APEX',
+        brandColor: '#1e40af',
+        tin: '008-991-234-000',
+        secDtiRegNo: 'SEC-CS2019-94120',
+        pcabLicenseNo: 'PCAB-GE-94120',
+        pcabCategory: 'AAA',
+        philgepsPlatinumNo: 'PLATINUM-2026-009841',
+        address: '14th Floor, Cyber Tower One, Ortigas Center, Pasig City, Metro Manila',
+        authorizedSignatory: {
+          name: 'Engr. Ferdinand R. Valenzuela',
+          title: 'President & Authorized Managing Officer',
+          tin: '194-882-019'
+        },
+        preferredRegime: 'RA_12009_NGPA',
+        primaryProcurementType: 'INFRASTRUCTURE'
+      },
+      {
+        email: 'f.valenzuela@apexcloudph.com',
+        fullName: 'Engr. Ferdinand R. Valenzuela',
+        role: 'COMPANY_OWNER',
+        password: 'Password123!'
+      }
+    );
+  };
 
   const handleNext = () => {
     setError('');
@@ -141,9 +171,20 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
         {/* Registration Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
           <div>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-800 text-xs text-slate-300 mb-2">
-              <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-              <span>Multi-Tenant Onboarding Wizard</span>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800 text-xs text-slate-300">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+                <span>Multi-Tenant Onboarding Wizard</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleQuickFillDemo}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-400/40 text-xs font-semibold transition shadow-sm cursor-pointer"
+                title="Immediately setup a pre-configured Philippine Contractor profile for instant testing"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                <span>⚡ 1-Click Launch Demo Enterprise</span>
+              </button>
             </div>
             <h1 className="text-2xl font-bold text-white">Register Corporate Profile</h1>
             <p className="text-xs text-slate-400">Setup your company identity, legal credentials, and white-label theme.</p>

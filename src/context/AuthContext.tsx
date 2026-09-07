@@ -13,12 +13,17 @@ const DEFAULT_USERS: User[] = [];
 const purgeLegacyMockData = () => {
   try {
     if (typeof localStorage === 'undefined') return;
-    const isFlushedForNewCorp = localStorage.getItem('bidocs_flushed_for_new_corp_v2');
-    if (!isFlushedForNewCorp) {
+    const isFlushedForLive = localStorage.getItem('bidocs_live_clean_flush_v5');
+    if (!isFlushedForLive) {
       localStorage.clear();
       if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
+      if (typeof caches !== 'undefined') {
+        caches.keys().then((names) => {
+          names.forEach((name) => caches.delete(name));
+        }).catch(() => {});
+      }
       clearAllVaultData().catch(() => {});
-      localStorage.setItem('bidocs_flushed_for_new_corp_v2', 'true');
+      localStorage.setItem('bidocs_live_clean_flush_v5', 'true');
     }
   } catch (e) {
     console.error('[AuthContext] Error flushing legacy mock data:', e);
@@ -313,8 +318,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (typeof caches !== 'undefined') {
         caches.keys().then((names) => {
           names.forEach((name) => caches.delete(name));
-        });
+        }).catch(() => {});
       }
+      localStorage.setItem('bidocs_live_clean_flush_v5', 'true');
     } catch (e) {
       console.error('Failed to clear browser storage:', e);
     }

@@ -1,0 +1,41 @@
+#!/bin/sh
+# BiDOCS Pre-Commit Guard — Runs on every git commit
+# Blocks commits that break the PDF system rules.
+
+echo ""
+echo "╔════════════════════════════════════════════════════════╗"
+echo "║  BiDOCS Pre-Commit Guard — Running checks...           ║"
+echo "╚════════════════════════════════════════════════════════╝"
+echo ""
+
+# Step 1: TypeScript strict check
+echo "► [1/2] TypeScript check..."
+npx tsc --noEmit
+TSC_EXIT=$?
+if [ $TSC_EXIT -ne 0 ]; then
+  echo ""
+  echo "✗ COMMIT BLOCKED: TypeScript errors found."
+  echo "  Fix all TypeScript errors before committing."
+  echo ""
+  exit 1
+fi
+echo "  ✓ TypeScript OK"
+echo ""
+
+# Step 2: BiDOCS PDF system rules guard
+echo "► [2/2] BiDOCS PDF system rules..."
+node scripts/bidocs-pdf-guard.js
+GUARD_EXIT=$?
+if [ $GUARD_EXIT -ne 0 ]; then
+  echo ""
+  echo "✗ COMMIT BLOCKED: PDF system rule violation."
+  echo "  Read GEMINI.md or .agents/skills/bidocs-pdf-system/SKILL.md"
+  echo ""
+  exit 1
+fi
+
+echo ""
+echo "╔════════════════════════════════════════════════════════╗"
+echo "║  All checks passed! Committing...           ✓          ║"
+echo "╚════════════════════════════════════════════════════════╝"
+echo ""

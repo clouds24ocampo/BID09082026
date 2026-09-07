@@ -58,6 +58,7 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
   initialFolderCopy = 'ORIGINAL'
 }) => {
   const [activeFolder, setActiveFolder] = useState<FolderCopyType>(initialFolderCopy);
+  const [selectedEnvelope, setSelectedEnvelope] = useState<'ALL' | 'ENVELOPE_1' | 'ENVELOPE_2'>(activeEnvelope);
   const [compiledPdfs, setCompiledPdfs] = useState<Record<FolderCopyType, string | null>>({
     ORIGINAL: null,
     COPY_1: null,
@@ -86,7 +87,24 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
   const tenantId = tenant?.id || '';
   const projectScopeKey = activeProject?.refNo || projectRefNo || 'PRJ-2026';
   const cleanRef = projectScopeKey.replace(/[^a-zA-Z0-9]/g, '_');
-  const envTag = activeEnvelope === 'ENVELOPE_1' ? 'TECHNICAL_LEGAL' : 'FINANCIAL';
+  const envTag = selectedEnvelope === 'ALL'
+    ? 'COMPLETE_BID_PACKAGE'
+    : selectedEnvelope === 'ENVELOPE_1'
+    ? 'TECHNICAL_LEGAL'
+    : 'FINANCIAL';
+
+  const currentItems = React.useMemo(() => {
+    if (selectedEnvelope === 'ALL') {
+      return items;
+    }
+    const filtered = items.filter(it => it.envelope === selectedEnvelope);
+    return filtered.length > 0 ? filtered : items;
+  }, [items, selectedEnvelope]);
+
+  // Reset compiled PDFs whenever envelope filter changes
+  useEffect(() => {
+    setCompiledPdfs({ ORIGINAL: null, COPY_1: null, COPY_2: null });
+  }, [selectedEnvelope]);
 
   // Folders configuration
   const folderTabs: { id: FolderCopyType; title: string; badge: string; desc: string; color: string }[] = [
@@ -118,14 +136,14 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
     // Page 1 is always the Table of Contents
     let startPage = 2;
     for (let i = 0; i < itemIndex; i++) {
-      const pastItem = items[i];
-      const attachedPages = docPageCounts[pastItem.id] || 1;
+      const pastItem = currentItems[i];
+      const attachedPages = pastItem ? (docPageCounts[pastItem.id] ?? 0) : 0;
       // 1 Cover Page + attachedPages
       const totalPagesForPastItem = 1 + attachedPages;
       startPage += totalPagesForPastItem;
     }
-    const currentItem = items[itemIndex];
-    const currentAttachedPages = currentItem ? (docPageCounts[currentItem.id] || 1) : 1;
+    const currentItem = currentItems[itemIndex];
+    const currentAttachedPages = currentItem ? (docPageCounts[currentItem.id] ?? 0) : 0;
     const endPage = startPage + (1 + currentAttachedPages) - 1;
     return {
       startPage,
@@ -135,65 +153,130 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
   };
 
   // Comprehensive Resolver for Attached Document Streams (Section VII, Section VI, BSD, OSS, Vault & System-Generated Documents)
-  const resolveAttachmentForDoc = async (doc: PackageItem): Promise<string | null> => {
-    return resolveDocumentPdfAttachment(doc, {
-      vaultDocs,
-      tenant,
-      tenantId,
-      projectRefNo,
-      projectTitle,
-      procuringEntity,
-      activeProject
-    });
+  const resolveAttachmentForDoc = async (doc: PackageItem, targetFolderCopy?: FolderCopyType): Promise<string | null> => {
+    try {
+      let targetVaultDocId = doc.vaultDocId;
+      let existingDataUrl = (doc as any).fileDataUrl;
+      const cleanDocId = doc.id.replace(/^pkg-c[12]-/, '');
+
+      if (!targetVaultDocId && vaultDocs && vaultDocs.length > 0) {
+        const dName = (doc.documentName || '').toLowerCase();
+        const dCode = (doc.code || '').toUpperCase();
+        const match = vaultDocs.find(v =>
+          (v.id && (v.id === doc.id || v.id === doc.code || v.id === cleanDocId)) ||
+          ((v as any).code && doc.code && (v as any).code.toLowerCase() === doc.code.toLowerCase()) ||
+          (v.documentName && doc.documentName && v.documentName.trim().toLowerCase() === doc.documentName.trim().toLowerCase()) ||
+          (dName.includes('philgeps') && (v.documentCode === 'DOC-1' || (v.documentName || '').toLowerCase().includes('philgeps'))) ||
+          ((dName.includes('dti') || dName.includes('sec')) && (v.documentCode === 'DOC-2' || (v.documentName || '').toLowerCase().includes('registration'))) ||
+          (dName.includes('mayor') && (v.documentCode === 'DOC-3' || (v.documentName || '').toLowerCase().includes('permit'))) ||
+          (dName.includes('tax') && (v.documentCode === 'DOC-4' || v.documentCode === 'DOC-7' || (v.documentName || '').toLowerCase().includes('clearance'))) ||
+          (dName.includes('audited') && (v.documentCode === 'DOC-5' || v.documentCode === 'DOC-15' || (v.documentName || '').toLowerCase().includes('audited'))) ||
+          (dName.includes('pcab') && (v.documentCode === 'DOC-6' || v.documentCode === 'DOC-8' || (v.documentName || '').toLowerCase().includes('pcab'))) ||
+          (dName.includes('secretary') && (v.documentCode === 'DOC-13' || (v.documentName || '').toLowerCase().includes('secretary') || (v.documentName || '').toLowerCase().includes('spa'))) ||
+          (dName.includes('joint') && (v.documentCode === 'DOC-14' || (v.documentName || '').toLowerCase().includes('joint') || (v.documentName || '').toLowerCase().includes('jva')))
+        );
+        if (match) {
+          targetVaultDocId = match.id;
+          if (match.fileDataUrl && !existingDataUrl) {
+            existingDataUrl = match.fileDataUrl;
+          }
+        }
+      }
+
+      if (!existingDataUrl && targetVaultDocId) {
+        try {
+          const dbData = await loadPdfData(targetVaultDocId);
+          if (dbData) existingDataUrl = dbData;
+        } catch (_) {}
+      }
+      if (!existingDataUrl && doc.id) {
+        try {
+          const dbData = await loadPdfData(doc.id) || await loadPdfData(cleanDocId);
+          if (dbData) existingDataUrl = dbData;
+        } catch (_) {}
+      }
+
+      const effectiveDoc = {
+        ...doc,
+        vaultDocId: targetVaultDocId,
+        fileDataUrl: existingDataUrl
+      };
+
+      return await resolveDocumentPdfAttachment(effectiveDoc, {
+        vaultDocs,
+        tenant,
+        tenantId,
+        projectRefNo,
+        projectTitle,
+        procuringEntity,
+        activeProject,
+        folderCopy: targetFolderCopy || effectiveDoc.folderCopy || activeFolder
+      });
+    } catch (err) {
+      console.warn(`[MergedPackageViewerModal] Could not generate attachment for ${doc.documentName}:`, err);
+      return null;
+    }
   };
 
   // Helper to compile a specific folder copy into a merged PDF Data URL
   const compileFolderPdf = async (folderCopy: FolderCopyType): Promise<string | null> => {
-    if (items.length === 0) return null;
+    if (currentItems.length === 0) {
+      setStatusMessage('No documents in this selection yet.');
+      return null;
+    }
 
     setIsCompiling(prev => ({ ...prev, [folderCopy]: true }));
-    setStatusMessage(`Compiling ${folderCopy} package...`);
+    setStatusMessage(`Compiling ${folderCopy} package (${currentItems.length} docs)...`);
 
     try {
       const units: ExportDocumentUnit[] = [];
 
       // Pre-resolve all attachments in parallel
       const resolvedAttachments = await Promise.all(
-        items.map(doc => resolveAttachmentForDoc(doc))
+        currentItems.map(doc => resolveAttachmentForDoc(doc, folderCopy))
       );
 
       // Measure attached PDF page counts and update state
       const counts: { [docId: string]: number } = {};
-      for (let i = 0; i < items.length; i++) {
-        const doc = items[i];
+      for (let i = 0; i < currentItems.length; i++) {
+        const doc = currentItems[i];
         const attachment = resolvedAttachments[i];
         if (attachment) {
           try {
             if (attachment.startsWith('data:')) {
               const base64Part = attachment.includes(',') ? attachment.split(',')[1] : attachment;
-              const binaryString = atob(base64Part);
+              const binaryString = atob(base64Part.replace(/\s+/g, ''));
               const bytes = new Uint8Array(binaryString.length);
               for (let b = 0; b < binaryString.length; b++) {
                 bytes[b] = binaryString.charCodeAt(b);
               }
-              const pdfDoc = await PDFDocument.load(bytes);
+              const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+              counts[doc.id] = pdfDoc.getPageCount();
+            } else if (attachment.startsWith('JVBERi0') || (!attachment.includes('://') && !attachment.startsWith('blob:') && attachment.length > 50)) {
+              const cleanBase64 = attachment.replace(/\s+/g, '');
+              const binaryString = atob(cleanBase64);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let b = 0; b < binaryString.length; b++) {
+                bytes[b] = binaryString.charCodeAt(b);
+              }
+              const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
               counts[doc.id] = pdfDoc.getPageCount();
             } else {
               const res = await fetch(attachment);
               const arrayBuf = await res.arrayBuffer();
-              const pdfDoc = await PDFDocument.load(arrayBuf);
+              const pdfDoc = await PDFDocument.load(arrayBuf, { ignoreEncryption: true });
               counts[doc.id] = pdfDoc.getPageCount();
             }
           } catch (_) {
-            counts[doc.id] = 1;
+            counts[doc.id] = 0;
           }
         } else {
-          counts[doc.id] = 1;
+          counts[doc.id] = 0;
         }
       }
       setDocPageCounts(prev => ({ ...prev, ...counts }));
       // Yield to allow React DOM to re-render TOC with exact page ranges
-      await new Promise(r => setTimeout(r, 60));
+      await new Promise(r => setTimeout(r, 150));
 
       // 1. FIRST PAGE: Table of Contents & Statutory Checklist for this Folder Copy
       const tocElem = document.getElementById(`preview-toc-${folderCopy}`) as HTMLElement | null;
@@ -207,12 +290,17 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
       }
 
       // 2. Subsequent Pages: Included Documents with Cover Separators and Attached PDF Streams
-      for (let i = 0; i < items.length; i++) {
-        const doc = items[i];
+      for (let i = 0; i < currentItems.length; i++) {
+        const doc = currentItems[i];
         const fileDataUrl = resolvedAttachments[i];
 
-        // Cover Page Element rendered specifically for this folder copy
-        const coverElem = document.getElementById(`preview-cover-${folderCopy}-${doc.id}`) as HTMLElement | null;
+        // Cover Page Element rendered specifically for this folder copy (with prefix fallbacks)
+        const coverElem = (
+          document.getElementById(`preview-cover-${folderCopy}-${doc.id}`) ||
+          document.getElementById(`preview-cover-${folderCopy}-${doc.id.replace(/^pkg-c[12]-/, '')}`) ||
+          document.getElementById(`cover-page-render-${doc.id}`) ||
+          document.getElementById(`cover-page-render-${doc.id.replace(/^pkg-c[12]-/, '')}`)
+        ) as HTMLElement | null;
 
         units.push({
           title: doc.documentName,
@@ -222,13 +310,6 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
         });
       }
 
-      setCompileProgress(prev => ({
-        ...prev,
-        percent: 85,
-        status: `Stamping "Page X of Y" pagination on ${folderCopy} package...`
-      }));
-      setStatusMessage(`Stamping "Page X of Y" pagination on ${folderCopy} package...`);
-      
       const outputFileName = `${cleanRef}_${folderCopy}_${envTag}_MERGED_PACKAGE.pdf`;
       const dataUrl = await buildMergedThreeLayerPdfDataUrl(
         units,
@@ -236,6 +317,15 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
         (progress) => {
           setCompileProgress(progress);
           setStatusMessage(progress.status);
+        },
+        {
+          folderCopy,
+          submissionDate: activeProject?.dateTimeSubmitted || (activeProject as any)?.submissionDeadline || 'August 30, 2026',
+          companyName: tenant?.companyName,
+          signatoryName: tenant?.authorizedSignatory?.name || 'Authorized Managing Officer',
+          signatoryTitle: tenant?.authorizedSignatory?.title || (tenant?.authorizedSignatory as any)?.designation || 'President',
+          projectRefNo: projectRefNo || activeProject?.refNo || 'PhilGEPS-2026',
+          projectTitle: projectTitle || activeProject?.title || 'Target Procurement Project'
         }
       );
 
@@ -254,11 +344,12 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
   // Compile on-demand ONLY for the currently active folder copy
   useEffect(() => {
     if (!isOpen) return;
+    if (items.length === 0) return;
 
     if (!compiledPdfs[activeFolder] && !isCompiling[activeFolder]) {
       compileFolderPdf(activeFolder);
     }
-  }, [isOpen, activeFolder]);
+  }, [isOpen, activeFolder, items]);
 
   if (!isOpen) return null;
 
@@ -305,13 +396,45 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
               <FileStack className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm sm:text-base font-black text-white leading-tight">
                   Merged Bid Packages Folder
                 </h3>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
-                  {activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1 (Legal & Technical)' : 'Envelope 2 (Financial)'}
-                </span>
+                <div className="inline-flex items-center bg-slate-800 p-0.5 rounded-lg border border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEnvelope('ALL')}
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded transition cursor-pointer ${
+                      selectedEnvelope === 'ALL'
+                        ? 'bg-purple-600 text-white font-bold shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    All Envelopes ({items.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEnvelope('ENVELOPE_1')}
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded transition cursor-pointer ${
+                      selectedEnvelope === 'ENVELOPE_1'
+                        ? 'bg-blue-600 text-white font-bold shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Envelope 1 ({items.filter(i => i.envelope === 'ENVELOPE_1').length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEnvelope('ENVELOPE_2')}
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded transition cursor-pointer ${
+                      selectedEnvelope === 'ENVELOPE_2'
+                        ? 'bg-emerald-600 text-white font-bold shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Envelope 2 ({items.filter(i => i.envelope === 'ENVELOPE_2').length})
+                  </button>
+                </div>
               </div>
               <p className="text-xs text-slate-400 mt-0.5 truncate max-w-xl">
                 Project: <span className="text-slate-200 font-medium">{projectTitle || activeProject?.title}</span> ({projectScopeKey})
@@ -545,12 +668,24 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
 
                 {/* Embedded PDF Viewer */}
                 <div className="flex-1 w-full bg-slate-900 relative min-h-[500px]">
-                  <iframe
-                    src={`${currentPdfDataUrl}#toolbar=1&navpanes=0&scrollbar=1`}
-                    className="w-full h-full border-none bg-slate-900"
-                    title={`Merged PDF Preview for ${activeFolder}`}
-                  />
+                  <object
+                    data={`${currentPdfDataUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                    type="application/pdf"
+                    className="w-full h-full min-h-[500px] border-none bg-slate-900 rounded-b-xl"
+                  >
+                    <iframe
+                      src={`${currentPdfDataUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                      className="w-full h-full min-h-[500px] border-none bg-slate-900"
+                      title={`Merged PDF Preview for ${activeFolder}`}
+                    />
+                  </object>
                 </div>
+              </div>
+            ) : items.length === 0 ? (
+              <div className="text-center space-y-3 p-8 text-slate-500">
+                <FileText className="w-12 h-12 mx-auto text-slate-600" />
+                <p className="text-xs text-slate-300 font-bold">No documents added to this envelope yet.</p>
+                <p className="text-[11px] text-slate-500">Click "Add Completed Docs" or "From Vault" in the Bid Package screen to populate this folder.</p>
               </div>
             ) : (
               <div className="text-center space-y-3 p-8 text-slate-500">
@@ -558,7 +693,8 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
                 <p className="text-xs">No preview ready yet. Click compile or select a folder tab.</p>
                 <button
                   onClick={() => compileFolderPdf(activeFolder)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 transition shadow"
+                  disabled={isCompiling[activeFolder]}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 transition shadow disabled:opacity-50 cursor-pointer"
                 >
                   Compile {activeFolder} Now
                 </button>
@@ -568,10 +704,10 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
 
         </div>
 
-        {/* OFF-SCREEN HIDDEN CONTAINER FOR RENDERING FOLDER-SPECIFIC COVER PAGES */}
-        <div 
-          className="fixed left-0 top-0 pointer-events-none opacity-0 overflow-hidden" 
-          style={{ width: '816px', zIndex: -9999 }}
+        {/* OFF-SCREEN CONTAINER FOR RENDERING FOLDER-SPECIFIC COVER PAGES */}
+        <div
+          className="fixed pointer-events-none"
+          style={{ left: '-9999px', top: '0px', width: '816px', zIndex: -1 }}
           aria-hidden="true"
         >
           {(['ORIGINAL', 'COPY_1', 'COPY_2'] as FolderCopyType[]).map((fCopy) => (
@@ -606,7 +742,11 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
                           </span>
                         </div>
                         <p className="text-[10.5px] text-slate-300 font-medium">
-                          {activeEnvelope === 'ENVELOPE_1' ? 'ENVELOPE 1: ELIGIBILITY & TECHNICAL COMPONENT' : 'ENVELOPE 2: FINANCIAL BID PROPOSAL'}
+                          {selectedEnvelope === 'ALL'
+                            ? 'COMPLETE BID PACKAGE: ENVELOPE 1 (TECHNICAL) & ENVELOPE 2 (FINANCIAL)'
+                            : selectedEnvelope === 'ENVELOPE_1'
+                            ? 'ENVELOPE 1: ELIGIBILITY & TECHNICAL COMPONENT'
+                            : 'ENVELOPE 2: FINANCIAL BID PROPOSAL'}
                         </p>
                       </div>
                       <div className="text-right text-[11px] font-mono text-slate-300">
@@ -628,14 +768,14 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
                           </tr>
                         </thead>
                         <tbody>
-                          {items.length === 0 ? (
+                          {currentItems.length === 0 ? (
                             <tr>
                               <td colSpan={5} className="p-6 text-center text-slate-400 italic">
                                 (No documents attached)
                               </td>
                             </tr>
                           ) : (
-                            items.map((doc, idx) => {
+                            currentItems.map((doc, idx) => {
                               const range = getDocumentPageRange(idx);
                               return (
                                 <tr key={doc.id} className="border-t border-slate-300 text-[11px]">
@@ -697,7 +837,7 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
                 </div>
               </div>
 
-              {items.map((doc, idx) => {
+              {currentItems.map((doc, idx) => {
                 const linkedVaultDoc = vaultDocs.find(v => v.id === doc.vaultDocId) ||
                   vaultDocs.find(v => {
                     const vName = (v.documentName || '').toLowerCase();

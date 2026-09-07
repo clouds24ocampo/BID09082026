@@ -2972,12 +2972,18 @@ export const KeyPersonnelModal: React.FC<KeyPersonnelModalProps> = ({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 bg-slate-950">
-              <iframe
-                src={previewPdfUrl}
-                className="w-full h-full border-none"
-                title="Attached Resume Preview"
-              />
+            <div className="flex-1 bg-slate-950 relative flex flex-col">
+              <object
+                data={`${previewPdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                type="application/pdf"
+                className="w-full h-full border-none bg-slate-900"
+              >
+                <iframe
+                  src={`${previewPdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                  className="w-full h-full border-none bg-slate-900"
+                  title="Attached Resume Preview"
+                />
+              </object>
             </div>
           </div>
         </div>

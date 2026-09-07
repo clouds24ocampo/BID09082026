@@ -69,6 +69,12 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
       for (const item of selectedItems) {
         if (!newResolved[item.id]) {
           try {
+            // 0. Check if item already has binary Data URL
+            if (item.fileDataUrl) {
+              newResolved[item.id] = item.fileDataUrl;
+              continue;
+            }
+
             // 1. Check if item has stored binary in IndexedDB
             const dbData = await loadPdfData(item.id);
             if (dbData) {
@@ -150,8 +156,6 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
     setStatusText(`Resolving & preparing ${items.length} document attachments...`);
 
     try {
-      const coverElements = Array.from(document.querySelectorAll('.print-document-sheet')) as HTMLElement[];
-
       // Resolve attachments for all bundle items in parallel
       const resolvedList = await Promise.all(
         items.map(async (doc) => {
@@ -173,12 +177,16 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
         })
       );
 
-      const units: ExportDocumentUnit[] = items.map((doc, idx) => ({
-        title: doc.documentName,
-        coverElement: coverElements[idx] || null,
-        fileDataUrl: resolvedList[idx] || null,
-        documentName: doc.documentName
-      }));
+      // Use dedicated off-screen cover elements by ID (avoids grabbing wrong elements)
+      const units: ExportDocumentUnit[] = items.map((doc, idx) => {
+        const coverEl = document.getElementById(`bundle-cover-${doc.id}`) as HTMLElement | null;
+        return {
+          title: doc.documentName,
+          coverElement: coverEl || null,
+          fileDataUrl: resolvedList[idx] || null,
+          documentName: doc.documentName
+        };
+      });
 
       setStatusText(`Compiling ${units.length} document streams with "Page X of Y" pagination...`);
 
@@ -186,7 +194,13 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
       const activeRef = (items[0]?.philgepsRefNo || projectRefNo || 'PACKAGE').replace(/[^a-zA-Z0-9]/g, '_');
       const fileName = `${activeRef}_${activeBundle.replace(/\s+/g, '_')}_${today}.pdf`;
 
-      await exportMergedThreeLayerPdf(units, fileName);
+      await exportMergedThreeLayerPdf(units, fileName, undefined, {
+        companyName: tenant?.companyName,
+        signatoryName: tenant?.authorizedSignatory?.name,
+        signatoryTitle: tenant?.authorizedSignatory?.title,
+        projectRefNo: projectRefNo || items[0]?.philgepsRefNo,
+        projectTitle: projectTitle || items[0]?.projectTitle
+      });
       setStatusText('Package Merged Successfully!');
     } catch (err) {
       console.error('Error exporting merged bundle:', err);
@@ -476,12 +490,35 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
             {statusText && <span className="ml-3 text-purple-400 font-bold">{statusText}</span>}
           </span>
 
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition cursor-pointer"
-          >
-            Close Bundle Organizer
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportBundle}
+              disabled={isExporting || currentBundleItems.length === 0}
+              className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+              <span>Compile & Download {activeBundle}</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+
+        {/* OFF-SCREEN CONTAINER FOR PRE-RENDERING COVER PAGES */}
+        <div
+          className="fixed pointer-events-none"
+          style={{ left: '-9999px', top: '0px', width: '816px', zIndex: -1 }}
+          aria-hidden="true"
+        >
+          {selectedItems.map((doc, idx) => (
+            <div key={`bundle-cover-${doc.id}`} id={`bundle-cover-${doc.id}`} style={{ width: '800px' }}>
+              <DocumentCoverPage item={doc} tenant={tenant} incrementNumber={idx + 1} />
+            </div>
+          ))}
         </div>
 
       </div>

@@ -334,11 +334,11 @@ export const ContractorsMajorEquipment: React.FC<ContractorsMajorEquipmentProps>
         remainingHeight += rowHeights[r];
       }
 
-      // Page 1 Continuation Limit: 890px (holds 23-24 rows comfortably filling Page 1 without empty gap)
-      // Subsequent Pages Continuation Limit: 980px
-      // Final Page Limit (with Signatory Block): 800px
-      const finalPageLimit = isPage1 ? 800 : 860;
-      const continuationPageLimit = isPage1 ? 890 : 980;
+      // Page 1 Continuation Limit: 720px
+      // Subsequent Pages Continuation Limit: 820px
+      // Final Page Limit (with Signatory Block): 540px on Page 1, 620px on Page 2+
+      const finalPageLimit = isPage1 ? 540 : 620;
+      const continuationPageLimit = isPage1 ? 720 : 820;
 
       // If all remaining items fit in final page limit alongside the signatory block, keep on current page
       if (currentHeight + remainingHeight <= finalPageLimit) {
@@ -1009,9 +1009,9 @@ export const ContractorsMajorEquipment: React.FC<ContractorsMajorEquipmentProps>
 
                     {/* Footer Section: Signatory Block strictly on the Last Page (DIRECTLY UNDER LAST ITEM) */}
                     {isLastPage && (
-                      <div className="mt-4 pt-3 border-t-2 border-slate-900 flex items-end justify-between px-1 pb-1 bg-white shrink-0">
+                      <div className="mt-8 pt-4 border-t-2 border-slate-900 flex items-end justify-between px-2 pb-2 bg-white shrink-0">
                         {/* Lower-Left: Official QR Verification Code */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2.5">
                           <DocumentQrCode
                             details={{
                               companyName: companyName,
@@ -1024,10 +1024,10 @@ export const ContractorsMajorEquipment: React.FC<ContractorsMajorEquipmentProps>
                               documentCategory: 'Technical Eligibility',
                               generatedBy: companyName
                             }}
-                            size={38}
+                            size={42}
                             showCaption={false}
                           />
-                          <div className="text-[7.5px] font-mono leading-tight text-slate-700">
+                          <div className="text-[8px] font-mono leading-tight text-slate-700 space-y-0.5">
                             <p className="font-bold text-slate-950 uppercase truncate max-w-[240px]">{companyName}</p>
                             <p className="truncate max-w-[240px]">PROJECT: {projectTitle}</p>
                             <p className="truncate max-w-[240px]">REF: {projectRefNo} • PAGE {pageIdx + 1} OF {totalPages}</p>
@@ -1049,8 +1049,8 @@ export const ContractorsMajorEquipment: React.FC<ContractorsMajorEquipmentProps>
                         </div>
 
                         {/* Lower-Right: Authorized Signatory Block */}
-                        <div className="text-center font-serif text-slate-950 min-w-[240px] pb-0.5">
-                          <div className="border-b border-slate-900 pb-0.5 mb-0.5 max-w-[220px] mx-auto">
+                        <div className="text-center font-serif text-slate-950 min-w-[240px] pb-1 space-y-0.5">
+                          <div className="border-b border-slate-900 pb-1 mb-1 max-w-[220px] mx-auto">
                             <input
                               type="text"
                               value={signatoryName}
@@ -1106,12 +1106,18 @@ export const ContractorsMajorEquipment: React.FC<ContractorsMajorEquipmentProps>
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex-1 bg-slate-950 p-2">
-              <iframe
-                src={previewPdfUrl}
-                className="w-full h-full rounded-xl border border-slate-800"
-                title="Equipment PDF Preview"
-              />
+            <div className="flex-1 bg-slate-950 p-2 relative flex flex-col">
+              <object
+                data={`${previewPdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                type="application/pdf"
+                className="w-full h-full rounded-xl border border-slate-800 bg-slate-900"
+              >
+                <iframe
+                  src={`${previewPdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                  className="w-full h-full rounded-xl border border-slate-800 bg-slate-900"
+                  title="Equipment PDF Preview"
+                />
+              </object>
             </div>
           </div>
         </div>

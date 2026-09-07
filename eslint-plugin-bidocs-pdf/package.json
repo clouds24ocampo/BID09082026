@@ -1,0 +1,10 @@
+{
+  "name": "eslint-plugin-bidocs-pdf",
+  "version": "1.0.0",
+  "description": "Custom ESLint plugin enforcing BiDOCS PDF system stability rules",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  }
+}

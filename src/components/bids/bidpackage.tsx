@@ -6,7 +6,7 @@ import { MergedPdfViewerModal } from '../vault/MergedPdfViewerModal';
 import { MergedPackageViewerModal } from '../vault/MergedPackageViewerModal';
 import { PdfPreviewModal } from '../vault/PdfPreviewModal';
 import DocumentQrCode from '../common/DocumentQrCode';
-import { loadVaultItems, loadPdfData } from '../../utils/vaultIndexedDB';
+import { loadVaultItems, loadPdfData, savePdfData } from '../../utils/vaultIndexedDB';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../utils/opportunityProjects';
 import { generateAndDownloadThreeLayerPdf, exportMergedThreeLayerPdf, buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit } from '../../utils/pdfExportEngine';
 import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
@@ -43,7 +43,8 @@ import {
   ArrowUpDown,
   GripVertical,
   ListOrdered,
-  FileStack
+  FileStack,
+  Upload
 } from 'lucide-react';
 
 export type FolderCopyType = 'ORIGINAL' | 'COPY_1' | 'COPY_2';
@@ -55,8 +56,12 @@ export interface PackageItem {
   category: 'LEGAL' | 'TECHNICAL' | 'FINANCIAL';
   envelope: 'ENVELOPE_1' | 'ENVELOPE_2';
   folderCopy: FolderCopyType;
+  code?: string;
   vaultDocId?: string;
   fileSizeBytes?: number;
+  fileName?: string;
+  fileDataUrl?: string;
+  storageKey?: string;
   dateAdded: string;
   isAutoDetected?: boolean;
   pageCount?: number;
@@ -117,6 +122,8 @@ export const BidPackageBuilderView: React.FC = () => {
   // Add Custom Modal Inputs
   const [customDocName, setCustomDocName] = useState('');
   const [customDocCategory, setCustomDocCategory] = useState<'LEGAL' | 'TECHNICAL' | 'FINANCIAL'>('LEGAL');
+  const [customDocFile, setCustomDocFile] = useState<File | null>(null);
+  const [customDocFileDataUrl, setCustomDocFileDataUrl] = useState<string>('');
 
   // Reorganize & Sequence State
   const [showReorderModal, setShowReorderModal] = useState(false);
@@ -289,10 +296,16 @@ export const BidPackageBuilderView: React.FC = () => {
         combinedDocs.map(async (d) => {
           try {
             const data = await loadPdfData(d.id);
-            if (data) pdfDataCache.current[d.id] = data;
+            if (data) {
+              pdfDataCache.current[d.id] = data;
+              d.fileDataUrl = data;
+            }
           } catch (_) { /* ignore missing binary */ }
         })
       );
+
+      // Re-trigger state with loaded fileDataUrl attached so all downstream modals and resolvers have immediate binary access
+      setVaultDocs([...combinedDocs]);
     }).catch(e => console.error('[BidPackage] Failed to load vault items:', e));
   }, [tenantId, projectScopeKey]);
 
@@ -308,12 +321,9 @@ export const BidPackageBuilderView: React.FC = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const normalized = parsed.map(item => ({
-            ...item,
-            folderCopy: item.folderCopy || 'ORIGINAL'
-          }));
-          setPackageItems(normalized);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const fullySynced = syncOriginalToCopies(parsed);
+          setPackageItems(fullySynced);
           return;
         }
       } catch (_) {}
@@ -649,13 +659,13 @@ export const BidPackageBuilderView: React.FC = () => {
           return vCode === 'DOC-12' || vCode.includes('OSS') || vCode.includes('OMNIBUS') || vCode.includes('GPPB-OSS-2020') || vName.includes('omnibus sworn statement');
         }
         if (doc.id === 'ORGANIZATIONAL_CHART') {
-          return vCode === 'DOC-8' || vCode.includes('ORG_CHART') || vCode.includes('FC-2024') || vCode.includes('(F.A)') || vCode === '(F)' || vName.includes('organizational chart') || vName.includes('org chart');
+          return vCode === 'DOC-8' || vCode.includes('ORG_CHART') || vCode.includes('FC-2024') || vCode.includes('(F.A)') || vCode === '(F)' || vCode.includes('EXHIBIT-F') || vName.includes('organizational chart') || vName.includes('org chart') || vName.includes('item (f)') || vName.includes('item f');
         }
-        if (doc.id === 'LIST_KEY_PERSONNEL') {
-          return vCode === 'DOC-9' || vCode.includes('KEY_PERSONNEL') || vCode.includes('FC-2025') || vCode.includes('(F.B)') || vCode === '(F)' || vName.includes('key personnel') || vName.includes('project manager') || vName.includes('manpower');
+        if (doc.id === 'KEY_PERSONNEL' || doc.id === 'LIST_KEY_PERSONNEL') {
+          return vCode === 'DOC-9' || vCode.includes('KEY_PERSONNEL') || vCode.includes('FC-2025') || vCode.includes('(F.B)') || vCode === '(F)' || vCode.includes('EXHIBIT-F') || vName.includes('key personnel') || vName.includes('project manager') || vName.includes('manpower') || vName.includes('item (f)') || vName.includes('item f');
         }
         if (doc.id === 'MAJOR_EQUIPMENT') {
-          return vCode === 'DOC-10' || vCode.includes('EQUIPMENT') || vCode.includes('FC-2026') || vCode.includes('(F.C)') || vCode === '(F)' || vName.includes('equipment') || vName.includes('machinery');
+          return vCode === 'DOC-10' || vCode.includes('EQUIPMENT') || vCode.includes('FC-2026') || vCode.includes('(F.C)') || vCode === '(F)' || vCode.includes('EXHIBIT-F') || vName.includes('equipment') || vName.includes('machinery') || vName.includes('item (f)') || vName.includes('item f');
         }
         if (doc.id === 'AFTERSALES_WARRANTY') {
           return vCode === 'DOC-11' || vCode.includes('AFTER') || vCode.includes('(H)') || vName.includes('after-sales') || vName.includes('aftersales') || vName.includes('warranty');
@@ -841,6 +851,7 @@ export const BidPackageBuilderView: React.FC = () => {
           category: def.category,
           envelope: def.envelope,
           folderCopy: 'ORIGINAL',
+          code: def.code,
           vaultDocId: readiness.vaultId,
           fileSizeBytes: 1048576,
           dateAdded: new Date().toISOString(),
@@ -937,27 +948,90 @@ export const BidPackageBuilderView: React.FC = () => {
     setShowVaultImportModal(false);
   };
 
-  const handleAddCustomDocument = (e: React.FormEvent) => {
+  const handleAddCustomDocument = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customDocName.trim()) return;
 
     const env: 'ENVELOPE_1' | 'ENVELOPE_2' = customDocCategory === 'FINANCIAL' ? 'ENVELOPE_2' : 'ENVELOPE_1';
 
+    const newItemId = `pkg-custom-${Date.now()}`;
     const newItem: PackageItem = {
-      id: `pkg-custom-${Date.now()}`,
+      id: newItemId,
       documentName: customDocName.trim(),
       documentNumber: projectRefNo,
       category: customDocCategory,
       envelope: env,
       folderCopy: 'ORIGINAL',
-      fileSizeBytes: 1048576,
+      fileSizeBytes: customDocFile?.size || 1048576,
+      fileName: customDocFile?.name,
+      fileDataUrl: customDocFileDataUrl || undefined,
       dateAdded: new Date().toISOString()
     };
+
+    if (customDocFileDataUrl) {
+      pdfDataCache.current[newItemId] = customDocFileDataUrl;
+      try {
+        await savePdfData(newItemId, customDocFileDataUrl);
+      } catch (_) {}
+    }
 
     const originalItems = packageItems.filter(item => item.folderCopy === 'ORIGINAL');
     savePackageItems([...originalItems, newItem]);
     setCustomDocName('');
+    setCustomDocFile(null);
+    setCustomDocFileDataUrl('');
     setShowAddCustomModal(false);
+  };
+
+  const handleUploadFileForDoc = (doc: PackageItem, file: File) => {
+    if (!file) return;
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Invalid Format: Only PDF documents (.pdf) can be attached to the bid package.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      if (dataUrl) {
+        const cleanDocId = doc.id.replace(/^pkg-c[12]-/, '');
+        try {
+          await savePdfData(cleanDocId, dataUrl);
+          await savePdfData(doc.id, dataUrl);
+          if (doc.vaultDocId) {
+            await savePdfData(doc.vaultDocId, dataUrl);
+          }
+
+          pdfDataCache.current[cleanDocId] = dataUrl;
+          pdfDataCache.current[doc.id] = dataUrl;
+          if (doc.vaultDocId) {
+            pdfDataCache.current[doc.vaultDocId] = dataUrl;
+          }
+
+          const originalItems = packageItems.filter(item => item.folderCopy === 'ORIGINAL');
+          const updatedOriginal = originalItems.map(it => {
+            const itClean = it.id.replace(/^pkg-c[12]-/, '');
+            if (itClean === cleanDocId || it.id === doc.id || (doc.vaultDocId && it.vaultDocId === doc.vaultDocId) || it.documentName.toLowerCase() === doc.documentName.toLowerCase()) {
+              return {
+                ...it,
+                fileDataUrl: dataUrl,
+                fileName: file.name,
+                fileSizeBytes: file.size,
+                isAutoDetected: true
+              };
+            }
+            return it;
+          });
+
+          savePackageItems(updatedOriginal);
+          alert(`✅ Document file "${file.name}" attached successfully to ${doc.documentName} across ORIGINAL, COPY 1, and COPY 2!`);
+        } catch (err) {
+          console.error('[BidPackage] Failed to save uploaded PDF binary:', err);
+          alert('Failed to save document file to browser storage.');
+        }
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDeleteItem = (id: string) => {
@@ -1154,6 +1228,21 @@ export const BidPackageBuilderView: React.FC = () => {
     item => item.envelope === activeEnvelope && item.folderCopy === activeFolderCopy
   );
 
+  // Reliable items for Merged Package Modal (includes all documents in folder for envelope toggle)
+  const packageItemsForMerge = React.useMemo(() => {
+    const matching = packageItems.filter(
+      item => item.folderCopy === activeFolderCopy || !item.folderCopy
+    );
+    if (matching.length > 0) return matching;
+
+    const originalInEnv = packageItems.filter(
+      item => item.folderCopy === 'ORIGINAL'
+    );
+    if (originalInEnv.length > 0) return originalInEnv;
+
+    return packageItems;
+  }, [packageItems, activeFolderCopy]);
+
   const filteredItems = currentFolderItems.filter(item => {
     if (!searchQuery) return true;
     return item.documentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1185,7 +1274,64 @@ export const BidPackageBuilderView: React.FC = () => {
 
   // Comprehensive Resolver for Attached Document Streams (Section VII, Section VI, BSD, OSS, Vault & Templates)
   const resolveAttachmentForDoc = async (doc: PackageItem): Promise<string | null> => {
-    return await resolveDocumentPdfAttachment(doc, {
+    let preloadedDataUrl: string | undefined = undefined;
+    const cleanDocId = doc.id.replace(/^pkg-c[12]-/, '');
+
+    if (doc.vaultDocId && pdfDataCache.current[doc.vaultDocId]) {
+      preloadedDataUrl = pdfDataCache.current[doc.vaultDocId];
+    } else if (pdfDataCache.current[doc.id]) {
+      preloadedDataUrl = pdfDataCache.current[doc.id];
+    } else if (pdfDataCache.current[cleanDocId]) {
+      preloadedDataUrl = pdfDataCache.current[cleanDocId];
+    }
+
+    let targetVaultDocId = doc.vaultDocId;
+    if (!preloadedDataUrl) {
+      const dName = (doc.documentName || '').toLowerCase();
+      const dCode = (doc.code || '').toUpperCase();
+      const match = vaultDocs.find(v =>
+        (targetVaultDocId && v.id === targetVaultDocId) ||
+        (v.id && (v.id === doc.id || v.id === doc.code || v.id === cleanDocId)) ||
+        ((v as any).code && doc.code && (v as any).code.toLowerCase() === doc.code.toLowerCase()) ||
+        (v.documentName && doc.documentName && v.documentName.trim().toLowerCase() === doc.documentName.trim().toLowerCase()) ||
+        (dName.includes('philgeps') && (v.documentCode === 'DOC-1' || (v.documentName || '').toLowerCase().includes('philgeps'))) ||
+        ((dName.includes('dti') || dName.includes('sec')) && (v.documentCode === 'DOC-2' || (v.documentName || '').toLowerCase().includes('registration'))) ||
+        (dName.includes('mayor') && (v.documentCode === 'DOC-3' || (v.documentName || '').toLowerCase().includes('permit'))) ||
+        (dName.includes('tax') && (v.documentCode === 'DOC-4' || v.documentCode === 'DOC-7' || (v.documentName || '').toLowerCase().includes('clearance'))) ||
+        (dName.includes('audited') && (v.documentCode === 'DOC-5' || v.documentCode === 'DOC-15' || (v.documentName || '').toLowerCase().includes('audited'))) ||
+        (dName.includes('pcab') && (v.documentCode === 'DOC-6' || v.documentCode === 'DOC-8' || (v.documentName || '').toLowerCase().includes('pcab'))) ||
+        (dName.includes('secretary') && (v.documentCode === 'DOC-13' || (v.documentName || '').toLowerCase().includes('secretary') || (v.documentName || '').toLowerCase().includes('spa'))) ||
+        (dName.includes('joint') && (v.documentCode === 'DOC-14' || (v.documentName || '').toLowerCase().includes('joint') || (v.documentName || '').toLowerCase().includes('jva')))
+      );
+      if (match) {
+        if (!targetVaultDocId) targetVaultDocId = match.id;
+        if (match.fileDataUrl) preloadedDataUrl = match.fileDataUrl;
+        else if (pdfDataCache.current[match.id]) preloadedDataUrl = pdfDataCache.current[match.id];
+      }
+    }
+
+    // Direct binary load from IndexedDB if not yet cached in memory
+    if (!preloadedDataUrl) {
+      const idCandidates = [targetVaultDocId, doc.vaultDocId, doc.id, cleanDocId].filter(Boolean) as string[];
+      for (const candId of idCandidates) {
+        try {
+          const dbData = await loadPdfData(candId);
+          if (dbData) {
+            preloadedDataUrl = dbData;
+            pdfDataCache.current[candId] = dbData;
+            break;
+          }
+        } catch (_) {}
+      }
+    }
+
+    const effectiveDoc = {
+      ...doc,
+      vaultDocId: targetVaultDocId,
+      fileDataUrl: preloadedDataUrl || (doc as any).fileDataUrl
+    };
+
+    const resolved = await resolveDocumentPdfAttachment(effectiveDoc, {
       tenant: currentTenant,
       activeProject,
       projectRefNo,
@@ -1194,13 +1340,38 @@ export const BidPackageBuilderView: React.FC = () => {
       vaultDocs,
       folderCopy: doc.folderCopy || activeFolderCopy
     });
+
+    if (resolved && targetVaultDocId) {
+      pdfDataCache.current[targetVaultDocId] = resolved;
+    }
+    if (resolved && doc.id) {
+      pdfDataCache.current[doc.id] = resolved;
+    }
+    if (resolved && cleanDocId) {
+      pdfDataCache.current[cleanDocId] = resolved;
+    }
+
+    return resolved;
   };
 
   // ─── ONE-CLICK MERGE ALL DOCUMENTS WITH "PAGE X OF Y" PAGINATION ───
   const handleMergeAllDocuments = async (scope: 'CURRENT_FOLDER' | 'ALL_ENVELOPES' = 'CURRENT_FOLDER') => {
-    const docsToMerge = scope === 'ALL_ENVELOPES'
+    let docsToMerge = scope === 'ALL_ENVELOPES'
       ? packageItems.filter(item => item.folderCopy === activeFolderCopy)
       : currentFolderItems;
+
+    // Fallback: If COPY_1 or COPY_2 is empty, automatically replicate from ORIGINAL so nothing is ever missing
+    if (docsToMerge.length === 0 && (activeFolderCopy === 'COPY_1' || activeFolderCopy === 'COPY_2')) {
+      const originalFallback = scope === 'ALL_ENVELOPES'
+        ? packageItems.filter(item => item.folderCopy === 'ORIGINAL')
+        : packageItems.filter(item => item.envelope === activeEnvelope && item.folderCopy === 'ORIGINAL');
+      if (originalFallback.length > 0) {
+        docsToMerge = originalFallback.map(item => ({
+          ...item,
+          folderCopy: activeFolderCopy
+        }));
+      }
+    }
 
     if (docsToMerge.length === 0) {
       alert(`No documents found in this ${activeFolderCopy} folder to merge.`);
@@ -1222,8 +1393,11 @@ export const BidPackageBuilderView: React.FC = () => {
         const doc = docsToMerge[i];
         const fileDataUrl = resolvedAttachments[i];
 
-        // 2. Cover Page element from pre-rendered offscreen container
-        const coverElem = document.getElementById(`cover-page-render-${doc.id}`) as HTMLElement | null;
+        // 2. Cover Page element from pre-rendered offscreen container (with prefix fallback)
+        const coverElem = (
+          document.getElementById(`cover-page-render-${doc.id}`) ||
+          document.getElementById(`cover-page-render-${doc.id.replace(/^pkg-c[12]-/, '')}`)
+        ) as HTMLElement | null;
 
         units.push({
           title: doc.documentName,
@@ -1236,10 +1410,22 @@ export const BidPackageBuilderView: React.FC = () => {
       setMergeStatusText(`Compiling & stamping "Page X of Y" pagination on ${units.length} documents...`);
 
       const cleanRef = (activeProject?.refNo || projectRefNo || 'PRJ-2026').replace(/[^a-zA-Z0-9]/g, '_');
-      const envTag = activeEnvelope === 'ENVELOPE_1' ? 'TECHNICAL_LEGAL' : 'FINANCIAL';
-      const fileName = `${cleanRef}_${activeFolderCopy}_${envTag}_COMPLETE_BID_PACKAGE.pdf`;
+      const envTag = scope === 'ALL_ENVELOPES'
+        ? 'COMPLETE_BID_PACKAGE_ALL_ENVELOPES'
+        : activeEnvelope === 'ENVELOPE_1' ? 'TECHNICAL_LEGAL' : 'FINANCIAL';
+      const fileName = `${cleanRef}_${activeFolderCopy}_${envTag}.pdf`;
 
-      await exportMergedThreeLayerPdf(units, fileName);
+      await exportMergedThreeLayerPdf(units, fileName, (prog) => {
+        setMergeStatusText(`${prog.status} (${prog.percent}%)`);
+      }, {
+        folderCopy: activeFolderCopy,
+        submissionDate: activeProject?.dateTimeSubmitted || (activeProject as any)?.submissionDeadline || submissionDeadline || 'August 30, 2026',
+        companyName: currentTenant?.companyName,
+        signatoryName: currentTenant?.authorizedSignatory?.name || 'Authorized Managing Officer',
+        signatoryTitle: currentTenant?.authorizedSignatory?.title || (currentTenant?.authorizedSignatory as any)?.designation || 'President',
+        projectRefNo: projectRefNo || activeProject?.refNo || 'PhilGEPS-2026',
+        projectTitle: projectTitle || activeProject?.title || 'Target Procurement Project'
+      });
       setMergeStatusText('Merged Package Successfully Downloaded!');
       setTimeout(() => {
         setIsMergingAll(false);
@@ -1587,15 +1773,41 @@ export const BidPackageBuilderView: React.FC = () => {
               </button>
             )}
 
+            {/* Direct 1-Click Merge Current Envelope Button */}
+            <button
+              onClick={() => handleMergeAllDocuments('CURRENT_FOLDER')}
+              disabled={isMergingAll || (currentFolderItems.length === 0 && originalCount === 0)}
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-emerald-950/40 cursor-pointer disabled:opacity-50 border border-emerald-400/40"
+              title={`Compile current envelope (${activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1' : 'Envelope 2'}) in ${activeFolderCopy} and download merged PDF`}
+            >
+              {isMergingAll ? (
+                <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5 text-emerald-200" />
+              )}
+              <span>Merge {activeEnvelope === 'ENVELOPE_1' ? 'Env 1' : 'Env 2'} ({activeFolderCopy})</span>
+            </button>
+
+            {/* Direct 1-Click Merge ALL Documents across Both Envelopes */}
+            <button
+              onClick={() => handleMergeAllDocuments('ALL_ENVELOPES')}
+              disabled={isMergingAll || packageItems.length === 0}
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-cyan-950/40 cursor-pointer disabled:opacity-50 border border-cyan-400/40"
+              title={`Compile ALL documents across BOTH Envelope 1 and Envelope 2 in ${activeFolderCopy} into one complete bid package`}
+            >
+              <FileStack className="w-3.5 h-3.5 text-cyan-200" />
+              <span>Merge All Envelopes ({activeFolderCopy})</span>
+            </button>
+
             {/* Merged Bid Packages Folder (Preview & Download Original, Copy 1, Copy 2) */}
             <button
               onClick={() => setShowMergedPackageViewerModal(true)}
-              disabled={currentFolderItems.length === 0}
+              disabled={packageItemsForMerge.length === 0}
               className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-purple-950/40 cursor-pointer disabled:opacity-50 border border-purple-400/40"
               title="Open Merged Bid Packages Folder to view and download ORIGINAL, COPY 1, and COPY 2 PDFs"
             >
               <FileStack className="w-3.5 h-3.5 text-purple-200" />
-              <span>Merged Packages Folder ({activeFolderCopy})</span>
+              <span>Merged Packages Folder</span>
             </button>
 
             {/* Organize & Merge */}
@@ -1745,6 +1957,21 @@ export const BidPackageBuilderView: React.FC = () => {
                 <span>Reorganize Sequence</span>
               </button>
 
+              {/* Direct 1-Click Merge & Download Button */}
+              <button
+                onClick={() => handleMergeAllDocuments('CURRENT_FOLDER')}
+                disabled={isMergingAll || filteredItems.length === 0}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border border-emerald-400/30"
+                title={`Direct 1-click compile & download ${activeFolderCopy} package with live progress bar`}
+              >
+                {isMergingAll ? (
+                  <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5 text-emerald-200" />
+                )}
+                <span>Merge & Download ({filteredItems.length})</span>
+              </button>
+
               {/* Preview & Merge Folder Button */}
               <button
                 onClick={() => setShowMergedPackageViewerModal(true)}
@@ -1870,6 +2097,27 @@ export const BidPackageBuilderView: React.FC = () => {
                         <FileText className="w-3.5 h-3.5 text-amber-400" />
                         <span>Doc Cover</span>
                       </button>
+
+                      {/* Attach / Replace PDF File Action */}
+                      <label
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 hover:bg-emerald-600 hover:text-white text-emerald-300 border border-emerald-500/40 transition flex items-center gap-1.5 cursor-pointer"
+                        title="Attach or replace PDF file for this document"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>{pdfDataCache.current[doc.id] || pdfDataCache.current[doc.id.replace(/^pkg-c[12]-/, '')] || doc.fileDataUrl ? 'Replace PDF' : 'Attach PDF'}</span>
+                        <input
+                          type="file"
+                          accept=".pdf,application/pdf"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleUploadFileForDoc(doc, file);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                      </label>
 
                       {/* Preview PDF */}
                       <button
@@ -3463,6 +3711,31 @@ export const BidPackageBuilderView: React.FC = () => {
                 />
               </div>
 
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">
+                  Attach PDF File <span className="text-slate-500 font-normal">(Optional)</span>
+                </label>
+                <input
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setCustomDocFile(file);
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        setCustomDocFileDataUrl(reader.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    } else {
+                      setCustomDocFile(null);
+                      setCustomDocFileDataUrl('');
+                    }
+                  }}
+                  className="w-full text-slate-300 text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-300 hover:file:bg-slate-700 cursor-pointer"
+                />
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <button type="button" onClick={() => setShowAddCustomModal(false)} className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">
                   Cancel
@@ -3701,7 +3974,7 @@ export const BidPackageBuilderView: React.FC = () => {
         <MergedPackageViewerModal
           isOpen={showMergedPackageViewerModal}
           onClose={() => setShowMergedPackageViewerModal(false)}
-          items={currentFolderItems}
+          items={packageItemsForMerge}
           vaultDocs={vaultDocs}
           tenant={currentTenant}
           activeProject={activeProject}
@@ -3725,7 +3998,7 @@ export const BidPackageBuilderView: React.FC = () => {
       )}
 
       {/* OFF-SCREEN COVER PAGE CONTAINER FOR INSTANT PERFECT MERGING */}
-      <div className="fixed -left-[9999px] -top-[9999px] pointer-events-none opacity-0 overflow-hidden" aria-hidden="true">
+      <div className="fixed pointer-events-none" style={{ left: '-9999px', top: '0px', width: '816px', zIndex: -1 }} aria-hidden="true">
         {packageItems.map((doc, idx) => {
           const linkedVaultDoc = vaultDocs.find(v => v.id === doc.vaultDocId) ||
             vaultDocs.find(v => {

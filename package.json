@@ -7,7 +7,30 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint:pdf": "node scripts/bidocs-pdf-guard.js",
+    "validate": "tsc --noEmit && node scripts/bidocs-pdf-guard.js",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "src/utils/pdfExportEngine.ts": [
+      "eslint --fix"
+    ],
+    "src/components/vault/MergedPackageViewerModal.tsx": [
+      "eslint --fix"
+    ],
+    "src/components/vault/MergedPdfViewerModal.tsx": [
+      "eslint --fix"
+    ],
+    "src/components/vault/PdfPreviewModal.tsx": [
+      "eslint --fix"
+    ],
+    "src/components/vault/DocumentCoverPage.tsx": [
+      "eslint --fix"
+    ],
+    "src/**/*.{ts,tsx}": [
+      "eslint --fix"
+    ]
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
@@ -22,6 +45,7 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^26.2.0",
@@ -32,6 +56,9 @@
     "@vitejs/plugin-react": "^6.0.5",
     "@vitest/ui": "^4.1.10",
     "autoprefixer": "^10.5.4",
+    "eslint": "^9.0.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
     "postcss": "^8.5.26",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",

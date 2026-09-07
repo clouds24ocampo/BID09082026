@@ -371,17 +371,30 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     }
     setItems(loadedItems !== null ? loadedItems : []);
 
-    const servicesKey = `bidocs_sec_vi_services_${tenant?.id || 'default'}_${projectScopeKey}`;
-    const savedServices = localStorage.getItem(servicesKey);
-    if (savedServices !== null) {
-      try {
-        const parsedSvc = JSON.parse(savedServices);
-        if (parsedSvc) {
-          setServicesDescription(parsedSvc.description || DEFAULT_SERVICES_DESCRIPTION);
-          setServicesPercentage(parsedSvc.percentage ?? 35);
-          setServicesCustomAmount(parsedSvc.customAmount || '');
-        }
-      } catch (e) {}
+    const candidateServiceKeys = [
+      `bidocs_sec_vi_services_${tenantKey}_${projectScopeKey}`,
+      selectedOppId ? `bidocs_sec_vi_services_${tenantKey}_${selectedOppId}` : '',
+      projectRefNo ? `bidocs_sec_vi_services_${tenantKey}_${projectRefNo}` : ''
+    ].filter(Boolean);
+
+    let loadedServices: any = null;
+    for (const key of candidateServiceKeys) {
+      const savedServices = localStorage.getItem(key);
+      if (savedServices !== null) {
+        try {
+          const parsedSvc = JSON.parse(savedServices);
+          if (parsedSvc) {
+            loadedServices = parsedSvc;
+            break;
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (loadedServices) {
+      setServicesDescription(loadedServices.description || DEFAULT_SERVICES_DESCRIPTION);
+      setServicesPercentage(loadedServices.percentage ?? 35);
+      setServicesCustomAmount(loadedServices.customAmount || '');
     } else {
       setServicesDescription(DEFAULT_SERVICES_DESCRIPTION);
       setServicesPercentage(35);

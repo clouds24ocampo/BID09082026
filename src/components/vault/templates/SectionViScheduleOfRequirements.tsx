@@ -236,7 +236,11 @@ interface PageRow {
 }
 
 export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequirementsProps> = ({
-  item = { id: 'sec-6', code: 'SEC-VI', name: 'Section VI. Schedule of Requirements' },
+  item = {
+    id: 'sec-vi-req',
+    code: 'SEC-VI',
+    name: 'Section VI: Schedule of Requirements'
+  },
   tenant,
   activeProjectRefNo = '',
   activeProjectTitle = '',
@@ -245,8 +249,6 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   onClose
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
-
-  // PDF Export rendering mode state
   const [isExporting, setIsExporting] = useState(false);
 
   // Adjustable Table Font Size State ('fine' = 9pt, 'xs' = 10pt, 'sm' = 11pt)
@@ -274,8 +276,8 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   const [items, setItems] = useState<ScheduleItem[]>(BLANK_SECTION_VI_ITEMS);
 
   // Editable Services / Logistics Layer State (Tax Inclusive)
-  const [servicesDescription, setServicesDescription] = useState<string>('');
-  const [servicesPercentage, setServicesPercentage] = useState<number>(0);
+  const [servicesDescription, setServicesDescription] = useState<string>(DEFAULT_SERVICES_DESCRIPTION);
+  const [servicesPercentage, setServicesPercentage] = useState<number>(35);
   const [servicesCustomAmount, setServicesCustomAmount] = useState<string>('');
 
   // Load real saved opportunity projects from Opportunity Finder
@@ -337,8 +339,8 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   useEffect(() => {
     if (!projectScopeKey) {
       setItems([]);
-      setServicesDescription('');
-      setServicesPercentage(0);
+      setServicesDescription(DEFAULT_SERVICES_DESCRIPTION);
+      setServicesPercentage(35);
       setServicesCustomAmount('');
       return;
     }
@@ -379,8 +381,8 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
         try {
           const parsedSvc = JSON.parse(savedServices);
           if (parsedSvc) {
-            setServicesDescription(parsedSvc.description || '');
-            setServicesPercentage(parsedSvc.percentage ?? 0);
+            setServicesDescription(parsedSvc.description || DEFAULT_SERVICES_DESCRIPTION);
+            setServicesPercentage(parsedSvc.percentage ?? 35);
             setServicesCustomAmount(parsedSvc.customAmount || '');
             foundServices = true;
             break;
@@ -389,8 +391,8 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       }
     }
     if (!foundServices) {
-      setServicesDescription('');
-      setServicesPercentage(0);
+      setServicesDescription(DEFAULT_SERVICES_DESCRIPTION);
+      setServicesPercentage(35);
       setServicesCustomAmount('');
     }
   }, [projectScopeKey, selectedOppId, projectRefNo, tenant?.id]);

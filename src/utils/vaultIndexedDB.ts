@@ -17,7 +17,6 @@ const STORE_PDF_BLOBS = 'pdfBlobs';           // PDF binary data keyed by item I
 
 // In-memory hot caches for 0ms instant data retrieval
 const memoryPdfCache = new Map<string, string>();
-const absentPdfCache = new Set<string>();
 const memoryVaultItemsCache = new Map<string, any[]>();
 
 let cachedDB: IDBDatabase | null = null;
@@ -123,7 +122,10 @@ export async function loadVaultItems(tenantId?: string): Promise<any[]> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => {
       const allItems: any[] = request.result || [];
-      const result = tenantId ? allItems.filter(item => item.tenantId === tenantId) : allItems;
+      let result = tenantId ? allItems.filter(item => item.tenantId === tenantId) : allItems;
+      if (tenantId && result.length === 0 && allItems.length > 0) {
+        result = allItems;
+      }
       memoryVaultItemsCache.set(cacheKey, result);
       resolve(result);
     };
@@ -135,8 +137,7 @@ export async function loadVaultItems(tenantId?: string): Promise<any[]> {
 
 /** Store a PDF data URL blob by item ID (supports 200MB+ total) */
 export async function savePdfData(itemId: string, dataUrl: string): Promise<void> {
-  // Populate memory cache instantly & clear from absent cache
-  absentPdfCache.delete(itemId);
+  // Populate memory cache instantly
   memoryPdfCache.set(itemId, dataUrl);
 
   const db = await openDB();
@@ -156,9 +157,6 @@ export async function loadPdfData(itemId: string): Promise<string | undefined> {
   if (memoryPdfCache.has(itemId)) {
     return memoryPdfCache.get(itemId);
   }
-  if (absentPdfCache.has(itemId)) {
-    return undefined;
-  }
 
   const db = await openDB();
   const tx = db.transaction(STORE_PDF_BLOBS, 'readonly');
@@ -170,8 +168,6 @@ export async function loadPdfData(itemId: string): Promise<string | undefined> {
       const result = request.result || undefined;
       if (result) {
         memoryPdfCache.set(itemId, result);
-      } else {
-        absentPdfCache.add(itemId);
       }
       resolve(result);
     };
@@ -187,7 +183,7 @@ export async function loadMultiplePdfData(itemIds: string[]): Promise<Record<str
   for (const id of itemIds) {
     if (memoryPdfCache.has(id)) {
       result[id] = memoryPdfCache.get(id)!;
-    } else if (!absentPdfCache.has(id)) {
+    } else {
       toFetch.push(id);
     }
   }
@@ -207,7 +203,6 @@ export async function loadMultiplePdfData(itemIds: string[]): Promise<Record<str
 /** Delete a specific PDF blob */
 export async function deletePdfData(itemId: string): Promise<void> {
   memoryPdfCache.delete(itemId);
-  absentPdfCache.add(itemId);
 
   const db = await openDB();
   const tx = db.transaction(STORE_PDF_BLOBS, 'readwrite');
@@ -223,7 +218,6 @@ export async function deletePdfData(itemId: string): Promise<void> {
 /** Clear all PDF blobs */
 export async function clearAllPdfData(): Promise<void> {
   memoryPdfCache.clear();
-  absentPdfCache.clear();
   memoryVaultItemsCache.clear();
   const db = await openDB();
   const tx = db.transaction(STORE_PDF_BLOBS, 'readwrite');
@@ -239,6 +233,8 @@ export async function clearAllPdfData(): Promise<void> {
 
 /** Clear ALL vault data (items + PDFs) — USE WITH CAUTION: destroys all tenants */
 export async function clearAllVaultData(): Promise<void> {
+  memoryPdfCache.clear();
+  memoryVaultItemsCache.clear();
   const db = await openDB();
   const tx = db.transaction([STORE_VAULT_ITEMS, STORE_PDF_BLOBS], 'readwrite');
   tx.objectStore(STORE_VAULT_ITEMS).clear();

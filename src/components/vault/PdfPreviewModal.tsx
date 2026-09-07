@@ -179,12 +179,31 @@ export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, 
                     />
                   </div>
                 ) : (
-                  <div className="w-full min-h-[760px] h-[82vh] rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-900 shadow-2xl mx-auto p-1">
-                    <iframe
-                      src={pdfBlobUrl || effectiveDataUrl}
-                      title={item.documentName}
-                      className="w-full h-full border-none rounded-xl bg-slate-900"
-                    />
+                  <div className="w-full min-h-[760px] h-[82vh] rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-900 shadow-2xl mx-auto p-1 relative flex flex-col">
+                    <object
+                      data={`${effectiveDataUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                      type="application/pdf"
+                      className="w-full h-full min-h-[760px] border-none rounded-xl bg-slate-900"
+                    >
+                      <iframe
+                        src={`${effectiveDataUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                        title={item.documentName}
+                        className="w-full h-full min-h-[760px] border-none rounded-xl bg-slate-900"
+                      >
+                        <div className="p-8 text-center text-slate-300 space-y-4">
+                          <p className="text-sm font-bold text-white">Document PDF Ready</p>
+                          <a
+                            href={effectiveDataUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            <span>Open PDF in New Window</span>
+                          </a>
+                        </div>
+                      </iframe>
+                    </object>
                   </div>
                 )
               ) : (
