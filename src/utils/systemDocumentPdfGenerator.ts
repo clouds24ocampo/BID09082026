@@ -2902,11 +2902,15 @@ export async function resolveDocumentPdfAttachment(
   if (docIdUpper.includes('SLCC') || dName.includes('slcc') || dName.includes('single largest')) {
     return await generateSlccStatementPdf(ctx);
   }
-  if (docIdUpper.includes('SECTION_VI') || docIdUpper.includes('SEC_VI') || dName.includes('section vi') || dName.includes('schedule of req')) {
-    return await generateSectionViRequirementsPdf(ctx);
-  }
+  // NOTE: "SECTION_VII"/"section vii" both contain "SECTION_VI"/"section vi" as a
+  // substring, so the Section VII check MUST be evaluated first, otherwise every
+  // Section VII (Technical Specifications) document would incorrectly resolve to
+  // the Section VI (Schedule of Requirements) generator instead.
   if (docIdUpper.includes('SECTION_VII') || docIdUpper.includes('SEC_VII') || docIdUpper.includes('TECH_SPECS') || dName.includes('section vii') || dName.includes('technical spec')) {
     return await generateTechnicalSpecificationsPdf(ctx);
+  }
+  if (docIdUpper.includes('SECTION_VI') || docIdUpper.includes('SEC_VI') || dName.includes('section vi') || dName.includes('schedule of req')) {
+    return await generateSectionViRequirementsPdf(ctx);
   }
   if (docIdUpper.includes('FRAMEWORK') || docIdUpper.includes('FAL') || dName.includes('framework agreement') || dName.includes('fal')) {
     return await generateFrameworkAgreementListPdf(ctx);
@@ -2978,7 +2982,10 @@ export async function resolveDocumentPdfAttachment(
     return await generatePhilgepsCertificatePdf(ctx);
   }
 
-  if (docIdUpper.includes('SEC') || docIdUpper.includes('DTI') || dName.includes('sec') || dName.includes('dti') || dName.includes('business registration')) {
+  // NOTE: use "SEC_DTI"/"SEC/DTI" specifically (not a bare "SEC" substring check) because
+  // "SEC" also matches unrelated ids like "SECRETARY_CERTIFICATE" and "SECTION_VI/VII",
+  // which must be routed to their own generators instead of being misidentified here.
+  if (docIdUpper.includes('SEC_DTI') || docIdUpper.includes('DTI') || dName.includes('sec/dti') || dName.includes('sec / dti') || dName.includes('dti') || dName.includes('business registration')) {
     const vDoc = findUploadedVaultDoc(['DOC-2', 'SEC', 'DTI', 'SEC_DTI_REG'], 'sec');
     if (vDoc?.fileDataUrl) return vDoc.fileDataUrl;
     if (vDoc?.id) {

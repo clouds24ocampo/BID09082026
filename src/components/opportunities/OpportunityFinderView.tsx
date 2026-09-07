@@ -663,7 +663,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                 className="w-3 h-3 rounded-full"
                 style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
               />
-              <h1 className="text-2xl font-bold text-white">Opportunity Finder & Procurement Registry</h1>
+              <h1 className="font-display text-2xl font-bold text-white tracking-wide text-glow">Opportunity Finder & Procurement Registry</h1>
             </div>
             <p className="text-xs text-slate-400 mt-1">
               Real-time PhilGEPS bidding opportunities repository for <span className="text-slate-200 font-semibold">{currentTenant?.companyName}</span>.
@@ -672,7 +672,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
           <button
             onClick={handleOpenAddModal}
-            className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white shadow-lg transition flex items-center gap-2 hover:opacity-90 shrink-0"
+            className="btn-glow px-4 py-2.5 rounded-xl text-xs font-semibold text-white shadow-lg transition flex items-center gap-2 hover:opacity-90 shrink-0"
             style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
           >
             <Plus className="w-4 h-4" />

@@ -252,7 +252,7 @@ export const FormsDirectoryView: React.FC = () => {
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                <h1 className="font-display text-2xl font-bold text-white tracking-wide text-glow flex items-center gap-3">
                   <span>Notarized Documents & Legal Forms</span>
                   <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
                     Opportunity Finder Connected ⚡

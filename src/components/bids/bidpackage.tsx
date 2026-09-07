@@ -60,6 +60,11 @@ export interface PackageItem {
   dateAdded: string;
   isAutoDetected?: boolean;
   pageCount?: number;
+  // Canonical statutory document code (e.g. 'SECTION_VI_REQUIREMENTS'). Auto-generated
+  // package items get a random `id` (e.g. `pkg-172839-ab12cd`), so this field lets the
+  // PDF attachment resolver reliably identify the document even after the random id is
+  // assigned, instead of relying solely on fragile documentName substring matching.
+  documentCode?: string;
 }
 
 interface StatutoryDocDefinition {
@@ -844,7 +849,8 @@ export const BidPackageBuilderView: React.FC = () => {
           vaultDocId: readiness.vaultId,
           fileSizeBytes: 1048576,
           dateAdded: new Date().toISOString(),
-          isAutoDetected: readiness.isReady
+          isAutoDetected: readiness.isReady,
+          documentCode: def.code
         });
       }
     });
@@ -1568,7 +1574,7 @@ export const BidPackageBuilderView: React.FC = () => {
                 setSelectedDocIdsToAdd([]);
                 setShowAddCompletedModal(true);
               }}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition flex items-center gap-1.5 cursor-pointer shadow"
+              className="btn-glow px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition flex items-center gap-1.5 cursor-pointer shadow"
               title={`Add completed documents into ${activeFolderCopy} folder`}
             >
               <ListPlus className="w-3.5 h-3.5" />

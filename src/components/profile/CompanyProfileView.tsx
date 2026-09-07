@@ -151,7 +151,7 @@ export const CompanyProfileView: React.FC = () => {
               className="w-3.5 h-3.5 rounded-full" 
               style={{ backgroundColor: brandColor }} 
             />
-            <h1 className="text-2xl font-bold text-white">Company Profile & System Credentials</h1>
+            <h1 className="font-display text-2xl font-bold text-white tracking-wide text-glow">Company Profile & System Credentials</h1>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Manage your corporate profile logo, statutory registration details, and system login credentials for <span className="text-slate-200 font-semibold">{companyName || 'Your Enterprise'}</span>.

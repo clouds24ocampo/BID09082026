@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
+import { SceneBackground } from '../fx/SceneBackground';
 import { UserRole } from '../../types';
 import {
   Building2,
@@ -77,98 +78,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#02040a] text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden font-sans select-none">
+    <div className="min-h-screen text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden font-sans select-none">
 
-      {/* ================= CONTINUOUS DEEP SPACE TRAVEL ENGINE ================= */}
-
-      {/* 1. Warp Speed Travelling Stars (Moving Toward Screen) */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        {Array.from({ length: 30 }).map((_, i) => {
-          const leftPct = (i * 13) % 100;
-          const topPct = (i * 17) % 100;
-          const duration = 2 + (i % 3);
-          const delay = (i * 0.2) % 3;
-
-          return (
-            <motion.div
-              key={i}
-              initial={{
-                scale: 0.2,
-                opacity: 0
-              }}
-              animate={{
-                scale: [0.2, 1.5, 0.2],
-                opacity: [0, 0.9, 0]
-              }}
-              transition={{
-                duration: duration,
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: delay
-              }}
-              style={{
-                left: `${leftPct}%`,
-                top: `${topPct}%`
-              }}
-              className="absolute w-1.5 h-1.5 bg-cyan-200 rounded-full shadow-[0_0_8px_#38bdf8]"
-            />
-          );
-        })}
-      </div>
-
-      {/* 2. Panning Deep Space Nebula Glow */}
-      <motion.div
-        animate={{
-          x: [-40, 40, -40],
-          y: [-30, 30, -30],
-          scale: [1, 1.15, 1],
-          opacity: [0.2, 0.35, 0.2]
-        }}
-        transition={{
-          duration: 20,
-          repeat: Infinity,
-          ease: 'easeInOut'
-        }}
-        className="absolute w-[45rem] h-[45rem] rounded-full blur-[160px] pointer-events-none z-0"
-        style={{ backgroundColor: activeTenantPreview.brandColor || '#0284c7' }}
-      />
-
-      {/* 3. Traveling Moon in Deep Space Background */}
-      <motion.div
-        animate={{
-          y: [-10, 10, -10],
-          x: [-8, 8, -8]
-        }}
-        transition={{
-          duration: 10,
-          repeat: Infinity,
-          ease: 'easeInOut'
-        }}
-        className="absolute -bottom-28 -left-28 w-[30rem] h-[30rem] rounded-full bg-gradient-to-br from-slate-300 via-slate-600 to-slate-950 border border-slate-700/50 shadow-[inset_-30px_-30px_70px_rgba(0,0,0,0.95),0_0_50px_rgba(56,189,248,0.15)] pointer-events-none opacity-40 xl:opacity-80 z-0"
-      >
-        {/* Dynamic Craters */}
-        <div className="absolute top-16 left-28 w-16 h-16 rounded-full bg-slate-800/60 border border-slate-600/40 shadow-inner" />
-        <div className="absolute top-48 right-24 w-24 h-24 rounded-full bg-slate-800/50 border border-slate-600/30 shadow-inner" />
-        <div className="absolute bottom-20 left-36 w-12 h-12 rounded-full bg-slate-800/70 border border-slate-600/40 shadow-inner" />
-      </motion.div>
-
-      {/* 4. Flying Spacecraft across the Screen */}
-      <motion.div
-        animate={{
-          x: [-200, 1200],
-          y: [400, -200]
-        }}
-        transition={{
-          duration: 16,
-          repeat: Infinity,
-          ease: 'linear',
-          delay: 1
-        }}
-        className="absolute z-0 pointer-events-none flex items-center gap-2 opacity-70"
-      >
-        <div className="w-16 h-[2px] bg-gradient-to-r from-transparent to-cyan-400 shadow-[0_0_8px_#38bdf8]" />
-        <Rocket className="w-6 h-6 text-cyan-300 transform -rotate-45 drop-shadow-[0_0_10px_#38bdf8]" />
-      </motion.div>
+      {/* ================= 3D IMMERSIVE DEEP SPACE SCENE ================= */}
+      <SceneBackground intensity="full" color={activeTenantPreview.brandColor || '#38bdf8'} />
 
       {/* ================= MAIN CONTENT GRID ================= */}
       <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">

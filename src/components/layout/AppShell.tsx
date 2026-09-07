@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { SceneBackground } from '../fx/SceneBackground';
 import { 
   Building2, 
   LayoutDashboard, 
@@ -93,7 +94,8 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
   ];
 
   return (
-    <div className="min-h-screen bg-[#070a12] text-slate-100 flex flex-col">
+    <div className="min-h-screen text-slate-100 flex flex-col relative">
+      <SceneBackground color={currentTenant?.brandColor || '#3b82f6'} intensity="ambient" />
       
       {/* TOP BAR HEADER */}
       <header className="h-16 border-b border-slate-800 bg-[#0b0f19]/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between">
@@ -120,7 +122,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-white text-base tracking-tight">BIDOCS</span>
+                <span className="font-display font-extrabold text-white text-base tracking-widest text-glow">BIDOCS</span>
                 <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono font-semibold border border-blue-500/20">
                   v2.5
                 </span>
@@ -288,7 +290,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
       <div className="flex-1 flex overflow-hidden min-h-0">
         
         {/* SIDEBAR NAVIGATION */}
-        <aside className={`w-64 bg-[#0b0f19] border-r border-slate-800 flex-col justify-between py-4 px-3 md:flex md:relative md:inset-auto md:shadow-none ${mobileMenuOpen ? 'flex absolute inset-y-16 left-0 z-30 shadow-2xl' : 'hidden'}`}>
+        <aside className={`w-64 bg-[#0b0f19]/70 backdrop-blur-xl border-r border-white/10 flex-col justify-between py-4 px-3 md:flex md:relative md:inset-auto md:shadow-none ${mobileMenuOpen ? 'flex absolute inset-y-16 left-0 z-30 shadow-2xl' : 'hidden'}`}>
           <div className="space-y-1">
             <div className="px-3 py-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
               Bidding Modules
@@ -310,7 +312,9 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
                   }`}
                   style={{
-                    borderLeft: isActive ? `3px solid ${currentTenant?.brandColor || '#1e40af'}` : undefined
+                    borderLeft: isActive ? `3px solid ${currentTenant?.brandColor || '#1e40af'}` : undefined,
+                    background: isActive ? `linear-gradient(90deg, color-mix(in srgb, ${currentTenant?.brandColor || '#1e40af'} 22%, transparent), rgba(30,41,59,0.55))` : undefined,
+                    boxShadow: isActive ? `0 0 20px color-mix(in srgb, ${currentTenant?.brandColor || '#1e40af'} 30%, transparent)` : undefined
                   }}
                 >
                   <div className="flex items-center gap-3">
@@ -348,7 +352,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
         </aside>
 
         {/* MAIN VIEWPORT */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[#070a12] min-h-[calc(100vh-4rem)] min-w-0">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 min-h-[calc(100vh-4rem)] min-w-0">
           <div className="w-full max-w-[1780px] mx-auto">
             {children}
           </div>

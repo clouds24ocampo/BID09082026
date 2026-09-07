@@ -72,7 +72,7 @@ export const TenantSettingsView: React.FC = () => {
               className="w-3 h-3 rounded-full" 
               style={{ backgroundColor: brandColor }} 
             />
-            <h1 className="text-2xl font-bold text-white">White-Label Tenant Engine Settings</h1>
+            <h1 className="font-display text-2xl font-bold text-white tracking-wide text-glow">White-Label Tenant Engine Settings</h1>
           </div>
           <p className="text-xs text-slate-400 mt-1">
             Zero-hardcoding configuration file (`tenant.config.json` equivalent). Updating values re-skins the entire BIDOCS platform instantly.

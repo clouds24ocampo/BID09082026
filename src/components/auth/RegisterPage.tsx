@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { SceneBackground } from '../fx/SceneBackground';
 import { LegalRegime, ProcurementType, UserRole } from '../../types';
 import {
   Building2,
@@ -128,13 +129,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
   };
 
   return (
-    <div className="min-h-screen bg-[#070a12] text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
-      {/* Dynamic Background Glow */}
-      <div
-        className="absolute -top-40 -right-40 w-96 h-96 rounded-full blur-[140px] opacity-20 pointer-events-none transition-colors duration-500"
-        style={{ backgroundColor: brandColor }}
-      />
-      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-600/10 rounded-full blur-[140px] pointer-events-none" />
+    <div className="min-h-screen text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
+      {/* 3D Immersive Scene — brand-tinted aurora + starfield */}
+      <SceneBackground intensity="full" color={brandColor} />
 
       <div className="w-full max-w-4xl glass-panel p-6 sm:p-8 rounded-2xl shadow-2xl border border-slate-800 relative z-10 space-y-6">
 

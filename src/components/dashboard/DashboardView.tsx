@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { loadVaultItems } from '../../utils/vaultIndexedDB';
+import { TiltCard, CountUp, SectionHeader } from '../fx/ui';
 
 interface DashboardViewProps {
   setActiveTab: (tab: string) => void;
@@ -120,50 +121,50 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
         {/* Metric 1 */}
-        <div className="glass-panel p-5 rounded-2xl space-y-3">
+        <TiltCard className="glass-panel p-5 rounded-2xl space-y-3">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-medium">Active Bidding Projects</span>
             <FolderKanban className="w-4 h-4 text-blue-400" />
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-extrabold text-white">{opportunities.length} Projects</span>
+            <span className="text-2xl font-extrabold text-white"><CountUp value={opportunities.length} suffix=" Projects" /></span>
             <span className="text-xs text-emerald-400 font-medium">{opportunities.length > 0 ? 'Active' : 'Empty'}</span>
           </div>
           <p className="text-[11px] text-slate-400">PhilGEPS Bids Logged</p>
-        </div>
+        </TiltCard>
 
         {/* Metric 2 */}
-        <div className="glass-panel p-5 rounded-2xl space-y-3">
+        <TiltCard className="glass-panel p-5 rounded-2xl space-y-3">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-medium">Total ABC Pipeline Value</span>
             <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-extrabold text-white">
-              {totalAbc > 0 ? `₱${(totalAbc / 1000000).toFixed(1)}M` : '₱0.00'}
+              {totalAbc > 0 ? <CountUp value={totalAbc / 1000000} decimals={1} prefix="₱" suffix="M" /> : '₱0.00'}
             </span>
             <span className="text-xs text-emerald-400 font-medium">Approved Budget</span>
           </div>
           <p className="text-[11px] text-slate-400">Sum of Target Contracts</p>
-        </div>
+        </TiltCard>
 
         {/* Metric 3 */}
-        <div className="glass-panel p-5 rounded-2xl space-y-3">
+        <TiltCard className="glass-panel p-5 rounded-2xl space-y-3">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-medium">Document Vault Items</span>
             <FileCheck className="w-4 h-4 text-purple-400" />
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-extrabold text-white">{vaultItems.length} Files</span>
+            <span className="text-2xl font-extrabold text-white"><CountUp value={vaultItems.length} suffix=" Files" /></span>
             <span className={`text-xs font-medium ${expiringDocs.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
               {expiringDocs.length > 0 ? `${expiringDocs.length} Expiring Soon` : 'Up to date'}
             </span>
           </div>
           <p className="text-[11px] text-slate-400">Compliance & Legal Permits</p>
-        </div>
+        </TiltCard>
 
         {/* Metric 4 */}
-        <div className="glass-panel p-5 rounded-2xl space-y-3">
+        <TiltCard className="glass-panel p-5 rounded-2xl space-y-3">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-medium">Historical Win Rate</span>
             <Award className="w-4 h-4 text-amber-400" />
@@ -173,7 +174,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
             <span className="text-xs text-slate-400 font-medium">No Bids Submitted</span>
           </div>
           <p className="text-[11px] text-slate-400">Ready for First Award</p>
-        </div>
+        </TiltCard>
 
       </div>
 

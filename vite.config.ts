@@ -23,11 +23,17 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            if (id.includes('three') || id.includes('@react-three')) {
+              return 'three-scene-vendor';
+            }
             if (id.includes('pdf-lib') || id.includes('html2canvas')) {
               return 'pdf-engine-vendor';
             }
             if (id.includes('lucide-react')) {
               return 'lucide-icons';
+            }
+            if (id.includes('framer-motion')) {
+              return 'motion-vendor';
             }
             return 'vendor';
           }
