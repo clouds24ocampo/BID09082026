@@ -8,11 +8,8 @@ import {
   Search,
   Plus,
   ArrowUpRight,
-  ShieldCheck,
-  Building2,
   Clock,
-  Award,
-  FileText
+  Award
 } from 'lucide-react';
 
 import { loadVaultItems } from '../../utils/vaultIndexedDB';

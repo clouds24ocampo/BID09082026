@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { DocumentVaultItem, DocCategory, Tenant, DocumentVersion } from '../../types';
+import { DocumentVaultItem, DocCategory, DocumentVersion } from '../../types';
 import { PdfPreviewModal } from './PdfPreviewModal';
 import { MergedPdfViewerModal } from './MergedPdfViewerModal';
 import { StatementOngoingContractsModal } from './templates/StatementOngoingContractsModal';
@@ -25,8 +25,6 @@ import {
   loadVaultItems,
   savePdfData,
   loadPdfData as loadPdfDataFromDB,
-  clearAllPdfData,
-  clearAllVaultData,
   clearVaultDataForTenant,
   migrateFromLocalStorage
 } from '../../utils/vaultIndexedDB';
@@ -49,7 +47,6 @@ import {
   CheckSquare,
   Square,
   Layers,
-  History,
   ChevronRight,
   ChevronDown,
   FileSignature,
@@ -58,11 +55,7 @@ import {
   Unlock,
   Trash2,
   Edit3,
-  Filter,
-  HardHat,
-  Table,
-  TrendingUp,
-  Calculator
+  Filter
 } from 'lucide-react';
 
 interface ClassAMasterItemDef {
@@ -876,7 +869,6 @@ export const DocumentVaultView: React.FC = () => {
   const [customDocName, setCustomDocName] = useState('');
 
   const [replaceTargetItem, setReplaceTargetItem] = useState<DocumentVaultItem | null>(null);
-  const [detailsTargetItem, setDetailsTargetItem] = useState<DocumentVaultItem | null>(null);
   const [previewPdfItem, setPreviewPdfItem] = useState<DocumentVaultItem | null>(null);
 
   const openPreviewItem = async (item: DocumentVaultItem) => {
@@ -1422,11 +1414,7 @@ export const DocumentVaultView: React.FC = () => {
     !CLASS_A_MASTER_LIST.some(d => d.code === item.documentCode)
   );
 
-  const technicalItemsForActiveProject = vaultItems.filter(item =>
-    item.category === 'TECHNICAL' &&
-    activeProjectRefNo &&
-    ((item.projectId && item.projectId === activeProjectId) || item.philgepsRefNo === activeProjectRefNo)
-  );
+
 
   const hasTechnicalDocForActiveProject = (docCode: string) =>
     !!activeProjectRefNo && vaultItems.some(item =>

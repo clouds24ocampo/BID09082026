@@ -4,11 +4,8 @@ import { LegalRegime, ProcurementType, UserRole } from '../../types';
 import {
   Building2,
   User as UserIcon,
-  Mail,
-  Lock,
   Palette,
   ShieldCheck,
-  FileText,
   ArrowRight,
   ArrowLeft,
   Check,
@@ -455,7 +452,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
                   Authorized Managing Officer (AMO) for Bid Documents
                 </span>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-slate-300 mb-1">Signatory Full Name</label>
                     <input
@@ -476,6 +473,17 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
                       onChange={(e) => setSignatoryTitle(e.target.value)}
                       placeholder="President & Authorized Managing Officer"
                       required
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Signatory Personal TIN</label>
+                    <input
+                      type="text"
+                      value={signatoryTin}
+                      onChange={(e) => setSignatoryTin(e.target.value)}
+                      placeholder="000-123-456-000"
                       className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
                     />
                   </div>

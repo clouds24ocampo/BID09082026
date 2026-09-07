@@ -4,30 +4,21 @@ import { getOpportunityProjects, OpportunityProjectOption } from '../../utils/op
 import { SectionViScheduleOfRequirements } from '../vault/templates/SectionViScheduleOfRequirements';
 import { TechnicalSpecifications } from '../vault/templates/TechnicalSpecifications';
 import { FrameworkAgreementList } from '../vault/templates/FrameworkAgreementList';
-import { TechnicalExhibitTemplateModal } from '../vault/templates/TechnicalExhibitTemplateModal';
 import { OmnibusSwornStatementModal } from '../vault/templates/OmnibusSwornStatementModal';
 import { BidSecuringDeclarationModal } from '../vault/templates/BidSecuringDeclarationModal';
 import { PdfPreviewModal } from '../vault/PdfPreviewModal';
 import VaultErrorBoundary from '../common/VaultErrorBoundary';
 import { savePdfData, loadPdfData as loadPdfDataFromDB } from '../../utils/vaultIndexedDB';
 import {
-  Download,
-  FileText,
   ShieldCheck,
   Search,
   Building2,
   CheckCircle2,
-  Calendar,
   Sparkles,
   FileCheck,
-  ExternalLink,
-  Award,
   Printer,
   Eye,
   Trash2,
-  Edit3,
-  Filter,
-  X,
   FileSignature
 } from 'lucide-react';
 
@@ -78,7 +69,7 @@ const OFFICIAL_NOTARIZED_DOCS: FormItem[] = [
 ];
 
 export const FormsDirectoryView: React.FC = () => {
-  const { currentTenant, currentUser } = useAuth();
+  const { currentTenant } = useAuth();
   const [forms] = useState<FormItem[]>(OFFICIAL_NOTARIZED_DOCS);
   const [searchQuery, setSearchQuery] = useState('');
 

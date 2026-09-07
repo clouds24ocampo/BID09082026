@@ -149,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [currentUser]);
 
-  const login = (email: string, password: string, role?: UserRole, tenantId?: string): boolean => {
+  const login = (email: string, password: string, _role?: UserRole, _tenantId?: string): boolean => {
     const normalizedEmail = email.trim().toLowerCase();
 
     // Find registered user — do NOT auto-create unknown users

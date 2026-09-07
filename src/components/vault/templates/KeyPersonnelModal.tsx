@@ -10,7 +10,6 @@ import {
   Printer,
   Download,
   RotateCcw,
-  Building2,
   FileText,
   UserCheck,
   UploadCloud,
@@ -489,7 +488,7 @@ export const KeyPersonnelModal: React.FC<KeyPersonnelModalProps> = ({
   const todayStr = new Date().toISOString().split('T')[0];
 
   // Projects dropdown state
-  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
+  const [, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
   // Editable Document Metadata Fields
@@ -497,7 +496,7 @@ export const KeyPersonnelModal: React.FC<KeyPersonnelModalProps> = ({
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || 'PhilGEPS-2026-001');
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle || 'PROPOSED INFRASTRUCTURE PROJECT');
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity || 'Procuring Entity Name');
-  const [solicitationNumber, setSolicitationNumber] = useState(propSolicitationNumber || 'SOL-2026-9901');
+  const [, setSolicitationNumber] = useState(propSolicitationNumber || 'SOL-2026-9901');
   const [dateTimeSubmitted, setDateTimeSubmitted] = useState(propDateTimeSubmitted || todayStr);
 
   const [signatoryName, setSignatoryName] = useState(

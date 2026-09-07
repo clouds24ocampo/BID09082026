@@ -67,8 +67,6 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
     nameLower.includes('jva')
   );
 
-  const isTechnical = !isFinancial && !isLegal;
-  
   // Explicit Envelope Name
   const officialEnvelopeName = isFinancial
     ? 'ENVELOPE 2: FINANCIAL BID PROPOSAL'
@@ -76,23 +74,12 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
       ? 'ENVELOPE 1: LEGAL & ELIGIBILITY COMPONENT'
       : 'ENVELOPE 1: TECHNICAL PROPOSAL COMPONENT';
 
-  // Explicit Component Classification inside the Envelope
-  const componentLabel = isFinancial
-    ? 'FINANCIAL PROPOSAL COMPONENT'
-    : isLegal
-      ? 'LEGAL & ELIGIBILITY COMPONENT'
-      : 'TECHNICAL PROPOSAL COMPONENT';
-
   // Category Tag for Pill Badge (Strictly Specific: LEGAL / TECHNICAL / FINANCIAL)
   const categoryTag = isFinancial
     ? 'FINANCIAL DOCUMENT'
     : isLegal
       ? 'LEGAL DOCUMENT'
       : 'TECHNICAL DOCUMENT';
-
-  // Format Dates
-  const issuedDateFormatted = item.issuedDate ? new Date(item.issuedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : null;
-  const expiryDateFormatted = item.expiryDate ? new Date(item.expiryDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : null;
 
   // Format Approved Budget cleanly from string or number
   const rawAbc = item.approvedBudget || (item as any).abc;
@@ -161,7 +148,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
               </span>
             </div>
             <p className="text-[9.5px] font-mono text-neutral-700 font-semibold tracking-wide pl-3.5">
-              SECTION: <strong className="text-black uppercase">{componentLabel}</strong>
+              SECTION: <strong className="text-black uppercase">{categoryTag}</strong>
             </p>
           </div>
 
@@ -313,7 +300,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
                 projectTitle: item.projectTitle || 'Target Bidding Project',
                 projectRefNo: item.philgepsRefNo || 'PhilGEPS-13200679',
                 procuringEntity: item.procuringEntity || 'Procuring Agency',
-                dateTimeSubmitted: item.submissionDeadline || item.preBidConferenceDate || issuedDateFormatted || 'August 30, 2026 at 02:00 PM',
+                dateTimeSubmitted: item.submissionDeadline || item.preBidConferenceDate || (item as any).dateIssued || 'August 30, 2026 at 02:00 PM',
                 submissionDate: item.submissionDeadline || 'August 30, 2026 at 02:00 PM',
                 documentCategory: `${normalizedCopy} Document Cover Page`,
                 generatedBy: tenant?.companyName

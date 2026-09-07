@@ -34,20 +34,6 @@ export interface BidFormForGoodsModalProps {
   onClose: () => void;
 }
 
-// Helper to format currency number with commas and 2 decimal places (e.g. 1,000,000.00)
-const formatCurrency = (num: number): string => {
-  return num.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-};
-
-const parseNum = (val: string): number => {
-  if (!val) return 0;
-  const cleaned = val.replace(/,/g, '').trim();
-  const n = parseFloat(cleaned);
-  return isNaN(n) ? 0 : n;
-};
 
 // Helper to format Date ONLY without time (e.g., "March 19, 2026")
 const formatDateOnly = (raw: string): string => {
@@ -85,10 +71,9 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
 
   // Corporate Entity & Signatory (Company Name is strictly locked to Tenant Registration Name)
   const companyName = tenant?.companyName || '';
-  const [companyAddress, setCompanyAddress] = useState(tenant?.address || '');
-  const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || 'Mark-Vin F. Ocampo');
-  const [signatoryTitle, setSignatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'President');
-  const [writtenAuthority, setWrittenAuthority] = useState("Board Resolution & Secretary's Certificate");
+  const [signatoryName] = useState(tenant?.authorizedSignatory?.name || 'Mark-Vin F. Ocampo');
+  const [signatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'President');
+  const [writtenAuthority] = useState("Board Resolution & Secretary's Certificate");
 
   // Category Auto-Detection State ('Goods' = Blue, 'Infrastructure' = Yellow/Amber, 'Consulting' = Green/Emerald)
   const [projectCategory, setProjectCategory] = useState<'Goods' | 'Infrastructure' | 'Consulting'>('Goods');
@@ -119,12 +104,9 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
   // Goods Description & Bid Offer Parameters
   const [bidBulletins, setBidBulletins] = useState('Bid Bulletin No. 1');
   const [offerAction, setOfferAction] = useState<string>('supply, deliver, and perform');
-  const [goodsDescription, setGoodsDescription] = useState(
-    activeProjectTitle || 'SUPPLY, DELIVERY, INSTALLATION, TESTING, AND CONFIGURATION OF ICT EQUIPMENT'
-  );
   const [totalBidAmountFigures, setTotalBidAmountFigures] = useState('1,250,000.00');
   const [totalBidAmountWords, setTotalBidAmountWords] = useState('');
-  const [commissionsText, setCommissionsText] = useState('None');
+  const [commissionsText] = useState('None');
 
   const [showMetadataInputs, setShowMetadataInputs] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -170,24 +152,6 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
     return 'Goods';
   };
 
-  // Auto-convert figures to words whenever figures change
-  const handleFiguresChange = (val: string) => {
-    setTotalBidAmountFigures(val);
-    const num = parseNum(val);
-    if (num > 0) {
-      const words = numberToWords(num);
-      setTotalBidAmountWords(words);
-    }
-  };
-
-  const handleBlurFigures = () => {
-    const num = parseNum(totalBidAmountFigures);
-    if (num > 0) {
-      const formatted = formatCurrency(num);
-      setTotalBidAmountFigures(formatted);
-      setTotalBidAmountWords(numberToWords(num));
-    }
-  };
 
   // Auto-sync total bid amount & project details strictly from this specific project's Detailed Estimates
   const syncFromDetailedEstimates = (refNo?: string, oppId?: string) => {
@@ -261,7 +225,6 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
             }
             if (parsed.projectName && parsed.projectName.trim()) {
               setProjectTitle(parsed.projectName.trim());
-              setGoodsDescription(parsed.projectName.trim());
             }
 
             if (!deliveryFound && parsed.deliverySchedule && parsed.deliverySchedule.trim()) {
@@ -311,7 +274,6 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
         currentOppId = match.id;
         setProjectRefNo(match.refNo);
         setProjectTitle(match.title);
-        setGoodsDescription(match.title);
         setProcuringEntity(`${match.procuringEntity.toUpperCase()}`);
         if (match.procuringEntityAddress || match.location) {
           setProcuringEntityAddress(match.procuringEntityAddress || match.location || '');
@@ -331,7 +293,6 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
       currentRefNo = first.refNo;
       setProjectRefNo(first.refNo);
       setProjectTitle(first.title);
-      setGoodsDescription(first.title);
       setProcuringEntity(`${first.procuringEntity.toUpperCase()}`);
       if (first.procuringEntityAddress || first.location) {
         setProcuringEntityAddress(first.procuringEntityAddress || first.location || '');
@@ -354,7 +315,6 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
     if (found) {
       setProjectRefNo(found.refNo);
       setProjectTitle(found.title);
-      setGoodsDescription(found.title);
       setProcuringEntity(`${found.procuringEntity.toUpperCase()}`);
       if (found.procuringEntityAddress || found.location) {
         setProcuringEntityAddress(found.procuringEntityAddress || found.location || '');

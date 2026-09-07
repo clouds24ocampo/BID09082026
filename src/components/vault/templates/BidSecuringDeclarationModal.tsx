@@ -3,15 +3,13 @@ import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import DocumentQrCode from '../../common/DocumentQrCode';
-import html2canvas from 'html2canvas';
 import {
   X,
   Printer,
   Download,
   Building2,
   FileSignature,
-  ShieldCheck,
-  Award
+  ShieldCheck
 } from 'lucide-react';
 
 export interface BidSecuringDeclarationModalProps {
@@ -39,8 +37,8 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
   const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || 'Juan Dela Cruz');
   const [signatoryTitle, setSignatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'Authorized Managing Officer / President');
   const [validityDays, setValidityDays] = useState('120 Calendar Days');
-  const [govIdType, setGovIdType] = useState('Passport / Driver\'s License');
-  const [govIdNumber, setGovIdNumber] = useState('P-109283029A');
+  const [govIdType] = useState('Passport / Driver\'s License');
+  const [govIdNumber] = useState('P-109283029A');
   const [notaryPlace, setNotaryPlace] = useState('');
   const [jurisdictionType, setJurisdictionType] = useState<'CITY' | 'MUNICIPALITY' | 'BOTH'>('BOTH');
 
@@ -55,9 +53,9 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
   const [guaranteeAmount, setGuaranteeAmount] = useState('₱ 500,000.00 (Two Percent of Approved Budget for the Contract)');
   const [guaranteeRefNumber, setGuaranteeRefNumber] = useState('BG-2026-908123-MANILA');
   const [foreignBankOfficer, setForeignBankOfficer] = useState('Robert Smith');
-  const [foreignBankOfficerTitle, setForeignBankOfficerTitle] = useState('Vice President - International Trade Finance');
+  const [foreignBankOfficerTitle] = useState('Vice President - International Trade Finance');
   const [localBankOfficer, setLocalBankOfficer] = useState('Maria Santos');
-  const [localBankOfficerTitle, setLocalBankOfficerTitle] = useState('Senior Vice President - Trade Finance & Confirmation Division');
+  const [localBankOfficerTitle] = useState('Senior Vice President - Trade Finance & Confirmation Division');
 
   // Opportunity Projects Auto-Fill Integration
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);

@@ -16,9 +16,7 @@ import {
   Sparkles,
   FileSpreadsheet,
   Type,
-  Lock,
-  Calendar,
-  Zap
+  Lock
 } from 'lucide-react';
 
 export interface ScheduleItem {
@@ -181,8 +179,6 @@ export const getGrandTotalWithServicesDisplay = (itemList: ScheduleItem[], perce
   return `PHP ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-const defaultDelivery = '30 Calendar Days upon receipt of NTP';
-
 interface PageRow {
   item: ScheduleItem;
   index: number;
@@ -225,7 +221,6 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
 
   // Items State (Mirrored and Synchronized with Section VI & Bid Documents)
   const [items, setItems] = useState<ScheduleItem[]>([]);
-  const [globalDeliveryDays, setGlobalDeliveryDays] = useState<string>('30 Calendar Days');
 
   // Services / Logistics Layer State (Mirrored Read-Only from Section VI)
   const [servicesDescription, setServicesDescription] = useState<string>(DEFAULT_SERVICES_DESCRIPTION);
@@ -273,17 +268,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     }
   };
 
-  const handleDeliveryChange = (index: number, newDelivered: string) => {
-    const updated = items.map((it, idx) => (idx === index ? { ...it, delivered: newDelivered } : it));
-    setItems(updated);
-    saveItemsToSharedStorage(updated);
-  };
 
-  const handleApplyDeliveryToAll = (newDelivered: string) => {
-    const updated = items.map((it) => ({ ...it, delivered: newDelivered }));
-    setItems(updated);
-    saveItemsToSharedStorage(updated);
-  };
 
   // Load real saved opportunity projects from Opportunity Finder
   useEffect(() => {

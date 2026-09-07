@@ -3,16 +3,12 @@ import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import DocumentQrCode from '../../common/DocumentQrCode';
-import html2canvas from 'html2canvas';
 import {
   X,
   Printer,
   Download,
   Building2,
-  FileSignature,
-  CheckCircle2,
-  AlertTriangle,
-  Lock
+  FileSignature
 } from 'lucide-react';
 
 export interface OmnibusSwornStatementModalProps {
@@ -40,7 +36,7 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
   const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || 'Juan Dela Cruz');
   const [signatoryTitle, setSignatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'Authorized Managing Officer / President');
   const [maritalStatus, setMaritalStatus] = useState<'single' | 'married' | 'widow' | 'widower'>('single');
-  const [affiantNationality, setAffiantNationality] = useState('Filipino');
+  const [affiantNationality] = useState('Filipino');
   const [govIdType, setGovIdType] = useState('Passport / Driver\'s License');
   const [govIdNumber, setGovIdNumber] = useState('P-109283029A');
   const [notaryPlace, setNotaryPlace] = useState('');

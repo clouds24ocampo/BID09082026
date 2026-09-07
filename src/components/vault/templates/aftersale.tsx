@@ -11,11 +11,9 @@ import {
   Download,
   Plus,
   Trash2,
-  Building2,
   ShieldCheck,
   CheckCircle2,
   RotateCcw,
-  Edit3,
   Lock
 } from 'lucide-react';
 
@@ -702,7 +700,7 @@ export const AfterSaleModalContent: React.FC<AfterSaleModalProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-300">
-                    {lots.map((lot, idx) => (
+                    {lots.map((lot) => (
                       <tr key={lot.id} className="hover:bg-slate-50 transition">
                         <td className="py-1.5 px-3 border-r border-slate-300 text-center font-mono font-bold text-slate-950 text-[10px]">
                           <input

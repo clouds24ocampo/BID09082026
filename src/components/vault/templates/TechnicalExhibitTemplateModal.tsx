@@ -16,8 +16,7 @@ import {
   Trash2,
   FileSignature,
   Move,
-  RotateCcw,
-  Lock
+  RotateCcw
 } from 'lucide-react';
 
 export interface TechnicalExhibitTemplateModalProps {
@@ -254,9 +253,9 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo);
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
-  const [dateTimeSubmitted, setDateTimeSubmitted] = useState('March 19, 2026');
-  const [companyName, setCompanyName] = useState(tenant?.companyName || 'Bidding Entity Corporate Name');
-  const [companyAddress, setCompanyAddress] = useState(tenant?.address || 'Metro Manila, Philippines');
+  const [dateTimeSubmitted] = useState('March 19, 2026');
+  const [companyName] = useState(tenant?.companyName || 'Bidding Entity Corporate Name');
+  const [companyAddress] = useState(tenant?.address || 'Metro Manila, Philippines');
   const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || 'Authorized Signatory Name');
   const [signatoryTitle, setSignatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'President / General Manager');
   const [signatoryTin, setSignatoryTin] = useState(tenant?.authorizedSignatory?.tin || '123-456-789-000');
@@ -378,10 +377,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
 
   // Notary Public State
   const [notaryCity, setNotaryCity] = useState('');
-  const [docNo, setDocNo] = useState('');
-  const [pageNo, setPageNo] = useState('');
-  const [bookNo, setBookNo] = useState('');
-  const [seriesYear, setSeriesYear] = useState('2026');
+  const [seriesYear] = useState(new Date().getFullYear().toString());
 
   // Load real saved opportunity projects
   useEffect(() => {
@@ -565,26 +561,6 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
     setKeyPersonnelPages(prev => [...prev, { id: newPageId, cols: newPageCols }]);
   };
 
-  const removeKeyPersonnelPage = (pageId: string) => {
-    if (keyPersonnelPages.length <= 1) return;
-    setKeyPersonnelPages(prev => prev.filter(p => p.id !== pageId));
-  };
-
-  const updateKeyPersonnelColInPage = (pageId: string, colId: string, field: string, value: string) => {
-    setKeyPersonnelPages(prevPages => prevPages.map(page => {
-      if (page.id !== pageId) return page;
-      const updatedCols = page.cols.map(col => {
-        if (col.id !== colId) return col;
-        if (field.startsWith('edu.')) {
-          const eduKey = field.replace('edu.', '');
-          return { ...col, education: { ...col.education, [eduKey]: value } };
-        }
-        return { ...col, [field]: value };
-      });
-      return { ...page, cols: updatedCols };
-    }));
-  };
-
   const addKeyPersonnelColToPage = (pageId: string, isSpecial: boolean = false) => {
     const newId = `col-${Date.now()}`;
     const newCol: KeyPersonnelMatrixCol = isSpecial ? {
@@ -614,13 +590,6 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
     setKeyPersonnelPages(prevPages => prevPages.map(page => {
       if (page.id !== pageId) return page;
       return { ...page, cols: [...page.cols, newCol] };
-    }));
-  };
-
-  const removeKeyPersonnelColFromPage = (pageId: string, colId: string) => {
-    setKeyPersonnelPages(prevPages => prevPages.map(page => {
-      if (page.id !== pageId) return page;
-      return { ...page, cols: page.cols.filter(c => c.id !== colId) };
     }));
   };
 
@@ -1262,7 +1231,6 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
                           if (!parent) return null;
 
                           const cardWidth = 288; // w-72 = 288px
-                          const cardHeight = child.level > 1 ? 130 : 110;
 
                           const px = parent.x + cardWidth / 2;
                           const py = parent.y + (parent.level > 1 ? 130 : 110);

@@ -5,32 +5,18 @@ import VaultErrorBoundary from '../common/VaultErrorBoundary';
 import { savePdfData, loadPdfData } from '../../utils/vaultIndexedDB';
 import {
   Search,
-  Filter,
   Building2,
-  Clock,
-  ShieldCheck,
   Plus,
-  ExternalLink,
-  DollarSign,
-  MapPin,
   FileText,
   CheckCircle2,
   Upload,
   AlertCircle,
-  Calendar,
   X,
-  ChevronDown,
-  ChevronUp,
   Eye,
   Download,
   Edit3,
   Trash2,
   RefreshCw,
-  Hash,
-  Award,
-  Mail,
-  Phone,
-  UserCheck,
   Lock,
   FileCheck
 } from 'lucide-react';
@@ -47,9 +33,6 @@ const parsePhpCurrency = (val: string): number => {
   const num = parseFloat(cleaned);
   return isNaN(num) ? 0 : num;
 };
-
-const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-const isValidPhone = (phone: string) => /^[\d\+\-\s\(\)]{7,20}$/.test(phone.trim());
 
 const readFileAsDataUrl = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {

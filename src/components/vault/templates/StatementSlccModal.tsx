@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
 import { savePdfData, loadPdfData } from '../../../utils/vaultIndexedDB';
-import { PDFDocument, degrees } from 'pdf-lib';
+import { PDFDocument } from 'pdf-lib';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import html2canvas from 'html2canvas';
@@ -11,7 +11,6 @@ import {
   Printer,
   Plus,
   Trash2,
-  Upload,
   Download,
   CheckCircle2,
   FileText,
@@ -22,9 +21,7 @@ import {
   Building2,
   Calendar,
   DollarSign,
-  ShieldCheck,
-  Clock,
-  Lock
+  ShieldCheck
 } from 'lucide-react';
 
 export interface SlccContractRow {

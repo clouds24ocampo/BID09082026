@@ -11,14 +11,9 @@ import {
   Printer,
   Download,
   Building2,
-  FileSignature,
-  DollarSign,
-  Lock,
   Edit3,
   HardHat,
-  Percent,
   CheckCircle2,
-  Calendar,
   ShieldCheck,
   FolderKanban
 } from 'lucide-react';
@@ -38,14 +33,6 @@ export interface BidFormForInfrastructureModalProps {
   onSaveAndComplete?: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string) => void;
   onClose: () => void;
 }
-
-// Helper to format currency number with commas and 2 decimal places (e.g. 1,000,000.00)
-const formatCurrency = (num: number): string => {
-  return num.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-};
 
 const parseNum = (val: string): number => {
   if (!val) return 0;
@@ -90,11 +77,8 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
 
   // Corporate Entity & Signatory
   const companyName = tenant?.companyName || '';
-  const [companyAddress, setCompanyAddress] = useState(tenant?.address || '');
-  const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || 'Authorized Managing Officer');
-  const [signatoryTitle, setSignatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'Authorized Managing Officer / President');
-  const [writtenAuthority, setWrittenAuthority] = useState("Board Resolution & Secretary's Certificate");
-  const [pcabLicenseNo, setPcabLicenseNo] = useState((tenant as any)?.pcabLicenseNo || 'PCAB-LIC-2026-AAA');
+  const [signatoryName] = useState(tenant?.authorizedSignatory?.name || 'Authorized Managing Officer');
+  const [signatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'Authorized Managing Officer / President');
 
   // Performance Security Parameters
   const [performanceSecurityOption, setPerformanceSecurityOption] = useState<'PERFORMANCE_BOND' | 'PSD' | 'MANAGERS_CHECK'>('PERFORMANCE_BOND');
@@ -116,7 +100,6 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
 
   // Discounts Offered
   const [discountsOffered, setDiscountsOffered] = useState('No discounts offered');
-  const [hasDiscounts, setHasDiscounts] = useState(false);
 
   // Financial Bid Amount
   const [totalBidAmountFigures, setTotalBidAmountFigures] = useState('0.00');

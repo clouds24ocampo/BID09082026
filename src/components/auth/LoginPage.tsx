@@ -8,7 +8,6 @@ import {
   Mail,
   Eye,
   EyeOff,
-  ArrowRight,
   Briefcase,
   FileCheck,
   Sparkles,
@@ -16,8 +15,7 @@ import {
   RefreshCw,
   Rocket,
   Globe2,
-  Radio,
-  Compass
+  Radio
 } from 'lucide-react';
 
 interface LoginPageProps {

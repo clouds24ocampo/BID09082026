@@ -9,13 +9,9 @@ import {
   Download,
   Building2,
   TrendingUp,
-  Calculator,
-  Calendar,
   Loader2,
-  Save,
   CheckCircle2,
-  FolderKanban,
-  Lock
+  FolderKanban
 } from 'lucide-react';
 
 export interface CashFlowByQuarterModalProps {
@@ -54,7 +50,7 @@ export const CashFlowByQuarterModal: React.FC<CashFlowByQuarterModalProps> = ({
   const [dateSubmitted, setDateSubmitted] = useState(todayStr);
 
   // Total Contract Price (Clean Slate)
-  const [totalContractPrice, setTotalContractPrice] = useState<string>('');
+  const [, setTotalContractPrice] = useState<string>('');
 
   // Signatory & Enterprise
   const [companyName, setCompanyName] = useState(tenant?.companyName || '');
@@ -139,26 +135,6 @@ export const CashFlowByQuarterModal: React.FC<CashFlowByQuarterModalProps> = ({
     setQ4CashFlow('');
   }, [tenant?.id, projectScopeKey]);
 
-  // Save changes to localStorage
-  const saveCashFlowData = (overrideData?: Record<string, string>) => {
-    if (!tenant?.id || !projectScopeKey) return;
-    const storageKey = `bidocs_cash_flow_${tenant.id}_${projectScopeKey}`;
-    const payload = {
-      totalContractPrice,
-      q1Accomplishment,
-      q1CashFlow,
-      q2Accomplishment,
-      q2CashFlow,
-      q3Accomplishment,
-      q3CashFlow,
-      q4Accomplishment,
-      q4CashFlow,
-      ...overrideData
-    };
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(payload));
-    } catch (_) {}
-  };
 
   useEffect(() => {
     if (tenant) {

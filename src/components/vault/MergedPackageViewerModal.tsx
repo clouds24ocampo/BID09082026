@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PackageItem, FolderCopyType } from '../bids/bidpackage';
 import { DocumentVaultItem, Tenant } from '../../types';
 import { DocumentCoverPage } from './DocumentCoverPage';
 import { 
   buildMergedThreeLayerPdfDataUrl, 
-  exportMergedThreeLayerPdf, 
   ExportDocumentUnit 
 } from '../../utils/pdfExportEngine';
 import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
@@ -20,12 +19,9 @@ import {
   Loader2, 
   Layers, 
   Eye, 
-  Printer, 
   FileStack, 
   Sparkles, 
   Copy,
-  ChevronRight,
-  ShieldCheck,
   Maximize2
 } from 'lucide-react';
 import DocumentQrCode from '../common/DocumentQrCode';
@@ -161,7 +157,6 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
 
       if (!targetVaultDocId && vaultDocs && vaultDocs.length > 0) {
         const dName = (doc.documentName || '').toLowerCase();
-        const dCode = (doc.code || '').toUpperCase();
         const match = vaultDocs.find(v =>
           (v.id && (v.id === doc.id || v.id === doc.code || v.id === cleanDocId)) ||
           ((v as any).code && doc.code && (v as any).code.toLowerCase() === doc.code.toLowerCase()) ||

@@ -148,7 +148,7 @@ export const ContractorsMajorEquipment: React.FC<ContractorsMajorEquipmentProps>
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '');
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle || '');
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity || '');
-  const [solicitationNumber, setSolicitationNumber] = useState(propSolicitationNumber || '');
+  const [, setSolicitationNumber] = useState(propSolicitationNumber || '');
   const [dateTimeSubmitted, setDateTimeSubmitted] = useState(propDateTimeSubmitted || todayStr);
 
   const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || '');

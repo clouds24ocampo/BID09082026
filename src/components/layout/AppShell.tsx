@@ -6,24 +6,20 @@ import {
   Search, 
   FileCheck, 
   FolderKanban, 
-  Download, 
   Settings, 
   LogOut, 
   Bell, 
   ShieldCheck, 
-  User as UserIcon, 
   ChevronDown, 
-  Sparkles,
-  Layers,
-  Menu,
-  X,
-  Lock,
-  Eye,
-  EyeOff,
-  AlertTriangle,
-  Key,
-  CheckCircle2,
-  Trash2
+  Menu, 
+  X, 
+  Lock, 
+  Eye, 
+  EyeOff, 
+  AlertTriangle, 
+  Key, 
+  CheckCircle2, 
+  Trash2 
 } from 'lucide-react';
 
 interface AppShellProps {

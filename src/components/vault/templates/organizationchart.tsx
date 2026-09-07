@@ -16,12 +16,7 @@ import {
   Workflow,
   Building2,
   Award,
-  ShieldCheck,
-  Zap,
-  Radio,
-  Network,
-  Wrench,
-  Lock
+  Wrench
 } from 'lucide-react';
 import DocumentQrCode from '../../common/DocumentQrCode';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
@@ -214,7 +209,7 @@ export const OrganizationalChartModal: React.FC<OrganizationalChartModalProps> =
   const [procuringEntity, setProcuringEntity] = useState(
     activeProcuringEntity || 'Department of Information and Communications Technology (DICT)'
   );
-  const [solicitationNumber, setSolicitationNumber] = useState(initialSolNo || 'SOL-DICT-2026-089');
+  const [, setSolicitationNumber] = useState(initialSolNo || 'SOL-DICT-2026-089');
   const [dateTimeSubmitted, setDateTimeSubmitted] = useState(initialDateTime || '');
 
   // Signatory details

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DocumentVaultItem, Tenant } from '../../types';
 import { DocumentCoverPage } from './DocumentCoverPage';
 import { exportMergedThreeLayerPdf, ExportDocumentUnit } from '../../utils/pdfExportEngine';
@@ -11,17 +11,11 @@ import {
   ArrowUp, 
   ArrowDown, 
   CheckCircle2, 
-  FileText, 
   GripVertical,
   ShieldCheck,
-  Plus,
   FolderPlus,
-  Trash2,
-  SlidersHorizontal,
   Download,
-  Loader2,
-  Eye,
-  Maximize2
+  Loader2
 } from 'lucide-react';
 
 interface MergedPdfViewerModalProps {

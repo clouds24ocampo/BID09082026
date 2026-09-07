@@ -11,7 +11,7 @@ interface PdfPreviewModalProps {
   hidePrintExport?: boolean; // Set to true for Document Vault tab to restrict to View only
 }
 
-export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant, onClose, pdfDataUrl, hidePrintExport = false }) => {
+export const PdfPreviewModal: React.FC<PdfPreviewModalProps> = ({ item, tenant: _tenant, onClose, pdfDataUrl, hidePrintExport: _hidePrintExport = false }) => {
   const [zoomLevel, setZoomLevel] = useState(100);
 
   // Use the in-memory pdfDataUrl first, then fall back to the item's stored value

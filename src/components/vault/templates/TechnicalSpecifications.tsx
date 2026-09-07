@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
-import { buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit, PdfAttachmentSource, generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import { buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit, PdfAttachmentSource } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import { autoFitPageChunks, calculateRowHeight, getAutoFitTypographyClass } from '../../../utils/autoFitEngine';
 import { formatDescriptionText } from './SectionViScheduleOfRequirements';
@@ -161,7 +161,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
   const [solicitationNumber, setSolicitationNumber] = useState('');
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
-  const [areaOfDelivery, setAreaOfDelivery] = useState('');
+  const [, setAreaOfDelivery] = useState('');
   const [dateTimeSubmitted, setDateTimeSubmitted] = useState<string>(getNowDateTimeString());
   const projectScopeKey = projectRefNo || selectedOppId || philgepsRefNo || activeProjectRefNo;
 

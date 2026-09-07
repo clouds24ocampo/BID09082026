@@ -10,26 +10,10 @@ import {
   X,
   Printer,
   Download,
-  Building2,
   Plus,
   Trash2,
-  Table,
-  RotateCcw,
   Calculator,
-  HardHat,
-  PackageCheck,
-  Truck,
-  Users,
-  Layers,
-  RefreshCw,
-  FileText,
-  ShieldCheck,
   CheckCircle2,
-  Lock,
-  Calendar,
-  MapPin,
-  FileCode,
-  DollarSign,
   FolderKanban,
   FileSignature
 } from 'lucide-react';
@@ -158,8 +142,6 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
-  // Active Editor Section Tab
-  const [activeTab, setActiveTab] = useState<'HEADER' | 'MATERIALS' | 'LABOR' | 'LOGISTICS' | 'EQUIPMENT' | 'CONFORME'>('MATERIALS');
 
   // Fixed Read-Only Statutory Header Metadata (Derived from Official Project Creation)
   const [projectName, setProjectName] = useState(activeProjectTitle || 'PROCUREMENT AND INSTALLATION OF CCTV AT PUROK 1-6');
@@ -703,7 +685,6 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
 
   // Labor Row Manipulations
   const handleAddLabor = () => {
-    setActiveTab('LABOR');
     const nextNo = labors.length + 1;
     const updated = [
       ...labors,
@@ -725,7 +706,6 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
 
   // Logistics & Mobilization Row Manipulations
   const handleAddLogistics = () => {
-    setActiveTab('LOGISTICS');
     const nextNo = logistics.length + 1;
     const updated = [
       ...logistics,
@@ -747,7 +727,6 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
 
   // Equipment Row Manipulations
   const handleAddEquipment = () => {
-    setActiveTab('EQUIPMENT');
     setNoEquipmentNeeded(false);
     const nextNo = equipments.length + 1;
     const updated = [
@@ -768,15 +747,6 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
     saveToLocalStorage(materials, labors, logistics, updated);
   };
 
-  const handleResetToCleanSlate = () => {
-    setMaterials([]);
-    setLabors([]);
-    setLogistics([]);
-    setEquipments([]);
-    setNoEquipmentNeeded(true);
-    setActiveTab('MATERIALS');
-    saveToLocalStorage([], [], [], []);
-  };
 
   // Calculation Formula Mechanics
   const computeMaterialTotal = (m: MaterialEstimateRow) => (m.quantity || 0) * (m.unitPrice || 0);

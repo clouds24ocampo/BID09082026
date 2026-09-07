@@ -37,31 +37,6 @@ export interface BillOfQuantitiesModalProps {
   onClose: () => void;
 }
 
-// Fallback Section VI Items if no custom items are found in storage
-const DEFAULT_SECTION_VI_ITEMS = [
-  {
-    id: '1',
-    description: 'Enterprise Server Rack Systems with High-Availability Redundancy, Dual Hot-Swappable 1200W Power Supplies, Rail Kits, and 5-Year OEM On-Site Warranty Support',
-    unit: 'Unit',
-    quantity: 5,
-    unitPrice: 500000.00
-  },
-  {
-    id: '2',
-    description: 'Managed Layer 3 Core Network Switches (48-Port PoE+ 740W, 4x 10G SFP+ Uplinks, Stacking Module, Redundant Power Module, Advanced L3 Routing License)',
-    unit: 'Unit',
-    quantity: 10,
-    unitPrice: 120000.00
-  },
-  {
-    id: '3',
-    description: 'Uninterruptible Power Supply (UPS) 10kVA Online Double Conversion Tower/Rack Mountable with Extended Battery Module (EBM) and Network Management Card',
-    unit: 'Unit',
-    quantity: 4,
-    unitPrice: 200000.00
-  }
-];
-
 export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
   tenant,
   activeProjectRefNo,
@@ -80,7 +55,7 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
   const [companyName, setCompanyName] = useState(tenant?.companyName || '');
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '');
   const [dateSubmitted, setDateSubmitted] = useState('March 19, 2026');
-  const [totalLabel, setTotalLabel] = useState('Total Calculated Bid Price (Delivered Final Destination)');
+  const [totalLabel] = useState('Total Calculated Bid Price (Delivered Final Destination)');
 
   // BOQ Materials Items State
   const [boqRows, setBoqRows] = useState<BoqItemRow[]>([]);
@@ -90,7 +65,7 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
   const [logisticsLumpSum, setLogisticsLumpSum] = useState<number>(0);
   const [equipmentLumpSum, setEquipmentLumpSum] = useState<number>(0);
   const [isSyncedFromDetailedEstimates, setIsSyncedFromDetailedEstimates] = useState<boolean>(false);
-  const [includeLumpSumsInTable, setIncludeLumpSumsInTable] = useState<boolean>(true);
+  const [includeLumpSumsInTable] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState(false);
 
   // Helper to parse numbers safely

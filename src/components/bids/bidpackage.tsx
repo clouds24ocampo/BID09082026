@@ -36,7 +36,6 @@ import {
   Copy,
   CheckSquare,
   Square,
-  FileCheck2,
   ListPlus,
   ArrowUp,
   ArrowDown,
@@ -364,11 +363,8 @@ export const BidPackageBuilderView: React.FC = () => {
   // Memoized batch readiness map for all statutory docs (0ms instantaneous lookup)
   const docReadinessMap = React.useMemo(() => {
     const currentRef = (projectRefNo || '').trim().toLowerCase();
-    const currentTitle = (projectTitle || '').trim().toLowerCase();
     const ref = projectRefNo || '';
-    const opp = selectedOppId || '';
     const currentRefDigits = currentRef.replace(/[^0-9]/g, '');
-    const currentOppId = (selectedOppId || '').trim().toLowerCase();
 
     const map: Record<string, { isReady: boolean; vaultId?: string }> = {};
 
@@ -874,23 +870,7 @@ export const BidPackageBuilderView: React.FC = () => {
     setTimeout(() => setShowAutoSyncSuccess(false), 3500);
   };
 
-  // Quick action: Select all legal documents
-  const handleSelectAllLegalDocs = () => {
-    const originalItems = packageItems.filter(item => item.folderCopy === 'ORIGINAL');
-    const legalIds = statutoryDocsList
-      .filter(d => d.category === 'LEGAL' && d.envelope === 'ENVELOPE_1')
-      .filter(d => {
-        const isAlreadyAdded = originalItems.some(
-          item => item.envelope === 'ENVELOPE_1' && 
-                  item.documentName.toLowerCase() === d.name.toLowerCase()
-        );
-        return !isAlreadyAdded;
-      })
-      .map(d => d.id);
 
-    setSelectedDocIdsToAdd(legalIds);
-    setCompletedDocFilter('LEGAL');
-  };
 
   // Quick action: Select all ready documents for current envelope
   const handleSelectAllReadyInEnvelope = () => {
@@ -1288,7 +1268,6 @@ export const BidPackageBuilderView: React.FC = () => {
     let targetVaultDocId = doc.vaultDocId;
     if (!preloadedDataUrl) {
       const dName = (doc.documentName || '').toLowerCase();
-      const dCode = (doc.code || '').toUpperCase();
       const match = vaultDocs.find(v =>
         (targetVaultDocId && v.id === targetVaultDocId) ||
         (v.id && (v.id === doc.id || v.id === doc.code || v.id === cleanDocId)) ||
@@ -2008,8 +1987,6 @@ export const BidPackageBuilderView: React.FC = () => {
               </div>
             ) : (
               filteredItems.map((doc, idx) => {
-                const linkedVaultDoc = vaultDocs.find(v => v.id === doc.vaultDocId);
-
                 return (
                   <div
                     key={doc.id}

@@ -4,11 +4,8 @@ import {
   Building2, 
   Palette, 
   Award, 
-  ShieldCheck, 
   Save, 
-  CheckCircle2, 
-  FileText, 
-  Lock 
+  CheckCircle2 
 } from 'lucide-react';
 
 const PRESET_COLORS = [

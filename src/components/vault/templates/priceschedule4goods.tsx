@@ -11,7 +11,6 @@ import {
   Download,
   Building2,
   Table,
-  RotateCcw,
   Calculator,
   Lock,
   RefreshCw,
@@ -38,28 +37,6 @@ export interface PriceScheduleModalProps {
   onSaveAndComplete?: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string) => void;
   onClose: () => void;
 }
-
-// Fallback Section VI Items if no custom items are found in storage
-const DEFAULT_SECTION_VI_ITEMS = [
-  {
-    id: '1',
-    description: 'Enterprise Server Rack Systems with High-Availability Redundancy, Dual Hot-Swappable 1200W Power Supplies, Rail Kits, and 5-Year OEM On-Site Warranty Support',
-    quantity: 5,
-    unitCost: 500000.00
-  },
-  {
-    id: '2',
-    description: 'Managed Layer 3 Core Network Switches (48-Port PoE+ 740W, 4x 10G SFP+ Uplinks, Stacking Module, Redundant Power Module, Advanced L3 Routing License)',
-    quantity: 10,
-    unitCost: 120000.00
-  },
-  {
-    id: '3',
-    description: 'Uninterruptible Power Supply (UPS) 10kVA Online Double Conversion Tower/Rack Mountable with Extended Battery Module (EBM) and Network Management Card',
-    quantity: 4,
-    unitCost: 200000.00
-  }
-];
 
 export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
   tenant,

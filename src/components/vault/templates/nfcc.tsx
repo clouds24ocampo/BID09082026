@@ -9,12 +9,10 @@ import {
   Printer,
   Download,
   Building2,
-  ShieldCheck,
   Calculator,
   CheckCircle2,
   FileText,
-  Edit3,
-  Lock
+  Edit3
 } from 'lucide-react';
 
 export interface NfccModalProps {
@@ -134,7 +132,7 @@ const fetchOngoingContractsTotal = (tenantId?: string, projectRefNo?: string, op
 };
 
 export const NfccModalContent: React.FC<NfccModalProps> = ({
-  item,
+  item: _item,
   tenant,
   activeProjectRefNo = '',
   activeProjectTitle = '',

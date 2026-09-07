@@ -2346,7 +2346,6 @@ export async function generateOmnibusSwornStatementPdf(ctx: DocResolveContext): 
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
   const signatoryName = (ctx.tenant?.authorizedSignatory?.name || 'AUTHORIZED MANAGING OFFICER').toUpperCase();
-  const signatoryTitle = ctx.tenant?.authorizedSignatory?.title || 'President / General Manager';
   const companyName = ctx.tenant?.companyName || 'Bidding Enterprise Corporation';
   const companyAddress = ctx.tenant?.address || 'Metro Manila, Philippines';
 
@@ -2418,10 +2417,6 @@ export async function generateBidSecuringDeclarationPdf(ctx: DocResolveContext):
   const pdfDoc = await PDFDocument.create();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
-
-  const signatoryName = (ctx.tenant?.authorizedSignatory?.name || 'AUTHORIZED MANAGING OFFICER').toUpperCase();
-  const companyName = ctx.tenant?.companyName || 'Bidding Enterprise Corporation';
-  const companyAddress = ctx.tenant?.address || 'Metro Manila, Philippines';
 
   const page = pdfDoc.addPage(LEGAL_PORTRAIT);
   drawOfficialHeader(

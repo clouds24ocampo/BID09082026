@@ -1,24 +1,17 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { 
-  Building2, 
   Upload, 
-  Palette, 
-  ShieldCheck, 
   Award, 
   Save, 
   CheckCircle2, 
   Image as ImageIcon,
   Trash2,
-  Mail,
-  Phone,
   MapPin,
   UserCheck,
-  FileText,
   Eye,
   EyeOff,
   Key,
-  Lock,
   RotateCcw
 } from 'lucide-react';
 
