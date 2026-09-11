@@ -1,0 +1,6 @@
+.agent/**
+.agents/**
+.claude/**
+node_modules/**
+dist/**
+*.log
