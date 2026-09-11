@@ -575,84 +575,142 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
     }
   };
 
-  // Section VI Target Amount: Strictly derived from the Section VI Service / Installation / Workmanship / Maintenance / Warranty amount (e.g. Row 14)
+  // Section VI Target Amount: Strictly derived from the Section VI Service / Installation / Workmanship / Maintenance / Warranty amount (Row items.length + 1)
   const getSectionViTargetAmount = (): number => {
     const tenantKey = tenant?.id || 'default';
     const scopeKey = projectRefNo || activeProjectRefNo || selectedOppId;
 
-    // 1. Check if Section VI has a customServicesAmount in saved services config
+    // 1. Compute effective materials cost to evaluate percentage formulas
+    let effectiveMaterialsCost = materials.reduce((sum, m) => sum + (m.quantity || 0) * (m.unitPrice || 0), 0);
+
     const candidateServiceKeys = [
       scopeKey ? `bidocs_sec_vi_services_${tenantKey}_${scopeKey}` : '',
       selectedOppId ? `bidocs_sec_vi_services_${tenantKey}_${selectedOppId}` : '',
       projectRefNo ? `bidocs_sec_vi_services_${tenantKey}_${projectRefNo}` : ''
     ].filter(Boolean);
 
-    for (const sKey of candidateServiceKeys) {
-      const rawSvc = localStorage.getItem(sKey);
-      if (rawSvc) {
-        try {
-          const parsedSvc = JSON.parse(rawSvc);
-          if (parsedSvc && parsedSvc.customAmount) {
-            const clean = parseFloat(`${parsedSvc.customAmount}`.replace(/[^0-9.]/g, ''));
-            if (!isNaN(clean) && clean > 0) return clean;
-          }
-        } catch (_) {}
-      }
-    }
-
-    // 2. Check if any item in materials is a Service / Labor / Installation / Warranty / Maintenance / Lot / Lump Sum item
-    const isServiceOrLumpSumItem = (m: MaterialEstimateRow): boolean => {
-      const desc = (m.description || '').toLowerCase();
-      const u = (m.unit || '').toLowerCase();
-      return (
-        desc.includes('workmanship') ||
-        desc.includes('preventive maintenance') ||
-        desc.includes('service and technical support') ||
-        desc.includes('technical support') ||
-        desc.includes('installation') ||
-        desc.includes('warranty') ||
-        desc.includes('commissioning') ||
-        desc.includes('cable pulling') ||
-        desc.includes('rough-in') ||
-        desc.includes('service agreement') ||
-        desc.includes('labor') ||
-        desc.includes('services') ||
-        desc.includes('lump sum') ||
-        (u === 'lot' && (desc.includes('service') || desc.includes('work') || desc.includes('maintenance') || desc.includes('warranty') || desc.includes('install')))
-      );
-    };
-
-    const serviceItem = materials.find(m => isServiceOrLumpSumItem(m));
-    if (serviceItem) {
-      const itemTotal = computeMaterialTotal(serviceItem);
-      if (itemTotal > 0) return itemTotal;
-      if (serviceItem.unitPrice && serviceItem.unitPrice > 0) return serviceItem.unitPrice;
-    }
-
-    // 3. Also check the saved raw Section VI items if not found in materials
     const secViKeys = [
       scopeKey ? `bidocs_sec_vi_${tenantKey}_${scopeKey}` : '',
       selectedOppId ? `bidocs_sec_vi_${tenantKey}_${selectedOppId}` : '',
       projectRefNo ? `bidocs_sec_vi_${tenantKey}_${projectRefNo}` : ''
     ].filter(Boolean);
 
+    // If materials array in Detailed Estimates has not loaded prices or items yet, derive from saved Section VI items
+    if (effectiveMaterialsCost === 0) {
+      for (const k of secViKeys) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          try {
+            const secItems = JSON.parse(raw);
+            if (Array.isArray(secItems) && secItems.length > 0) {
+              let secSum = 0;
+              secItems.forEach((it: any) => {
+                const qtyStr = it.quantity || '1';
+                const qtyMatch = `${qtyStr}`.match(/([\d,.]+)\s*(.*)/);
+                const qty = qtyMatch ? parseFloat(qtyMatch[1].replace(/,/g, '')) || 0 : 0;
+                let unitAmt = 0;
+                if (it.unitAmount) {
+                  unitAmt = parseFloat(`${it.unitAmount}`.replace(/[^0-9.]/g, '')) || 0;
+                } else if (it.unitPrice) {
+                  unitAmt = parseFloat(`${it.unitPrice}`.replace(/[^0-9.]/g, '')) || 0;
+                }
+                if (it.total) {
+                  const tot = parseFloat(`${it.total}`.replace(/[^0-9.]/g, ''));
+                  if (!isNaN(tot) && tot > 0) {
+                    secSum += tot;
+                    return;
+                  }
+                }
+                secSum += (qty * unitAmt);
+              });
+              if (secSum > 0) {
+                effectiveMaterialsCost = secSum;
+                break;
+              }
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    // 2. Check saved Section VI services configuration
+    for (const sKey of candidateServiceKeys) {
+      const rawSvc = localStorage.getItem(sKey);
+      if (rawSvc) {
+        try {
+          const parsedSvc = JSON.parse(rawSvc);
+          if (parsedSvc) {
+            // A. If an explicit computedAmount was stored
+            if (typeof parsedSvc.computedAmount === 'number' && parsedSvc.computedAmount > 0) {
+              return parsedSvc.computedAmount;
+            }
+
+            // B. If a customAmount string or number was entered
+            if (parsedSvc.customAmount && `${parsedSvc.customAmount}`.trim() !== '') {
+              const customStr = `${parsedSvc.customAmount}`.trim();
+              if (customStr.includes('%')) {
+                const pct = parseFloat(customStr.replace('%', ''));
+                if (!isNaN(pct) && pct > 0 && effectiveMaterialsCost > 0) {
+                  return effectiveMaterialsCost * (pct / 100);
+                }
+              } else {
+                const clean = parseFloat(customStr.replace(/[^0-9.]/g, ''));
+                if (!isNaN(clean) && clean > 0) {
+                  return clean;
+                }
+              }
+            }
+
+            // C. If a percentage was entered / configured (default 35%)
+            const pct = typeof parsedSvc.percentage === 'number'
+              ? parsedSvc.percentage
+              : parsedSvc.percentage
+                ? parseFloat(`${parsedSvc.percentage}`)
+                : NaN;
+            if (!isNaN(pct) && pct > 0 && effectiveMaterialsCost > 0) {
+              return effectiveMaterialsCost * (pct / 100);
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 3. Check if any item in materials is an EXPLICIT Service / Labor / Installation item
+    const isExplicitServiceItem = (desc: string): boolean => {
+      const d = desc.toLowerCase();
+      return (
+        d.includes('workmanship') ||
+        d.includes('preventive maintenance') ||
+        d.includes('service and technical support') ||
+        d.includes('technical support') ||
+        d.includes('installation') ||
+        d.includes('warranty') ||
+        d.includes('commissioning') ||
+        d.includes('cable pulling') ||
+        d.includes('rough-in') ||
+        d.includes('rough-ins') ||
+        d.includes('service agreement') ||
+        d.includes('labor') ||
+        d.includes('logistics') ||
+        d.includes('services')
+      );
+    };
+
+    const explicitServiceMaterial = materials.find(m => isExplicitServiceItem(m.description || ''));
+    if (explicitServiceMaterial) {
+      const itemTotal = (explicitServiceMaterial.quantity || 0) * (explicitServiceMaterial.unitPrice || 0);
+      if (itemTotal > 0) return itemTotal;
+      if (explicitServiceMaterial.unitPrice && explicitServiceMaterial.unitPrice > 0) return explicitServiceMaterial.unitPrice;
+    }
+
+    // 4. Also check saved raw Section VI items for an explicit service row
     for (const k of secViKeys) {
       const raw = localStorage.getItem(k);
       if (raw) {
         try {
           const secItems = JSON.parse(raw);
           if (Array.isArray(secItems) && secItems.length > 0) {
-            const matched = secItems.find((it: any) => {
-              const desc = (it.description || '').toLowerCase();
-              return (
-                desc.includes('workmanship') ||
-                desc.includes('preventive maintenance') ||
-                desc.includes('service') ||
-                desc.includes('installation') ||
-                desc.includes('warranty') ||
-                desc.includes('labor')
-              );
-            });
+            const matched = secItems.find((it: any) => isExplicitServiceItem(it.description || ''));
             if (matched) {
               const amtStr = matched.total || matched.unitAmount || '';
               const clean = parseFloat(`${amtStr}`.replace(/[^0-9.]/g, ''));
@@ -663,14 +721,9 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
       }
     }
 
-    // 4. If no explicit service row exists, check the last item of materials if unit is Lot or qty is 1 Lot
-    if (materials.length > 0) {
-      const lastItem = materials[materials.length - 1];
-      const lastUnit = (lastItem.unit || '').toLowerCase();
-      if (lastUnit === 'lot' || lastUnit.includes('lot')) {
-        const lastTotal = computeMaterialTotal(lastItem);
-        if (lastTotal > 0) return lastTotal;
-      }
+    // 5. Section VI default standard fallback: If materials cost exists, Section VI defaults to 35%
+    if (effectiveMaterialsCost > 0) {
+      return effectiveMaterialsCost * 0.35;
     }
 
     return 0;

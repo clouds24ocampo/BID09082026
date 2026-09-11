@@ -1803,9 +1803,28 @@ export async function generateDetailedEstimatesPdf(ctx: DocResolveContext): Prom
     {}
   );
 
-  const directLabor = Number(estData.totalLabor || 3200000);
-  const directMaterials = Number(estData.totalMaterials || 9800000);
-  const directEquipment = Number(estData.totalEquipment || 1500000);
+  const calcMatFromList = Array.isArray(estData.materials) && estData.materials.length > 0
+    ? estData.materials.reduce((sum: number, m: any) => sum + (Number(m.quantity) || 0) * (Number(m.unitPrice) || 0), 0)
+    : undefined;
+  const calcLabFromList = Array.isArray(estData.labors) && estData.labors.length > 0
+    ? estData.labors.reduce((sum: number, l: any) => sum + (Number(l.noOfWorkers) || 0) * (Number(l.noOfDays) || 0) * (Number(l.dailyPrice) || 0), 0)
+    : undefined;
+  const calcEqFromList = Array.isArray(estData.equipments) && estData.equipments.length > 0
+    ? estData.equipments.reduce((sum: number, e: any) => sum + (Number(e.noOfDays) || 0) * (Number(e.dailyPrice) || 0), 0)
+    : 0;
+  const calcLogFromList = Array.isArray(estData.logistics) && estData.logistics.length > 0
+    ? estData.logistics.reduce((sum: number, lg: any) => sum + (Number(lg.noOfVehicles) || 0) * (Number(lg.noOfDays) || 0) * (Number(lg.dailyRate) || 0), 0)
+    : 0;
+
+  const hasUserData = estData.totalMaterialsCost !== undefined || estData.totalLaborCost !== undefined || calcMatFromList !== undefined || calcLabFromList !== undefined;
+
+  const calcEqAndLog = (Array.isArray(estData.equipments) && estData.equipments.length > 0) || (Array.isArray(estData.logistics) && estData.logistics.length > 0)
+    ? calcEqFromList + calcLogFromList
+    : undefined;
+
+  const directMaterials = Number(estData.totalMaterialsCost ?? estData.totalMaterials ?? calcMatFromList ?? (hasUserData ? 0 : 9800000));
+  const directLabor = Number(estData.totalLaborCost ?? estData.totalLabor ?? calcLabFromList ?? (hasUserData ? 0 : 3200000));
+  const directEquipment = Number(estData.totalEquipmentCost ?? estData.totalEquipment ?? calcEqAndLog ?? (hasUserData ? 0 : 1500000));
   const directCost = directLabor + directMaterials + directEquipment;
 
   const ocm = Number(estData.ocmAmount || directCost * 0.12);
@@ -3618,22 +3637,53 @@ export async function resolveDocumentPdfAttachment(
   const currentRefDigits = currentRef.replace(/[^0-9]/g, '');
   const scopeKey = ctx.projectRefNo || ctx.activeProject?.id || 'default';
 
+  // Identify if this item is a project-specific technical or financial statutory document
+  const isTechnicalOrFinancialDoc = 
+    docIdUpper.includes('ONGOING') || dName.includes('ongoing') ||
+    docIdUpper.includes('SLCC') || dName.includes('slcc') || dName.includes('single largest') ||
+    docIdUpper.includes('SECTION_VI') || docIdUpper.includes('SEC_VI') || dName.includes('section vi') || dName.includes('schedule of req') ||
+    docIdUpper.includes('SECTION_VII') || docIdUpper.includes('SEC_VII') || docIdUpper.includes('TECH_SPECS') || dName.includes('section vii') || dName.includes('technical spec') ||
+    docIdUpper.includes('FRAMEWORK') || docIdUpper.includes('FAL') || dName.includes('framework agreement') || dName.includes('fal') ||
+    docIdUpper.includes('ORGANIZATIONAL_CHART') || docIdUpper.includes('ORG_CHART') || dName.includes('org chart') || dName.includes('organizational chart') ||
+    docIdUpper.includes('KEY_PERSONNEL') || docIdUpper.includes('PERSONNEL') || dName.includes('key personnel') || dName.includes('manpower') ||
+    docIdUpper.includes('MAJOR_EQUIPMENT') || docIdUpper.includes('EQUIPMENT') || dName.includes('equipment') ||
+    docIdUpper.includes('AFTERSALES') || docIdUpper.includes('WARRANTY') || dName.includes('after-sale') || dName.includes('aftersales') || dName.includes('warranty') ||
+    docIdUpper.includes('OMNIBUS') || docIdUpper.includes('OSS') || dName.includes('omnibus') || dName.includes('oss') ||
+    docIdUpper.includes('BID_SECURING') || docIdUpper.includes('BSD') || dName.includes('bid secur') || dName.includes('bsd') ||
+    docIdUpper.includes('NFCC') || dName.includes('nfcc') || dName.includes('contracting capacity') ||
+    docIdUpper.includes('BID_FORM') || docIdUpper.includes('BIDFORM') || dName.includes('bid form') ||
+    docIdUpper.includes('BILL_OF_QUANTITIES') || docIdUpper.includes('BOQ') || dName.includes('bill of quantities') || dName.includes('boq') ||
+    docIdUpper.includes('DETAILED_ESTIMATES') || docIdUpper.includes('ESTIMATES') || docIdUpper.includes('FORM_L') || dName.includes('detailed estimate') || dName.includes('form l') ||
+    docIdUpper.includes('PRICE_SCHEDULE') || docIdUpper.includes('PRICESCHED') || dName.includes('price schedule') ||
+    docIdUpper.includes('SUMMARY_BID') || docIdUpper.includes('SUMMARY_BID_PRICE') || dName.includes('summary of bid') ||
+    docIdUpper.includes('CASH_FLOW') || docIdUpper.includes('CASHFLOW') || dName.includes('cash flow');
+
   // 1. DIRECT EMBEDDED ATTACHMENT
   const directUrl = (doc as any).fileDataUrl || (doc as any).pdfDataUrl;
   if (typeof directUrl === 'string' && directUrl.trim().length > 0) {
     return directUrl;
   }
 
-  // 2. DIRECT VAULT DOC ID MATCH (In memory or IndexedDB)
+  // 2. DIRECT VAULT DOC ID MATCH (In memory or IndexedDB) - ONLY if not cross-matched with corporate doc
   if (doc.vaultDocId) {
-    if (Array.isArray(ctx.vaultDocs)) {
-      const linked = ctx.vaultDocs.find(v => v && v.id === doc.vaultDocId);
-      if (linked?.fileDataUrl) return linked.fileDataUrl;
+    let isValidVaultLink = true;
+    if (isTechnicalOrFinancialDoc) {
+      const linked = Array.isArray(ctx.vaultDocs) ? ctx.vaultDocs.find(v => v && v.id === doc.vaultDocId) : null;
+      const vCode = (linked?.documentCode || '').toUpperCase();
+      if (['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode)) {
+        isValidVaultLink = false;
+      }
     }
-    try {
-      const data = await loadPdfData(doc.vaultDocId);
-      if (data) return data;
-    } catch (_) {}
+    if (isValidVaultLink) {
+      if (Array.isArray(ctx.vaultDocs)) {
+        const linked = ctx.vaultDocs.find(v => v && v.id === doc.vaultDocId);
+        if (linked?.fileDataUrl) return linked.fileDataUrl;
+      }
+      try {
+        const data = await loadPdfData(doc.vaultDocId);
+        if (data) return data;
+      } catch (_) {}
+    }
   }
 
   // 3. DIRECT CLEAN ID MATCH IN INDEXEDDB
@@ -3668,13 +3718,19 @@ export async function resolveDocumentPdfAttachment(
   const findMatchingVaultDoc = (): DocumentVaultItem | undefined => {
     if (allVaultDocs.length === 0) return undefined;
 
-    // A. Direct vaultDocId
+    // A. Direct vaultDocId (Guarded against corporate cross-matching)
     if (doc.vaultDocId) {
       const found = allVaultDocs.find(v => v && v.id === doc.vaultDocId);
-      if (found) return found;
+      if (found) {
+        const vCode = (found.documentCode || '').toUpperCase();
+        const isCorporateVaultDoc = ['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode);
+        if (!isCorporateVaultDoc || !isTechnicalOrFinancialDoc) {
+          return found;
+        }
+      }
     }
 
-    // B. Project-Tagged Completed Form in Vault
+    // B. Project-Tagged Completed Form in Vault (Strictly matching project)
     if (currentRef) {
       const projMatch = allVaultDocs.find(v => {
         if (!v) return false;
@@ -3684,79 +3740,102 @@ export async function resolveDocumentPdfAttachment(
         if (!isProj) return false;
         const vName = (v.documentName || '').toLowerCase();
         const vCode = (v.documentCode || '').toUpperCase();
+        const isCorp = ['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode);
+        if (isCorp && isTechnicalOrFinancialDoc) return false;
         return (dCode && vCode && vCode.includes(dCode)) || vName === dName || vName.includes(dName) || dName.includes(vName);
       });
       if (projMatch) return projMatch;
     }
 
-    // C. Exact Document Code Match
+    // C. Exact Document Code Match (Excluding corporate cross-matches)
     if (dCode) {
-      const codeMatch = allVaultDocs.find(v => v && v.documentCode && v.documentCode.toUpperCase() === dCode);
+      const codeMatch = allVaultDocs.find(v => {
+        if (!v || !v.documentCode) return false;
+        const vCode = v.documentCode.toUpperCase();
+        const isCorp = ['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode);
+        if (isCorp && isTechnicalOrFinancialDoc) return false;
+        return vCode === dCode;
+      });
       if (codeMatch) return codeMatch;
     }
 
-    // D. Specialized Keyword and Subtype Matching for all 27 document types
+    // D. Specialized Keyword and Subtype Matching (Strict separation between Corporate and Technical)
     return allVaultDocs.find(v => {
       if (!v) return false;
       const vName = (v.documentName || '').toLowerCase();
       const vCode = (v.documentCode || '').toUpperCase();
+      const isCorporateVaultDoc = ['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode);
 
+      // Corporate Class A & B Eligibility Documents
       if (dName.includes('philgeps') || dCode.includes('PHILGEPS')) {
         return vCode === 'DOC-1' || vCode.includes('PHILGEPS') || vName.includes('philgeps');
       }
-      if (dName.includes('sec') || dName.includes('dti') || dCode.includes('SEC') || dCode.includes('DTI')) {
-        return vCode === 'DOC-2' || vCode.includes('SEC') || vCode.includes('DTI') || vName.includes('sec') || vName.includes('dti') || vName.includes('business registration');
+      if ((dCode === 'SEC_DTI_REG' || dCode === 'DOC-2' || dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) {
+        return (vCode === 'DOC-2' || vCode.includes('SEC') || vCode.includes('DTI') || vName.includes('sec') || vName.includes('dti') || vName.includes('incorporation') || vName.includes('business registration')) && !vName.includes('section') && !vName.includes('philgeps') && !vName.includes('bir');
       }
-      if (dName.includes('mayor') || dCode.includes('MAYOR')) {
+      if ((dCode === 'MAYORS_PERMIT' || dCode === 'DOC-3' || dName.includes('mayor') || (dName.includes('business permit') && !dName.includes('barangay'))) && !dName.includes('ongoing') && !dName.includes('slcc') && !dName.includes('section')) {
         return vCode === 'DOC-3' || vCode === 'DOC-4' || vCode.includes('MAYOR') || vName.includes('mayor') || vName.includes('business permit');
       }
-      if (dName.includes('tax') || dCode.includes('TAX')) {
-        return vCode === 'DOC-4' || vCode === 'DOC-7' || vCode.includes('TAX') || vName.includes('tax') || vName.includes('clearance') || vName.includes('bir');
+      if (dCode === 'DOC-4' || (dName.includes('barangay') && dName.includes('permit'))) {
+        return vCode === 'DOC-4' || vName.includes('barangay');
       }
-      if (dName.includes('audited') || dName.includes('afs') || dCode.includes('AFS') || dName.includes('financial statement')) {
-        return vCode === 'DOC-5' || vCode === 'DOC-15' || vCode.includes('AFS') || vCode.includes('AUDITED') || vName.includes('audited') || vName.includes('financial statement') || vName.includes('afs');
+      if (dCode === 'DOC-5' || dName.includes('business plate')) {
+        return vCode === 'DOC-5' || vName.includes('business plate');
       }
-      if (dName.includes('pcab') || dCode.includes('PCAB')) {
-        return vCode === 'DOC-6' || vCode === 'DOC-8' || vCode.includes('PCAB') || vName.includes('pcab');
+      if (dCode === 'DOC-6' || (dName.includes('bir') && dName.includes('2303'))) {
+        return vCode === 'DOC-6' || vName.includes('2303');
       }
-      if (dName.includes('secretary') || dName.includes('board res') || dName.includes('spa') || dCode.includes('SECRETARY')) {
+      if (dCode === 'TAX_CLEARANCE' || dCode === 'DOC-7' || (dName.includes('tax') && (dName.includes('clearance') || dName.includes('bir')))) {
+        return vCode === 'DOC-7' || vCode === 'DOC-4' || vCode.includes('TAX') || (vName.includes('tax') && vName.includes('clearance')) || vName.includes('bir');
+      }
+      if (dCode === 'AUDITED_FS' || dCode === 'DOC-15' || dName.includes('audited') || dName.includes('afs') || (dName.includes('financial statement') && !dName.includes('bid form'))) {
+        return vCode === 'DOC-15' || vCode === 'DOC-5' || vCode.includes('AFS') || vCode.includes('AUDITED') || vName.includes('audited') || vName.includes('financial statement') || vName.includes('afs');
+      }
+      if (dCode === 'PCAB_LICENSE' || dCode === 'DOC-8' || dName.includes('pcab')) {
+        return vCode === 'DOC-8' || vCode === 'DOC-6' || vCode.includes('PCAB') || vName.includes('pcab');
+      }
+      if ((dCode === 'SECRETARY_CERTIFICATE' || dCode === 'DOC-13' || dName.includes('secretary') || dName.includes('board res') || dName.includes('spa')) && !dName.includes('section')) {
         return vCode === 'DOC-13' || vCode.includes('SEC_CERT') || vCode.includes('BOARD_RES') || vCode.includes('SPA') || vName.includes('secretary') || vName.includes('board') || vName.includes('attorney') || vName.includes('spa');
       }
-      if (dName.includes('joint venture') || dName.includes('jva') || dCode.includes('JVA')) {
+      if (dCode === 'JOINT_VENTURE_AGREEMENT' || dCode === 'DOC-14' || dName.includes('joint venture') || dName.includes('jva')) {
         return vCode === 'DOC-14' || vCode.includes('JVA') || vCode.includes('JOINT') || vName.includes('joint venture') || vName.includes('jva');
       }
+
+      // Technical & Financial Proposals (NEVER match corporate vault docs DOC-1..DOC-15)
+      if (isCorporateVaultDoc && isTechnicalOrFinancialDoc) return false;
+
       if (dName.includes('ongoing') || dCode.includes('ONGOING')) {
-        return vCode === 'DOC-2' || vCode.includes('ONGOING') || vCode.includes('(B)') || vName.includes('ongoing');
+        return vCode.includes('ONGOING') || vName.includes('ongoing contracts') || (vName.includes('ongoing') && !vName.includes('sec'));
       }
       if (dName.includes('slcc') || dName.includes('single largest') || dCode.includes('SLCC')) {
-        return vCode === 'DOC-3' || vCode.includes('SLCC') || vCode.includes('(C)') || vName.includes('slcc') || vName.includes('single largest');
+        return vCode.includes('SLCC') || vName.includes('slcc') || vName.includes('single largest');
       }
       if (dName.includes('section vi') || dName.includes('schedule of req') || dCode.includes('SECTION_VI') || dCode.includes('SEC_VI')) {
-        return vCode === 'SEC-VI' || vCode === 'DOC-6' || vCode.includes('(F.D)') || vName.includes('section vi') || vName.includes('schedule of req');
+        return vCode === 'SEC-VI' || vCode.includes('SEC-VI') || vName.includes('section vi') || vName.includes('schedule of req');
       }
       if (dName.includes('technical spec') || dName.includes('section vii') || dCode.includes('TECH_SPECS') || dCode.includes('SEC_VII')) {
-        return vCode === 'SEC-VII' || vCode === 'DOC-7' || vCode.includes('TECH_SPECS') || vName.includes('section vii') || vName.includes('technical spec');
+        return vCode === 'SEC-VII' || vCode.includes('TECH_SPECS') || vCode.includes('SEC-VII') || vName.includes('section vii') || vName.includes('technical spec');
       }
       if (dName.includes('framework agreement') || dName.includes('fal') || dCode.includes('FRAMEWORK') || dCode.includes('FAL')) {
         return vCode === 'FAL' || vCode.includes('FAL') || vName.includes('framework agreement') || vName.includes('fal');
       }
       if (dName.includes('organizational chart') || dName.includes('org chart') || dCode.includes('ORG_CHART')) {
-        return vCode === 'DOC-8' || vCode.includes('ORG_CHART') || vCode.includes('(F.A)') || vCode === '(F)' || vName.includes('organizational chart') || vName.includes('org chart');
+        return vCode.includes('ORG_CHART') || vCode.includes('FC-2024') || vName.includes('organizational chart') || vName.includes('org chart');
       }
       if (dName.includes('key personnel') || dName.includes('manpower') || dCode.includes('KEY_PERSONNEL')) {
-        return vCode === 'DOC-9' || vCode.includes('KEY_PERSONNEL') || vCode.includes('(F.B)') || vName.includes('key personnel') || vName.includes('manpower');
+        return vCode.includes('KEY_PERSONNEL') || vCode.includes('FC-2025') || vName.includes('key personnel') || vName.includes('manpower');
       }
       if (dName.includes('equipment') || dCode.includes('EQUIPMENT')) {
-        return vCode === 'DOC-10' || vCode.includes('EQUIPMENT') || vCode.includes('(F.C)') || vName.includes('equipment') || vName.includes('machinery');
+        return vCode.includes('EQUIPMENT') || vCode.includes('FC-2026') || vName.includes('equipment') || vName.includes('machinery');
       }
       if (dName.includes('after-sale') || dName.includes('aftersales') || dName.includes('warranty') || dCode.includes('AFTERSALES') || dCode.includes('WARRANTY')) {
-        return vCode === 'DOC-11' || vCode.includes('AFTER') || vCode.includes('(H)') || vName.includes('after-sale') || vName.includes('aftersales') || vName.includes('warranty');
+        return vCode.includes('AFTER') || vCode.includes('WARRANTY') || vName.includes('after-sale') || vName.includes('aftersales') || vName.includes('warranty');
       }
       if (dName.includes('omnibus') || dName.includes('oss') || dCode.includes('OMNIBUS') || dCode.includes('OSS')) {
-        return vCode === 'DOC-12' || vCode.includes('OSS') || vCode.includes('OMNIBUS') || vName.includes('omnibus') || vName.includes('oss');
+        return vCode.includes('OSS') || vCode.includes('OMNIBUS') || vName.includes('omnibus') || vName.includes('oss');
       }
       if (dName.includes('bid secur') || dName.includes('bsd') || dCode.includes('BID_SECURING') || dCode.includes('BSD')) {
-        return vCode === 'DOC-5' || vCode === 'DOC-11' || vCode.includes('BSD') || vCode.includes('BID_SECURING') || vName.includes('bid secur') || vName.includes('bsd');
+        return vCode.includes('BSD') || vCode.includes('BID_SECURING') || vName.includes('bid secur') || vName.includes('bsd');
       }
       if (dName.includes('nfcc') || dName.includes('contracting capacity') || dCode.includes('NFCC')) {
         return vCode.includes('NFCC') || vName.includes('nfcc') || vName.includes('contracting capacity');
@@ -3768,7 +3847,7 @@ export async function resolveDocumentPdfAttachment(
         return vCode.includes('BOQ') || vName.includes('bill of quantities') || vName.includes('boq');
       }
       if (dName.includes('detailed estimate') || dName.includes('form l') || dCode.includes('DETAILED_ESTIMATES') || dCode.includes('FORM_L')) {
-        return vCode.includes('ESTIMATES') || vCode.includes('FORM_L') || vName.includes('detailed estimate') || vName.includes('form l') || vName.includes('form (l)');
+        return vCode.includes('ESTIMATES') || vCode.includes('FORM_L') || vName.includes('detailed estimate') || vName.includes('form l');
       }
       if (dName.includes('price schedule') || dCode.includes('PRICE_SCHEDULE') || dCode.includes('PRICESCHED')) {
         return vCode.includes('PRICESCHED') || vName.includes('price schedule');
@@ -3779,6 +3858,8 @@ export async function resolveDocumentPdfAttachment(
       if (dName.includes('cash flow') || dCode.includes('CASH_FLOW') || dCode.includes('CASHFLOW')) {
         return vCode.includes('CASHFLOW') || vCode.includes('SF-INFR-56') || vName.includes('cash flow');
       }
+
+      if (isCorporateVaultDoc) return false;
 
       // Exact or substring match for custom items
       return vName && (vName === dName || vName.includes(dName) || dName.includes(vName));
@@ -3794,25 +3875,44 @@ export async function resolveDocumentPdfAttachment(
     } catch (_) {}
   }
 
-  // 6. CHECK TEMPLATE-SPECIFIC CACHED PDFS IN INDEXEDDB
-  const candidateKeys = [
-    `tech_specs_${tenantId}_${scopeKey}`,
-    `tech_specs_${tenantId}_${currentRef}`,
-    `equipment_pdf_${tenantId}_${scopeKey}`,
-    `equipment_pdf_${tenantId}_${currentRef}`,
-    `key_personnel_pdf_${tenantId}_${scopeKey}`,
-    `key_personnel_pdf_${tenantId}_${currentRef}`,
-    `org_chart_pdf_${tenantId}_${scopeKey}`,
-    `org_chart_pdf_${tenantId}_${currentRef}`,
-    `ongoing_pdf_${tenantId}_${scopeKey}`,
-    `ongoing_pdf_${tenantId}_${currentRef}`,
-    `slcc_pdf_${tenantId}_${scopeKey}`,
-    `slcc_pdf_${tenantId}_${currentRef}`,
-    `boq_pdf_${tenantId}_${scopeKey}`,
-    `boq_pdf_${tenantId}_${currentRef}`,
-    `bidform_pdf_${tenantId}_${scopeKey}`,
-    `bidform_pdf_${tenantId}_${currentRef}`
-  ];
+  // 6. CHECK TEMPLATE-SPECIFIC CACHED PDFS IN INDEXEDDB (STRICTLY SCOPED TO MATCHING DOCUMENT TYPE)
+  const candidateKeys: string[] = [];
+
+  const isTechSpecs = docIdUpper.includes('SECTION_VII') || docIdUpper.includes('SEC_VII') || docIdUpper.includes('TECH_SPECS') || dName.includes('section vii') || dName.includes('technical spec');
+  const isEquipment = docIdUpper.includes('MAJOR_EQUIPMENT') || docIdUpper.includes('EQUIPMENT') || dName.includes('equipment');
+  const isKeyPersonnel = docIdUpper.includes('KEY_PERSONNEL') || docIdUpper.includes('PERSONNEL') || dName.includes('key personnel') || dName.includes('manpower');
+  const isOrgChart = docIdUpper.includes('ORGANIZATIONAL_CHART') || docIdUpper.includes('ORG_CHART') || dName.includes('org chart') || dName.includes('organizational chart');
+  const isOngoing = docIdUpper.includes('ONGOING') || dName.includes('ongoing');
+  const isSlcc = docIdUpper.includes('SLCC') || dName.includes('slcc') || dName.includes('single largest');
+  const isBoq = docIdUpper.includes('BILL_OF_QUANTITIES') || docIdUpper.includes('BOQ') || dName.includes('bill of quantities') || dName.includes('boq');
+  const isBidForm = docIdUpper.includes('BID_FORM') || docIdUpper.includes('BIDFORM') || dName.includes('bid form');
+  const isDetailedEstimates = docIdUpper.includes('DETAILED_ESTIMATES') || docIdUpper.includes('ESTIMATES') || docIdUpper.includes('FORM_L') || dName.includes('detailed estimate') || dName.includes('form l') || dName.includes('form (l)');
+  const isPriceSched = docIdUpper.includes('PRICE_SCHEDULE') || docIdUpper.includes('PRICESCHED') || dName.includes('price schedule');
+  const isFal = docIdUpper.includes('FRAMEWORK') || docIdUpper.includes('FAL') || dName.includes('framework agreement') || dName.includes('fal');
+
+  if (isTechSpecs) {
+    candidateKeys.push(`tech_specs_${tenantId}_${scopeKey}`, `tech_specs_${tenantId}_${currentRef}`);
+  } else if (isEquipment) {
+    candidateKeys.push(`equipment_pdf_${tenantId}_${scopeKey}`, `equipment_pdf_${tenantId}_${currentRef}`);
+  } else if (isKeyPersonnel) {
+    candidateKeys.push(`key_personnel_pdf_${tenantId}_${scopeKey}`, `key_personnel_pdf_${tenantId}_${currentRef}`);
+  } else if (isOrgChart) {
+    candidateKeys.push(`org_chart_pdf_${tenantId}_${scopeKey}`, `org_chart_pdf_${tenantId}_${currentRef}`);
+  } else if (isOngoing) {
+    candidateKeys.push(`ongoing_pdf_${tenantId}_${scopeKey}`, `ongoing_pdf_${tenantId}_${currentRef}`);
+  } else if (isSlcc) {
+    candidateKeys.push(`slcc_pdf_${tenantId}_${scopeKey}`, `slcc_pdf_${tenantId}_${currentRef}`);
+  } else if (isBoq) {
+    candidateKeys.push(`boq_${tenantId}_${scopeKey}`, `boq_${tenantId}_${currentRef}`, `boq_pdf_${tenantId}_${scopeKey}`, `boq_pdf_${tenantId}_${currentRef}`);
+  } else if (isBidForm) {
+    candidateKeys.push(`bidform_${tenantId}_${scopeKey}`, `bidform_infra_${tenantId}_${scopeKey}`, `bidform_pdf_${tenantId}_${scopeKey}`, `bidform_pdf_${tenantId}_${currentRef}`);
+  } else if (isDetailedEstimates) {
+    candidateKeys.push(`detailed_estimates_pdf_${tenantId}_${scopeKey}`, `detailed_estimates_pdf_${tenantId}_${currentRef}`, `estimates_pdf_${tenantId}_${scopeKey}`);
+  } else if (isPriceSched) {
+    candidateKeys.push(`priceschedule_${tenantId}_${scopeKey}`, `pricesched_${tenantId}_${scopeKey}`);
+  } else if (isFal) {
+    candidateKeys.push(`fal_${tenantId}_${scopeKey}`, `fal_${tenantId}_${currentRef}`);
+  }
 
   for (const k of candidateKeys) {
     try {
@@ -3828,9 +3928,18 @@ export async function resolveDocumentPdfAttachment(
       const parsedCompleted = JSON.parse(rawCompleted);
       if (Array.isArray(parsedCompleted)) {
         const matchingForm = parsedCompleted.find((f: any) => {
-          const fTitle = (f.title || f.documentName || '').toLowerCase();
-          const fCode = (f.formCode || f.documentCode || '').toUpperCase();
-          return (dCode && fCode && fCode === dCode) || fTitle === dName || fTitle.includes(dName) || dName.includes(fTitle);
+          const fTitle = (f.title || f.documentName || '').toLowerCase().trim();
+          const fCode = (f.formCode || f.documentCode || '').toUpperCase().trim();
+          if (dCode && fCode && fCode === dCode) return true;
+          if (fTitle && dName && (fTitle === dName || (dName.length > 5 && fTitle.includes(dName)) || (fTitle.length > 5 && dName.includes(fTitle)))) {
+            // Guard against cross-contamination
+            if (dName.includes('section') && !fTitle.includes('section')) return false;
+            if (fTitle.includes('section') && !dName.includes('section')) return false;
+            if (dName.includes('personnel') && !fTitle.includes('personnel')) return false;
+            if (dName.includes('estimate') && !fTitle.includes('estimate')) return false;
+            return true;
+          }
+          return false;
         });
         if (matchingForm) {
           if (matchingForm.fileDataUrl) return matchingForm.fileDataUrl;
@@ -3910,7 +4019,7 @@ export async function resolveDocumentPdfAttachment(
   if (docIdUpper.includes('PHILGEPS') || dName.includes('philgeps')) {
     return await generatePhilgepsCertificatePdf(ctx);
   }
-  if (docIdUpper.includes('SEC') || docIdUpper.includes('DTI') || dName.includes('sec') || dName.includes('dti') || dName.includes('business registration')) {
+  if ((docIdUpper.includes('SEC_DTI') || docIdUpper === 'SEC' || docIdUpper.includes('DTI') || dName.includes('securities and exchange') || dName.includes('sec registration') || dName.includes('dti certificate') || dName.includes('certificate of incorporation') || dName.includes('business registration')) && !dName.includes('section') && !dName.includes('secretary')) {
     return await generateSecDtiRegistrationPdf(ctx);
   }
   if (docIdUpper.includes('MAYOR') || dName.includes('mayor') || dName.includes('business permit')) {

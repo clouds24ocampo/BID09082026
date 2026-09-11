@@ -407,10 +407,12 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       selectedOppId ? `bidocs_sec_vi_services_${tenantKey}_${selectedOppId}` : '',
       projectRefNo ? `bidocs_sec_vi_services_${tenantKey}_${projectRefNo}` : ''
     ]);
+    const computedAmt = getServicesCostAmount(items, pct, customAmt);
     const json = JSON.stringify({
       description: desc,
       percentage: pct,
-      customAmount: customAmt
+      customAmount: customAmt,
+      computedAmount: computedAmt
     });
     keys.forEach(k => {
       if (k) localStorage.setItem(k, json);
@@ -428,6 +430,23 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     const json = JSON.stringify(newItems);
     keys.forEach(k => {
       if (k) localStorage.setItem(k, json);
+    });
+
+    // Automatically synchronize services computedAmount whenever material items change
+    const computedAmt = getServicesCostAmount(newItems, servicesPercentage, servicesCustomAmount);
+    const svcJson = JSON.stringify({
+      description: servicesDescription,
+      percentage: servicesPercentage,
+      customAmount: servicesCustomAmount,
+      computedAmount: computedAmt
+    });
+    const svcKeys = new Set([
+      projectScopeKey ? `bidocs_sec_vi_services_${tenantKey}_${projectScopeKey}` : '',
+      selectedOppId ? `bidocs_sec_vi_services_${tenantKey}_${selectedOppId}` : '',
+      projectRefNo ? `bidocs_sec_vi_services_${tenantKey}_${projectRefNo}` : ''
+    ]);
+    svcKeys.forEach(k => {
+      if (k) localStorage.setItem(k, svcJson);
     });
   };
 

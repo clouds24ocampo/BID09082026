@@ -57,6 +57,10 @@ import {
   Edit3,
   Filter
 } from 'lucide-react';
+import { SpotlightCard } from '../common/SpotlightCard';
+import { BorderBeam } from '../common/BorderBeam';
+import { ShinyText } from '../common/ShinyText';
+import { CyberBadge } from '../common/CyberBadge';
 
 interface ClassAMasterItemDef {
   code: string;
@@ -1247,7 +1251,7 @@ export const DocumentVaultView: React.FC = () => {
       documentCode: uploadTargetDef.code,
       documentName: docName,
       documentNumber: docNumber.trim() || `REF-${Math.floor(Math.random() * 899999 + 100000)}`,
-      category: 'ELIGIBILITY_CLASS_A',
+      category: uploadTargetDef.code === 'DOC-14' ? 'ELIGIBILITY_CLASS_B' : 'ELIGIBILITY_CLASS_A',
       procurementApplicability: ['Goods & Supply', 'Goods & Supply with Installation', 'Infrastructure', 'Consulting'],
       legalBasisReference: uploadTargetDef.conditionalRuleNote,
       versionNumber: 1,
@@ -1471,54 +1475,71 @@ export const DocumentVaultView: React.FC = () => {
     <VaultErrorBoundary fallbackTitle="Document Vault Render Protected">
       <div className="space-y-6 animate-fadeIn">
 
-      {/* Header Banner */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-5">
-        <div>
-          <div className="flex items-center gap-2">
-            <span
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
-            />
-            <h1 className="text-2xl font-bold text-white">Document Vault & Statutory Registry</h1>
+      {/* Header Banner — 3D Glass with BorderBeam & Telemetry */}
+      <div className="relative rounded-2xl p-5 md:p-6 bg-gradient-to-r from-slate-900/90 via-[#0a1128]/85 to-slate-900/90 border border-slate-800/90 shadow-2xl backdrop-blur-xl overflow-hidden">
+        <BorderBeam size={200} duration={14} colorFrom="#3b82f6" colorTo="#8b5cf6" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <span
+                className="w-3.5 h-3.5 rounded-full ring-4 ring-blue-500/20"
+                style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
+              />
+              <h1 className="text-2xl font-black text-white tracking-tight">
+                <ShinyText text="Document Vault" speed={6} />
+                <span className="text-slate-400 font-medium text-lg ml-2 font-sans">& Statutory Registry</span>
+              </h1>
+            </div>
+            <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-2">
+              <span>Encrypted compliance repository for</span>
+              <span className="text-slate-200 font-bold bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700/60 font-mono">
+                {currentTenant?.companyName || 'Your Enterprise'}
+              </span>
+            </p>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Encrypted compliance repository storing Class A & Class B eligibility, technical exhibits, and financial statements for <span className="text-slate-200 font-semibold">{currentTenant?.companyName || 'Your Enterprise'}</span>.
-          </p>
-        </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleResetClassAVault}
-            className="px-4 py-2.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition flex items-center gap-2 shrink-0"
-            title="Remove all uploaded PDFs and reset  and CPhilGEPSlass A slots to v1.0 for re-uploading from scratch"
-          >
-            <RefreshCw className="w-4 h-4 text-amber-400" />
-            <span>Reset & Refresh Vault (Re-upload from Scratch)</span>
-          </button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <CyberBadge 
+              label="Vault Encrypted" 
+              variant="emerald" 
+              telemetry={`${vaultItems.length} Docs`}
+              pulse={true}
+            />
 
-          {selectedItemIds.length > 0 && (
             <button
-              onClick={() => setShowMergeModal(true)}
-              className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg transition flex items-center gap-2"
+              onClick={handleResetClassAVault}
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+              title="Remove all uploaded PDFs and reset PhilGEPS and Class A slots to v1.0 for re-uploading from scratch"
             >
-              <Layers className="w-4 h-4" />
-              <span>Merge Selected ({selectedItemIds.length})</span>
+              <RefreshCw className="w-4 h-4 text-amber-400" />
+              <span>Reset & Refresh Vault</span>
             </button>
-          )}
 
-          <button
-            onClick={() => {
-              resetFormState();
-              setCustomUploadCategory('ELIGIBILITY_CLASS_A');
-              setShowCustomUploadModal(true);
-            }}
-            className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white shadow-lg transition flex items-center gap-2 hover:opacity-90 shrink-0"
-            style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
-            title="Add custom or project-specific legal document to vault"
-          >
-            <Plus className="w-4 h-4 text-blue-200" />
-            <span>+ Add Additional Legal Document</span>
-          </button>
+            {selectedItemIds.length > 0 && (
+              <button
+                onClick={() => setShowMergeModal(true)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Layers className="w-4 h-4" />
+                <span>Merge Selected ({selectedItemIds.length})</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => {
+                resetFormState();
+                setCustomUploadCategory('ELIGIBILITY_CLASS_A');
+                setShowCustomUploadModal(true);
+              }}
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg shadow-blue-600/25 transition-all flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
+              style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
+              title="Add custom or project-specific legal document to vault"
+            >
+              <Plus className="w-4 h-4 text-blue-200" />
+              <span>+ Add Legal Document</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2318,52 +2339,55 @@ export const DocumentVaultView: React.FC = () => {
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {displayedCompletedTechItems.map((item) => (
-                          <div
+                          <SpotlightCard
                             key={item.id}
-                            className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-slate-700 transition space-y-4 flex flex-col justify-between"
+                            spotlightColor="rgba(16, 185, 129, 0.2)"
+                            enableTilt={true}
+                            className="p-5 rounded-2xl border border-slate-800/90 hover:border-emerald-500/50 transition-all duration-300 space-y-4 flex flex-col justify-between shadow-xl"
                           >
                             <div className="space-y-3">
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-1">
+                                <span className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                   <CheckCircle2 className="w-3 h-3" /> Technical Completed Form
                                 </span>
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800/80 text-slate-300 font-semibold border border-slate-700/60">
                                   v{item.versionNumber}.0
                                 </span>
                               </div>
 
                               <div>
-                                <h3 className="text-sm font-bold text-white leading-snug">{item.documentName}</h3>
+                                <h3 className="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors leading-snug">{item.documentName}</h3>
                                 <p className="text-xs text-slate-400 mt-1 font-mono">Ref: {item.documentNumber || 'N/A'}</p>
                               </div>
 
-                              <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2 text-[11px] font-mono text-slate-400">
+                              <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2 text-[11px] font-mono text-slate-400 backdrop-blur-sm">
                                 {item.philgepsRefNo ? (
-                                  <div className="p-2.5 rounded-lg bg-blue-950/90 border border-blue-500/50 text-[11px] font-mono space-y-1">
+                                  <div className="p-2.5 rounded-lg bg-blue-950/80 border border-blue-500/40 text-[11px] font-mono space-y-1">
                                     <div className="flex items-center justify-between gap-1">
                                       <span className="text-blue-300 font-bold flex items-center gap-1">
                                         <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" /> Tagged Bidding Project:
                                       </span>
                                       <button
                                         onClick={() => openRetagModal(item)}
-                                        className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline flex items-center gap-1 transition"
+                                        className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline flex items-center gap-1 transition cursor-pointer"
                                         title="Change or update associated Bidding Project tag"
                                       >
-                                        <Edit3 className="w-3 h-3" /> Change Tag
+                                        Retag
                                       </button>
                                     </div>
-                                    <span className="text-white font-bold block truncate">[{item.philgepsRefNo}] {item.projectTitle || 'Bidding Opportunity'}</span>
+                                    <p className="text-white font-bold truncate">
+                                      [{item.philgepsRefNo}] {item.projectTitle || 'Selected Opportunity'}
+                                    </p>
                                   </div>
                                 ) : (
-                                  <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2">
-                                    <span className="text-amber-300 text-[11px] font-bold flex items-center gap-1">
-                                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" /> No Project Tagged
-                                    </span>
+                                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/80 border border-slate-800">
+                                    <span className="text-slate-500 italic text-[10px]">No specific project tagged</span>
                                     <button
                                       onClick={() => openRetagModal(item)}
-                                      className="px-2 py-1 rounded bg-amber-400 text-slate-950 font-bold text-[10px] hover:bg-amber-300 transition"
+                                      className="text-[10px] text-blue-400 hover:text-blue-300 font-bold underline cursor-pointer"
                                     >
-                                      Tag Project
+                                      + Tag to Project
                                     </button>
                                   </div>
                                 )}
@@ -2373,10 +2397,10 @@ export const DocumentVaultView: React.FC = () => {
                               </div>
                             </div>
 
-                            <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                            <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
                               <button
                                 onClick={() => openPreviewItem(item)}
-                                className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
+                                className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30 cursor-pointer"
                                 title="View completed PDF document"
                               >
                                 <Eye className="w-3.5 h-3.5" />
@@ -2391,7 +2415,7 @@ export const DocumentVaultView: React.FC = () => {
                                     name: item.documentName
                                   });
                                 }}
-                                className="px-3 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-amber-500/30"
+                                className="px-3 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-amber-500/30 cursor-pointer"
                                 title="Edit form entries in legal template"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
@@ -2403,7 +2427,7 @@ export const DocumentVaultView: React.FC = () => {
                                   setReplaceTargetItem(item);
                                   resetFormState();
                                 }}
-                                className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30"
+                                className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30 cursor-pointer"
                                 title="Replace PDF file"
                               >
                                 <RefreshCw className="w-3.5 h-3.5" />
@@ -2412,14 +2436,14 @@ export const DocumentVaultView: React.FC = () => {
 
                               <button
                                 onClick={() => handleDeleteCompletedTechDoc(item.id, item.documentName)}
-                                className="px-3.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30"
+                                className="px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30 cursor-pointer"
                                 title="Delete completed technical document"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 <span>Delete</span>
                               </button>
                             </div>
-                          </div>
+                          </SpotlightCard>
                         ))}
                       </div>
                     )}
@@ -3154,10 +3178,12 @@ export const DocumentVaultView: React.FC = () => {
                 const projInfo = getProjectInfoForDoc(item);
 
                 return (
-                  <div
+                  <SpotlightCard
                     key={item.id}
-                    className={`glass-card p-5 rounded-2xl border transition space-y-4 flex flex-col justify-between group cursor-pointer ${isSelected
-                      ? 'border-blue-500 bg-blue-950/20 shadow-xl'
+                    spotlightColor="rgba(59, 130, 246, 0.22)"
+                    enableTilt={true}
+                    className={`p-5 rounded-2xl border transition-all duration-300 space-y-4 flex flex-col justify-between group cursor-pointer shadow-xl ${isSelected
+                      ? 'border-blue-500 bg-blue-950/20 shadow-blue-500/10'
                       : `${projInfo.accentCardBorder} hover:border-slate-700`
                       }`}
                     onClick={() => toggleSelectDoc(item.id)}
@@ -3179,11 +3205,11 @@ export const DocumentVaultView: React.FC = () => {
                       </div>
 
                       <div>
-                        <h3 className="text-sm font-bold text-white group-hover:text-blue-400 transition leading-snug">{item.documentName}</h3>
+                        <h3 className="text-sm font-bold text-white group-hover:text-blue-300 transition-colors leading-snug">{item.documentName}</h3>
                         <p className="text-xs text-slate-400 mt-1 font-mono">Serial No: {item.documentNumber || 'N/A'}</p>
                       </div>
 
-                      <div className={`p-3 rounded-xl bg-slate-900/90 border ${projInfo.accentBorder} space-y-1.5 text-[11px] font-mono text-slate-400`}>
+                      <div className={`p-3 rounded-xl bg-slate-950/70 border ${projInfo.accentBorder} space-y-1.5 text-[11px] font-mono text-slate-400 backdrop-blur-sm`}>
                         {item.philgepsRefNo && (
                           <div className="space-y-0.5">
                             <div className="flex items-center gap-1.5">
@@ -3206,7 +3232,7 @@ export const DocumentVaultView: React.FC = () => {
                     <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-1" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => openPreviewItem(item)}
-                        className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
+                        className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30 cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>View PDF</span>
@@ -3214,7 +3240,7 @@ export const DocumentVaultView: React.FC = () => {
 
                       <button
                         onClick={() => openEditModal(item)}
-                        className="px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-amber-500/30"
+                        className="px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-amber-500/30 cursor-pointer"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                         <span>Edit</span>
@@ -3225,7 +3251,7 @@ export const DocumentVaultView: React.FC = () => {
                           setReplaceTargetItem(item);
                           resetFormState();
                         }}
-                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30"
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30 cursor-pointer"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
                         <span>Replace</span>
@@ -3233,14 +3259,14 @@ export const DocumentVaultView: React.FC = () => {
 
                       <button
                         onClick={() => handleDeleteFinancialDoc(item.id, item.documentName)}
-                        className="px-2.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30"
+                        className="px-2.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30 cursor-pointer"
                         title="Delete document from vault"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         <span>Delete</span>
                       </button>
                     </div>
-                  </div>
+                  </SpotlightCard>
                 );
               })}
             </div>

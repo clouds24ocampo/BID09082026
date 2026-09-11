@@ -45,6 +45,11 @@ import {
   FileStack,
   Upload
 } from 'lucide-react';
+import { SpotlightCard } from '../common/SpotlightCard';
+import { BorderBeam } from '../common/BorderBeam';
+import { ShinyText } from '../common/ShinyText';
+import { CyberBadge } from '../common/CyberBadge';
+
 
 export type FolderCopyType = 'ORIGINAL' | 'COPY_1' | 'COPY_2';
 
@@ -308,57 +313,7 @@ export const BidPackageBuilderView: React.FC = () => {
     }).catch(e => console.error('[BidPackage] Failed to load vault items:', e));
   }, [tenantId, projectScopeKey]);
 
-  // Load project-scoped package items from localStorage (Strictly Isolated per Project)
-  useEffect(() => {
-    if (!tenantId || !projectScopeKey) {
-      setPackageItems([]);
-      return;
-    }
 
-    const storageKey = `bidocs_package_items_${tenantId}_${projectScopeKey}`;
-    const saved = localStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const fullySynced = syncOriginalToCopies(parsed);
-          setPackageItems(fullySynced);
-          return;
-        }
-      } catch (_) {}
-    }
-
-    setPackageItems([]);
-  }, [tenantId, projectScopeKey]);
-
-  // Master Helper: Guarantee COPY 1 and COPY 2 are 100% IDENTICAL to ORIGINAL in content, envelope, and sequence
-  const syncOriginalToCopies = (items: PackageItem[]): PackageItem[] => {
-    const originalItems = items.filter(item => item.folderCopy === 'ORIGINAL');
-
-    const copy1Items: PackageItem[] = originalItems.map(item => ({
-      ...item,
-      id: item.id.startsWith('pkg-c1-') ? item.id : `pkg-c1-${item.id.replace(/^pkg-c[12]-/, '')}`,
-      folderCopy: 'COPY_1'
-    }));
-
-    const copy2Items: PackageItem[] = originalItems.map(item => ({
-      ...item,
-      id: item.id.startsWith('pkg-c2-') ? item.id : `pkg-c2-${item.id.replace(/^pkg-c[12]-/, '')}`,
-      folderCopy: 'COPY_2'
-    }));
-
-    return [...originalItems, ...copy1Items, ...copy2Items];
-  };
-
-  // Persist package items per project with automatic 100% synchronization to COPY 1 and COPY 2
-  const savePackageItems = (newItems: PackageItem[]) => {
-    const fullySynced = syncOriginalToCopies(newItems);
-    setPackageItems(fullySynced);
-    if (tenantId && projectScopeKey) {
-      const storageKey = `bidocs_package_items_${tenantId}_${projectScopeKey}`;
-      localStorage.setItem(storageKey, JSON.stringify(fullySynced));
-    }
-  };
 
   // Memoized batch readiness map for all statutory docs (0ms instantaneous lookup)
   const docReadinessMap = React.useMemo(() => {
@@ -629,42 +584,42 @@ export const BidPackageBuilderView: React.FC = () => {
 
         if (!isStrictlyForThisProject) return false;
 
-        // Technical Exhibits & Statements Matching
+        // Technical Exhibits & Statements Matching (Never match corporate DOC-1 through DOC-15!)
         if (doc.id === 'STATEMENT_SLCC' || doc.id === 'SLCC_STATEMENT') {
-          return vCode === 'DOC-3' || vCode.includes('SLCC') || vCode.includes('(C)') || vName.includes('slcc') || vName.includes('single largest');
+          return vCode.includes('SLCC') || vName.includes('slcc') || vName.includes('single largest');
         }
         if (doc.id === 'STATEMENT_ONGOING_CONTRACTS' || doc.id === 'ONGOING_CONTRACTS') {
-          return vCode === 'DOC-2' || vCode.includes('ONGOING') || vCode.includes('(B)') || vName.includes('ongoing');
+          return vCode.includes('ONGOING') || vName.includes('ongoing contracts') || (vName.includes('ongoing') && !vName.includes('sec'));
         }
         if (doc.id === 'NFCC_COMPUTATION') {
-          return vCode === 'DOC-13' || vCode.includes('NFCC') || vCode.includes('CL-08') || vCode.includes('(K)') || vName.includes('nfcc') || vName.includes('net financial contracting') || vName.includes('contracting capacity');
+          return vCode.includes('NFCC') || vCode.includes('CL-08') || vName.includes('nfcc') || vName.includes('net financial contracting') || vName.includes('contracting capacity');
         }
         if (doc.id === 'BID_SECURING_DECLARATION') {
-          return vCode === 'DOC-5' || vCode.includes('BSD') || vCode.includes('BID_SECURITY') || vCode.includes('GPPB-BSD-2020') || vName.includes('bid securing declaration') || vName.includes('bid security');
+          return vCode.includes('BSD') || vCode.includes('BID_SECURITY') || vCode.includes('GPPB-BSD') || vName.includes('bid securing declaration') || vName.includes('surety bond');
         }
-        if (doc.id === 'SECTION_VI_SCHEDULE_OF_REQUIREMENTS') {
-          return vCode === 'DOC-6' || vCode === 'SEC-VI' || vCode === '(F.D)' || vCode.includes('SEC-VI') || vName.includes('section vi') || vName.includes('schedule of requirement');
+        if (doc.id === 'SECTION_VI_SCHEDULE_OF_REQUIREMENTS' || doc.id === 'SECTION_VI_REQUIREMENTS') {
+          return vCode === 'SEC-VI' || vCode.includes('SEC-VI') || vName.includes('section vi') || vName.includes('schedule of requirement');
         }
-        if (doc.id === 'SECTION_VII_TECHNICAL_SPECS') {
-          return vCode === 'DOC-7' || vCode === 'SEC-VII' || vCode === '(G)' || vCode.includes('SEC-VII') || vName.includes('section vii') || vName.includes('technical specification');
+        if (doc.id === 'SECTION_VII_TECHNICAL_SPECS' || doc.id === 'TECH_SPECS_SECTION_VII') {
+          return vCode === 'SEC-VII' || vCode.includes('SEC-VII') || vCode.includes('TECH_SPECS') || vName.includes('section vii') || vName.includes('technical specification');
         }
         if (doc.id === 'FRAMEWORK_AGREEMENT_LIST') {
-          return vCode === 'FAL' || vCode === 'FAL-01' || vCode === 'SEC-VI-FAL' || vName.includes('framework agreement') || vName.includes('fal');
+          return vCode === 'FAL' || vCode === 'FAL-01' || vCode.includes('FAL') || vName.includes('framework agreement') || vName.includes('fal');
         }
         if (doc.id === 'OMNIBUS_SWORN_STATEMENT') {
-          return vCode === 'DOC-12' || vCode.includes('OSS') || vCode.includes('OMNIBUS') || vCode.includes('GPPB-OSS-2020') || vName.includes('omnibus sworn statement');
+          return vCode.includes('OSS') || vCode.includes('OMNIBUS') || vCode.includes('GPPB-OSS') || vName.includes('omnibus sworn statement');
         }
         if (doc.id === 'ORGANIZATIONAL_CHART') {
-          return vCode === 'DOC-8' || vCode.includes('ORG_CHART') || vCode.includes('FC-2024') || vCode.includes('(F.A)') || vCode === '(F)' || vCode.includes('EXHIBIT-F') || vName.includes('organizational chart') || vName.includes('org chart') || vName.includes('item (f)') || vName.includes('item f');
+          return vCode.includes('ORG_CHART') || vCode.includes('FC-2024') || vName.includes('organizational chart') || vName.includes('org chart');
         }
         if (doc.id === 'KEY_PERSONNEL' || doc.id === 'LIST_KEY_PERSONNEL') {
-          return vCode === 'DOC-9' || vCode.includes('KEY_PERSONNEL') || vCode.includes('FC-2025') || vCode.includes('(F.B)') || vCode === '(F)' || vCode.includes('EXHIBIT-F') || vName.includes('key personnel') || vName.includes('project manager') || vName.includes('manpower') || vName.includes('item (f)') || vName.includes('item f');
+          return vCode.includes('KEY_PERSONNEL') || vCode.includes('FC-2025') || vName.includes('key personnel') || vName.includes('project manager') || vName.includes('manpower');
         }
         if (doc.id === 'MAJOR_EQUIPMENT') {
-          return vCode === 'DOC-10' || vCode.includes('EQUIPMENT') || vCode.includes('FC-2026') || vCode.includes('(F.C)') || vCode === '(F)' || vCode.includes('EXHIBIT-F') || vName.includes('equipment') || vName.includes('machinery') || vName.includes('item (f)') || vName.includes('item f');
+          return vCode.includes('EQUIPMENT') || vCode.includes('FC-2026') || vName.includes('major equipment') || vName.includes('machinery');
         }
         if (doc.id === 'AFTERSALES_WARRANTY') {
-          return vCode === 'DOC-11' || vCode.includes('AFTER') || vCode.includes('(H)') || vName.includes('after-sales') || vName.includes('aftersales') || vName.includes('warranty');
+          return vCode.includes('AFTER') || vCode.includes('WARRANTY') || vName.includes('after-sales') || vName.includes('aftersales') || vName.includes('warranty');
         }
 
         // Financial Proposals Matching
@@ -696,7 +651,12 @@ export const BidPackageBuilderView: React.FC = () => {
         return vName === (doc.name || '').toLowerCase() || vName.includes((doc.name || '').toLowerCase());
       });
 
-      if (matchingVault) {
+      if (doc.id === 'BID_SECURING_DECLARATION' || doc.id === 'OMNIBUS_SWORN_STATEMENT') {
+        map[doc.id] = {
+          isReady: true,
+          vaultId: matchingVault?.id
+        };
+      } else if (matchingVault) {
         map[doc.id] = {
           isReady: true,
           vaultId: matchingVault.id
@@ -822,6 +782,152 @@ export const BidPackageBuilderView: React.FC = () => {
     if (doc.category === 'FINANCIAL') return 21;
     return 50;
   };
+
+  // Master Helper: Guarantee BSD and OSS Cover Pages are ALWAYS active in Envelope 1
+  const ensureMandatoryStatutoryDocs = (items: PackageItem[], currentRef: string): PackageItem[] => {
+    const originalItems = items.filter(item => item.folderCopy === 'ORIGINAL');
+    let updatedOriginal = [...originalItems];
+
+    const hasBsd = updatedOriginal.some(
+      item => item.envelope === 'ENVELOPE_1' && (
+        item.code === 'BID_SECURING_DECLARATION' ||
+        item.id === 'BID_SECURING_DECLARATION' ||
+        item.id.includes('bsd') ||
+        item.documentName.toLowerCase().includes('bid securing declaration') ||
+        item.documentName.toLowerCase().includes('surety bond') ||
+        item.documentName.toLowerCase().includes('bsd')
+      )
+    );
+
+    if (!hasBsd) {
+      const bsdDef = statutoryDocsList.find(d => d.id === 'BID_SECURING_DECLARATION');
+      const bsdReadiness = checkDocReadiness(bsdDef || { id: 'BID_SECURING_DECLARATION', name: '', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'BID_SECURING_DECLARATION' });
+      updatedOriginal.push({
+        id: 'pkg-bsd-statutory',
+        documentName: bsdDef?.name || 'Bid Securing Declaration / Bid Security or Surety Bond (BSD)',
+        documentNumber: currentRef,
+        category: 'TECHNICAL',
+        envelope: 'ENVELOPE_1',
+        folderCopy: 'ORIGINAL',
+        code: 'BID_SECURING_DECLARATION',
+        vaultDocId: bsdReadiness.vaultId,
+        fileSizeBytes: 1048576,
+        dateAdded: new Date().toISOString(),
+        isAutoDetected: true
+      });
+    }
+
+    const hasOss = updatedOriginal.some(
+      item => item.envelope === 'ENVELOPE_1' && (
+        item.code === 'OMNIBUS_SWORN_STATEMENT' ||
+        item.id === 'OMNIBUS_SWORN_STATEMENT' ||
+        item.id.includes('oss') ||
+        item.documentName.toLowerCase().includes('omnibus sworn statement') ||
+        item.documentName.toLowerCase().includes('oss')
+      )
+    );
+
+    if (!hasOss) {
+      const ossDef = statutoryDocsList.find(d => d.id === 'OMNIBUS_SWORN_STATEMENT');
+      const ossReadiness = checkDocReadiness(ossDef || { id: 'OMNIBUS_SWORN_STATEMENT', name: '', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'OMNIBUS_SWORN_STATEMENT' });
+      updatedOriginal.push({
+        id: 'pkg-oss-statutory',
+        documentName: ossDef?.name || 'Omnibus Sworn Statement (OSS)',
+        documentNumber: currentRef,
+        category: 'TECHNICAL',
+        envelope: 'ENVELOPE_1',
+        folderCopy: 'ORIGINAL',
+        code: 'OMNIBUS_SWORN_STATEMENT',
+        vaultDocId: ossReadiness.vaultId,
+        fileSizeBytes: 1048576,
+        dateAdded: new Date().toISOString(),
+        isAutoDetected: true
+      });
+    }
+
+    // Sort active envelope items in statutory rank order
+    const env1Sorted = updatedOriginal
+      .filter(i => i.envelope === 'ENVELOPE_1')
+      .sort((a, b) => getDocumentChecklistRank(a) - getDocumentChecklistRank(b));
+    const otherEnvs = updatedOriginal.filter(i => i.envelope !== 'ENVELOPE_1');
+
+    return [...otherEnvs, ...env1Sorted];
+  };
+
+  // Master Helper: Guarantee COPY 1 and COPY 2 are 100% IDENTICAL to ORIGINAL in content, envelope, and sequence
+  const syncOriginalToCopies = (items: PackageItem[]): PackageItem[] => {
+    const originalItems = items.filter(item => item.folderCopy === 'ORIGINAL');
+
+    const copy1Items: PackageItem[] = originalItems.map(item => ({
+      ...item,
+      id: item.id.startsWith('pkg-c1-') ? item.id : `pkg-c1-${item.id.replace(/^pkg-c[12]-/, '')}`,
+      folderCopy: 'COPY_1'
+    }));
+
+    const copy2Items: PackageItem[] = originalItems.map(item => ({
+      ...item,
+      id: item.id.startsWith('pkg-c2-') ? item.id : `pkg-c2-${item.id.replace(/^pkg-c[12]-/, '')}`,
+      folderCopy: 'COPY_2'
+    }));
+
+    return [...originalItems, ...copy1Items, ...copy2Items];
+  };
+
+  // Persist package items per project with automatic 100% synchronization to COPY 1 and COPY 2
+  const savePackageItems = (newItems: PackageItem[]) => {
+    const withMandatory = ensureMandatoryStatutoryDocs(newItems, projectRefNo);
+    const fullySynced = syncOriginalToCopies(withMandatory);
+    setPackageItems(fullySynced);
+    if (tenantId && projectScopeKey) {
+      const storageKey = `bidocs_package_items_${tenantId}_${projectScopeKey}`;
+      localStorage.setItem(storageKey, JSON.stringify(fullySynced));
+    }
+  };
+
+  // Load project-scoped package items from localStorage (Strictly Isolated per Project)
+  useEffect(() => {
+    if (!tenantId || !projectScopeKey) {
+      setPackageItems([]);
+      return;
+    }
+
+    const storageKey = `bidocs_package_items_${tenantId}_${projectScopeKey}`;
+    const saved = localStorage.getItem(storageKey);
+    let itemsToUse: PackageItem[] = [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          itemsToUse = parsed;
+        }
+      } catch (_) {}
+    }
+
+    // Sanitize technical/financial documents from corrupted corporate vault links
+    const sanitizedItems = itemsToUse.map(item => {
+      const codeOrId = ((item.code || item.id || '') as string).toUpperCase();
+      const name = (item.documentName || '').toLowerCase();
+      const isTechOrFinancial = [
+        'ONGOING_CONTRACTS', 'SLCC_STATEMENT', 'SECTION_VI_REQUIREMENTS', 'TECH_SPECS_SECTION_VII',
+        'FRAMEWORK_AGREEMENT_LIST', 'ORGANIZATIONAL_CHART', 'KEY_PERSONNEL', 'MAJOR_EQUIPMENT',
+        'AFTERSALES_WARRANTY', 'OMNIBUS_SWORN_STATEMENT', 'BID_SECURING_DECLARATION', 'NFCC_COMPUTATION',
+        'FINANCIAL_BID_FORM_GOODS', 'FINANCIAL_BID_FORM_INFRA', 'FINANCIAL_BID_FORM_CONSULTING',
+        'BILL_OF_QUANTITIES', 'DETAILED_ESTIMATES_FORM_L', 'PRICE_SCHEDULE_GOODS', 'SUMMARY_BID_PRICES',
+        'CASH_FLOW_BY_QUARTER'
+      ].some(k => codeOrId.includes(k)) || name.includes('ongoing') || name.includes('slcc') || name.includes('single largest');
+
+      if (isTechOrFinancial && item.vaultDocId) {
+        // If it was linked to a corporate vault doc, clear it so the official system document generates cleanly
+        return { ...item, vaultDocId: undefined };
+      }
+      return item;
+    });
+
+    const withMandatory = ensureMandatoryStatutoryDocs(sanitizedItems, projectRefNo);
+    const fullySynced = syncOriginalToCopies(withMandatory);
+    setPackageItems(fullySynced);
+    localStorage.setItem(storageKey, JSON.stringify(fullySynced));
+  }, [tenantId, projectScopeKey, projectRefNo]);
 
   // Add selected completed statutory documents to ORIGINAL (Auto-replicated to COPY 1 & COPY 2 in 1-17 checklist sequence)
   const handleAddSelectedCompletedDocs = () => {
@@ -1017,6 +1123,21 @@ export const BidPackageBuilderView: React.FC = () => {
   const handleDeleteItem = (id: string) => {
     const target = packageItems.find(item => item.id === id);
     if (!target) return;
+
+    if (
+      target.code === 'BID_SECURING_DECLARATION' ||
+      target.id === 'BID_SECURING_DECLARATION' ||
+      target.id.includes('bsd') ||
+      target.documentName.toLowerCase().includes('bid securing declaration') ||
+      target.documentName.toLowerCase().includes('surety bond') ||
+      target.code === 'OMNIBUS_SWORN_STATEMENT' ||
+      target.id === 'OMNIBUS_SWORN_STATEMENT' ||
+      target.id.includes('oss') ||
+      target.documentName.toLowerCase().includes('omnibus sworn statement')
+    ) {
+      alert('Notice: Bid Securing Declaration (or Surety Bond) and Omnibus Sworn Statement Cover Pages are statutory requirements and always kept active in your bid package.');
+      return;
+    }
 
     const originalItems = packageItems.filter(item => item.folderCopy === 'ORIGINAL');
     const updatedOriginal = originalItems.filter(
@@ -1265,8 +1386,47 @@ export const BidPackageBuilderView: React.FC = () => {
       preloadedDataUrl = pdfDataCache.current[cleanDocId];
     }
 
+    const codeOrId = ((doc.code || doc.id || '') as string).toUpperCase();
+    const docNameLower = (doc.documentName || '').toLowerCase();
+    const isTechnicalOrFinancialDoc = [
+      'ONGOING_CONTRACTS', 'SLCC_STATEMENT', 'SECTION_VI_REQUIREMENTS', 'TECH_SPECS_SECTION_VII',
+      'FRAMEWORK_AGREEMENT_LIST', 'ORGANIZATIONAL_CHART', 'KEY_PERSONNEL', 'MAJOR_EQUIPMENT',
+      'AFTERSALES_WARRANTY', 'OMNIBUS_SWORN_STATEMENT', 'BID_SECURING_DECLARATION', 'NFCC_COMPUTATION',
+      'FINANCIAL_BID_FORM_GOODS', 'FINANCIAL_BID_FORM_INFRA', 'FINANCIAL_BID_FORM_CONSULTING',
+      'BILL_OF_QUANTITIES', 'DETAILED_ESTIMATES_FORM_L', 'PRICE_SCHEDULE_GOODS', 'SUMMARY_BID_PRICES',
+      'CASH_FLOW_BY_QUARTER', 'ESTIMATES', 'FORM_L', 'BOQ', 'BID_FORM', 'PRICE_SCHEDULE', 'TECH_SPECS', 'SEC_VI', 'SEC_VII'
+    ].some(k => codeOrId.includes(k)) ||
+    docNameLower.includes('ongoing') || docNameLower.includes('slcc') || docNameLower.includes('single largest') ||
+    docNameLower.includes('section vi') || docNameLower.includes('schedule of req') ||
+    docNameLower.includes('section vii') || docNameLower.includes('technical spec') ||
+    docNameLower.includes('framework agreement') || docNameLower.includes('fal') ||
+    docNameLower.includes('org chart') || docNameLower.includes('organizational chart') ||
+    docNameLower.includes('key personnel') || docNameLower.includes('personnel') || docNameLower.includes('manpower') ||
+    docNameLower.includes('equipment') || docNameLower.includes('machinery') ||
+    docNameLower.includes('after-sale') || docNameLower.includes('aftersales') || docNameLower.includes('warranty') ||
+    docNameLower.includes('omnibus') || docNameLower.includes('oss') ||
+    docNameLower.includes('bid secur') || docNameLower.includes('bsd') ||
+    docNameLower.includes('nfcc') || docNameLower.includes('contracting capacity') ||
+    docNameLower.includes('bid form') ||
+    docNameLower.includes('bill of quantities') || docNameLower.includes('boq') ||
+    docNameLower.includes('detailed estimate') || docNameLower.includes('form l') || docNameLower.includes('form (l)') ||
+    docNameLower.includes('price schedule') ||
+    docNameLower.includes('summary of bid') || docNameLower.includes('summary bid') ||
+    docNameLower.includes('cash flow');
+
     let targetVaultDocId = doc.vaultDocId;
-    if (!preloadedDataUrl) {
+
+    // Sanitize: If technical or financial doc was mistakenly linked to a corporate vault doc (DOC-1..DOC-15), clear it
+    if (isTechnicalOrFinancialDoc && targetVaultDocId) {
+      const linked = vaultDocs.find(v => v.id === targetVaultDocId);
+      const vCode = (linked?.documentCode || '').toUpperCase();
+      if (['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode)) {
+        targetVaultDocId = undefined;
+        preloadedDataUrl = undefined;
+      }
+    }
+
+    if (!preloadedDataUrl && !isTechnicalOrFinancialDoc) {
       const dName = (doc.documentName || '').toLowerCase();
       const match = vaultDocs.find(v =>
         (targetVaultDocId && v.id === targetVaultDocId) ||
@@ -1274,12 +1434,12 @@ export const BidPackageBuilderView: React.FC = () => {
         ((v as any).code && doc.code && (v as any).code.toLowerCase() === doc.code.toLowerCase()) ||
         (v.documentName && doc.documentName && v.documentName.trim().toLowerCase() === doc.documentName.trim().toLowerCase()) ||
         (dName.includes('philgeps') && (v.documentCode === 'DOC-1' || (v.documentName || '').toLowerCase().includes('philgeps'))) ||
-        ((dName.includes('dti') || dName.includes('sec')) && (v.documentCode === 'DOC-2' || (v.documentName || '').toLowerCase().includes('registration'))) ||
-        (dName.includes('mayor') && (v.documentCode === 'DOC-3' || (v.documentName || '').toLowerCase().includes('permit'))) ||
+        (((dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) && (v.documentCode === 'DOC-2' || ((v.documentName || '').toLowerCase().includes('incorporation') || (v.documentName || '').toLowerCase().includes('business registration') || (v.documentName || '').toLowerCase().includes('dti') || (v.documentName || '').toLowerCase().includes('sec')) && !(v.documentName || '').toLowerCase().includes('philgeps') && !(v.documentName || '').toLowerCase().includes('bir'))) ||
+        ((dName.includes('mayor') || (dName.includes('business permit') && !dName.includes('barangay'))) && (v.documentCode === 'DOC-3' || (v.documentName || '').toLowerCase().includes('permit'))) ||
         (dName.includes('tax') && (v.documentCode === 'DOC-4' || v.documentCode === 'DOC-7' || (v.documentName || '').toLowerCase().includes('clearance'))) ||
         (dName.includes('audited') && (v.documentCode === 'DOC-5' || v.documentCode === 'DOC-15' || (v.documentName || '').toLowerCase().includes('audited'))) ||
         (dName.includes('pcab') && (v.documentCode === 'DOC-6' || v.documentCode === 'DOC-8' || (v.documentName || '').toLowerCase().includes('pcab'))) ||
-        (dName.includes('secretary') && (v.documentCode === 'DOC-13' || (v.documentName || '').toLowerCase().includes('secretary') || (v.documentName || '').toLowerCase().includes('spa'))) ||
+        ((dName.includes('secretary') || dName.includes('board res') || dName.includes('spa')) && !dName.includes('section') && (v.documentCode === 'DOC-13' || (v.documentName || '').toLowerCase().includes('secretary') || (v.documentName || '').toLowerCase().includes('spa'))) ||
         (dName.includes('joint') && (v.documentCode === 'DOC-14' || (v.documentName || '').toLowerCase().includes('joint') || (v.documentName || '').toLowerCase().includes('jva')))
       );
       if (match) {
@@ -1290,7 +1450,7 @@ export const BidPackageBuilderView: React.FC = () => {
     }
 
     // Direct binary load from IndexedDB if not yet cached in memory
-    if (!preloadedDataUrl) {
+    if (!preloadedDataUrl && !isTechnicalOrFinancialDoc) {
       const idCandidates = [targetVaultDocId, doc.vaultDocId, doc.id, cleanDocId].filter(Boolean) as string[];
       for (const candId of idCandidates) {
         try {
@@ -1497,15 +1657,17 @@ export const BidPackageBuilderView: React.FC = () => {
   return (
     <div className="space-y-6 animate-fadeIn text-left min-h-[60vh] p-2 sm:p-4 md:p-6">
       
-      {/* 1. Target Bidding Project Identifier Container + Header Controls */}
-      <div className="w-full bg-[#080d1a]/90 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-2xl backdrop-blur-md">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
+      {/* 1. Target Bidding Project Identifier Container + Header Controls — HorizonX 3D Glass */}
+      <div className="relative w-full bg-gradient-to-r from-slate-900/95 via-[#080d1a]/90 to-slate-900/95 border border-slate-800/90 rounded-2xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl overflow-hidden">
+        <BorderBeam size={220} duration={14} colorFrom="#3b82f6" colorTo="#6366f1" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
           
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className="flex items-center gap-2 shrink-0">
               <Briefcase className="w-4 h-4 text-blue-400" />
-              <span className="text-xs sm:text-sm font-bold text-slate-200 whitespace-nowrap">
-                Target Bidding Project:
+              <span className="text-xs sm:text-sm font-black text-white tracking-tight whitespace-nowrap">
+                <ShinyText text="Target Bidding Project:" speed={6} />
               </span>
             </div>
 
@@ -2040,6 +2202,12 @@ export const BidPackageBuilderView: React.FC = () => {
                               Verified Project Document
                             </span>
                           )}
+                          {(doc.code === 'BID_SECURING_DECLARATION' || doc.code === 'OMNIBUS_SWORN_STATEMENT' || doc.id.includes('bsd') || doc.id.includes('oss') || doc.documentName.toLowerCase().includes('bid securing') || doc.documentName.toLowerCase().includes('surety bond') || doc.documentName.toLowerCase().includes('omnibus')) && (
+                            <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-[10px] font-bold flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-amber-400" />
+                              <span>Cover Page Always Active • Attach Notarized Original</span>
+                            </span>
+                          )}
                         </div>
 
                         <h4 className="text-xs sm:text-sm font-bold text-white truncate">
@@ -2099,11 +2267,28 @@ export const BidPackageBuilderView: React.FC = () => {
                       {/* Preview PDF */}
                       <button
                         onClick={async () => {
-                          // 1. Direct ID lookup
-                          let targetVaultDoc = vaultDocs.find(v => v.id === doc.vaultDocId);
+                          const codeOrId = ((doc.code || doc.id || '') as string).toUpperCase();
+                          const docNameLower = (doc.documentName || '').toLowerCase();
+                          const isTechOrFinancial = [
+                            'ONGOING_CONTRACTS', 'SLCC_STATEMENT', 'SECTION_VI_REQUIREMENTS', 'TECH_SPECS_SECTION_VII',
+                            'FRAMEWORK_AGREEMENT_LIST', 'ORGANIZATIONAL_CHART', 'KEY_PERSONNEL', 'MAJOR_EQUIPMENT',
+                            'AFTERSALES_WARRANTY', 'OMNIBUS_SWORN_STATEMENT', 'BID_SECURING_DECLARATION', 'NFCC_COMPUTATION',
+                            'FINANCIAL_BID_FORM_GOODS', 'FINANCIAL_BID_FORM_INFRA', 'FINANCIAL_BID_FORM_CONSULTING',
+                            'BILL_OF_QUANTITIES', 'DETAILED_ESTIMATES_FORM_L', 'PRICE_SCHEDULE_GOODS', 'SUMMARY_BID_PRICES',
+                            'CASH_FLOW_BY_QUARTER'
+                          ].some(k => codeOrId.includes(k)) || docNameLower.includes('ongoing') || docNameLower.includes('slcc') || docNameLower.includes('single largest');
 
-                          // 2. Match through statutory checklist definition
-                          if (!targetVaultDoc) {
+                          // 1. Direct ID lookup (guarded against corporate mismatch)
+                          let targetVaultDoc = vaultDocs.find(v => v.id === doc.vaultDocId);
+                          if (targetVaultDoc && isTechOrFinancial) {
+                            const vCode = (targetVaultDoc.documentCode || '').toUpperCase();
+                            if (['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode)) {
+                              targetVaultDoc = undefined;
+                            }
+                          }
+
+                          // 2. Match through statutory checklist definition (Corporate docs only)
+                          if (!targetVaultDoc && !isTechOrFinancial) {
                             const def = statutoryDocsList.find(
                               d => d.name.toLowerCase() === doc.documentName.toLowerCase() || 
                                    d.name.toLowerCase().includes(doc.documentName.toLowerCase()) || 
@@ -2117,21 +2302,21 @@ export const BidPackageBuilderView: React.FC = () => {
                             }
                           }
 
-                          // 3. Smart Keyword Fallback Lookup
-                          if (!targetVaultDoc) {
+                          // 3. Smart Keyword Fallback Lookup (Corporate docs only)
+                          if (!targetVaultDoc && !isTechOrFinancial) {
                             const dName = doc.documentName.toLowerCase();
                             targetVaultDoc = vaultDocs.find(v => {
                               const vName = (v.documentName || '').toLowerCase();
                               const vCode = (v.documentCode || '').toUpperCase();
                               if (dName.includes('philgeps') && (vCode === 'DOC-1' || vName.includes('philgeps'))) return true;
-                              if ((dName.includes('dti') || dName.includes('sec')) && (vCode === 'DOC-2' || vName.includes('dti') || vName.includes('sec') || vName.includes('registration'))) return true;
-                              if (dName.includes('mayor') && (vCode === 'DOC-3' || vCode === 'DOC-4' || vName.includes('mayor') || vName.includes('permit'))) return true;
+                              if (((dName.includes('sec ') || dName.includes('securities') || dName.includes('dti')) && !dName.includes('section') && !dName.includes('secretary')) && (vCode === 'DOC-2' || vName.includes('registration'))) return true;
+                              if ((dName.includes('mayor') || (dName.includes('business permit') && !dName.includes('barangay'))) && (vCode === 'DOC-3' || vCode === 'DOC-4' || vName.includes('permit'))) return true;
                               if (dName.includes('tax') && (vCode === 'DOC-7' || vCode === 'DOC-6' || vName.includes('tax') || vName.includes('clearance'))) return true;
                               if ((dName.includes('financial') || dName.includes('afs') || dName.includes('audited')) && (vCode === 'DOC-15' || vName.includes('afs') || vName.includes('financial') || vName.includes('audited'))) return true;
                               if (dName.includes('pcab') && (vCode === 'DOC-8' || vName.includes('pcab'))) return true;
-                              if (dName.includes('secretary') && (vCode === 'DOC-13' || vName.includes('secretary') || vName.includes('board') || vName.includes('attorney'))) return true;
+                              if (dName.includes('secretary') && !dName.includes('section') && (vCode === 'DOC-13' || vName.includes('secretary') || vName.includes('board') || vName.includes('attorney'))) return true;
                               if ((dName.includes('joint venture') || dName.includes('jva')) && (vCode === 'DOC-14' || vName.includes('joint') || vName.includes('jva'))) return true;
-                              return vName.includes(dName) || dName.includes(vName);
+                              return false;
                             });
                           }
 

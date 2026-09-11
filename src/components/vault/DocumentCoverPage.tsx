@@ -52,7 +52,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
     rawCategory.includes('ELIGIBILITY') || 
     rawCategory.includes('LEGAL') || 
     nameLower.includes('philgeps') || 
-    nameLower.includes('sec') || 
+    (((nameLower.includes('sec ') || nameLower.includes('securities') || nameLower.includes('sec registration') || nameLower.includes('sec-dti') || nameLower === 'sec') && !nameLower.includes('section') && !nameLower.includes('secretary'))) ||
     nameLower.includes('dti') || 
     nameLower.includes('mayor') || 
     nameLower.includes('tax clearance') || 
@@ -66,6 +66,31 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
     nameLower.includes('joint venture') || 
     nameLower.includes('jva')
   );
+
+  // Clean tags for ORIGINAL, COPY 1, COPY 2
+  const copyDisplay = normalizedCopy.includes('ORIGINAL')
+    ? 'ORIGINAL COPY'
+    : (normalizedCopy === 'COPY_1' || normalizedCopy === 'COPY 1')
+      ? 'COPY NO. 1'
+      : (normalizedCopy === 'COPY_2' || normalizedCopy === 'COPY 2')
+        ? 'COPY NO. 2'
+        : normalizedCopy.replace(/_/g, ' ');
+
+  const copyFileDisplay = normalizedCopy.includes('ORIGINAL')
+    ? 'ORIGINAL FILE'
+    : (normalizedCopy === 'COPY_1' || normalizedCopy === 'COPY 1')
+      ? 'COPY 1 FILE'
+      : (normalizedCopy === 'COPY_2' || normalizedCopy === 'COPY 2')
+        ? 'COPY 2 FILE'
+        : `${normalizedCopy.replace(/_/g, ' ')} FILE`;
+
+  const copyVerifiedDisplay = normalizedCopy.includes('ORIGINAL')
+    ? 'ORIGINAL VERIFIED'
+    : (normalizedCopy === 'COPY_1' || normalizedCopy === 'COPY 1')
+      ? 'COPY 1 VERIFIED'
+      : (normalizedCopy === 'COPY_2' || normalizedCopy === 'COPY 2')
+        ? 'COPY 2 VERIFIED'
+        : `${normalizedCopy.replace(/_/g, ' ')} VERIFIED`;
 
   // Explicit Envelope Name
   const officialEnvelopeName = isFinancial
@@ -153,7 +178,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
           </div>
 
           <span className="px-3 py-1 rounded-lg font-mono font-black text-xs uppercase tracking-widest bg-neutral-100 text-black border-2 border-black shrink-0">
-            {normalizedCopy.includes('ORIGINAL') ? 'ORIGINAL COPY' : normalizedCopy}
+            {copyDisplay}
           </span>
         </div>
 
@@ -240,7 +265,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
             </div>
             <div className="bg-white p-2 rounded border border-black col-span-2 sm:col-span-1">
               <span className="text-[8.5px] text-neutral-600 font-bold block uppercase">Copy Verification</span>
-              <strong className="text-black font-black">{normalizedCopy} VERIFIED</strong>
+              <strong className="text-black font-black">{copyVerifiedDisplay}</strong>
             </div>
           </div>
         </div>
@@ -282,7 +307,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
             </span>
           </div>
           <span className="px-2 py-0.5 rounded font-mono font-black text-[10.5px] uppercase tracking-widest bg-neutral-100 text-black border border-black">
-            {normalizedCopy.includes('ORIGINAL') ? 'ORIGINAL COPY' : normalizedCopy}
+            {copyDisplay}
           </span>
         </div>
 
@@ -319,7 +344,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
           <div className="text-right flex-1 min-w-0 space-y-1 border-l-2 border-black pl-3 flex flex-col items-end justify-center">
             <div className="inline-flex items-center gap-1.5 text-black bg-neutral-100 border-2 border-black px-3 py-1 rounded-lg shadow-sm">
               <span className="font-mono font-black text-xs uppercase tracking-wider text-black">
-                {normalizedCopy.includes('ORIGINAL') ? 'ORIGINAL FILE' : normalizedCopy.includes('COPY_1') || normalizedCopy === 'COPY 1' ? 'COPY 1 FILE' : normalizedCopy.includes('COPY_2') || normalizedCopy === 'COPY 2' ? 'COPY 2 FILE' : `${normalizedCopy} FILE`}
+                {copyFileDisplay}
               </span>
             </div>
             <div className="text-[10px] sm:text-[11px] font-mono text-black font-black uppercase tracking-wide">

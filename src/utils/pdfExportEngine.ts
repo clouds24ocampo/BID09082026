@@ -27,6 +27,25 @@ const blobToDataUrl = async (blob: Blob): Promise<string> => {
   return `data:application/pdf;base64,${base64}`;
 };
 
+/** Formats a date string to date-only (strictly NO time component) for official BAC stamping */
+export const formatDateOnly = (dateStr?: string | null): string => {
+  if (!dateStr) return 'August 30, 2026';
+  const raw = String(dateStr).trim();
+  // Strip time suffixes like " at 02:00 PM", " at 10:00 AM", "T14:00:00", "T14:00", " 14:00", etc.
+  const datePart = raw.replace(/\s+at\s+.*$/i, '').replace(/T.*$/, '').replace(/\s+\d{1,2}:\d{2}(:\d{2})?.*$/, '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    const [y, m, d] = datePart.split('-').map(Number);
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${months[m - 1]} ${d}, ${y}`;
+    }
+  }
+  return datePart;
+};
+
 const normalizePdfSourceToArrayBuffer = async (source: PdfAttachmentSource): Promise<ArrayBuffer> => {
   if (typeof source === 'string') {
     const trimmed = source.trim();
@@ -539,7 +558,7 @@ export async function buildMergedThreeLayerPdfBytes(
          outputFileName.includes('COPY_2') || outputFileName.includes('COPY 2') ? 'COPY_2' :
          outputFileName.includes('ORIGINAL') ? 'ORIGINAL' : undefined);
 
-      const submissionDate = options?.submissionDate || 'August 30, 2026';
+      const submissionDate = formatDateOnly(options?.submissionDate);
       const signatory = options?.signatoryName || 'Authorized Managing Officer';
       const refNo = options?.projectRefNo || 'PhilGEPS-2026';
 
@@ -627,7 +646,7 @@ export async function buildMergedThreeLayerPdfBytes(
             color: rgb(0.12, 0.24, 0.54),
             rotate: stampTilt
           });
-          page.drawText(`Authenticated: ${signatory.slice(0, 30)}`, {
+          page.drawText(`Signed by: ${signatory.slice(0, 32)}`, {
             x: stampX + 12,
             y: stampY + stampH - 41,
             size: 5.5,

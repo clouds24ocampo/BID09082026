@@ -24,6 +24,9 @@ let cachedDB: IDBDatabase | null = null;
 
 /** Open (or get cached) IndexedDB database connection */
 function openDB(): Promise<IDBDatabase> {
+  if (typeof indexedDB === 'undefined') {
+    return Promise.reject(new Error('IndexedDB is not available in this environment'));
+  }
   if (cachedDB) {
     try {
       // Test if connection is still active
@@ -140,6 +143,10 @@ export async function savePdfData(itemId: string, dataUrl: string): Promise<void
   // Populate memory cache instantly
   memoryPdfCache.set(itemId, dataUrl);
 
+  if (typeof indexedDB === 'undefined') {
+    return;
+  }
+
   const db = await openDB();
   const tx = db.transaction(STORE_PDF_BLOBS, 'readwrite');
   const store = tx.objectStore(STORE_PDF_BLOBS);
@@ -156,6 +163,10 @@ export async function loadPdfData(itemId: string): Promise<string | undefined> {
   // 0ms instant retrieval from in-memory cache if present
   if (memoryPdfCache.has(itemId)) {
     return memoryPdfCache.get(itemId);
+  }
+
+  if (typeof indexedDB === 'undefined') {
+    return undefined;
   }
 
   const db = await openDB();
@@ -204,6 +215,10 @@ export async function loadMultiplePdfData(itemIds: string[]): Promise<Record<str
 export async function deletePdfData(itemId: string): Promise<void> {
   memoryPdfCache.delete(itemId);
 
+  if (typeof indexedDB === 'undefined') {
+    return;
+  }
+
   const db = await openDB();
   const tx = db.transaction(STORE_PDF_BLOBS, 'readwrite');
   const store = tx.objectStore(STORE_PDF_BLOBS);
@@ -219,6 +234,9 @@ export async function deletePdfData(itemId: string): Promise<void> {
 export async function clearAllPdfData(): Promise<void> {
   memoryPdfCache.clear();
   memoryVaultItemsCache.clear();
+  if (typeof indexedDB === 'undefined') {
+    return;
+  }
   const db = await openDB();
   const tx = db.transaction(STORE_PDF_BLOBS, 'readwrite');
   const store = tx.objectStore(STORE_PDF_BLOBS);
@@ -235,6 +253,9 @@ export async function clearAllPdfData(): Promise<void> {
 export async function clearAllVaultData(): Promise<void> {
   memoryPdfCache.clear();
   memoryVaultItemsCache.clear();
+  if (typeof indexedDB === 'undefined') {
+    return;
+  }
   const db = await openDB();
   const tx = db.transaction([STORE_VAULT_ITEMS, STORE_PDF_BLOBS], 'readwrite');
   tx.objectStore(STORE_VAULT_ITEMS).clear();

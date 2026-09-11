@@ -443,7 +443,7 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
                   </div>
                   
                   {/* Page 1: Front Cover Page (Legal 13" x 8.5") */}
-                  <DocumentCoverPage item={doc} tenant={tenant} incrementNumber={idx + 1} />
+                  <DocumentCoverPage item={doc} tenant={tenant} folderCopy={activeBundle} incrementNumber={idx + 1} />
 
                   {/* Page 2+: Content Page (Legal 13" x 8.5" Fit-to-Page) */}
                   <div className="space-y-2 pt-2">
@@ -510,7 +510,7 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
         >
           {selectedItems.map((doc, idx) => (
             <div key={`bundle-cover-${doc.id}`} id={`bundle-cover-${doc.id}`} style={{ width: '800px' }}>
-              <DocumentCoverPage item={doc} tenant={tenant} incrementNumber={idx + 1} />
+              <DocumentCoverPage item={doc} tenant={tenant} folderCopy={activeBundle} incrementNumber={idx + 1} />
             </div>
           ))}
         </div>

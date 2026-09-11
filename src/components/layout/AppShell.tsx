@@ -22,6 +22,8 @@ import {
   Trash2 
 } from 'lucide-react';
 
+import { AuroraBackground } from '../common/AuroraBackground';
+
 interface AppShellProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
@@ -88,25 +90,30 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
     { id: 'settings', label: 'Tenant Settings', icon: Settings },
   ];
 
+  const brandColor = currentTenant?.brandColor || '#1e40af';
+
   return (
-    <div className="min-h-screen bg-[#070a12] text-slate-100 flex flex-col">
+    <AuroraBackground className="min-h-screen flex flex-col">
       
-      {/* TOP BAR HEADER */}
-      <header className="h-16 border-b border-slate-800 bg-[#0b0f19]/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between">
+      {/* TOP BAR HEADER — HORIZONX FLOATING GLASS WITH GLOW */}
+      <header className="h-16 border-b border-slate-800/80 bg-[#090d1a]/85 backdrop-blur-xl sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between shadow-lg shadow-black/30">
         
         {/* Left Branding & Mobile Toggle */}
         <div className="flex items-center gap-3 sm:gap-4">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg text-slate-400 hover:text-white md:hidden"
+            className="p-2 rounded-lg text-slate-400 hover:text-white md:hidden cursor-pointer"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => setActiveTab('profile')}>
+          <div className="flex items-center gap-2.5 cursor-pointer group" onClick={() => setActiveTab('profile')}>
             <div 
-              className="w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-white text-sm shadow-md transition-transform hover:scale-105 overflow-hidden p-0.5"
-              style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
+              className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-white text-sm shadow-lg transition-transform group-hover:scale-105 overflow-hidden p-0.5"
+              style={{ 
+                backgroundColor: brandColor,
+                boxShadow: `0 0 20px -3px ${brandColor}60`
+              }}
             >
               {currentTenant?.logoUrl ? (
                 <img src={currentTenant.logoUrl} alt="Logo" className="w-full h-full object-contain bg-white rounded-lg" />
@@ -116,12 +123,12 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-white text-base tracking-tight">BIDOCS</span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono font-semibold border border-blue-500/20">
-                  v2.5
+                <span className="font-black text-white text-base tracking-tight text-shimmer">BIDOCS</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-mono font-bold border border-blue-500/30 shadow-[0_0_10px_-2px_rgba(59,130,246,0.3)]">
+                  v2.5 PRO
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 truncate max-w-37.5 sm:max-w-50">
+              <p className="text-[10px] text-slate-400 truncate max-w-37.5 sm:max-w-50 group-hover:text-slate-200 transition-colors">
                 {currentTenant?.companyName}
               </p>
             </div>
@@ -132,15 +139,15 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
         <div className="hidden md:flex items-center relative">
           <button
             onClick={() => setShowTenantDropdown(!showTenantDropdown)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition shadow-inner cursor-pointer"
           >
-            <Building2 className="w-3.5 h-3.5" style={{ color: currentTenant?.brandColor }} />
+            <Building2 className="w-3.5 h-3.5" style={{ color: brandColor }} />
             <span className="font-semibold">{currentTenant?.companyName}</span>
             <ChevronDown className="w-3 h-3 text-slate-400" />
           </button>
 
           {showTenantDropdown && (
-            <div className="absolute top-10 left-0 w-72 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-2 space-y-1 z-50 animate-fadeIn">
+            <div className="absolute top-10 left-0 w-72 bg-slate-900/95 border border-slate-800 rounded-xl shadow-2xl p-2 space-y-1 z-50 animate-scaleIn backdrop-blur-xl">
               <div className="px-2 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                 Switch Corporate Profile
               </div>
@@ -151,21 +158,21 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
                     switchTenant(t.id);
                     setShowTenantDropdown(false);
                   }}
-                  className={`w-full text-left p-2 rounded-lg text-xs flex items-center justify-between transition ${
+                  className={`w-full text-left p-2 rounded-lg text-xs flex items-center justify-between transition cursor-pointer ${
                     t.id === currentTenant?.id
-                      ? 'bg-blue-600/10 border border-blue-500/30 text-white'
-                      : 'hover:bg-slate-800 text-slate-300'
+                      ? 'bg-blue-600/15 border border-blue-500/40 text-white shadow-sm'
+                      : 'hover:bg-slate-800/80 text-slate-300'
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.brandColor }} />
                     <div className="truncate max-w-45">
                       <p className="font-medium text-white truncate">{t.companyName}</p>
-                      <p className="text-[10px] text-slate-400">TIN: {t.tin}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">TIN: {t.tin}</p>
                     </div>
                   </div>
                   {t.id === currentTenant?.id && (
-                    <span className="text-[10px] text-blue-400 font-semibold">Active</span>
+                    <span className="text-[10px] text-blue-400 font-bold">Active</span>
                   )}
                 </button>
               ))}
@@ -176,24 +183,25 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
         {/* Right Header Actions */}
         <div className="flex items-center gap-3">
           
-          {/* Legal Regime Badge */}
-          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>RA 12009 NGPA Mode</span>
+          {/* HorizonX Live Legal Regime Telemetry Badge */}
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold shadow-[0_0_15px_-3px_rgba(16,185,129,0.25)]">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-dot" />
+            <span>RA 12009 NGPA Live</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 font-mono text-emerald-300">GPPB v6</span>
           </div>
 
           {/* Expiry Notifications Alert */}
           <div className="relative">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition relative"
+              className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white transition relative cursor-pointer hover:border-slate-700"
             >
               <Bell className="w-4 h-4" />
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500" />
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
             </button>
 
             {showNotifications && (
-              <div className="absolute right-0 top-10 w-80 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-3 z-50 space-y-2 animate-fadeIn">
+              <div className="absolute right-0 top-10 w-80 bg-slate-900/95 border border-slate-800 rounded-xl shadow-2xl p-3 z-50 space-y-2 animate-scaleIn backdrop-blur-xl">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                   <span className="text-xs font-bold text-white">Compliance Alerts</span>
                   <span className="text-[10px] text-amber-400 font-mono">2 Expiration Warnings</span>
@@ -216,11 +224,11 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
           <div className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 p-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 transition"
+              className="flex items-center gap-2 p-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition cursor-pointer"
             >
               <div 
-                className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm"
+                style={{ backgroundColor: brandColor }}
               >
                 {currentUser?.fullName?.charAt(0) || 'U'}
               </div>
@@ -229,11 +237,11 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
             </button>
 
             {showUserMenu && (
-              <div className="absolute right-0 top-10 w-56 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 space-y-1 animate-fadeIn">
+              <div className="absolute right-0 top-10 w-56 bg-slate-900/95 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 space-y-1 animate-scaleIn backdrop-blur-xl">
                 <div className="px-3 py-2 border-b border-slate-800">
                   <p className="text-xs font-semibold text-white truncate">{currentUser?.fullName}</p>
                   <p className="text-[10px] text-slate-400 truncate">{currentUser?.email}</p>
-                  <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-semibold">
+                  <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-semibold font-mono">
                     {currentUser?.role === 'COMPANY_OWNER' ? 'Company Owner' : 'Bid Manager'}
                   </span>
                 </div>
@@ -243,7 +251,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
                     setActiveTab('settings');
                     setShowUserMenu(false);
                   }}
-                  className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-2 cursor-pointer"
                 >
                   <Settings className="w-3.5 h-3.5 text-slate-400" />
                   <span>Tenant & Branding Settings</span>
@@ -254,7 +262,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
                     logout();
                     setShowUserMenu(false);
                   }}
-                  className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-2 cursor-pointer"
                 >
                   <LogOut className="w-3.5 h-3.5 text-slate-400" />
                   <span>Log Out Session</span>
@@ -268,7 +276,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
                       window.location.reload();
                     }
                   }}
-                  className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg flex items-center gap-2 border-t border-slate-800 mt-1 pt-2"
+                  className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg flex items-center gap-2 border-t border-slate-800 mt-1 pt-2 cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-red-400" />
                   <span>Purge Workspace & Clear Companies</span>
@@ -280,14 +288,15 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
         </div>
       </header>
 
-      {/* BODY CONTENT AREA WITH SIDEBAR */}
+      {/* BODY CONTENT AREA WITH 3D SIDEBAR */}
       <div className="flex-1 flex overflow-hidden min-h-0">
         
-        {/* SIDEBAR NAVIGATION */}
-        <aside className={`w-64 bg-[#0b0f19] border-r border-slate-800 flex-col justify-between py-4 px-3 md:flex md:relative md:inset-auto md:shadow-none ${mobileMenuOpen ? 'flex absolute inset-y-16 left-0 z-30 shadow-2xl' : 'hidden'}`}>
+        {/* SIDEBAR NAVIGATION — HORIZONX SLICK FROSTED ACRYLIC */}
+        <aside className={`w-64 bg-[#080c16]/90 backdrop-blur-xl border-r border-slate-800/80 flex-col justify-between py-4 px-3 md:flex md:relative md:inset-auto md:shadow-none ${mobileMenuOpen ? 'flex absolute inset-y-16 left-0 z-30 shadow-2xl' : 'hidden'}`}>
           <div className="space-y-1">
-            <div className="px-3 py-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-              Bidding Modules
+            <div className="px-3 py-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              <span>Bidding Modules</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse-dot" />
             </div>
 
             {navItems.map((item) => {
@@ -300,26 +309,28 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
                     setActiveTab(item.id);
                     setMobileMenuOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition ${
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? 'bg-slate-800/90 text-white font-semibold shadow-sm border border-slate-700/80'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                      ? 'bg-gradient-to-r from-blue-600/20 via-slate-800/80 to-slate-800/40 text-white font-bold border border-blue-500/40 shadow-[0_0_20px_-5px_rgba(59,130,246,0.3)]'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                   }`}
                   style={{
-                    borderLeft: isActive ? `3px solid ${currentTenant?.brandColor || '#1e40af'}` : undefined
+                    borderLeft: isActive ? `3px solid ${brandColor}` : undefined
                   }}
                 >
                   <div className="flex items-center gap-3">
                     <Icon 
-                      className="w-4 h-4" 
-                      style={{ color: isActive ? currentTenant?.brandColor || '#3b82f6' : undefined }} 
+                      className={`w-4 h-4 transition-transform ${isActive ? 'scale-110' : ''}`} 
+                      style={{ color: isActive ? brandColor : undefined }} 
                     />
                     <span>{item.label}</span>
                   </div>
 
                   {item.badge && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                      isActive ? 'bg-blue-500/20 text-blue-300' : 'bg-slate-800 text-slate-500'
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold ${
+                      isActive 
+                        ? 'bg-blue-500/25 text-blue-300 border border-blue-500/30' 
+                        : 'bg-slate-800/80 text-slate-500 border border-slate-700/50'
                     }`}>
                       {item.badge}
                     </span>
@@ -329,13 +340,16 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
             })}
           </div>
 
-          {/* Sidebar Footer: Active Tenant Summary */}
-          <div className="p-3 rounded-xl glass-card border border-slate-800 space-y-2 mt-4">
+          {/* Sidebar Footer: Active Tenant Summary with 3D Border Glow */}
+          <div className="p-3.5 rounded-xl glass-card-3d border border-slate-800/90 space-y-2 mt-4">
             <div className="flex items-center justify-between text-[11px] text-slate-400">
-              <span>Tenant Scope</span>
-              <span className="font-mono text-emerald-400">ONLINE</span>
+              <span className="font-semibold">Tenant Scope</span>
+              <span className="font-mono text-emerald-400 flex items-center gap-1 text-[10px]">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                ONLINE
+              </span>
             </div>
-            <p className="text-xs font-bold text-white truncate">{currentTenant?.companyName}</p>
+            <p className="text-xs font-black text-white truncate">{currentTenant?.companyName}</p>
             <div className="text-[10px] text-slate-400 space-y-0.5 font-mono">
               <p>TIN: {currentTenant?.tin}</p>
               <p>PCAB: {currentTenant?.pcabLicenseNo || 'N/A'}</p>
@@ -344,7 +358,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
         </aside>
 
         {/* MAIN VIEWPORT */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[#070a12] min-h-[calc(100vh-4rem)] min-w-0">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 min-h-[calc(100vh-4rem)] min-w-0">
           <div className="w-full max-w-[1780px] mx-auto">
             {children}
           </div>
@@ -446,6 +460,6 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
         </div>
       )}
 
-    </div>
+    </AuroraBackground>
   );
 };

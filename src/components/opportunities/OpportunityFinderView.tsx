@@ -20,6 +20,10 @@ import {
   Lock,
   FileCheck
 } from 'lucide-react';
+import { SpotlightCard } from '../common/SpotlightCard';
+import { BorderBeam } from '../common/BorderBeam';
+import { ShinyText } from '../common/ShinyText';
+import { CyberBadge } from '../common/CyberBadge';
 
 const formatPhpCurrency = (val: number | string): string => {
   if (val === '' || val === null || val === undefined) return '';
@@ -638,29 +642,48 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     <VaultErrorBoundary fallbackTitle="Opportunity Finder Protected">
       <div className="space-y-6 animate-fadeIn">
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
-          <div>
-            <div className="flex items-center gap-2">
-              <span
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
-              />
-              <h1 className="text-2xl font-bold text-white">Opportunity Finder & Procurement Registry</h1>
+        {/* Header Banner — 3D Glass with BorderBeam & Telemetry */}
+        <div className="relative rounded-2xl p-5 md:p-6 bg-gradient-to-r from-slate-900/90 via-[#0a1128]/85 to-slate-900/90 border border-slate-800/90 shadow-2xl backdrop-blur-xl overflow-hidden">
+          <BorderBeam size={180} duration={12} colorFrom="#3b82f6" colorTo="#10b981" />
+          
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <span
+                  className="w-3.5 h-3.5 rounded-full ring-4 ring-blue-500/20"
+                  style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
+                />
+                <h1 className="text-2xl font-black text-white tracking-tight">
+                  <ShinyText text="Opportunity Finder" speed={6} />
+                  <span className="text-slate-400 font-medium text-lg ml-2 font-sans">& Statutory Bidding Registry</span>
+                </h1>
+              </div>
+              <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-2">
+                <span>Real-time PhilGEPS bidding opportunities repository for</span>
+                <span className="text-slate-200 font-bold bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700/60 font-mono">
+                  {currentTenant?.companyName}
+                </span>
+              </p>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Real-time PhilGEPS bidding opportunities repository for <span className="text-slate-200 font-semibold">{currentTenant?.companyName}</span>.
-            </p>
-          </div>
 
-          <button
-            onClick={handleOpenAddModal}
-            className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white shadow-lg transition flex items-center gap-2 hover:opacity-90 shrink-0"
-            style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Bidding Opportunity</span>
-          </button>
+            <div className="flex items-center gap-3 shrink-0">
+              <CyberBadge 
+                label="PhilGEPS Sync Live" 
+                variant="blue" 
+                telemetry={`${filteredOps.length} Projects`}
+                pulse={true}
+              />
+
+              <button
+                onClick={handleOpenAddModal}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg shadow-blue-500/25 transition-all duration-300 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
+                style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Bidding Opportunity</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Filters and Search */}
@@ -693,48 +716,57 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
           </div>
         </div>
 
-        {/* Opportunities List Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Opportunities List Grid — ReactBits SpotlightCards with 3D micro-tilt */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredOps.map((op) => (
-            <div
+            <SpotlightCard
               key={op.id}
-              className="glass-card p-5 rounded-2xl border border-slate-800 hover:border-slate-700 transition space-y-4 flex flex-col justify-between group"
+              spotlightColor="rgba(59, 130, 246, 0.22)"
+              enableTilt={true}
+              className="p-5 rounded-2xl border border-slate-800/90 hover:border-blue-500/50 transition-all duration-300 space-y-4 flex flex-col justify-between group shadow-xl hover:shadow-blue-500/10"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">
+                  <span className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-lg bg-blue-950/80 text-blue-300 border border-blue-800/80 shadow-sm flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
                     {op.projectReferenceNumber}
                   </span>
                   <div className="flex items-center gap-1.5">
                     <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${getProcurementTypeBadgeStyle(op.procurementType)}`}>
                       {op.procurementType}
                     </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold border border-slate-700">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800/80 text-slate-300 font-semibold border border-slate-700/60">
                       {op.sector || 'Government'}
                     </span>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-bold text-white group-hover:text-blue-400 transition leading-snug">{op.title}</h3>
-                  <p className="text-xs text-slate-400 mt-1 flex items-center gap-1 font-mono">
+                  <h3 className="text-sm font-bold text-white group-hover:text-blue-300 transition-colors leading-snug">
+                    {op.title}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-1.5 font-mono">
                     <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                     <span className="truncate">{op.procuringEntity}</span>
                   </p>
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono mt-1 pt-1 border-t border-slate-800/60">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono mt-2 pt-1.5 border-t border-slate-800/60">
                     <span>PhilGEPS: <strong className="text-slate-200">{op.philgepsRefNo}</strong></span>
                     <span>Solicitation: <strong className="text-slate-200">{op.solicitationNumber}</strong></span>
                   </div>
                 </div>
 
-                <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1.5 text-xs font-mono">
+                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2 text-xs font-mono backdrop-blur-sm">
                   <div className="flex items-center justify-between text-slate-400">
-                    <span>Approved Budget (ABC)</span>
-                    <span className="text-emerald-400 font-bold">{formatPhpCurrency(op.approvedBudget)}</span>
+                    <span className="text-slate-400">Approved Budget (ABC)</span>
+                    <span className="text-emerald-400 font-extrabold tracking-tight drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]">
+                      {formatPhpCurrency(op.approvedBudget)}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between text-slate-400 text-[11px]">
                     <span>Project Type</span>
-                    <span className={`truncate max-w-[180px] ${getProcurementTypeTextStyle(op.procurementType)}`}>{op.procurementType}</span>
+                    <span className={`truncate max-w-[180px] font-semibold ${getProcurementTypeTextStyle(op.procurementType)}`}>
+                      {op.procurementType}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between text-slate-400 text-[11px]">
                     <span>Area of Delivery</span>
@@ -753,7 +785,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                 <div className="flex items-center gap-1.5 wrap flex-wrap">
                   <button
                     onClick={() => handleWorkOnProject(op)}
-                    className="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition text-xs font-bold flex items-center gap-1 shadow"
+                    className="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-all text-xs font-bold flex items-center gap-1 shadow-md shadow-blue-600/30 hover:shadow-blue-500/50 cursor-pointer"
                     title="Select project and open Document Vault"
                   >
                     <FileCheck className="w-3.5 h-3.5" />
@@ -762,7 +794,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
                   <button
                     onClick={() => setViewingItem(op)}
-                    className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
+                    className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30 cursor-pointer"
                   >
                     <Eye className="w-3.5 h-3.5" />
                     <span>View Details</span>
@@ -774,7 +806,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                       fileName: op.pdfFileName || `${op.philgepsRefNo}_Notice.pdf`,
                       dataUrl: op.pdfFileDataUrl
                     })}
-                    className="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30"
+                    className="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30 cursor-pointer"
                     title="View Official PhilGEPS PDF Notice Document"
                   >
                     <FileText className="w-3.5 h-3.5" />
@@ -783,7 +815,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
                   <button
                     onClick={() => downloadFile(op.pdfFileName || `${op.philgepsRefNo}_Notice.pdf`, op.pdfFileDataUrl)}
-                    className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition text-xs font-semibold flex items-center gap-1 border border-slate-700/80"
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition text-xs font-semibold flex items-center gap-1 border border-slate-700/80 cursor-pointer"
                     title="Download Official PhilGEPS PDF Notice Document"
                   >
                     <Download className="w-3.5 h-3.5" />
@@ -794,21 +826,21 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => handleOpenEditModal(op)}
-                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition"
+                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition cursor-pointer"
                     title="Edit Opportunity"
                   >
                     <Edit3 className="w-4 h-4 text-amber-400" />
                   </button>
                   <button
                     onClick={() => setDeletingItem(op)}
-                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-red-600 hover:text-white transition"
+                    className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-red-600 hover:text-white transition cursor-pointer"
                     title="Delete Opportunity"
                   >
                     <Trash2 className="w-4 h-4 text-red-400" />
                   </button>
                 </div>
               </div>
-            </div>
+            </SpotlightCard>
           ))}
         </div>
 
