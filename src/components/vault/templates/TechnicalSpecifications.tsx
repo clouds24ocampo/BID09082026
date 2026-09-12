@@ -552,7 +552,9 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
   const handleViewPdf = async () => {
     setIsPreviewing(true);
+    setIsExporting(true);
     try {
+      await new Promise(resolve => setTimeout(resolve, 80));
       const dataUrl = await buildFinalPdfDataUrl();
       if (dataUrl) {
         setPreviewPdfUrl(dataUrl);
@@ -562,6 +564,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     } catch (err) {
       console.error('[SectionVII] View PDF generation error:', err);
     } finally {
+      setIsExporting(false);
       setIsPreviewing(false);
     }
   };
@@ -569,6 +572,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
   const handleExportPdf = async () => {
     setIsExporting(true);
     try {
+      await new Promise(resolve => setTimeout(resolve, 80));
       const fileName = `${philgepsRefNo || projectRefNo}_Section_VII_Technical_Specifications_${todayStr}.pdf`;
       const finalPdfDataUrl = await buildFinalPdfDataUrl();
       if (finalPdfDataUrl) {
@@ -629,6 +633,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     setIsExporting(true);
     let dataUrl: string | undefined = undefined;
     try {
+      await new Promise(resolve => setTimeout(resolve, 80));
       dataUrl = await buildFinalPdfDataUrl();
       if (dataUrl) {
         const tenantKey = tenant?.id || 'default';
@@ -671,26 +676,40 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     return 'text-xs leading-normal';
   };
 
+  const { charsPerLine, lineHeightPx, basePaddingPx } = useMemo(() => {
+    if (fontSizeMode === 'fine' || (fontSizeMode === 'xs' && totalCharactersInDoc > 5000)) {
+      return { charsPerLine: 62, lineHeightPx: 13, basePaddingPx: 14 };
+    }
+    if (fontSizeMode === 'sm') {
+      return { charsPerLine: 44, lineHeightPx: 20, basePaddingPx: 18 };
+    }
+    return { charsPerLine: 52, lineHeightPx: 16.5, basePaddingPx: 16 };
+  }, [fontSizeMode, totalCharactersInDoc]);
+
   // --- DYNAMIC AUTO-FIT PAGE-PACKING ENGINE ---
-  // Automatically measures and packs all information inside the minimum necessary number of pages with zero empty space
+  // Calibrated for 58% column width (445px @ 96DPI) with zero empty space & safe footer margin
   const pageChunks = useMemo<PageRow[][]>(() => {
     const indexedItems: PageRow[] = items.map((it, idx) => ({ item: it, index: idx }));
     return autoFitPageChunks(
       indexedItems,
       (row) => {
-        const specHeight = calculateRowHeight(row.item.specification || '', 60, 13.5, 8, 22);
-        const bmHeight = calculateRowHeight(row.item.brandModel || '', 25, 13.5, 8, 22);
-        return Math.max(specHeight, bmHeight, 22);
+        const formattedSpec = formatDescriptionText(row.item.specification || '');
+        const specHeight = calculateRowHeight(formattedSpec, charsPerLine, lineHeightPx, basePaddingPx, 28);
+        const bmText = row.item.brandModel ? formatDescriptionText(row.item.brandModel) : '';
+        const bmHeight = bmText ? calculateRowHeight(bmText, 25, 14, 10, 16) + 24 : 24;
+        return Math.max(specHeight, bmHeight, 28);
       },
       {
         orientation: 'portrait',
-        columnCharWidth: 60,
+        columnCharWidth: charsPerLine,
         headerHeightPx: 170,
         footerHeightPx: 260,
-        runningFooterPx: 30
+        runningFooterPx: 42,
+        continuationTheadHeightPx: 0,
+        safetyBufferPx: 45
       }
     );
-  }, [items]);
+  }, [items, charsPerLine, lineHeightPx, basePaddingPx]);
 
   const totalPages = pageChunks.length;
 
@@ -698,7 +717,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     <div
       key={`sec-7-page-${pIdx}`}
       id={pIdx === 0 ? 'section-vii-paper' : `section-vii-paper-p${pIdx + 1}`}
-      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
+      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col font-serif mb-8 box-border relative text-slate-950"
     >
       <div>
         {/* COMPANY & PROJECT HEADER BLOCK (PAGE 1 ONLY) */}
@@ -745,12 +764,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
             <p className="text-[10px] font-mono text-slate-700 uppercase mt-0.5 font-bold">
               (MANDATORY TECHNICAL SPECIFICATIONS & STATEMENT OF COMPLIANCE)
             </p>
-            {(brochurePdfName || drawingPdfName) && (
-              <div className="mt-1 text-xs font-serif italic text-purple-950 font-semibold space-y-0.5">
-                {brochurePdfName && <div>📎 Attached Brochure PDF: {brochurePdfName}</div>}
-                {drawingPdfName && <div>📎 Attached Drawing PDF: {drawingPdfName}</div>}
-              </div>
-            )}
           </div>
         ) : null}
 
@@ -763,7 +776,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
               <col className="w-[58%]" />
               <col className="w-[28%]" />
             </colgroup>
-            {pIdx === 0 ? (
+            {pIdx === 0 && (
               <thead>
                 <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[11px]">
                   <th className="border border-black px-1 py-1 w-[6%]">Item No.</th>
@@ -775,15 +788,6 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
                       [Bidders must state <strong>"Comply"</strong> or <strong>"Not Comply"</strong> against each individual parameter supported by evidence.]
                     </div>
                   </th>
-                </tr>
-              </thead>
-            ) : (
-              <thead>
-                <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[10px]">
-                  <th className="border border-black px-1 py-1 w-[6%]">Item No.</th>
-                  <th className="border border-black px-1.5 py-1 w-[8%]">Qty</th>
-                  <th className="border border-black px-3 py-1 text-center w-[58%]">Technical Specifications / Scope of Work (Continuation)</th>
-                  <th className="border border-black px-3 py-1 text-center w-[28%]">Statement of Compliance</th>
                 </tr>
               </thead>
             )}
@@ -896,7 +900,7 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
       </div>
 
       {/* Document Footer: Signatory Block (Final Page Only) + Running Page Footer on EVERY Page */}
-      <div>
+      <div className="w-full shrink-0 mt-auto">
         {/* Signatory Block & GPPB QR Code (Final Page Only) */}
         {pIdx === totalPages - 1 && (
           <div className="mt-6 pt-3 border-t border-slate-300 flex items-end justify-between text-xs font-serif signatory-block mb-3">

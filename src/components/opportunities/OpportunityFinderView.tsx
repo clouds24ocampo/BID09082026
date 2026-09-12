@@ -586,6 +586,19 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     const updated = opportunities.filter(o => o.id !== deletingItem.id);
     setOpportunities(updated);
     await saveOpportunitiesSafely(updated);
+
+    // If deleting the currently active project, remove its active markers
+    try {
+      const activeRaw = localStorage.getItem(`bidocs_active_project_${tenantId}`);
+      if (activeRaw) {
+        const parsed = JSON.parse(activeRaw);
+        if (parsed.refNo === deletingItem.projectReferenceNumber || parsed.refNo === deletingItem.philgepsRefNo) {
+          localStorage.removeItem(`bidocs_active_project_${tenantId}`);
+          localStorage.removeItem('bidocs_active_project');
+        }
+      }
+    } catch (_) {}
+
     if (viewingItem?.id === deletingItem.id) setViewingItem(null);
     setDeletingItem(null);
   };

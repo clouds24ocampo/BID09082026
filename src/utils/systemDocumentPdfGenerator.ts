@@ -42,11 +42,11 @@ export const exportPdfDocAsDataUri = async (pdfDoc: PDFDocument): Promise<string
 export interface DocResolveContext {
   tenant: Tenant | null;
   tenantId?: string;
-  activeProject: any;
-  projectRefNo: string;
-  projectTitle: string;
-  procuringEntity: string;
-  vaultDocs: DocumentVaultItem[];
+  activeProject?: any;
+  projectRefNo?: string;
+  projectTitle?: string;
+  procuringEntity?: string;
+  vaultDocs?: DocumentVaultItem[];
   folderCopy?: string;
 }
 
@@ -167,8 +167,8 @@ const drawOfficialHeader = (
   tenant: Tenant | null,
   title: string,
   subtitle: string,
-  projectRefNo: string,
-  projectTitle: string,
+  projectRefNo?: string,
+  projectTitle?: string,
   isLandscape: boolean = true
 ) => {
   const pageWidth = isLandscape ? 936 : 612;
@@ -260,8 +260,8 @@ const drawOfficialFooter = async (
   fontReg: PDFFont,
   tenant: Tenant | null,
   docName: string,
-  projectRefNo: string,
-  projectTitle: string,
+  projectRefNo?: string,
+  projectTitle?: string,
   isLandscape: boolean = true,
   customY?: number
 ) => {
@@ -1074,6 +1074,28 @@ export async function generateSectionViRequirementsPdf(ctx: DocResolveContext): 
     'Section VI. Schedule of Requirements', ctx.projectRefNo, ctx.projectTitle, false
   );
 
+  // Stamp official running footer across every page
+  const totalDocPages = pdfDoc.getPageCount();
+  const allDocPages = pdfDoc.getPages();
+  const compNameStr = (ctx.tenant?.companyName || 'BIDDING ENTERPRISE').toUpperCase();
+  const refStr = ctx.projectRefNo || 'REF: SEC-VI';
+  allDocPages.forEach((p, pIndex) => {
+    const { width: pW } = p.getSize();
+    p.drawLine({
+      start: { x: 36, y: 32 },
+      end: { x: pW - 36, y: 32 },
+      thickness: 1,
+      color: rgb(0.2, 0.2, 0.2)
+    });
+    p.drawText(compNameStr, { x: 36, y: 22, size: 7.5, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+    const centerTxt = `SECTION VI SCHEDULE OF REQUIREMENTS • ${refStr}`;
+    const cW = fontReg.widthOfTextAtSize(centerTxt, 7);
+    p.drawText(centerTxt, { x: (pW - cW) / 2, y: 22, size: 7, font: fontReg, color: rgb(0.3, 0.3, 0.3) });
+    const pageNumTxt = `PAGE ${pIndex + 1} OF ${totalDocPages}`;
+    const pNW = fontBold.widthOfTextAtSize(pageNumTxt, 7.5);
+    p.drawText(pageNumTxt, { x: pW - 36 - pNW, y: 22, size: 7.5, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+  });
+
   return await exportPdfDocAsDataUri(pdfDoc);
 }
 
@@ -1160,8 +1182,6 @@ export async function generateTechnicalSpecificationsPdf(ctx: DocResolveContext)
         ctx.projectRefNo, ctx.projectTitle, false
       );
       currentY = 820;
-      drawTechHeader(page, currentY);
-      currentY -= 20;
     }
 
     page.drawRectangle({
@@ -1259,6 +1279,28 @@ export async function generateTechnicalSpecificationsPdf(ctx: DocResolveContext)
     await appendPdfStreams(pdfDoc, [brochureData, drawingData]);
   } catch (_) {}
 
+  // Stamp official running footer across every page
+  const totalDocPages = pdfDoc.getPageCount();
+  const allDocPages = pdfDoc.getPages();
+  const compNameStr = (ctx.tenant?.companyName || 'BIDDING ENTERPRISE').toUpperCase();
+  const refStr = ctx.projectRefNo || 'REF: SEC-VII';
+  allDocPages.forEach((p, pIndex) => {
+    const { width: pW } = p.getSize();
+    p.drawLine({
+      start: { x: 36, y: 32 },
+      end: { x: pW - 36, y: 32 },
+      thickness: 1,
+      color: rgb(0.2, 0.2, 0.2)
+    });
+    p.drawText(compNameStr, { x: 36, y: 22, size: 7.5, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+    const centerTxt = `SECTION VII TECHNICAL SPECIFICATIONS • ${refStr}`;
+    const cW = fontReg.widthOfTextAtSize(centerTxt, 7);
+    p.drawText(centerTxt, { x: (pW - cW) / 2, y: 22, size: 7, font: fontReg, color: rgb(0.3, 0.3, 0.3) });
+    const pageNumTxt = `PAGE ${pIndex + 1} OF ${totalDocPages}`;
+    const pNW = fontBold.widthOfTextAtSize(pageNumTxt, 7.5);
+    p.drawText(pageNumTxt, { x: pW - 36 - pNW, y: 22, size: 7.5, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+  });
+
   return await exportPdfDocAsDataUri(pdfDoc);
 }
 
@@ -1286,7 +1328,7 @@ export async function generateFrameworkAgreementListPdf(ctx: DocResolveContext):
     ];
   }
 
-  const page = pdfDoc.addPage(LEGAL_PORTRAIT);
+  let page = pdfDoc.addPage(LEGAL_PORTRAIT);
   drawOfficialHeader(
     page, fontBold, fontReg, ctx.tenant,
     'Framework Agreement List',
@@ -1307,26 +1349,43 @@ export async function generateFrameworkAgreementListPdf(ctx: DocResolveContext):
     { label: 'Indicative Timeframe', width: 75, align: 'center' }
   ];
 
-  page.drawRectangle({
-    x: startX,
-    y: currentY - 18,
-    width: tableWidth,
-    height: 22,
-    color: rgb(0.12, 0.16, 0.24)
-  });
+  const drawFalHeader = (p: PDFPage, yPos: number) => {
+    p.drawRectangle({
+      x: startX,
+      y: yPos - 18,
+      width: tableWidth,
+      height: 22,
+      color: rgb(0.12, 0.16, 0.24)
+    });
 
-  let curX = startX;
-  cols.forEach(col => {
-    const textW = fontBold.widthOfTextAtSize(col.label, 7);
-    const xPos = col.align === 'center' ? curX + (col.width - textW) / 2 : col.align === 'right' ? curX + col.width - textW - 4 : curX + 4;
-    page.drawText(col.label, { x: xPos, y: currentY - 12, size: 7, font: fontBold, color: rgb(1, 1, 1) });
-    curX += col.width;
-  });
+    let curX = startX;
+    cols.forEach(col => {
+      const textW = fontBold.widthOfTextAtSize(col.label, 7);
+      const xPos = col.align === 'center' ? curX + (col.width - textW) / 2 : col.align === 'right' ? curX + col.width - textW - 4 : curX + 4;
+      p.drawText(col.label, { x: xPos, y: yPos - 12, size: 7, font: fontBold, color: rgb(1, 1, 1) });
+      curX += col.width;
+    });
+  };
 
+  drawFalHeader(page, currentY);
   currentY -= 20;
 
-  items.forEach((it, idx) => {
-    const rowHeight = 24;
+  for (let idx = 0; idx < items.length; idx++) {
+    const it = items[idx];
+    const descLines = wrapText(it.description || 'Framework Item', 210, fontReg, 6.8);
+    const rowHeight = Math.max(24, descLines.length * 10 + 6);
+
+    if (currentY - rowHeight < 115) {
+      page = pdfDoc.addPage(LEGAL_PORTRAIT);
+      drawOfficialHeader(
+        page, fontBold, fontReg, ctx.tenant,
+        'Framework Agreement List',
+        'Framework Agreement Deliverables (Continuation)',
+        ctx.projectRefNo, ctx.projectTitle, false
+      );
+      currentY = 820;
+    }
+
     page.drawRectangle({
       x: startX,
       y: currentY - rowHeight,
@@ -1337,31 +1396,83 @@ export async function generateFrameworkAgreementListPdf(ctx: DocResolveContext):
       borderWidth: 0.5
     });
 
-    const values = [
-      String(idx + 1),
-      (it.description || 'Framework Item').slice(0, 48),
-      it.quantity || '1 Lot',
-      formatCurrency(it.unitAmount || '0'),
-      formatCurrency(it.total || it.unitAmount || '0'),
-      it.delivered || '30 Days'
-    ];
+    // Column 1: #
+    const itemNum = String(idx + 1);
+    page.drawText(itemNum, { x: startX + 15 - fontReg.widthOfTextAtSize(itemNum, 6.8) / 2, y: currentY - 14, size: 6.8, font: fontReg, color: rgb(0.2, 0.25, 0.3) });
 
-    let rX = startX;
-    cols.forEach((col, cIdx) => {
-      const val = values[cIdx];
-      const textW = fontReg.widthOfTextAtSize(val, 6.8);
-      const xPos = col.align === 'center' ? rX + (col.width - textW) / 2 : col.align === 'right' ? rX + col.width - textW - 4 : rX + 4;
-      page.drawText(val, { x: xPos, y: currentY - 15, size: 6.8, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
-      rX += col.width;
+    // Column 2: Item / Service Type (multi-line)
+    descLines.forEach((l, lIdx) => {
+      page.drawText(l, { x: startX + 34, y: currentY - 12 - lIdx * 9.5, size: 6.8, font: fontReg, color: rgb(0.1, 0.15, 0.25) });
     });
 
+    // Column 3: Max Qty
+    const qtyStr = it.quantity || '1 Lot';
+    page.drawText(qtyStr, { x: startX + 250 + (55 - fontReg.widthOfTextAtSize(qtyStr, 6.8)) / 2, y: currentY - 14, size: 6.8, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
+
+    // Column 4: Max Unit Price
+    const unitStr = formatCurrency(it.unitAmount || '0');
+    page.drawText(unitStr, { x: startX + 305 + 80 - fontReg.widthOfTextAtSize(unitStr, 6.8) - 4, y: currentY - 14, size: 6.8, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
+
+    // Column 5: Total Price
+    const totalStr = formatCurrency(it.total || it.unitAmount || '0');
+    page.drawText(totalStr, { x: startX + 385 + 80 - fontReg.widthOfTextAtSize(totalStr, 6.8) - 4, y: currentY - 14, size: 6.8, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
+
+    // Column 6: Indicative Timeframe
+    const delivStr = it.delivered || '30 Days';
+    page.drawText(delivStr, { x: startX + 465 + (75 - fontReg.widthOfTextAtSize(delivStr, 6.8)) / 2, y: currentY - 14, size: 6.8, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
+
     currentY -= rowHeight;
-  });
+  }
+
+  // End of items marker
+  if (items.length < 10 && currentY - 24 >= 115) {
+    page.drawRectangle({
+      x: startX,
+      y: currentY - 18,
+      width: tableWidth,
+      height: 18,
+      color: rgb(0.98, 0.98, 0.99),
+      borderColor: rgb(0.85, 0.88, 0.92),
+      borderWidth: 0.5
+    });
+    const nfText = '— NOTHING FOLLOWS / END OF FRAMEWORK AGREEMENT LIST —';
+    const nfW = fontReg.widthOfTextAtSize(nfText, 6.8);
+    page.drawText(nfText, {
+      x: startX + (tableWidth - nfW) / 2,
+      y: currentY - 12,
+      size: 6.8,
+      font: fontReg,
+      color: rgb(0.5, 0.55, 0.62)
+    });
+    currentY -= 18;
+  }
 
   await drawOfficialFooter(
     pdfDoc, page, fontBold, fontReg, ctx.tenant,
     'Framework Agreement List', ctx.projectRefNo, ctx.projectTitle, false
   );
+
+  // Stamp official running footer across every page
+  const totalDocPages = pdfDoc.getPageCount();
+  const allDocPages = pdfDoc.getPages();
+  const compNameStr = (ctx.tenant?.companyName || 'BIDDING ENTERPRISE').toUpperCase();
+  const refStr = ctx.projectRefNo || 'REF: FAL';
+  allDocPages.forEach((p, pIndex) => {
+    const { width: pW } = p.getSize();
+    p.drawLine({
+      start: { x: 36, y: 32 },
+      end: { x: pW - 36, y: 32 },
+      thickness: 1,
+      color: rgb(0.2, 0.2, 0.2)
+    });
+    p.drawText(compNameStr, { x: 36, y: 22, size: 7.5, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+    const centerTxt = `FRAMEWORK AGREEMENT LIST • ${refStr}`;
+    const cW = fontReg.widthOfTextAtSize(centerTxt, 7);
+    p.drawText(centerTxt, { x: (pW - cW) / 2, y: 22, size: 7, font: fontReg, color: rgb(0.3, 0.3, 0.3) });
+    const pageNumTxt = `PAGE ${pIndex + 1} OF ${totalDocPages}`;
+    const pNW = fontBold.widthOfTextAtSize(pageNumTxt, 7.5);
+    p.drawText(pageNumTxt, { x: pW - 36 - pNW, y: 22, size: 7.5, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+  });
 
   return await exportPdfDocAsDataUri(pdfDoc);
 }

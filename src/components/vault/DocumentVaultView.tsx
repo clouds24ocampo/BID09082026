@@ -22,9 +22,12 @@ import { PackageItem } from '../bids/bidpackage';
 import VaultErrorBoundary from '../common/VaultErrorBoundary';
 import {
   saveVaultItems,
+  upsertVaultItem,
   loadVaultItems,
+  deleteVaultItem,
   savePdfData,
   loadPdfData as loadPdfDataFromDB,
+  deletePdfData,
   clearVaultDataForTenant,
   migrateFromLocalStorage
 } from '../../utils/vaultIndexedDB';
@@ -296,21 +299,8 @@ export const DocumentVaultView: React.FC = () => {
         }
 
         if (!cancelled) {
-          // Pre-load PDF blobs from IndexedDB into in-memory cache and attach them to item state in parallel
-          let pdfLoadedCount = 0;
-          await Promise.all(
-            items.map(async (item) => {
-              try {
-                const pdfData = await loadPdfDataFromDB(item.id);
-                if (pdfData) {
-                  pdfDataCache.current[item.id] = pdfData;
-                  item.fileDataUrl = pdfData;
-                  pdfLoadedCount++;
-                }
-              } catch (_) { /* skip items without PDF data */ }
-            })
-          );
-
+          // Instantaneous metadata mount: items are ready immediately (<10ms)
+          // PDF binaries are hydrated on demand into the bounded LRU cache when viewed or compiled
           setVaultItems(items);
 
           // #region agent log
@@ -318,7 +308,6 @@ export const DocumentVaultView: React.FC = () => {
             activeTenantId,
             itemCount: items.length,
             migratedCount: migrated.length,
-            pdfLoadedCount,
             dbReady: true
           }, 'B');
           // #endregion
@@ -882,8 +871,14 @@ export const DocumentVaultView: React.FC = () => {
   const [previewPdfItem, setPreviewPdfItem] = useState<DocumentVaultItem | null>(null);
 
   const openPreviewItem = async (item: DocumentVaultItem) => {
+    const cachedData = getPdfData(item.id) || item.fileDataUrl;
+    if (cachedData) {
+      pdfDataCache.current[item.id] = cachedData;
+      setPreviewPdfItem({ ...item, fileDataUrl: cachedData });
+      return;
+    }
+
     setPreviewPdfItem(item);
-    if (getPdfData(item.id)) return;
 
     try {
       const loaded = await loadPdfDataFromDB(item.id);
@@ -1149,17 +1144,96 @@ export const DocumentVaultView: React.FC = () => {
     notifySuccess(`[${docTitle}, v1.0] Template Save Successful!`, 'Legal template saved into Document Vault as an active technical exhibit under Completed Technical Documents & Forms.');
   };
 
-  const handleDeleteCompletedTechDoc = (docId: string, docName: string) => {
+  const handleDeleteCompletedTechDoc = async (docId: string, docName: string) => {
     if (confirm(`Are you sure you want to delete "${docName}" from Completed Technical Documents? This will remove the completed form and reset its item status.`)) {
       setVaultItems(prev => prev.filter(item => item.id !== docId));
+      await deleteVaultItem(docId, activeTenantId).catch(e => console.error('[VaultDB] Failed to delete doc:', e));
+      await deletePdfData(docId).catch(() => {});
+
+      // Clean up project-scoped storage keys if this was a template document
+      if (activeProjectRefNo) {
+        const ref = activeProjectRefNo;
+        const tenantKey = activeTenantId || 'default';
+        const dLower = (docName || '').toLowerCase();
+        const keysToPurge = [
+          dLower.includes('technical specifications') || dLower.includes('section vii') ? `bidocs_tech_specs_${tenantKey}_${ref}` : '',
+          dLower.includes('schedule of requirements') || dLower.includes('section vi') ? `bidocs_sec_vi_${tenantKey}_${ref}` : '',
+          dLower.includes('schedule of requirements') || dLower.includes('section vi') ? `bidocs_sec_vi_services_${tenantKey}_${ref}` : '',
+          dLower.includes('framework agreement') ? `bidocs_fal_${tenantKey}_${ref}` : '',
+          dLower.includes('organizational chart') ? `bidocs_org_chart_${tenantKey}_${ref}` : '',
+          dLower.includes('key personnel') ? `bidocs_key_personnel_${tenantKey}_${ref}` : '',
+          dLower.includes('major equipment') ? `bidocs_major_equipment_${tenantKey}_${ref}` : '',
+          dLower.includes('after-sales') || dLower.includes('warranty') ? `bidocs_aftersale_${tenantKey}_${ref}` : ''
+        ].filter(Boolean);
+
+        keysToPurge.forEach(k => {
+          try { localStorage.removeItem(k); } catch (_) {}
+        });
+
+        if (dLower.includes('technical specifications') || dLower.includes('section vii')) {
+          deletePdfData(`tech_specs_${tenantKey}_${ref}`).catch(() => {});
+          deletePdfData(`tech_specs_brochure_${tenantKey}_${ref}`).catch(() => {});
+          deletePdfData(`tech_specs_drawing_${tenantKey}_${ref}`).catch(() => {});
+        }
+        if (dLower.includes('framework agreement')) {
+          deletePdfData(`fal_${tenantKey}_${ref}`).catch(() => {});
+        }
+      }
+
       notifySuccess('Completed Form Deleted', `"${docName}" has been successfully removed from Technical Eligibility.`);
     }
   };
 
-  const handleDeleteFinancialDoc = (docId: string, docName: string) => {
+  const handleDeleteFinancialDoc = async (docId: string, docName: string) => {
     if (confirm(`Are you sure you want to delete "${docName}" from Financial Documents? This will remove the document from the vault.`)) {
       setVaultItems(prev => prev.filter(item => item.id !== docId));
+      await deleteVaultItem(docId, activeTenantId).catch(e => console.error('[VaultDB] Failed to delete doc:', e));
+      await deletePdfData(docId).catch(() => {});
+
+      // Clean up project-scoped storage keys if this was a template document
+      if (activeProjectRefNo) {
+        const ref = activeProjectRefNo;
+        const tenantKey = activeTenantId || 'default';
+        const dLower = (docName || '').toLowerCase();
+        const keysToPurge = [
+          dLower.includes('detailed estimate') ? `bidocs_detailed_estimates_${tenantKey}_${ref}` : '',
+          dLower.includes('bill of quantities') || dLower.includes('boq') ? `bidocs_boq_${tenantKey}_${ref}` : '',
+          dLower.includes('price schedule') ? `bidocs_pricesched_${tenantKey}_${ref}` : '',
+          dLower.includes('summary of bid price') ? `bidocs_summary_bid_price_${tenantKey}_${ref}` : '',
+          dLower.includes('cash flow') ? `bidocs_cash_flow_${tenantKey}_${ref}` : '',
+          dLower.includes('bid form') ? `bidocs_bidform_goods_${tenantKey}_${ref}` : '',
+          dLower.includes('bid form') ? `bidocs_bidform_infra_${tenantKey}_${ref}` : '',
+          dLower.includes('bid form') ? `bidocs_bidform_consulting_${tenantKey}_${ref}` : '',
+          dLower.includes('nfcc') ? `bidocs_nfcc_${tenantKey}_${ref}` : ''
+        ].filter(Boolean);
+
+        keysToPurge.forEach(k => {
+          try { localStorage.removeItem(k); } catch (_) {}
+        });
+
+        if (dLower.includes('boq')) {
+          deletePdfData(`boq_${tenantKey}_${ref}`).catch(() => {});
+        }
+        if (dLower.includes('price schedule')) {
+          deletePdfData(`priceschedule_${tenantKey}_${ref}`).catch(() => {});
+          deletePdfData(`pricesched_${tenantKey}_${ref}`).catch(() => {});
+        }
+        if (dLower.includes('bid form')) {
+          deletePdfData(`bidform_infra_${tenantKey}_${ref}`).catch(() => {});
+          deletePdfData(`bidform_${tenantKey}_${ref}`).catch(() => {});
+        }
+      }
+
       notifySuccess('Financial Document Deleted', `"${docName}" has been successfully removed from Financial Documents.`);
+    }
+  };
+
+  const handleDeleteClassADoc = async (item: DocumentVaultItem) => {
+    if (confirm(`Are you sure you want to delete the uploaded file for "${item.documentName}"? This will clear this document slot so you can upload a fresh file.`)) {
+      setVaultItems(prev => prev.filter(i => i.id !== item.id));
+      await deleteVaultItem(item.id, activeTenantId).catch(e => console.error('[VaultDB] Failed to delete doc:', e));
+      await deletePdfData(item.id).catch(() => {});
+      notifySuccess('Document Deleted', `"${item.documentName}" has been removed and the slot is now ready for re-upload.`);
     }
   };
 
@@ -1828,7 +1902,7 @@ export const DocumentVaultView: React.FC = () => {
                                     setReplaceTargetItem(uploadedItem);
                                     resetFormState();
                                   }}
-                                  className={`px-3 py-1.5 rounded-lg transition font-bold text-[11px] flex items-center gap-1.5 border shadow ${isSoonExpiring || isExp || uploadedItem.status === 'EXPIRING_SOON' || uploadedItem.status === 'EXPIRED'
+                                  className={`px-3 py-1.5 rounded-lg transition font-bold text-[11px] flex items-center gap-1.5 border shadow cursor-pointer ${isSoonExpiring || isExp || uploadedItem.status === 'EXPIRING_SOON' || uploadedItem.status === 'EXPIRED'
                                     ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-400 animate-pulse'
                                     : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border-emerald-500/30'
                                     }`}
@@ -1837,6 +1911,14 @@ export const DocumentVaultView: React.FC = () => {
                                   <RefreshCw className="w-3.5 h-3.5" />
                                   <span>{isSoonExpiring || isExp ? 'Upload Replacement (30-Day Notice)' : 'Replace PDF'}</span>
                                 </button>
+                                <button
+                                  onClick={() => handleDeleteClassADoc(uploadedItem)}
+                                  className="px-2.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-red-500/30 cursor-pointer"
+                                  title="Delete uploaded document and clear this slot"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Delete</span>
+                                </button>
                               </>
                             ) : (
                               <button
@@ -1844,7 +1926,7 @@ export const DocumentVaultView: React.FC = () => {
                                   setUploadTargetDef(def);
                                   resetFormState();
                                 }}
-                                className="px-3 py-1.5 rounded-lg text-white font-semibold text-[11px] shadow transition flex items-center gap-1.5 hover:opacity-90"
+                                className="px-3 py-1.5 rounded-lg text-white font-semibold text-[11px] shadow transition flex items-center gap-1.5 hover:opacity-90 cursor-pointer"
                                 style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
                               >
                                 <Upload className="w-3.5 h-3.5" />
@@ -1915,14 +1997,14 @@ export const DocumentVaultView: React.FC = () => {
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => openPreviewItem(item)}
-                              className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-blue-500/30"
+                              className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-blue-500/30 cursor-pointer"
                             >
                               <Eye className="w-3.5 h-3.5" />
                               <span>View PDF</span>
                             </button>
                             <button
                               onClick={() => openEditModal(item)}
-                              className="px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-amber-500/30"
+                              className="px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-amber-500/30 cursor-pointer"
                               title="Edit Document Number, Title, or Validity Dates"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
@@ -1933,11 +2015,19 @@ export const DocumentVaultView: React.FC = () => {
                                 setReplaceTargetItem(item);
                                 resetFormState();
                               }}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition font-bold text-[11px] flex items-center gap-1.5 border border-emerald-500/30 shadow"
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition font-bold text-[11px] flex items-center gap-1.5 border border-emerald-500/30 shadow cursor-pointer"
                               title="Replace PDF file"
                             >
                               <RefreshCw className="w-3.5 h-3.5" />
                               <span>Replace PDF</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClassADoc(item)}
+                              className="px-2.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-red-500/30 cursor-pointer"
+                              title="Delete this custom document"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
                             </button>
                           </div>
                         </td>
@@ -3752,7 +3842,7 @@ export const DocumentVaultView: React.FC = () => {
           item={previewPdfItem}
           tenant={currentTenant}
           onClose={() => setPreviewPdfItem(null)}
-          pdfDataUrl={getPdfData(previewPdfItem.id)}
+          pdfDataUrl={getPdfData(previewPdfItem.id) || previewPdfItem.fileDataUrl}
           hidePrintExport={true}
         />
       )}

@@ -394,6 +394,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
   const handleExportPdf = async () => {
     setIsExporting(true);
     try {
+      await new Promise(resolve => setTimeout(resolve, 80));
       const fileName = `${projectRefNo}_Framework_Agreement_List_${todayStr}.pdf`;
       const containerElem = document.getElementById('framework-pages-container') || document.getElementById('framework-paper');
       if (containerElem) {
@@ -453,6 +454,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
   const handleSave = async () => {
     setIsExporting(true);
     try {
+      await new Promise(resolve => setTimeout(resolve, 80));
       const containerElem = (document.getElementById('framework-pages-container') || document.getElementById('framework-paper')) as HTMLElement;
       let dataUrl: string | undefined = undefined;
       if (containerElem) {
@@ -503,22 +505,37 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     return 'text-xs leading-normal';
   };
 
+  const { charsPerLine, lineHeightPx, basePaddingPx } = useMemo(() => {
+    if (fontSizeMode === 'fine' || (fontSizeMode === 'xs' && totalCharactersInDoc > 5000)) {
+      return { charsPerLine: 54, lineHeightPx: 14, basePaddingPx: 14 };
+    }
+    if (fontSizeMode === 'sm') {
+      return { charsPerLine: 40, lineHeightPx: 22, basePaddingPx: 18 };
+    }
+    return { charsPerLine: 46, lineHeightPx: 18, basePaddingPx: 16 };
+  }, [fontSizeMode, totalCharactersInDoc]);
+
   // --- DYNAMIC AUTO-FIT PAGE-PACKING ENGINE ---
-  // Automatically measures and packs all information inside the minimum necessary number of pages with zero empty space
+  // Calibrated for 48% column width (368px @ 96DPI) with zero empty space & safe footer margin
   const pageChunks = useMemo<PageRow[][]>(() => {
     const indexedItems: PageRow[] = items.map((it, idx) => ({ item: it, index: idx }));
     return autoFitPageChunks(
       indexedItems,
-      (row) => calculateRowHeight(row.item.description || '', 65, 13.5, 8, 22),
+      (row) => {
+        const formatted = formatDescriptionText(row.item.description || '');
+        return calculateRowHeight(formatted, charsPerLine, lineHeightPx, basePaddingPx, 24);
+      },
       {
         orientation: 'portrait',
-        columnCharWidth: 65,
+        columnCharWidth: charsPerLine,
         headerHeightPx: 170,
         footerHeightPx: 260,
-        runningFooterPx: 30
+        runningFooterPx: 42,
+        continuationTheadHeightPx: 32,
+        safetyBufferPx: 45
       }
     );
-  }, [items]);
+  }, [items, charsPerLine, lineHeightPx, basePaddingPx]);
 
   const totalPages = pageChunks.length;
 
@@ -526,7 +543,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     <div
       key={`fal-page-${pIdx}`}
       id={pIdx === 0 ? 'framework-paper' : `framework-paper-p${pIdx + 1}`}
-      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
+      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col font-serif mb-8 box-border relative text-slate-950"
     >
       <div>
         {/* COMPANY & PROJECT HEADER BLOCK (PAGE 1 ONLY) */}
@@ -731,7 +748,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       </div>
 
       {/* Document Footer: Signatory Block (Final Page Only) + Running Page Footer on EVERY Page */}
-      <div>
+      <div className="w-full shrink-0 mt-auto">
         {/* Signatory Block & GPPB QR Code (Final Page Only) */}
         {pIdx === totalPages - 1 && (
           <div className="mt-6 pt-3 border-t border-slate-300 flex items-end justify-between text-xs font-serif signatory-block mb-3">

@@ -19,12 +19,15 @@ export interface AutoFitConfig {
   baseRowPaddingPx?: number;// e.g. 8px base cell padding
   headerHeightPx?: number;  // e.g. 170px for Page 1 top header
   footerHeightPx?: number;  // e.g. 260px for summary totals + signature block + QR
-  runningFooterPx?: number; // e.g. 30px for running page number footer
+  runningFooterPx?: number; // e.g. 38px for running page number footer
+  continuationTheadHeightPx?: number; // Optional continuation table header height (0 if omitted on continuation pages)
+  safetyBufferPx?: number;  // Safe bottom margin buffer to guarantee footers never clip
 }
 
 /**
  * Calculates exact physical row height based on compact text wrapping geometry.
- * Realistic line counts and padding prevent premature page breaks that leave massive empty whitespace.
+ * Realistic line counts with word-boundary wrapping and padding prevent premature page breaks
+ * while guaranteeing zero collision with footers and signatures.
  */
 export function calculateRowHeight(
   text: string,
@@ -36,12 +39,14 @@ export function calculateRowHeight(
   if (!text) return minHeightPx;
   const paragraphs = text.split('\n');
   let totalLines = 0;
+  // Natural word-wrapping in serif typography leaves ~12% end-of-line ragged slack
+  const effectiveChars = Math.max(10, Math.floor(charsPerLine * 0.88));
   for (const para of paragraphs) {
     const trimmed = para.trim();
     if (trimmed.length === 0) {
       totalLines += 1;
     } else {
-      totalLines += Math.max(1, Math.ceil(trimmed.length / charsPerLine));
+      totalLines += Math.max(1, Math.ceil(trimmed.length / effectiveChars));
     }
   }
   return Math.max(minHeightPx, basePaddingPx + totalLines * lineHeightPx);
@@ -66,16 +71,19 @@ export function autoFitPageChunks<T>(
 
   const headerHeight = config.headerHeightPx ?? (isPortrait ? 170 : 110);
   const theadHeight = isPortrait ? 32 : 28;
+  const continuationTheadHeight = config.continuationTheadHeightPx !== undefined
+    ? config.continuationTheadHeightPx
+    : theadHeight;
   const summaryAndSignatoryHeight = config.footerHeightPx ?? (isPortrait ? 260 : 180);
-  const runningFooterHeight = config.runningFooterPx ?? (isPortrait ? 30 : 28);
-  const continuationTheadHeight = theadHeight;
+  const runningFooterHeight = config.runningFooterPx ?? (isPortrait ? 38 : 28);
+  const safetyBuffer = config.safetyBufferPx ?? (isPortrait ? 40 : 25);
 
-  // Maximum items height capacity per page type (Strictly calibrated to fill sheets up to 95%+)
-  const page1ContinuationCapacity = usableHeight - headerHeight - theadHeight - runningFooterHeight - 10; // ~958px in portrait
-  const continuationCapacity = usableHeight - continuationTheadHeight - runningFooterHeight - 10; // ~1130px in portrait
+  // Maximum items height capacity per page type (Calibrated to preserve safe footer room)
+  const page1ContinuationCapacity = usableHeight - headerHeight - theadHeight - runningFooterHeight - safetyBuffer;
+  const continuationCapacity = usableHeight - continuationTheadHeight - runningFooterHeight - safetyBuffer;
 
-  const singlePageCapacity = usableHeight - headerHeight - theadHeight - summaryAndSignatoryHeight - runningFooterHeight - 10; // ~698px in portrait
-  const finalContinuationCapacity = usableHeight - continuationTheadHeight - summaryAndSignatoryHeight - runningFooterHeight - 10; // ~870px in portrait
+  const singlePageCapacity = usableHeight - headerHeight - theadHeight - summaryAndSignatoryHeight - runningFooterHeight - safetyBuffer;
+  const finalContinuationCapacity = usableHeight - continuationTheadHeight - summaryAndSignatoryHeight - runningFooterHeight - safetyBuffer;
 
   const rowHeights = items.map((it) => getRowHeightFn(it));
   const totalContentHeight = rowHeights.reduce((sum, h) => sum + h, 0);
@@ -85,7 +93,83 @@ export function autoFitPageChunks<T>(
     return [items];
   }
 
-  // 2. Multi-Page Optimal Packing
+  // 2. Balanced Minimum-Page Allocation Engine
+  // Eliminates giant empty spaces by discovering the minimum necessary page count
+  // and distributing items proportionately so all pages are balanced and filled.
+  const N = items.length;
+  const prefixSum = new Array(N + 1).fill(0);
+  for (let i = 0; i < N; i++) {
+    prefixSum[i + 1] = prefixSum[i] + rowHeights[i];
+  }
+  const getRangeHeight = (start: number, end: number) => prefixSum[end] - prefixSum[start];
+
+  const getCapacity = (pageIndex: number, numPages: number): number => {
+    if (numPages === 1) return singlePageCapacity;
+    if (pageIndex === 0) return page1ContinuationCapacity;
+    if (pageIndex === numPages - 1) return finalContinuationCapacity;
+    return continuationCapacity;
+  };
+
+  // Find minimum page count P that can validly host all items
+  for (let P = 2; P <= Math.min(N, 25); P++) {
+    // Calculate expected target fill ratio across all pages
+    let totalAvailCap = 0;
+    for (let p = 0; p < P; p++) {
+      totalAvailCap += getCapacity(p, P);
+    }
+    if (totalContentHeight > totalAvailCap) {
+      continue; // Physically impossible to fit in P pages
+    }
+    const targetFillRatio = totalContentHeight / totalAvailCap;
+
+    // dp[i][p] stores the minimum imbalance cost of partitioning items 0..i-1 into p pages
+    // prev[i][p] stores the split index j for backtracking
+    const dp: number[][] = Array.from({ length: N + 1 }, () => new Array(P + 1).fill(Infinity));
+    const prev: number[][] = Array.from({ length: N + 1 }, () => new Array(P + 1).fill(-1));
+
+    dp[0][0] = 0;
+
+    for (let p = 1; p <= P; p++) {
+      const pageCap = getCapacity(p - 1, P);
+      for (let i = p; i <= N; i++) {
+        for (let j = p - 1; j < i; j++) {
+          if (dp[j][p - 1] === Infinity) continue;
+          const h = getRangeHeight(j, i);
+          if (h <= pageCap) {
+            const ratio = h / pageCap;
+            const stepCost = Math.pow(ratio - targetFillRatio, 2);
+            const totalCost = dp[j][p - 1] + stepCost;
+            if (totalCost < dp[i][p]) {
+              dp[i][p] = totalCost;
+              prev[i][p] = j;
+            }
+          }
+        }
+      }
+    }
+
+    // If all N items were successfully partitioned into P pages
+    if (dp[N][P] !== Infinity) {
+      const splitPoints: number[] = [];
+      let curr = N;
+      for (let p = P; p >= 1; p--) {
+        const prevIdx = prev[curr][p];
+        splitPoints.unshift(prevIdx);
+        curr = prevIdx;
+      }
+
+      const balancedPages: T[][] = [];
+      for (let p = 0; p < P; p++) {
+        const start = splitPoints[p];
+        const end = p === P - 1 ? N : splitPoints[p + 1];
+        balancedPages.push(items.slice(start, end));
+      }
+
+      return balancedPages;
+    }
+  }
+
+  // 3. Fallback (Safe Sequential Packing) if items exceed normal distribution bounds
   const pages: T[][] = [];
   let currentChunk: T[] = [];
   let currentHeight = 0;
@@ -104,20 +188,21 @@ export function autoFitPageChunks<T>(
     const finalCapacity = isPage1 ? singlePageCapacity : finalContinuationCapacity;
     const maxCapacity = isPage1 ? page1ContinuationCapacity : continuationCapacity;
 
-    // A. If all remaining items fit in final page capacity on this page, include them all!
     if (currentHeight + remainingHeight <= finalCapacity) {
       currentChunk.push(...items.slice(idx));
       break;
     }
 
-    // B. Check if this item fits on current continuation page
-    const fitsOnCurrent = currentHeight + rHeight <= maxCapacity;
+    const effectiveCapacity = (idx === items.length - 1 && currentChunk.length > 0)
+      ? finalCapacity
+      : maxCapacity;
+
+    const fitsOnCurrent = currentHeight + rHeight <= effectiveCapacity;
 
     if (fitsOnCurrent) {
       currentChunk.push(item);
       currentHeight += rHeight;
     } else {
-      // Current page is full: finalize it and start next page with this item
       if (currentChunk.length > 0) {
         pages.push(currentChunk);
         pageIdx++;
@@ -125,7 +210,7 @@ export function autoFitPageChunks<T>(
         currentHeight = rHeight;
       } else {
         currentChunk.push(item);
-        currentHeight += rHeight;
+        currentHeight = rHeight;
       }
     }
   }

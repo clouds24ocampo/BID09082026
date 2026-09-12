@@ -516,6 +516,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   const handleExportPdf = async () => {
     setIsExporting(true);
     try {
+      await new Promise(resolve => setTimeout(resolve, 80));
       const fileName = `${projectRefNo}_Section_VI_Schedule_of_Requirements_${todayStr}.pdf`;
       const containerElem = document.getElementById('section-vi-pages-container') || document.getElementById('section-vi-paper');
       if (containerElem) {
@@ -576,6 +577,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   const handleSave = async () => {
     setIsExporting(true);
     try {
+      await new Promise(resolve => setTimeout(resolve, 80));
       const containerElem = (document.getElementById('section-vi-pages-container') || document.getElementById('section-vi-paper')) as HTMLElement;
       let dataUrl: string | undefined = undefined;
       if (containerElem) {
@@ -613,23 +615,38 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     return 'text-xs leading-normal';
   };
 
+  const { charsPerLine, lineHeightPx, basePaddingPx } = useMemo(() => {
+    if (fontSizeMode === 'fine' || (fontSizeMode === 'xs' && totalCharactersInDoc > 5000)) {
+      return { charsPerLine: 48, lineHeightPx: 14, basePaddingPx: 14 };
+    }
+    if (fontSizeMode === 'sm') {
+      return { charsPerLine: 35, lineHeightPx: 22, basePaddingPx: 18 };
+    }
+    return { charsPerLine: 40, lineHeightPx: 18, basePaddingPx: 16 };
+  }, [fontSizeMode, totalCharactersInDoc]);
+
   // --- DYNAMIC AUTO-FIT PAGE-PACKING ENGINE ---
-  // Automatically measures and packs all information inside the minimum necessary number of pages with zero empty space
+  // Calibrated for 41% column width (315px @ 96DPI) with zero empty space & safe footer margin
   const pageChunks = useMemo<PageRow[][]>(() => {
     if (items.length === 0) return [[]];
     const indexedItems: PageRow[] = items.map((it, idx) => ({ item: it, index: idx }));
     return autoFitPageChunks(
       indexedItems,
-      (row) => calculateRowHeight(row.item.description || '', 65, 13.5, 8, 22),
+      (row) => {
+        const formatted = formatDescriptionText(row.item.description || '');
+        return calculateRowHeight(formatted, charsPerLine, lineHeightPx, basePaddingPx, 24);
+      },
       {
         orientation: 'portrait',
-        columnCharWidth: 65,
+        columnCharWidth: charsPerLine,
         headerHeightPx: 170,
         footerHeightPx: 260,
-        runningFooterPx: 30
+        runningFooterPx: 42,
+        continuationTheadHeightPx: 32,
+        safetyBufferPx: 45
       }
     );
-  }, [items]);
+  }, [items, charsPerLine, lineHeightPx, basePaddingPx]);
 
   const totalPages = pageChunks.length;
 
@@ -637,7 +654,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     <div
       key={`sec-6-page-${pIdx}`}
       id={pIdx === 0 ? 'section-vi-paper' : `section-vi-paper-p${pIdx + 1}`}
-      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
+      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col font-serif mb-8 box-border relative text-slate-950"
     >
       <div>
         {/* COMPANY & PROJECT HEADER BLOCK (PAGE 1 ONLY) */}
@@ -1002,7 +1019,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       </div>
 
       {/* Document Footer: Signatory Block (Final Page Only) + Running Page Footer on EVERY Page */}
-      <div>
+      <div className="w-full shrink-0 mt-auto">
         {/* Signatory Block & GPPB QR Code (Final Page Only) */}
         {pIdx === totalPages - 1 && (
           <div className="mt-4 pt-2.5 border-t border-slate-300 font-serif text-xs mb-2">

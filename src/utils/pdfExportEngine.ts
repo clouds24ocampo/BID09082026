@@ -1,6 +1,7 @@
 import { PDFDocument, degrees, rgb, StandardFonts } from 'pdf-lib';
 import html2canvas from 'html2canvas';
 import { debugLog } from './debugLog';
+import { yieldToMain } from './storageScalability';
 
 export type PdfAttachmentSource = string | ArrayBuffer | Uint8Array | Blob;
 
@@ -563,6 +564,9 @@ export async function buildMergedThreeLayerPdfBytes(
       const refNo = options?.projectRefNo || 'PhilGEPS-2026';
 
       for (let pageIdx = 0; pageIdx < totalPageCount; pageIdx++) {
+        if (pageIdx > 0 && pageIdx % 8 === 0) {
+          await yieldToMain();
+        }
         const page = allPages[pageIdx];
         const width = page.getWidth();
         const height = page.getHeight();

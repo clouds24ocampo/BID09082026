@@ -6,7 +6,7 @@ import { MergedPdfViewerModal } from '../vault/MergedPdfViewerModal';
 import { MergedPackageViewerModal } from '../vault/MergedPackageViewerModal';
 import { PdfPreviewModal } from '../vault/PdfPreviewModal';
 import DocumentQrCode from '../common/DocumentQrCode';
-import { loadVaultItems, loadPdfData, savePdfData } from '../../utils/vaultIndexedDB';
+import { loadVaultItems, loadPdfData, savePdfData, deleteVaultItem, deletePdfData } from '../../utils/vaultIndexedDB';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../utils/opportunityProjects';
 import { generateAndDownloadThreeLayerPdf, exportMergedThreeLayerPdf, buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit } from '../../utils/pdfExportEngine';
 import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
@@ -1156,6 +1156,19 @@ export const BidPackageBuilderView: React.FC = () => {
         }
       }
     } catch (_) {}
+
+    const matchingDocs = vaultDocs.filter(v => {
+      const vRef = (v.philgepsRefNo || '').trim().toLowerCase();
+      const vName = (v.documentName || '').toLowerCase();
+      const isMatchProj = vRef === ref.toLowerCase();
+      const isMatchDoc = vName.includes(dName) || dName.includes(vName) || (doc.code && v.documentCode === doc.code);
+      return (isMatchProj && isMatchDoc);
+    });
+
+    matchingDocs.forEach(m => {
+      deleteVaultItem(m.id, tenantId).catch(() => {});
+      deletePdfData(m.id).catch(() => {});
+    });
 
     setVaultDocs(prev => prev.filter(v => {
       const vRef = (v.philgepsRefNo || '').trim().toLowerCase();
