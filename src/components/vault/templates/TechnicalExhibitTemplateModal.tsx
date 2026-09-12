@@ -612,7 +612,8 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
   };
 
   // Standalone dedicated modals for Organizational Chart (f.a), Key Personnel (f.b) & Equipment List (f.c)
-  if (item.code === '(f.a)') {
+  const isOrgChart = item.code === '(f.a)' || item.name.toLowerCase().includes('organizational chart') || item.name.toLowerCase().includes('org chart');
+  if (isOrgChart) {
     return (
       <OrganizationalChartModal
         item={item}
@@ -626,7 +627,7 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
     );
   }
 
-  if (item.code === '(f.b)' || item.code === '(f)' || item.code === '(b)') {
+  if (item.code === '(f.b)' || item.code === '(f)' || item.code === '(b)' || item.name.toLowerCase().includes('personnel') || item.name.toLowerCase().includes('manpower')) {
     return (
       <KeyPersonnelModal
         item={item}

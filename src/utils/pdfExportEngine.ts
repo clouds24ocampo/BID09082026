@@ -568,7 +568,7 @@ export async function buildMergedThreeLayerPdfBytes(
         const height = page.getHeight();
         const rotationAngle = page.getRotation().angle;
 
-        // 1. DIAGONAL WATERMARK (SUBTLE, UNOBTRUSIVE BAC COMPLIANT)
+        // 1. DIAGONAL WATERMARK (APPROX 5% DARKER / MORE VISIBLE, CRISP BAC COMPLIANT)
         if (effectiveFolderCopy && rotationAngle === 0) {
           const watermarkText = effectiveFolderCopy === 'ORIGINAL'
             ? 'ORIGINAL BID DOCUMENT'
@@ -584,144 +584,184 @@ export async function buildMergedThreeLayerPdfBytes(
             y: height / 2 - 30,
             size: wmSize,
             font: helveticaBold,
-            color: rgb(0.85, 0.88, 0.93),
+            color: rgb(0.72, 0.77, 0.85),
             rotate: degrees(36),
-            opacity: 0.22
+            opacity: 0.28
           });
         }
 
-        // 2. CERTIFIED TRUE COPY OFFICIAL RUBBER STAMP (FOR COPY_1 AND COPY_2)
-        if ((effectiveFolderCopy === 'COPY_1' || effectiveFolderCopy === 'COPY_2') && rotationAngle === 0) {
-          const copyLabel = effectiveFolderCopy === 'COPY_1' ? 'COPY 1 (FIRST CERTIFIED TRUE COPY)' : 'COPY 2 (SECOND CERTIFIED TRUE COPY)';
-          const stampW = 210;
-          const stampH = 56;
-          // Deterministic slight tilt angle (-5 to -8 deg) for realistic authentic government stamp feel
-          const tiltDeg = -6 - (pageIdx % 3);
-          const stampTilt = degrees(tiltDeg);
-          const stampX = width - stampW - 20;
-          const stampY = height - stampH - 22;
+        // 2. OFFICIAL GOVERNMENT RUBBER STAMP (FOR ORIGINAL, COPY_1, AND COPY_2)
+        // Perfectly rectangular, straight (0 deg rotation), crisp aligned text with solid backing box to prevent illegible overlap
+        if (effectiveFolderCopy && rotationAngle === 0) {
+          const isOrig = effectiveFolderCopy === 'ORIGINAL';
+          const isCopy1 = effectiveFolderCopy === 'COPY_1';
+          const stampW = 205;
+          const stampH = 54;
+          const stampX = width - stampW - 18;
+          const stampY = height - stampH - 16;
 
-          // Double border stamp box in classic official ink blue
+          const stampBlue = rgb(0.08, 0.22, 0.55);
+          const headerText = isOrig ? '* OFFICIAL ORIGINAL BID DOCUMENT *' : '* CERTIFIED TRUE COPY *';
+          const subText = isOrig
+            ? 'OFFICIAL SUBMISSION COPY'
+            : isCopy1
+            ? 'COPY 1 (FIRST CERTIFIED TRUE COPY)'
+            : 'COPY 2 (SECOND CERTIFIED TRUE COPY)';
+
+          // Solid white backing card to prevent overlapping with any document headers/borders
           page.drawRectangle({
             x: stampX,
             y: stampY,
             width: stampW,
             height: stampH,
-            borderColor: rgb(0.08, 0.2, 0.5),
-            borderWidth: 1.5,
-            rotate: stampTilt
-          });
-          page.drawRectangle({
-            x: stampX + 2,
-            y: stampY + 2,
-            width: stampW - 4,
-            height: stampH - 4,
-            borderColor: rgb(0.08, 0.2, 0.5),
-            borderWidth: 0.5,
-            rotate: stampTilt
+            color: rgb(1, 1, 1),
+            borderColor: stampBlue,
+            borderWidth: 1.4
           });
 
-          // Header line
-          page.drawText('* CERTIFIED TRUE COPY *', {
-            x: stampX + 16,
-            y: stampY + stampH - 13,
+          // Inner neat stamp border
+          page.drawRectangle({
+            x: stampX + 2.5,
+            y: stampY + 2.5,
+            width: stampW - 5,
+            height: stampH - 5,
+            borderColor: stampBlue,
+            borderWidth: 0.6
+          });
+
+          // Line 1: Header (Centered)
+          const hW = helveticaBold.widthOfTextAtSize(headerText, 7.5);
+          page.drawText(headerText, {
+            x: stampX + (stampW - hW) / 2,
+            y: stampY + stampH - 12.5,
             size: 7.5,
             font: helveticaBold,
-            color: rgb(0.08, 0.2, 0.5),
-            rotate: stampTilt
+            color: stampBlue
           });
-          page.drawText(copyLabel, {
-            x: stampX + 16,
-            y: stampY + stampH - 22,
-            size: 6,
+
+          // Line 2: Copy Designation (Centered)
+          const sW = helveticaBold.widthOfTextAtSize(subText, 6.2);
+          page.drawText(subText, {
+            x: stampX + (stampW - sW) / 2,
+            y: stampY + stampH - 21.5,
+            size: 6.2,
             font: helveticaBold,
-            color: rgb(0.08, 0.2, 0.5),
-            rotate: stampTilt
+            color: stampBlue
           });
+
+          // Line 3: Date of Submission (Left padded)
           page.drawText(`Date of Submission: ${submissionDate}`, {
-            x: stampX + 12,
-            y: stampY + stampH - 32,
-            size: 6,
+            x: stampX + 8,
+            y: stampY + stampH - 31,
+            size: 5.8,
             font: helveticaFont,
-            color: rgb(0.12, 0.24, 0.54),
-            rotate: stampTilt
+            color: stampBlue
           });
-          page.drawText(`Signed by: ${signatory.slice(0, 32)}`, {
-            x: stampX + 12,
-            y: stampY + stampH - 41,
+
+          // Line 4: Authorized Signatory (Left padded)
+          page.drawText(`Signed by: ${signatory.slice(0, 36)}`, {
+            x: stampX + 8,
+            y: stampY + stampH - 39.5,
+            size: 5.8,
+            font: helveticaFont,
+            color: stampBlue
+          });
+
+          // Line 5: Project Reference & BAC Compliance (Left padded)
+          page.drawText(`Ref: ${refNo} • BAC COMPLIANT`, {
+            x: stampX + 8,
+            y: stampY + stampH - 48,
             size: 5.5,
-            font: helveticaFont,
-            color: rgb(0.12, 0.24, 0.54),
-            rotate: stampTilt
-          });
-          page.drawText(`Ref: ${refNo} - BAC COMPLIANT`, {
-            x: stampX + 12,
-            y: stampY + stampH - 50,
-            size: 5,
             font: helveticaBold,
-            color: rgb(0.16, 0.28, 0.58),
-            rotate: stampTilt
-          });
-        } else if (effectiveFolderCopy === 'ORIGINAL' && rotationAngle === 0) {
-          // Sleek official original submission banner badge at upper right
-          const origTag = 'OFFICIAL ORIGINAL SUBMISSION COPY';
-          const origTagW = helveticaBold.widthOfTextAtSize(origTag, 6.5);
-          page.drawRectangle({
-            x: width - origTagW - 32,
-            y: height - 24,
-            width: origTagW + 12,
-            height: 14,
-            color: rgb(0.08, 0.14, 0.25),
-            borderColor: rgb(0.9, 0.75, 0.2),
-            borderWidth: 0.8
-          });
-          page.drawText(origTag, {
-            x: width - origTagW - 26,
-            y: height - 19.5,
-            size: 6.5,
-            font: helveticaBold,
-            color: rgb(1, 1, 1)
+            color: stampBlue
           });
         }
 
-        // 3. PAGE X OF Y PAGINATION (AT BOTTOM CENTER)
+        // 3. PAGE X OF Y PAGINATION (AT BOTTOM CENTER WITH CLEAN WHITE BACKING PILL)
+        // White backing pill guarantees pagination never collides or double-exposes on top of footer text
         const pageText = `Page ${pageIdx + 1} of ${totalPageCount}`;
         const fontSize = 7.5;
         const textWidth = helveticaFont.widthOfTextAtSize(pageText, fontSize);
+        const pillW = textWidth + 18;
+        const pillH = 14;
 
         if (rotationAngle === 0) {
+          const pillX = (width - pillW) / 2;
+          const pillY = 7;
+          page.drawRectangle({
+            x: pillX,
+            y: pillY,
+            width: pillW,
+            height: pillH,
+            color: rgb(1, 1, 1),
+            borderColor: rgb(0.8, 0.82, 0.88),
+            borderWidth: 0.6
+          });
           page.drawText(pageText, {
             x: (width - textWidth) / 2,
-            y: 12,
+            y: pillY + 3.5,
             size: fontSize,
-            font: helveticaFont,
-            color: rgb(0.2, 0.2, 0.2)
+            font: helveticaBold,
+            color: rgb(0.12, 0.16, 0.25)
           });
         } else if (rotationAngle === 90) {
+          const pillX = 7;
+          const pillY = (height - pillW) / 2;
+          page.drawRectangle({
+            x: pillX,
+            y: pillY,
+            width: pillH,
+            height: pillW,
+            color: rgb(1, 1, 1),
+            borderColor: rgb(0.8, 0.82, 0.88),
+            borderWidth: 0.6
+          });
           page.drawText(pageText, {
-            x: 12,
+            x: pillX + 3.5,
             y: (height - textWidth) / 2,
             size: fontSize,
-            font: helveticaFont,
-            color: rgb(0.2, 0.2, 0.2),
+            font: helveticaBold,
+            color: rgb(0.12, 0.16, 0.25),
             rotate: degrees(90)
           });
         } else if (rotationAngle === 180) {
+          const pillX = (width - pillW) / 2;
+          const pillY = height - 21;
+          page.drawRectangle({
+            x: pillX,
+            y: pillY,
+            width: pillW,
+            height: pillH,
+            color: rgb(1, 1, 1),
+            borderColor: rgb(0.8, 0.82, 0.88),
+            borderWidth: 0.6
+          });
           page.drawText(pageText, {
             x: (width + textWidth) / 2,
-            y: height - 12,
+            y: pillY + 10.5,
             size: fontSize,
-            font: helveticaFont,
-            color: rgb(0.2, 0.2, 0.2),
+            font: helveticaBold,
+            color: rgb(0.12, 0.16, 0.25),
             rotate: degrees(180)
           });
         } else if (rotationAngle === 270) {
+          const pillX = width - 21;
+          const pillY = (height - pillW) / 2;
+          page.drawRectangle({
+            x: pillX,
+            y: pillY,
+            width: pillH,
+            height: pillW,
+            color: rgb(1, 1, 1),
+            borderColor: rgb(0.8, 0.82, 0.88),
+            borderWidth: 0.6
+          });
           page.drawText(pageText, {
-            x: width - 12,
+            x: pillX + 10.5,
             y: (height + textWidth) / 2,
             size: fontSize,
-            font: helveticaFont,
-            color: rgb(0.2, 0.2, 0.2),
+            font: helveticaBold,
+            color: rgb(0.12, 0.16, 0.25),
             rotate: degrees(270)
           });
         }

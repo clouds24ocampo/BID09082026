@@ -158,6 +158,12 @@ const TECHNICAL_CHECKLIST_MASTER: TechnicalChecklistItem[] = [
         notes: 'Legal template to follow'
       },
       {
+        id: 'tech-fb',
+        code: '(f.b)',
+        name: 'List of contractor\'s key personnel (e.g., Project Manager, Project Engineers, Materials Engineers, and Foremen)',
+        notes: 'Legal template to follow'
+      },
+      {
         id: 'tech-fc',
         code: '(f.c)',
         name: 'List of contractor\'s major equipment (owned/leased/under purchase) with proof of ownership or lessor/vendor availability certification',

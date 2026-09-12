@@ -13,7 +13,7 @@ const DEFAULT_USERS: User[] = [];
 const purgeLegacyMockData = () => {
   try {
     if (typeof localStorage === 'undefined') return;
-    const isFlushedForLive = localStorage.getItem('bidocs_live_clean_flush_v5');
+    const isFlushedForLive = localStorage.getItem('bidocs_live_clean_flush_v6');
     if (!isFlushedForLive) {
       localStorage.clear();
       if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
@@ -23,7 +23,12 @@ const purgeLegacyMockData = () => {
         }).catch(() => {});
       }
       clearAllVaultData().catch(() => {});
-      localStorage.setItem('bidocs_live_clean_flush_v5', 'true');
+      try {
+        if (typeof indexedDB !== 'undefined') {
+          indexedDB.deleteDatabase('bidocs_vault_db');
+        }
+      } catch (_) {}
+      localStorage.setItem('bidocs_live_clean_flush_v6', 'true');
     }
   } catch (e) {
     console.error('[AuthContext] Error flushing legacy mock data:', e);
@@ -320,11 +325,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           names.forEach((name) => caches.delete(name));
         }).catch(() => {});
       }
-      localStorage.setItem('bidocs_live_clean_flush_v5', 'true');
+      localStorage.setItem('bidocs_live_clean_flush_v6', 'true');
     } catch (e) {
       console.error('Failed to clear browser storage:', e);
     }
     clearAllVaultData().catch((e) => console.error('Failed to clear vault DB:', e));
+    try {
+      if (typeof indexedDB !== 'undefined') {
+        indexedDB.deleteDatabase('bidocs_vault_db');
+      }
+    } catch (_) {}
     setTenants([]);
     setUsers([]);
     setCurrentUser(null);

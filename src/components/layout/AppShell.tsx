@@ -124,9 +124,6 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-black text-white text-base tracking-tight text-shimmer">BIDOCS</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-mono font-bold border border-blue-500/30 shadow-[0_0_10px_-2px_rgba(59,130,246,0.3)]">
-                  v2.5 PRO
-                </span>
               </div>
               <p className="text-[10px] text-slate-400 truncate max-w-37.5 sm:max-w-50 group-hover:text-slate-200 transition-colors">
                 {currentTenant?.companyName}
@@ -182,14 +179,6 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
 
         {/* Right Header Actions */}
         <div className="flex items-center gap-3">
-          
-          {/* HorizonX Live Legal Regime Telemetry Badge */}
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold shadow-[0_0_15px_-3px_rgba(16,185,129,0.25)]">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-dot" />
-            <span>RA 12009 NGPA Live</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 font-mono text-emerald-300">GPPB v6</span>
-          </div>
-
           {/* Expiry Notifications Alert */}
           <div className="relative">
             <button

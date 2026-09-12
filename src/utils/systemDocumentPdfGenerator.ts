@@ -3637,19 +3637,26 @@ export async function resolveDocumentPdfAttachment(
   const currentRefDigits = currentRef.replace(/[^0-9]/g, '');
   const scopeKey = ctx.projectRefNo || ctx.activeProject?.id || 'default';
 
+  // User Requirement: Bid Securing Declaration / Surety Bond and Omnibus Sworn Statement
+  // must ONLY contain the official statutory cover page separator (0 attached pages)
+  // so the user can physically attach the original notarized paper documents.
+  const isBsdOrOss = docIdUpper.includes('BID_SECURING') || docIdUpper.includes('BSD') || dName.includes('bid secur') || dName.includes('surety bond') ||
+                     docIdUpper.includes('OMNIBUS') || docIdUpper.includes('OSS') || dName.includes('omnibus') || dName.includes('oss');
+  if (isBsdOrOss) {
+    return null;
+  }
+
   // Identify if this item is a project-specific technical or financial statutory document
   const isTechnicalOrFinancialDoc = 
     docIdUpper.includes('ONGOING') || dName.includes('ongoing') ||
     docIdUpper.includes('SLCC') || dName.includes('slcc') || dName.includes('single largest') ||
-    docIdUpper.includes('SECTION_VI') || docIdUpper.includes('SEC_VI') || dName.includes('section vi') || dName.includes('schedule of req') ||
+    (!dName.includes('section vii') && (docIdUpper.includes('SECTION_VI') || docIdUpper.includes('SEC_VI') || dName.includes('section vi') || dName.includes('schedule of req'))) ||
     docIdUpper.includes('SECTION_VII') || docIdUpper.includes('SEC_VII') || docIdUpper.includes('TECH_SPECS') || dName.includes('section vii') || dName.includes('technical spec') ||
     docIdUpper.includes('FRAMEWORK') || docIdUpper.includes('FAL') || dName.includes('framework agreement') || dName.includes('fal') ||
     docIdUpper.includes('ORGANIZATIONAL_CHART') || docIdUpper.includes('ORG_CHART') || dName.includes('org chart') || dName.includes('organizational chart') ||
     docIdUpper.includes('KEY_PERSONNEL') || docIdUpper.includes('PERSONNEL') || dName.includes('key personnel') || dName.includes('manpower') ||
     docIdUpper.includes('MAJOR_EQUIPMENT') || docIdUpper.includes('EQUIPMENT') || dName.includes('equipment') ||
     docIdUpper.includes('AFTERSALES') || docIdUpper.includes('WARRANTY') || dName.includes('after-sale') || dName.includes('aftersales') || dName.includes('warranty') ||
-    docIdUpper.includes('OMNIBUS') || docIdUpper.includes('OSS') || dName.includes('omnibus') || dName.includes('oss') ||
-    docIdUpper.includes('BID_SECURING') || docIdUpper.includes('BSD') || dName.includes('bid secur') || dName.includes('bsd') ||
     docIdUpper.includes('NFCC') || dName.includes('nfcc') || dName.includes('contracting capacity') ||
     docIdUpper.includes('BID_FORM') || docIdUpper.includes('BIDFORM') || dName.includes('bid form') ||
     docIdUpper.includes('BILL_OF_QUANTITIES') || docIdUpper.includes('BOQ') || dName.includes('bill of quantities') || dName.includes('boq') ||
@@ -3771,7 +3778,7 @@ export async function resolveDocumentPdfAttachment(
         return vCode === 'DOC-1' || vCode.includes('PHILGEPS') || vName.includes('philgeps');
       }
       if ((dCode === 'SEC_DTI_REG' || dCode === 'DOC-2' || dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) {
-        return (vCode === 'DOC-2' || vCode.includes('SEC') || vCode.includes('DTI') || vName.includes('sec') || vName.includes('dti') || vName.includes('incorporation') || vName.includes('business registration')) && !vName.includes('section') && !vName.includes('philgeps') && !vName.includes('bir');
+        return (vCode === 'DOC-2' || vCode.includes('SEC') || vCode.includes('DTI') || vName.includes('sec') || vName.includes('dti') || vName.includes('incorporation') || (vName.includes('business registration') && !vName.includes('permit') && !vName.includes('mayor'))) && !vName.includes('section') && !vName.includes('philgeps') && !vName.includes('bir');
       }
       if ((dCode === 'MAYORS_PERMIT' || dCode === 'DOC-3' || dName.includes('mayor') || (dName.includes('business permit') && !dName.includes('barangay'))) && !dName.includes('ongoing') && !dName.includes('slcc') && !dName.includes('section')) {
         return vCode === 'DOC-3' || vCode === 'DOC-4' || vCode.includes('MAYOR') || vName.includes('mayor') || vName.includes('business permit');
@@ -3792,7 +3799,7 @@ export async function resolveDocumentPdfAttachment(
         return vCode === 'DOC-15' || vCode === 'DOC-5' || vCode.includes('AFS') || vCode.includes('AUDITED') || vName.includes('audited') || vName.includes('financial statement') || vName.includes('afs');
       }
       if (dCode === 'PCAB_LICENSE' || dCode === 'DOC-8' || dName.includes('pcab')) {
-        return vCode === 'DOC-8' || vCode === 'DOC-6' || vCode.includes('PCAB') || vName.includes('pcab');
+        return (vCode === 'DOC-8' || vCode.includes('PCAB') || vName.includes('pcab')) && !vName.includes('bir') && !vName.includes('2303') && vCode !== 'DOC-6';
       }
       if ((dCode === 'SECRETARY_CERTIFICATE' || dCode === 'DOC-13' || dName.includes('secretary') || dName.includes('board res') || dName.includes('spa')) && !dName.includes('section')) {
         return vCode === 'DOC-13' || vCode.includes('SEC_CERT') || vCode.includes('BOARD_RES') || vCode.includes('SPA') || vName.includes('secretary') || vName.includes('board') || vName.includes('attorney') || vName.includes('spa');
@@ -3810,8 +3817,8 @@ export async function resolveDocumentPdfAttachment(
       if (dName.includes('slcc') || dName.includes('single largest') || dCode.includes('SLCC')) {
         return vCode.includes('SLCC') || vName.includes('slcc') || vName.includes('single largest');
       }
-      if (dName.includes('section vi') || dName.includes('schedule of req') || dCode.includes('SECTION_VI') || dCode.includes('SEC_VI')) {
-        return vCode === 'SEC-VI' || vCode.includes('SEC-VI') || vName.includes('section vi') || vName.includes('schedule of req');
+      if ((!dName.includes('section vii') && !dName.includes('sec_vii')) && (dName.includes('section vi') || dName.includes('schedule of req') || dCode.includes('SECTION_VI') || dCode.includes('SEC_VI'))) {
+        return (vCode === 'SEC-VI' || vCode.includes('SEC-VI') || (vName.includes('section vi') && !vName.includes('section vii')) || vName.includes('schedule of req')) && !vName.includes('section vii');
       }
       if (dName.includes('technical spec') || dName.includes('section vii') || dCode.includes('TECH_SPECS') || dCode.includes('SEC_VII')) {
         return vCode === 'SEC-VII' || vCode.includes('TECH_SPECS') || vCode.includes('SEC-VII') || vName.includes('section vii') || vName.includes('technical spec');
@@ -3820,7 +3827,7 @@ export async function resolveDocumentPdfAttachment(
         return vCode === 'FAL' || vCode.includes('FAL') || vName.includes('framework agreement') || vName.includes('fal');
       }
       if (dName.includes('organizational chart') || dName.includes('org chart') || dCode.includes('ORG_CHART')) {
-        return vCode.includes('ORG_CHART') || vCode.includes('FC-2024') || vName.includes('organizational chart') || vName.includes('org chart');
+        return (vCode.includes('ORG_CHART') || (vCode.includes('FC-2024') && !vCode.includes('2025')) || (vName.includes('organizational chart') || vName.includes('org chart'))) && !vName.includes('key personnel') && !vName.includes('manpower');
       }
       if (dName.includes('key personnel') || dName.includes('manpower') || dCode.includes('KEY_PERSONNEL')) {
         return vCode.includes('KEY_PERSONNEL') || vCode.includes('FC-2025') || vName.includes('key personnel') || vName.includes('manpower');
@@ -3960,7 +3967,7 @@ export async function resolveDocumentPdfAttachment(
   if (docIdUpper.includes('SLCC') || dName.includes('slcc') || dName.includes('single largest')) {
     return await generateSlccStatementPdf(ctx);
   }
-  if (docIdUpper.includes('SECTION_VI') || docIdUpper.includes('SEC_VI') || dName.includes('section vi') || dName.includes('schedule of req')) {
+  if ((!dName.includes('section vii') && !dName.includes('sec_vii')) && (docIdUpper.includes('SECTION_VI') || docIdUpper.includes('SEC_VI') || dName.includes('section vi') || dName.includes('schedule of req'))) {
     return await generateSectionViRequirementsPdf(ctx);
   }
   if (docIdUpper.includes('SECTION_VII') || docIdUpper.includes('SEC_VII') || docIdUpper.includes('TECH_SPECS') || dName.includes('section vii') || dName.includes('technical spec')) {

@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   TrendingUp,
   Search,
-  Plus,
   ArrowUpRight,
   Clock,
   Award,
@@ -20,7 +19,6 @@ import {
 import { loadVaultItems } from '../../utils/vaultIndexedDB';
 import { SpotlightCard } from '../common/SpotlightCard';
 import { BorderBeam } from '../common/BorderBeam';
-import { HoloBadge3D } from '../common/HoloBadge3D';
 
 interface DashboardViewProps {
   setActiveTab: (tab: string) => void;
@@ -108,37 +106,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
               Enterprise workspace for <strong className="text-white font-semibold">{currentTenant?.companyName || 'Your Company'}</strong>. Operating under Philippine Republic Act 12009 (New Government Procurement Act) with certified 3-copy sealed package automation.
             </p>
-
-            <div className="flex flex-wrap items-center gap-2.5 pt-2">
-              <button
-                onClick={() => setActiveTab('opportunities')}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-xl transition-all duration-200 flex items-center gap-2 hover:opacity-95 hover:scale-[1.02] cursor-pointer"
-                style={{ 
-                  backgroundColor: brandColor,
-                  boxShadow: `0 0 25px -5px ${brandColor}60`
-                }}
-              >
-                <Search className="w-4 h-4" />
-                <span>Explore PhilGEPS Bids</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('vault')}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-200 bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-slate-600 transition flex items-center gap-2 cursor-pointer shadow"
-              >
-                <Plus className="w-4 h-4 text-blue-400" />
-                <span>Upload Document to Vault</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Interactive 3D Holographic Emblem Badge */}
-          <div className="shrink-0 hidden md:block">
-            <HoloBadge3D
-              brandColor={brandColor}
-              companyName={currentTenant?.companyName}
-              brandCode={currentTenant?.brandCode}
-              subText="RA 12009 NGPA Standard"
-            />
           </div>
         </div>
       </div>

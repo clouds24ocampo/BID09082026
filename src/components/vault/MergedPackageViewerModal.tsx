@@ -151,30 +151,38 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
   // Comprehensive Resolver for Attached Document Streams (Section VII, Section VI, BSD, OSS, Vault & System-Generated Documents)
   const resolveAttachmentForDoc = async (doc: PackageItem, targetFolderCopy?: FolderCopyType): Promise<string | null> => {
     try {
+      const codeOrId = ((doc.code || doc.id || '') as string).toUpperCase();
+      const docNameLower = (doc.documentName || '').toLowerCase();
+
+      // User Requirement: Bid Securing Declaration / Surety Bond and Omnibus Sworn Statement
+      // must ONLY contain the official statutory cover page separator (0 attached pages)
+      // so the user can physically attach the original notarized paper documents.
+      const isBsdOrOss = codeOrId.includes('BID_SECURING') || codeOrId.includes('BSD') || docNameLower.includes('bid secur') || docNameLower.includes('surety bond') ||
+                         codeOrId.includes('OMNIBUS') || codeOrId.includes('OSS') || docNameLower.includes('omnibus') || docNameLower.includes('oss');
+      if (isBsdOrOss) {
+        return null;
+      }
+
       let targetVaultDocId = doc.vaultDocId;
       let existingDataUrl = (doc as any).fileDataUrl;
       const cleanDocId = doc.id.replace(/^pkg-c[12]-/, '');
 
-      const codeOrId = ((doc.code || doc.id || '') as string).toUpperCase();
-      const docNameLower = (doc.documentName || '').toLowerCase();
       const isTechnicalOrFinancialDoc = [
         'ONGOING_CONTRACTS', 'SLCC_STATEMENT', 'SECTION_VI_REQUIREMENTS', 'TECH_SPECS_SECTION_VII',
         'FRAMEWORK_AGREEMENT_LIST', 'ORGANIZATIONAL_CHART', 'KEY_PERSONNEL', 'MAJOR_EQUIPMENT',
-        'AFTERSALES_WARRANTY', 'OMNIBUS_SWORN_STATEMENT', 'BID_SECURING_DECLARATION', 'NFCC_COMPUTATION',
+        'AFTERSALES_WARRANTY', 'NFCC_COMPUTATION',
         'FINANCIAL_BID_FORM_GOODS', 'FINANCIAL_BID_FORM_INFRA', 'FINANCIAL_BID_FORM_CONSULTING',
         'BILL_OF_QUANTITIES', 'DETAILED_ESTIMATES_FORM_L', 'PRICE_SCHEDULE_GOODS', 'SUMMARY_BID_PRICES',
         'CASH_FLOW_BY_QUARTER', 'ESTIMATES', 'FORM_L', 'BOQ', 'BID_FORM', 'PRICE_SCHEDULE', 'TECH_SPECS', 'SEC_VI', 'SEC_VII'
       ].some(k => codeOrId.includes(k)) ||
       docNameLower.includes('ongoing') || docNameLower.includes('slcc') || docNameLower.includes('single largest') ||
-      docNameLower.includes('section vi') || docNameLower.includes('schedule of req') ||
+      (!docNameLower.includes('section vii') && (docNameLower.includes('section vi') || docNameLower.includes('schedule of req'))) ||
       docNameLower.includes('section vii') || docNameLower.includes('technical spec') ||
       docNameLower.includes('framework agreement') || docNameLower.includes('fal') ||
       docNameLower.includes('org chart') || docNameLower.includes('organizational chart') ||
       docNameLower.includes('key personnel') || docNameLower.includes('personnel') || docNameLower.includes('manpower') ||
       docNameLower.includes('equipment') || docNameLower.includes('machinery') ||
       docNameLower.includes('after-sale') || docNameLower.includes('aftersales') || docNameLower.includes('warranty') ||
-      docNameLower.includes('omnibus') || docNameLower.includes('oss') ||
-      docNameLower.includes('bid secur') || docNameLower.includes('bsd') ||
       docNameLower.includes('nfcc') || docNameLower.includes('contracting capacity') ||
       docNameLower.includes('bid form') ||
       docNameLower.includes('bill of quantities') || docNameLower.includes('boq') ||
@@ -200,11 +208,11 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
           ((v as any).code && doc.code && (v as any).code.toLowerCase() === doc.code.toLowerCase()) ||
           (v.documentName && doc.documentName && v.documentName.trim().toLowerCase() === doc.documentName.trim().toLowerCase()) ||
           (dName.includes('philgeps') && (v.documentCode === 'DOC-1' || (v.documentName || '').toLowerCase().includes('philgeps'))) ||
-          (((dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) && (v.documentCode === 'DOC-2' || ((v.documentName || '').toLowerCase().includes('incorporation') || (v.documentName || '').toLowerCase().includes('business registration') || (v.documentName || '').toLowerCase().includes('dti') || (v.documentName || '').toLowerCase().includes('sec')) && !(v.documentName || '').toLowerCase().includes('philgeps') && !(v.documentName || '').toLowerCase().includes('bir'))) ||
+          (((dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) && (v.documentCode === 'DOC-2' || ((v.documentName || '').toLowerCase().includes('incorporation') || ((v.documentName || '').toLowerCase().includes('business registration') && !(v.documentName || '').toLowerCase().includes('permit') && !(v.documentName || '').toLowerCase().includes('mayor')) || (v.documentName || '').toLowerCase().includes('dti') || (v.documentName || '').toLowerCase().includes('sec')) && !(v.documentName || '').toLowerCase().includes('philgeps') && !(v.documentName || '').toLowerCase().includes('bir'))) ||
           ((dName.includes('mayor') || (dName.includes('business permit') && !dName.includes('barangay'))) && (v.documentCode === 'DOC-3' || (v.documentName || '').toLowerCase().includes('permit'))) ||
           (dName.includes('tax') && (v.documentCode === 'DOC-4' || v.documentCode === 'DOC-7' || (v.documentName || '').toLowerCase().includes('clearance'))) ||
           (dName.includes('audited') && (v.documentCode === 'DOC-5' || v.documentCode === 'DOC-15' || (v.documentName || '').toLowerCase().includes('audited'))) ||
-          (dName.includes('pcab') && (v.documentCode === 'DOC-6' || v.documentCode === 'DOC-8' || (v.documentName || '').toLowerCase().includes('pcab'))) ||
+          (dName.includes('pcab') && (v.documentCode === 'DOC-8' || (v.documentName || '').toLowerCase().includes('pcab')) && v.documentCode !== 'DOC-6' && !(v.documentName || '').toLowerCase().includes('bir')) ||
           ((dName.includes('secretary') || dName.includes('board res') || dName.includes('spa')) && !dName.includes('section') && (v.documentCode === 'DOC-13' || (v.documentName || '').toLowerCase().includes('secretary') || (v.documentName || '').toLowerCase().includes('spa'))) ||
           (dName.includes('joint') && (v.documentCode === 'DOC-14' || (v.documentName || '').toLowerCase().includes('joint') || (v.documentName || '').toLowerCase().includes('jva')))
         );
@@ -929,6 +937,9 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
                         id: doc.id,
                         tenantId: tenantId,
                         documentName: doc.documentName,
+                        vaultDocumentName: linkedVaultDoc?.documentName,
+                        attachedDocumentName: linkedVaultDoc?.fileName,
+                        dtiSecType: (linkedVaultDoc as any)?.dtiSecType,
                         documentNumber: linkedVaultDoc?.documentNumber || doc.documentNumber || projectRefNo,
                         category: docCategory,
                         procurementApplicability: ['Infrastructure'],

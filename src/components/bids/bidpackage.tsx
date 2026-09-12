@@ -26,7 +26,6 @@ import {
   CheckCircle2, 
   Clock, 
   Search, 
-  FolderPlus, 
   Plus, 
   Trash2, 
   Layers, 
@@ -118,16 +117,8 @@ export const BidPackageBuilderView: React.FC = () => {
   const [selectedDocIdsToAdd, setSelectedDocIdsToAdd] = useState<string[]>([]);
   const [completedDocFilter, setCompletedDocFilter] = useState<'ALL' | 'LEGAL' | 'TECHNICAL' | 'FINANCIAL'>('ALL');
 
-  const [showVaultImportModal, setShowVaultImportModal] = useState(false);
-  const [showAddCustomModal, setShowAddCustomModal] = useState(false);
   const [showAutoSyncSuccess, setShowAutoSyncSuccess] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Add Custom Modal Inputs
-  const [customDocName, setCustomDocName] = useState('');
-  const [customDocCategory, setCustomDocCategory] = useState<'LEGAL' | 'TECHNICAL' | 'FINANCIAL'>('LEGAL');
-  const [customDocFile, setCustomDocFile] = useState<File | null>(null);
-  const [customDocFileDataUrl, setCustomDocFileDataUrl] = useState<string>('');
 
   // Reorganize & Sequence State
   const [showReorderModal, setShowReorderModal] = useState(false);
@@ -1005,70 +996,6 @@ export const BidPackageBuilderView: React.FC = () => {
     setTimeout(() => setShowAutoSyncSuccess(false), 3500);
   };
 
-  const handleImportFromVault = (vaultDoc: DocumentVaultItem) => {
-    const isFinancial = vaultDoc.category === 'FINANCIAL' || 
-                        vaultDoc.documentName.toLowerCase().includes('bid form') ||
-                        vaultDoc.documentName.toLowerCase().includes('price schedule') ||
-                        vaultDoc.documentName.toLowerCase().includes('bill of quantities') ||
-                        vaultDoc.documentName.toLowerCase().includes('detailed estimate');
-
-    const env: 'ENVELOPE_1' | 'ENVELOPE_2' = isFinancial ? 'ENVELOPE_2' : 'ENVELOPE_1';
-    let cat: 'LEGAL' | 'TECHNICAL' | 'FINANCIAL' = 'LEGAL';
-    if (isFinancial) cat = 'FINANCIAL';
-    else if (vaultDoc.category === 'TECHNICAL') cat = 'TECHNICAL';
-
-    const newItem: PackageItem = {
-      id: `pkg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-      documentName: vaultDoc.documentName,
-      documentNumber: vaultDoc.documentNumber || projectRefNo,
-      category: cat,
-      envelope: env,
-      folderCopy: 'ORIGINAL',
-      vaultDocId: vaultDoc.id,
-      fileSizeBytes: vaultDoc.fileSizeBytes || 1048576,
-      dateAdded: new Date().toISOString()
-    };
-
-    const originalItems = packageItems.filter(item => item.folderCopy === 'ORIGINAL');
-    savePackageItems([...originalItems, newItem]);
-    setShowVaultImportModal(false);
-  };
-
-  const handleAddCustomDocument = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customDocName.trim()) return;
-
-    const env: 'ENVELOPE_1' | 'ENVELOPE_2' = customDocCategory === 'FINANCIAL' ? 'ENVELOPE_2' : 'ENVELOPE_1';
-
-    const newItemId = `pkg-custom-${Date.now()}`;
-    const newItem: PackageItem = {
-      id: newItemId,
-      documentName: customDocName.trim(),
-      documentNumber: projectRefNo,
-      category: customDocCategory,
-      envelope: env,
-      folderCopy: 'ORIGINAL',
-      fileSizeBytes: customDocFile?.size || 1048576,
-      fileName: customDocFile?.name,
-      fileDataUrl: customDocFileDataUrl || undefined,
-      dateAdded: new Date().toISOString()
-    };
-
-    if (customDocFileDataUrl) {
-      pdfDataCache.current[newItemId] = customDocFileDataUrl;
-      try {
-        await savePdfData(newItemId, customDocFileDataUrl);
-      } catch (_) {}
-    }
-
-    const originalItems = packageItems.filter(item => item.folderCopy === 'ORIGINAL');
-    savePackageItems([...originalItems, newItem]);
-    setCustomDocName('');
-    setCustomDocFile(null);
-    setCustomDocFileDataUrl('');
-    setShowAddCustomModal(false);
-  };
-
   const handleUploadFileForDoc = (doc: PackageItem, file: File) => {
     if (!file) return;
     if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
@@ -1266,26 +1193,6 @@ export const BidPackageBuilderView: React.FC = () => {
     reordered.splice(targetIndex, 0, moved);
 
     savePackageItems([...otherOriginalDocs, ...reordered]);
-  };
-
-  // Instant 1-Click Action: Organize current folder documents according to the 17-item statutory checklist order
-  const handleOrganizeDirectlyByChecklist = () => {
-    const currentFolderDocs = packageItems.filter(
-      item => item.folderCopy === 'ORIGINAL' && item.envelope === activeEnvelope
-    );
-    const otherOriginalDocs = packageItems.filter(
-      item => item.folderCopy === 'ORIGINAL' && item.envelope !== activeEnvelope
-    );
-
-    if (currentFolderDocs.length === 0) return;
-
-    const sortedCurrent = [...currentFolderDocs].sort(
-      (a, b) => getDocumentChecklistRank(a) - getDocumentChecklistRank(b)
-    );
-
-    savePackageItems([...otherOriginalDocs, ...sortedCurrent]);
-    setShowAutoSyncSuccess(true);
-    setTimeout(() => setShowAutoSyncSuccess(false), 3500);
   };
 
   // Open Reorganize Modal for active envelope
@@ -2053,38 +1960,6 @@ export const BidPackageBuilderView: React.FC = () => {
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Completed Docs</span>
-              </button>
-
-              <button
-                onClick={() => setShowVaultImportModal(true)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5 shadow cursor-pointer"
-                title="Import from Document Vault"
-              >
-                <FolderPlus className="w-3.5 h-3.5 text-blue-400" />
-                <span>From Vault</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setCustomDocCategory(activeEnvelope === 'ENVELOPE_1' ? 'LEGAL' : 'FINANCIAL');
-                  setShowAddCustomModal(true);
-                }}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/30 hover:bg-emerald-600 hover:text-white text-emerald-300 border border-emerald-500/40 transition flex items-center gap-1.5 shadow cursor-pointer"
-                title="Add custom document"
-              >
-                <Plus className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Custom Doc</span>
-              </button>
-
-              {/* 1-Click Instant Organize by Checklist */}
-              <button
-                onClick={handleOrganizeDirectlyByChecklist}
-                disabled={filteredItems.length <= 1}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/40 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1.5 shadow cursor-pointer"
-                title="Automatically organize all documents in this folder according to the standard 17-item Philippine Statutory Checklist"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Organize by Checklist</span>
               </button>
 
               {/* Reorganize & Reorder Sequence Button */}
@@ -3746,167 +3621,6 @@ export const BidPackageBuilderView: React.FC = () => {
                 })()}
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* IMPORT FROM VAULT MODAL */}
-      {showVaultImportModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[90vh] flex flex-col">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-10">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <FolderPlus className="w-4 h-4 text-blue-400" />
-                  <span>Import Documents from Document Vault ({activeFolderCopy})</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">Select documents to add into this {activeFolderCopy} folder.</p>
-              </div>
-              <button onClick={() => setShowVaultImportModal(false)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-3 flex-1">
-              {vaultDocs.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs italic">
-                  No documents found in Document Vault.
-                </div>
-              ) : (
-                vaultDocs.map((doc) => {
-                  const isAlreadyAdded = currentFolderItems.some(i => i.vaultDocId === doc.id || i.documentName === doc.documentName);
-                  return (
-                    <div
-                      key={doc.id}
-                      className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 transition flex items-center justify-between gap-3"
-                    >
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">
-                            {doc.category}
-                          </span>
-                          {doc.philgepsRefNo && (
-                            <span className="text-[10px] font-mono text-slate-400">
-                              REF: {doc.philgepsRefNo}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs font-bold text-white">{doc.documentName}</p>
-                      </div>
-
-                      <button
-                        onClick={() => handleImportFromVault(doc)}
-                        disabled={isAlreadyAdded}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shrink-0 ${
-                          isAlreadyAdded
-                            ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                            : 'bg-blue-600 hover:bg-blue-500 text-white shadow cursor-pointer'
-                        }`}
-                      >
-                        {isAlreadyAdded ? (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Added</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Add to {activeFolderCopy}</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="p-4 border-t border-slate-800 flex items-center justify-end bg-slate-900/95">
-              <button
-                onClick={() => setShowVaultImportModal(false)}
-                className="px-5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-white cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ADD CUSTOM DOCUMENT MODAL */}
-      {showAddCustomModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scaleIn my-auto">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Plus className="w-4 h-4 text-emerald-400" />
-                <span>Add Document to {activeFolderCopy} Folder</span>
-              </h3>
-              <button onClick={() => setShowAddCustomModal(false)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddCustomDocument} className="p-6 space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Document Category</label>
-                <select
-                  value={customDocCategory}
-                  onChange={(e) => setCustomDocCategory(e.target.value as any)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-medium focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="LEGAL">Legal & Eligibility (Class A / Class B)</option>
-                  <option value="TECHNICAL">Technical Document / Exhibit</option>
-                  <option value="FINANCIAL">Financial Proposal Document</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Document Name / Title <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={customDocName}
-                  onChange={(e) => setCustomDocName(e.target.value)}
-                  placeholder="e.g. PCAB Special Joint Venture License"
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-medium focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">
-                  Attach PDF File <span className="text-slate-500 font-normal">(Optional)</span>
-                </label>
-                <input
-                  type="file"
-                  accept=".pdf,application/pdf"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setCustomDocFile(file);
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        setCustomDocFileDataUrl(reader.result as string);
-                      };
-                      reader.readAsDataURL(file);
-                    } else {
-                      setCustomDocFile(null);
-                      setCustomDocFileDataUrl('');
-                    }
-                  }}
-                  className="w-full text-slate-300 text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-300 hover:file:bg-slate-700 cursor-pointer"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
-                <button type="button" onClick={() => setShowAddCustomModal(false)} className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">
-                  Cancel
-                </button>
-                <button type="submit" className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition shadow">
-                  Add to {activeFolderCopy}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

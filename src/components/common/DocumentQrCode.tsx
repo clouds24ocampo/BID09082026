@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { generateQrCodeDataUrl, formatQrPayload, QrCodeDetails } from '../../utils/qrCodeGenerator';
+import { generateQrCodeDataUrl, formatQrPayload, getCachedQrCodeDataUrl, QrCodeDetails } from '../../utils/qrCodeGenerator';
 import { debugLog } from '../../utils/debugLog';
 
 export interface DocumentQrCodeProps {
@@ -15,7 +15,7 @@ export const DocumentQrCode: React.FC<DocumentQrCodeProps> = ({
   className = '',
   showCaption = true
 }) => {
-  const [dataUrl, setDataUrl] = useState<string>('');
+  const [dataUrl, setDataUrl] = useState<string>(() => getCachedQrCodeDataUrl(details) || '');
   const [showTextModal, setShowTextModal] = useState(false);
 
   // Guarantee minimum physical dimension of at least 64px for phone camera & scanner sensor resolution

@@ -3,7 +3,6 @@ import { useAuth } from '../../context/AuthContext';
 import { LegalRegime, ProcurementType, UserRole } from '../../types';
 import {
   Building2,
-  User as UserIcon,
   Palette,
   ShieldCheck,
   ArrowRight,
@@ -16,16 +15,12 @@ import {
   Zap,
   Lock,
   Cpu,
-  Fingerprint,
   Layers,
   Globe2
 } from 'lucide-react';
 import { AuroraBackground } from '../common/AuroraBackground';
-import { SpotlightCard } from '../common/SpotlightCard';
 import { BorderBeam } from '../common/BorderBeam';
-import { HoloBadge3D } from '../common/HoloBadge3D';
 import { ShinyText } from '../common/ShinyText';
-import { CyberBadge } from '../common/CyberBadge';
 
 interface RegisterPageProps {
   onSwitchToLogin: () => void;
@@ -185,83 +180,38 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
         {/* ─── LEFT PANEL: 3D HOLOGRAPHIC COMMAND DECK (HorizonX Style) ─── */}
         <div className="lg:col-span-5 flex flex-col justify-between space-y-5">
           
-          {/* Top Brand Pill & Live Telemetry */}
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <div 
-                className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-white text-xs shadow-lg transition-transform hover:scale-105"
-                style={{ 
-                  backgroundColor: brandColor,
-                  boxShadow: `0 0 20px -2px ${brandColor}70` 
-                }}
-              >
-                {displayBrandCode.substring(0, 3)}
-              </div>
-              <span className="font-black text-white text-lg tracking-tight">
-                <ShinyText text="BiDOCS" speed={5} />
-              </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-mono font-bold border border-blue-500/30">
-                PRO ONBOARDING
-              </span>
+          {/* Top Brand */}
+          <div className="flex items-center gap-2">
+            <div 
+              className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-white text-xs shadow-lg transition-transform hover:scale-105"
+              style={{ 
+                backgroundColor: brandColor,
+                boxShadow: `0 0 20px -2px ${brandColor}70` 
+              }}
+            >
+              {displayBrandCode.substring(0, 3)}
             </div>
-
-            <CyberBadge
-              label="RA 12009 NGPA"
-              variant="emerald"
-              telemetry="READY"
-              pulse={true}
-            />
+            <span className="font-black text-white text-lg tracking-tight">
+              <ShinyText text="BiDOCS" speed={5} />
+            </span>
           </div>
 
-          {/* Interactive 3D Holographic Badge Card */}
-          <div className="space-y-4">
-            <HoloBadge3D
-              brandColor={brandColor}
-              companyName={displayCompanyName}
-              brandCode={displayBrandCode}
-              subText={`${preferredRegime === 'RA_12009_NGPA' ? 'RA 12009 NGPA' : 'RA 9184'} Statutory Portal`}
-            />
-
-            {/* Live 3D Smart Contractor Identity Card */}
-            <SpotlightCard
-              spotlightColor="rgba(59, 130, 246, 0.2)"
-              enableTilt={true}
-              className="p-5 rounded-2xl border border-slate-800/90 shadow-2xl space-y-3 relative overflow-hidden group backdrop-blur-xl"
-            >
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                <div className="flex items-center gap-2">
-                  <Fingerprint className="w-4 h-4 text-blue-400" />
-                  <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">
-                    Digital Smart ID
-                  </span>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  TENANT ISOLATED
-                </span>
+          <div className="space-y-4 my-auto py-4">
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
+              Enterprise Procurement Workspace
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Automated Philippine government procurement compliance, multi-tenant digital vault, and 3-copy sealed package generation under RA 12009 (NGPA) and RA 9184.
+            </p>
+            <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2 text-xs text-slate-400">
+              <div className="flex items-center gap-2 text-slate-200 font-semibold">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Statutory 3-Copy Sealed Packages</span>
               </div>
-
-              <div className="space-y-1">
-                <p className="text-xs font-extrabold text-white truncate group-hover:text-blue-300 transition-colors">
-                  {displayCompanyName}
-                </p>
-                <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1">
-                  <span>TIN: <strong className="text-slate-200">{tin || 'Pending Input'}</strong></span>
-                  <span>PCAB: <strong className="text-slate-200">{pcabLicenseNo || 'N/A'}</strong></span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
-                  <span>PhilGEPS: <strong className="text-slate-200">{philgepsPlatinumNo || 'Standard Platinum'}</strong></span>
-                  <span>Category: <strong className="text-emerald-400">{primaryProcurementType}</strong></span>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] font-mono text-slate-400">
-                <span className="flex items-center gap-1 text-slate-300">
-                  <UserIcon className="w-3 h-3 text-blue-400" />
-                  AMO: <span className="text-white font-bold truncate max-w-[140px]">{displaySignatory}</span>
-                </span>
-                <span className="text-blue-400 font-bold">ACTIVE REGISTRATION</span>
-              </div>
-            </SpotlightCard>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Synchronized Original, Copy 1, and Copy 2 compilation with dynamic document separators, QR code verification, and automated pagination.
+              </p>
+            </div>
           </div>
 
           {/* Quick-Launch 1-Click Demo Button */}

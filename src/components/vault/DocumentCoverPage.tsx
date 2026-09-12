@@ -9,6 +9,10 @@ interface DocumentCoverPageProps {
     approvedBudget?: number | string;
     preBidConferenceDate?: string;
     submissionDeadline?: string;
+    code?: string;
+    vaultDocumentName?: string;
+    attachedDocumentName?: string;
+    dtiSecType?: string;
   };
   tenant: Tenant | null;
   incrementNumber?: number;
@@ -106,6 +110,27 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
       ? 'LEGAL DOCUMENT'
       : 'TECHNICAL DOCUMENT';
 
+  // Dynamically resolve Document Title for SEC vs DTI
+  let resolvedDocName = item.documentName;
+  const isSecDti = ((item.documentName || '').toLowerCase().includes('sec') && (item.documentName || '').toLowerCase().includes('dti')) ||
+                   (item.code === 'SEC_DTI_REG' || item.code === 'DOC-2');
+  if (isSecDti) {
+    const rawVaultName = ((item as any).vaultDocumentName || (item as any).attachedDocumentName || (item as any).fileName || '').toLowerCase();
+    const subType = ((item as any).dtiSecType || (item as any).subType || '').toUpperCase();
+    const isExplicitDti = subType === 'DTI' || rawVaultName.includes('dti') || (item.documentName || '').toLowerCase().startsWith('dti');
+    const isExplicitSec = subType === 'SEC' || rawVaultName.includes('sec') || rawVaultName.includes('securities') || (item.documentName || '').toLowerCase().startsWith('sec');
+
+    if (isExplicitDti && !isExplicitSec) {
+      resolvedDocName = 'Department of Trade and Industry (DTI) Certificate of Business Name Registration';
+    } else if (isExplicitSec) {
+      resolvedDocName = 'Securities and Exchange Commission (SEC) Certificate of Registration';
+    } else if (tenant?.companyName?.toUpperCase().includes('CORP') || tenant?.companyName?.toUpperCase().includes('INC') || tenant?.companyName?.toUpperCase().includes('LTD') || (tenant as any)?.businessType === 'CORPORATION' || (tenant as any)?.businessType === 'PARTNERSHIP') {
+      resolvedDocName = 'Securities and Exchange Commission (SEC) Certificate of Registration';
+    } else {
+      resolvedDocName = 'Securities and Exchange Commission (SEC) Certificate of Registration';
+    }
+  }
+
   // Format Approved Budget cleanly from string or number
   const rawAbc = item.approvedBudget || (item as any).abc;
   const formattedAbc = typeof rawAbc === 'number'
@@ -191,7 +216,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
           </div>
 
           <h2 className="text-xl sm:text-2xl md:text-[26px] font-black text-black leading-tight uppercase tracking-tight px-2">
-            {item.documentName}
+            {resolvedDocName}
           </h2>
         </div>
 
@@ -251,7 +276,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
           </div>
 
           <p className="text-[10px] leading-relaxed text-justify font-serif text-black">
-            This document serves as the official statutory exhibit separator and verified cover sheet for <strong className="uppercase underline text-black">{item.documentName}</strong> forming an integral statutory component of <strong className="uppercase text-black">{envelopeName || officialEnvelopeName}</strong>. The attached document is certified true, authentic, valid, and legally binding as submitted to the Bids and Awards Committee (BAC) in full compliance with the Revised Implementing Rules and Regulations (IRR) of Republic Act No. 9184 and the New Government Procurement Act (RA 12009).
+            This document serves as the official statutory exhibit separator and verified cover sheet for <strong className="uppercase underline text-black">{resolvedDocName}</strong> forming an integral statutory component of <strong className="uppercase text-black">{envelopeName || officialEnvelopeName}</strong>. The attached document is certified true, authentic, valid, and legally binding as submitted to the Bids and Awards Committee (BAC) in full compliance with the Revised Implementing Rules and Regulations (IRR) of Republic Act No. 9184 and the New Government Procurement Act (RA 12009).
           </p>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 border-t border-black/30 font-mono text-[9.5px]">
