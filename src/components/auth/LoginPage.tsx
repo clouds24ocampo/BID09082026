@@ -78,7 +78,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
   };
 
   return (
-    <div className="min-h-screen text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden font-sans select-none">
+    <div className="auth-stage min-h-screen text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden font-sans select-none">
 
       {/* ================= 3D IMMERSIVE DEEP SPACE SCENE ================= */}
       <SceneBackground intensity="full" color={activeTenantPreview.brandColor || '#38bdf8'} />
@@ -91,7 +91,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
           initial={{ opacity: 0, x: -40 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.7 }}
-          className="lg:col-span-6 space-y-6 pr-0 lg:pr-6"
+          className="login-hero lg:col-span-6 space-y-6 pr-0 lg:pr-6"
         >
           {/* Artemis Space Telemetry Badge */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-cyan-500/40 text-xs font-mono font-medium text-cyan-300 backdrop-blur-md shadow-[0_0_20px_rgba(6,182,212,0.2)]">
@@ -100,7 +100,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
           </div>
 
           <div className="space-y-3">
-            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
+            <h1 className="login-title text-4xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
               BiDOCS <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-500">Vault</span>
             </h1>
             <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
@@ -136,7 +136,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
               <motion.div
                 key={idx}
                 whileHover={{ x: 8, scale: 1.02 }}
-                className="flex items-start gap-3 p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-cyan-500/50 backdrop-blur-md transition-all shadow-md"
+                className="mission-feature flex items-start gap-3 p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-cyan-500/50 backdrop-blur-md transition-all shadow-md"
               >
                 <div className={`mt-0.5 p-2 rounded-lg border ${feature.bg} ${feature.color}`}>
                   <feature.icon className="w-4 h-4" />
@@ -155,9 +155,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.1 }}
-          className="lg:col-span-6"
+          className="login-console-wrap lg:col-span-6"
         >
-          <div className="bg-slate-950/85 backdrop-blur-2xl p-6 sm:p-8 rounded-3xl shadow-[0_0_70px_rgba(0,0,0,0.95)] border border-slate-800/90 space-y-6 relative overflow-hidden">
+          <div className="login-console bg-slate-950/85 backdrop-blur-2xl p-6 sm:p-8 rounded-3xl shadow-[0_0_70px_rgba(0,0,0,0.95)] border border-slate-800/90 space-y-6 relative overflow-hidden">
 
             {/* Top Accent Line */}
             <div

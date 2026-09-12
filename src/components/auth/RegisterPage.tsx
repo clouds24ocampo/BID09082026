@@ -129,11 +129,11 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
   };
 
   return (
-    <div className="min-h-screen text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
+    <div className="auth-stage min-h-screen text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
       {/* 3D Immersive Scene — brand-tinted aurora + starfield */}
       <SceneBackground intensity="full" color={brandColor} />
 
-      <div className="w-full max-w-4xl glass-panel p-6 sm:p-8 rounded-2xl shadow-2xl border border-slate-800 relative z-10 space-y-6">
+      <div className="register-console w-full max-w-4xl glass-panel p-6 sm:p-8 rounded-2xl shadow-2xl border border-slate-800 relative z-10 space-y-6">
 
         {/* Registration Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">

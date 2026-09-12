@@ -1340,7 +1340,7 @@ export const BidPackageBuilderView: React.FC = () => {
       
       {/* 1. Target Bidding Project Identifier Container + Header Controls */}
       <div className="w-full bg-[#080d1a]/90 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-2xl backdrop-blur-md">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 w-full">
           
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className="flex items-center gap-2 shrink-0">
@@ -1373,7 +1373,7 @@ export const BidPackageBuilderView: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="w-full bg-[#040814] border border-slate-800 rounded-full px-5 py-2.5 text-xs text-slate-500 font-mono italic">
+                <div className="w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap bg-[#040814] border border-slate-800 rounded-full px-5 py-2.5 text-xs text-slate-500 font-mono italic">
                   No Opportunity Projects Found
                 </div>
               )}
@@ -1381,7 +1381,7 @@ export const BidPackageBuilderView: React.FC = () => {
           </div>
 
           {/* Action Header Buttons */}
-          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+          <div className="flex w-full xl:w-auto items-center justify-stretch xl:justify-end gap-2.5 flex-wrap shrink-0">
             {/* Add Completed Documents to Current Folder Button */}
             <button
               onClick={() => {
@@ -1392,7 +1392,7 @@ export const BidPackageBuilderView: React.FC = () => {
                 setSelectedDocIdsToAdd([]);
                 setShowAddCompletedModal(true);
               }}
-              className="px-4 py-2.5 rounded-full text-xs font-black bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-950/40 transition flex items-center gap-2 cursor-pointer"
+              className="flex-1 xl:flex-none justify-center px-4 py-2.5 rounded-full text-xs font-black bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-950/40 transition flex items-center gap-2 cursor-pointer"
               title={`Add completed legal, technical, or financial documents to the ${activeFolderCopy} folder`}
             >
               <ListPlus className="w-4 h-4 text-blue-200" />
@@ -1410,7 +1410,7 @@ export const BidPackageBuilderView: React.FC = () => {
                 setCoverFolderCopyChoice(activeFolderCopy);
                 setShowUnifiedCoverModal(true);
               }}
-              className="px-4 py-2.5 rounded-full text-xs font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-lg shadow-amber-950/30 transition flex items-center gap-2 cursor-pointer"
+              className="flex-1 xl:flex-none justify-center px-4 py-2.5 rounded-full text-xs font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-lg shadow-amber-950/30 transition flex items-center gap-2 cursor-pointer"
               title="View, Print & Preview All Cover Pages (Mother Box, Envelopes & Folders)"
             >
               <Box className="w-4 h-4 text-slate-950" />

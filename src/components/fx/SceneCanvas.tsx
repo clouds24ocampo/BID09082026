@@ -1,6 +1,70 @@
 import React, { Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { Stars, Sparkles, Float, MeshDistortMaterial } from '@react-three/drei';
+import * as THREE from 'three';
+
+const DocumentConstellation: React.FC<{ color: string }> = ({ color }) => {
+  const groupRef = React.useRef<THREE.Group>(null);
+  const ringRef = React.useRef<THREE.Mesh>(null);
+
+  useFrame(({ pointer }, delta) => {
+    if (!groupRef.current || !ringRef.current) return;
+
+    groupRef.current.rotation.y += delta * 0.12;
+    groupRef.current.rotation.x = THREE.MathUtils.lerp(
+      groupRef.current.rotation.x,
+      pointer.y * 0.1,
+      0.035
+    );
+    groupRef.current.position.x = THREE.MathUtils.lerp(
+      groupRef.current.position.x,
+      2.25 + pointer.x * 0.32,
+      0.035
+    );
+    groupRef.current.position.y = THREE.MathUtils.lerp(
+      groupRef.current.position.y,
+      0.15 + pointer.y * 0.18,
+      0.035
+    );
+    ringRef.current.rotation.z -= delta * 0.45;
+  });
+
+  return (
+    <group ref={groupRef} position={[2.25, 0.15, -0.7]} rotation={[0.18, -0.35, 0.12]}>
+      <Float speed={1.4} rotationIntensity={0.18} floatIntensity={0.35}>
+        <mesh position={[0, 0.32, 0.22]} rotation={[0.05, -0.12, 0.08]}>
+          <boxGeometry args={[2.45, 0.08, 1.65]} />
+          <meshStandardMaterial color="#dbeafe" emissive={color} emissiveIntensity={0.08} metalness={0.25} roughness={0.32} />
+        </mesh>
+        <mesh position={[-0.18, 0.43, 0.1]} rotation={[0.05, -0.12, 0.08]}>
+          <boxGeometry args={[2.05, 0.06, 1.3]} />
+          <meshStandardMaterial color="#f8fafc" emissive={color} emissiveIntensity={0.12} metalness={0.12} roughness={0.42} />
+        </mesh>
+        <mesh position={[0.22, 0.54, -0.04]} rotation={[0.05, -0.12, 0.08]}>
+          <boxGeometry args={[1.65, 0.045, 0.95]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.22} metalness={0.4} roughness={0.28} transparent opacity={0.72} />
+        </mesh>
+      </Float>
+
+      <mesh ref={ringRef} rotation={[Math.PI / 2.2, 0.1, 0]}>
+        <torusGeometry args={[1.62, 0.012, 12, 96]} />
+        <meshBasicMaterial color={color} transparent opacity={0.52} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2.7, 0.8, 0.4]}>
+        <torusGeometry args={[1.35, 0.008, 10, 96]} />
+        <meshBasicMaterial color="#a78bfa" transparent opacity={0.36} />
+      </mesh>
+      <mesh position={[0.95, 0.74, 0.2]}>
+        <sphereGeometry args={[0.075, 16, 16]} />
+        <meshBasicMaterial color="#fbbf24" />
+      </mesh>
+      <mesh position={[-1.1, -0.55, 0.2]}>
+        <sphereGeometry args={[0.045, 16, 16]} />
+        <meshBasicMaterial color="#22d3ee" />
+      </mesh>
+    </group>
+  );
+};
 
 /**
  * WebGL scene contents. This module is ONLY ever loaded via React.lazy from
@@ -40,6 +104,8 @@ export const SceneCanvas: React.FC<{ color: string; full: boolean }> = ({ color,
           scale={[15, 9, 6]}
           noise={2}
         />
+
+        <DocumentConstellation color={color} />
 
         <Float speed={1.2} rotationIntensity={0.6} floatIntensity={1.2}>
           <mesh position={[3.4, 1.3, -2]}>
