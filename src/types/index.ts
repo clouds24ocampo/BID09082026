@@ -138,7 +138,7 @@ export interface PhilGEPSOpportunity {
   pdfFileName?: string;
   pdfFileSize?: number;
   pdfFileDataUrl?: string;
-  status: 'OPEN' | 'CLOSED' | 'AWARDED_TO_OTHERS' | 'CANCELLED';
+  status: 'OPEN' | 'CLOSED' | 'AWARDED' | 'AWARDED_TO_OTHERS' | 'CANCELLED';
   location: string;
   description: string;
   pdfAttachments?: {

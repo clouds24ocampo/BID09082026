@@ -9,6 +9,7 @@ import {
 } from '../../utils/pdfExportEngine';
 import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
 import { loadPdfData } from '../../utils/vaultIndexedDB';
+import { markProjectBidMergeDone } from '../../utils/opportunityProjects';
 import { PDFDocument } from 'pdf-lib';
 import { 
   X, 
@@ -389,6 +390,17 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
 
       setCompiledPdfs(prev => ({ ...prev, [folderCopy]: dataUrl }));
       setStatusMessage(`Merged ${folderCopy} package ready.`);
+
+      // Mark this project as having merged and completed bid documents
+      const targetProjectRef = projectRefNo || activeProject?.refNo || cleanRef;
+      if (tenant?.id && targetProjectRef) {
+        markProjectBidMergeDone(tenant.id, targetProjectRef, {
+          fileName: outputFileName,
+          copiesCount: 3,
+          completedBy: tenant.authorizedSignatory?.name || 'BiDOCS 3-Copy Engine'
+        });
+      }
+
       return dataUrl;
     } catch (err) {
       console.error(`Error compiling ${folderCopy} package:`, err);

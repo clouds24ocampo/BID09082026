@@ -14,7 +14,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import { savePdfData, loadPdfData } from '../../../utils/vaultIndexedDB';
+import { savePdfData, loadPdfData, deletePdfData } from '../../../utils/vaultIndexedDB';
 import html2canvas from 'html2canvas';
 
 export interface EquipmentItemRow {
@@ -229,6 +229,10 @@ export const ContractorsMajorEquipment: React.FC<ContractorsMajorEquipmentProps>
     if (items.length <= 1) {
       alert('At least 1 equipment row must be maintained.');
       return;
+    }
+    const itemToRemove = items.find(it => it.id === id);
+    if (itemToRemove?.attachedPdfId) {
+      deletePdfData(itemToRemove.attachedPdfId).catch(() => {});
     }
     saveItems(items.filter(it => it.id !== id));
   };

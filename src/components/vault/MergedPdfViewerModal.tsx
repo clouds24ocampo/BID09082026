@@ -4,6 +4,7 @@ import { DocumentCoverPage } from './DocumentCoverPage';
 import { exportMergedThreeLayerPdf, ExportDocumentUnit } from '../../utils/pdfExportEngine';
 import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
 import { loadPdfData } from '../../utils/vaultIndexedDB';
+import { markProjectBidMergeDone } from '../../utils/opportunityProjects';
 import { 
   X, 
   CheckCircle2, 
@@ -198,6 +199,13 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
         projectTitle: projectTitle || items[0]?.projectTitle
       });
       setStatusText('Package Merged Successfully!');
+
+      if (tenant?.id && activeRef) {
+        markProjectBidMergeDone(tenant.id, activeRef, {
+          fileName,
+          completedBy: tenant.authorizedSignatory?.name || 'BiDOCS Bundle Organizer'
+        });
+      }
     } catch (err) {
       console.error('Error exporting merged bundle:', err);
       alert('An error occurred while compiling the merged package. Please try again.');

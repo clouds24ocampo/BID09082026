@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
-import { savePdfData, loadPdfData } from '../../../utils/vaultIndexedDB';
+import { savePdfData, loadPdfData, deletePdfData } from '../../../utils/vaultIndexedDB';
 import { PDFDocument } from 'pdf-lib';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import html2canvas from 'html2canvas';
@@ -275,6 +275,9 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
   };
 
   const removeRow = (id: string) => {
+    if (tenant?.id) {
+      deletePdfData(`slcc_row_pdf_${tenant.id}_${id}`).catch(() => {});
+    }
     updateAndSaveContracts(prev => prev.filter(c => c.id !== id));
   };
 

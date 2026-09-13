@@ -114,6 +114,22 @@ export async function upsertVaultItem(item: any): Promise<void> {
     }
   }
 
+  // Synchronize localStorage fallback
+  if (typeof localStorage !== 'undefined' && tenantId) {
+    try {
+      const saved = localStorage.getItem(`bidocs_vault_items_${tenantId}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const idx = parsed.findIndex((i: any) => i.id === item.id);
+          if (idx >= 0) parsed[idx] = cleanItem;
+          else parsed.push(cleanItem);
+          localStorage.setItem(`bidocs_vault_items_${tenantId}`, JSON.stringify(parsed));
+        }
+      }
+    } catch (_) {}
+  }
+
   const db = await openDB();
   const tx = db.transaction(STORE_VAULT_ITEMS, 'readwrite');
   const store = tx.objectStore(STORE_VAULT_ITEMS);
@@ -135,6 +151,13 @@ export async function upsertVaultItems(items: any[], tenantId?: string): Promise
     memoryVaultItemsCache.set(tenantId, cleanItems);
   }
 
+  // Synchronize localStorage fallback
+  if (typeof localStorage !== 'undefined' && tenantId) {
+    try {
+      localStorage.setItem(`bidocs_vault_items_${tenantId}`, JSON.stringify(cleanItems));
+    } catch (_) {}
+  }
+
   const db = await openDB();
   const tx = db.transaction(STORE_VAULT_ITEMS, 'readwrite');
   const store = tx.objectStore(STORE_VAULT_ITEMS);
@@ -149,7 +172,7 @@ export async function upsertVaultItems(items: any[], tenantId?: string): Promise
   });
 }
 
-/** Delete a single vault item and its associated PDF binary immediately */
+/** Delete a single vault item and its associated PDF binary immediately across all storage tiers */
 export async function deleteVaultItem(itemId: string, tenantId?: string): Promise<void> {
   // Evict from in-memory caches
   memoryPdfCache.delete(itemId);
@@ -160,6 +183,37 @@ export async function deleteVaultItem(itemId: string, tenantId?: string): Promis
     for (const [key, list] of memoryVaultItemsCache.entries()) {
       memoryVaultItemsCache.set(key, list.filter(i => i.id !== itemId));
     }
+  }
+
+  // Synchronize with localStorage fallback
+  if (typeof localStorage !== 'undefined') {
+    try {
+      if (tenantId) {
+        const saved = localStorage.getItem(`bidocs_vault_items_${tenantId}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            const filtered = parsed.filter((i: any) => i.id !== itemId);
+            localStorage.setItem(`bidocs_vault_items_${tenantId}`, JSON.stringify(filtered));
+          }
+        }
+      } else {
+        // Iterate through all vault localStorage keys
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('bidocs_vault_items_')) {
+            const saved = localStorage.getItem(k);
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed)) {
+                const filtered = parsed.filter((item: any) => item.id !== itemId);
+                localStorage.setItem(k, JSON.stringify(filtered));
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   if (typeof indexedDB === 'undefined') {
@@ -187,6 +241,13 @@ export async function saveVaultItems(items: any[], tenantId?: string): Promise<v
     memoryVaultItemsCache.set(tenantId, cleanItems);
   } else {
     memoryVaultItemsCache.set('all', cleanItems);
+  }
+
+  // Synchronize with localStorage fallback
+  if (typeof localStorage !== 'undefined' && tenantId) {
+    try {
+      localStorage.setItem(`bidocs_vault_items_${tenantId}`, JSON.stringify(cleanItems));
+    } catch (_) {}
   }
 
   if (typeof indexedDB === 'undefined') {
@@ -487,6 +548,60 @@ export async function migrateFromLocalStorage(): Promise<any[]> {
   }
 
   return [];
+}
+
+/**
+ * Vacuum and reclaim storage space by purging orphaned PDF blobs that are no longer referenced
+ */
+export async function vacuumOrphanedBlobs(): Promise<number> {
+  if (typeof indexedDB === 'undefined') return 0;
+  try {
+    const db = await openDB();
+    const readTx = db.transaction([STORE_VAULT_ITEMS, STORE_PDF_BLOBS], 'readonly');
+    const itemKeys = new Set<string>((await new Promise<any[]>((res) => {
+      const req = readTx.objectStore(STORE_VAULT_ITEMS).getAllKeys();
+      req.onsuccess = () => res(req.result || []);
+      req.onerror = () => res([]);
+    })).map(String));
+
+    const allBlobKeys: string[] = await new Promise((res) => {
+      const req = readTx.objectStore(STORE_PDF_BLOBS).getAllKeys();
+      req.onsuccess = () => res((req.result || []).map(String));
+      req.onerror = () => res([]);
+    });
+
+    // Find orphaned blobs (excluding active template prefixes like tech_specs_, fal_, boq_, equip_proof_, ongoing_row_pdf_, slcc_row_pdf_, proj_)
+    const orphaned = allBlobKeys.filter(k => {
+      if (itemKeys.has(k)) return false;
+      if (k.startsWith('tech_specs_') || k.startsWith('fal_') || k.startsWith('boq_') || 
+          k.startsWith('equip_proof_') || k.startsWith('ongoing_row_pdf_') || 
+          k.startsWith('slcc_row_pdf_') || k.startsWith('proj_') || k.startsWith('resume_') ||
+          k.startsWith('priceschedule_') || k.startsWith('pricesched_') || k.startsWith('bidform_')) {
+        return false;
+      }
+      return true;
+    });
+
+    if (orphaned.length === 0) return 0;
+
+    const writeTx = db.transaction(STORE_PDF_BLOBS, 'readwrite');
+    const blobStore = writeTx.objectStore(STORE_PDF_BLOBS);
+    for (const key of orphaned) {
+      blobStore.delete(key);
+      memoryPdfCache.delete(key);
+    }
+
+    await new Promise((res) => {
+      writeTx.oncomplete = () => res(true);
+      writeTx.onerror = () => res(false);
+    });
+
+    console.log(`[VaultDB] Vacuumed ${orphaned.length} orphaned PDF blobs.`);
+    return orphaned.length;
+  } catch (err) {
+    console.error('[VaultDB] Vacuum error:', err);
+    return 0;
+  }
 }
 
 /**

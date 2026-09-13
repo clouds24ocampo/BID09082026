@@ -7,7 +7,7 @@ import { MergedPackageViewerModal } from '../vault/MergedPackageViewerModal';
 import { PdfPreviewModal } from '../vault/PdfPreviewModal';
 import DocumentQrCode from '../common/DocumentQrCode';
 import { loadVaultItems, loadPdfData, savePdfData, deleteVaultItem, deletePdfData } from '../../utils/vaultIndexedDB';
-import { getOpportunityProjects, OpportunityProjectOption } from '../../utils/opportunityProjects';
+import { getOpportunityProjects, OpportunityProjectOption, markProjectBidMergeDone } from '../../utils/opportunityProjects';
 import { generateAndDownloadThreeLayerPdf, exportMergedThreeLayerPdf, buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit } from '../../utils/pdfExportEngine';
 import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
 import { 
@@ -1504,6 +1504,14 @@ export const BidPackageBuilderView: React.FC = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+
+      if (currentTenant?.id && cleanRef) {
+        markProjectBidMergeDone(currentTenant.id, cleanRef, {
+          fileName,
+          copiesCount: 3,
+          completedBy: currentTenant.authorizedSignatory?.name || 'BiDOCS Packaging Engine'
+        });
+      }
     } catch (err) {
       console.error('Failed to download packaging covers bundle:', err);
       alert('Error generating packaging bundle. Please try again.');

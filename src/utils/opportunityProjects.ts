@@ -194,3 +194,96 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
 
   return [];
 };
+
+export interface ProjectMergeRecord {
+  projectRefNo: string;
+  projectId?: string;
+  mergedAt: string;
+  fileName?: string;
+  copiesCount?: number;
+  completedBy?: string;
+}
+
+/**
+ * Marks a project's bidding documents package as completely compiled, merged, and ready.
+ */
+export const markProjectBidMergeDone = (
+  tenantId: string,
+  projectRefOrId: string,
+  details?: Partial<ProjectMergeRecord>
+) => {
+  if (!projectRefOrId) return;
+  const cleanRef = projectRefOrId.trim();
+  const record: ProjectMergeRecord = {
+    projectRefNo: cleanRef,
+    mergedAt: details?.mergedAt || new Date().toISOString(),
+    fileName: details?.fileName,
+    copiesCount: details?.copiesCount || 3,
+    completedBy: details?.completedBy || 'BiDOCS Merge Engine',
+    ...details
+  };
+
+  try {
+    if (tenantId) {
+      localStorage.setItem(`bidocs_merged_done_${tenantId}_${cleanRef}`, JSON.stringify(record));
+    }
+    localStorage.setItem(`bidocs_merged_done_${cleanRef}`, JSON.stringify(record));
+
+    // Update merged project list for tenant
+    const listKey = tenantId ? `bidocs_merged_projects_list_${tenantId}` : 'bidocs_merged_projects_list';
+    const rawList = localStorage.getItem(listKey);
+    let list: string[] = [];
+    if (rawList) {
+      try {
+        list = JSON.parse(rawList);
+      } catch {}
+    }
+    if (!list.includes(cleanRef)) {
+      list.push(cleanRef);
+      localStorage.setItem(listKey, JSON.stringify(list));
+    }
+  } catch (e) {
+    console.error('[OpportunityProjects] Error marking bid merge done:', e);
+  }
+};
+
+/**
+ * Checks if a project has completed the bidding package merge process.
+ * Projects only appear in Project Profile once their bid documents are merged and done.
+ */
+export const isProjectBidMergeDone = (
+  tenantId: string,
+  project: { id?: string; projectReferenceNumber?: string; philgepsRefNo?: string; refNo?: string; status?: string }
+): boolean => {
+  if (!project) return false;
+  if (project.status === 'AWARDED') return true;
+
+  const candidateRefs = [
+    project.projectReferenceNumber,
+    project.philgepsRefNo,
+    project.refNo,
+    project.id
+  ].filter(Boolean) as string[];
+
+  // 1. Check direct keys
+  for (const ref of candidateRefs) {
+    if (tenantId && localStorage.getItem(`bidocs_merged_done_${tenantId}_${ref}`)) return true;
+    if (localStorage.getItem(`bidocs_merged_done_${ref}`)) return true;
+    const winStatus = tenantId ? localStorage.getItem(`bidocs_project_win_status_${tenantId}_${ref}`) : null;
+    if (winStatus === 'WIN' || winStatus === 'WON') return true;
+  }
+
+  // 2. Check merged projects list
+  try {
+    const listKey = tenantId ? `bidocs_merged_projects_list_${tenantId}` : 'bidocs_merged_projects_list';
+    const rawList = localStorage.getItem(listKey);
+    if (rawList) {
+      const list: string[] = JSON.parse(rawList);
+      if (Array.isArray(list) && candidateRefs.some(ref => list.includes(ref))) {
+        return true;
+      }
+    }
+  } catch {}
+
+  return false;
+};

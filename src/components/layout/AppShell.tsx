@@ -85,7 +85,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'opportunities', label: 'Opportunity Finder', icon: Search, badge: 'Philgeps' },
-    { id: 'project-profile', label: 'Project Profile', icon: Briefcase, badge: 'Projects' },
+    { id: 'project-profile', label: 'Project Status', icon: Briefcase, badge: 'Status' },
     { id: 'vault', label: 'Document Vault', icon: FileCheck, badge: 'Secure' },
     { id: 'bids', label: 'Bid Packages', icon: FolderKanban, badge: 'Envelopes' },
     { id: 'covers', label: 'Labels & Covers', icon: Box, badge: 'Samples' },
