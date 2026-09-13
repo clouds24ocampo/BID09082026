@@ -4,7 +4,8 @@ import { DocumentVaultItem, Tenant } from '../../types';
 import { DocumentCoverPage } from './DocumentCoverPage';
 import { 
   buildMergedThreeLayerPdfDataUrl, 
-  ExportDocumentUnit 
+  ExportDocumentUnit,
+  StampColor
 } from '../../utils/pdfExportEngine';
 import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
 import { loadPdfData } from '../../utils/vaultIndexedDB';
@@ -16,15 +17,24 @@ import {
   Download, 
   FileText, 
   CheckCircle2, 
-  Loader2, 
-  Layers, 
-  Eye, 
-  FileStack, 
-  Sparkles, 
+  Loader2,
+  FileStack,
   Copy,
+  Stamp,
+  Sparkles,
+  Layers,
+  Eye,
   Maximize2
 } from 'lucide-react';
 import DocumentQrCode from '../common/DocumentQrCode';
+
+const STAMP_COLORS: { id: StampColor; label: string; bgClass: string; hex: string }[] = [
+  { id: 'blue', label: 'Blue', bgClass: 'bg-blue-600', hex: '#1d4ed8' },
+  { id: 'red', label: 'Red', bgClass: 'bg-red-600', hex: '#dc2626' },
+  { id: 'purple', label: 'Purple', bgClass: 'bg-purple-600', hex: '#9333ea' },
+  { id: 'black', label: 'Black', bgClass: 'bg-zinc-800', hex: '#27272a' },
+  { id: 'green', label: 'Green', bgClass: 'bg-emerald-600', hex: '#16a34a' }
+];
 
 interface MergedPackageViewerModalProps {
   isOpen: boolean;
@@ -78,6 +88,7 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
     totalDocs: 0
   });
   const [isExportingAll, setIsExportingAll] = useState<boolean>(false);
+  const [stampColor, setStampColor] = useState<StampColor>('blue');
   const [docPageCounts, setDocPageCounts] = useState<Record<string, number>>({});
 
   const tenantId = tenant?.id || '';
@@ -208,11 +219,12 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
           ((v as any).code && doc.code && (v as any).code.toLowerCase() === doc.code.toLowerCase()) ||
           (v.documentName && doc.documentName && v.documentName.trim().toLowerCase() === doc.documentName.trim().toLowerCase()) ||
           (dName.includes('philgeps') && (v.documentCode === 'DOC-1' || (v.documentName || '').toLowerCase().includes('philgeps'))) ||
-          (((dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) && (v.documentCode === 'DOC-2' || ((v.documentName || '').toLowerCase().includes('incorporation') || ((v.documentName || '').toLowerCase().includes('business registration') && !(v.documentName || '').toLowerCase().includes('permit') && !(v.documentName || '').toLowerCase().includes('mayor')) || (v.documentName || '').toLowerCase().includes('dti') || (v.documentName || '').toLowerCase().includes('sec')) && !(v.documentName || '').toLowerCase().includes('philgeps') && !(v.documentName || '').toLowerCase().includes('bir'))) ||
+          (((dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) && (v.documentCode === 'DOC-2' || ((v.documentName || '').toLowerCase().includes('incorporation') || (v.documentName || '').toLowerCase().includes('securities and exchange') || (v.documentName || '').toLowerCase().includes('dti') || ((v.documentName || '').toLowerCase().includes('sec') && !(v.documentName || '').toLowerCase().includes('secretary') && !(v.documentName || '').toLowerCase().includes('section'))) && !(v.documentName || '').toLowerCase().includes('philgeps') && !(v.documentName || '').toLowerCase().includes('bir') && !(v.documentName || '').toLowerCase().includes('secretary') && v.documentCode !== 'DOC-13')) ||
           ((dName.includes('mayor') || (dName.includes('business permit') && !dName.includes('barangay'))) && (v.documentCode === 'DOC-3' || (v.documentName || '').toLowerCase().includes('permit'))) ||
-          (dName.includes('tax') && (v.documentCode === 'DOC-4' || v.documentCode === 'DOC-7' || (v.documentName || '').toLowerCase().includes('clearance'))) ||
+          (((dName.includes('bir') || dName.includes('2303')) && (dName.includes('registration') || dName.includes('certificate') || dName.includes('cor') || dName.includes('2303')) && !dName.includes('clearance')) && (v.documentCode === 'DOC-6' || (v.documentName || '').toLowerCase().includes('2303') || ((v.documentName || '').toLowerCase().includes('bir') && (v.documentName || '').toLowerCase().includes('registration')))) ||
+          (dName.includes('tax') && (v.documentCode === 'DOC-7' || (v.documentName || '').toLowerCase().includes('clearance')) && v.documentCode !== 'DOC-6' && !(v.documentName || '').toLowerCase().includes('2303')) ||
           (dName.includes('audited') && (v.documentCode === 'DOC-5' || v.documentCode === 'DOC-15' || (v.documentName || '').toLowerCase().includes('audited'))) ||
-          (dName.includes('pcab') && (v.documentCode === 'DOC-8' || (v.documentName || '').toLowerCase().includes('pcab')) && v.documentCode !== 'DOC-6' && !(v.documentName || '').toLowerCase().includes('bir')) ||
+          (dName.includes('pcab') && (v.documentCode === 'DOC-8' || (v.documentName || '').toLowerCase().includes('pcab')) && v.documentCode !== 'DOC-6' && !(v.documentName || '').toLowerCase().includes('bir') && !(v.documentName || '').toLowerCase().includes('2303')) ||
           ((dName.includes('secretary') || dName.includes('board res') || dName.includes('spa')) && !dName.includes('section') && (v.documentCode === 'DOC-13' || (v.documentName || '').toLowerCase().includes('secretary') || (v.documentName || '').toLowerCase().includes('spa'))) ||
           (dName.includes('joint') && (v.documentCode === 'DOC-14' || (v.documentName || '').toLowerCase().includes('joint') || (v.documentName || '').toLowerCase().includes('jva')))
         );
@@ -260,11 +272,13 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
   };
 
   // Helper to compile a specific folder copy into a merged PDF Data URL
-  const compileFolderPdf = async (folderCopy: FolderCopyType): Promise<string | null> => {
+  const compileFolderPdf = async (folderCopy: FolderCopyType, overrideStampColor?: StampColor): Promise<string | null> => {
     if (currentItems.length === 0) {
       setStatusMessage('No documents in this selection yet.');
       return null;
     }
+
+    const effectiveColor = overrideStampColor || stampColor;
 
     setIsCompiling(prev => ({ ...prev, [folderCopy]: true }));
     setStatusMessage(`Compiling ${folderCopy} package (${currentItems.length} docs)...`);
@@ -347,7 +361,9 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
           title: doc.documentName,
           coverElement: coverElem || null,
           fileDataUrl: fileDataUrl || null,
-          documentName: doc.documentName
+          documentName: doc.documentName,
+          documentCode: doc.code || (doc as any).documentCode,
+          fileName: doc.fileName
         });
       }
 
@@ -366,7 +382,8 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
           signatoryName: tenant?.authorizedSignatory?.name || 'Authorized Managing Officer',
           signatoryTitle: tenant?.authorizedSignatory?.title || (tenant?.authorizedSignatory as any)?.designation || 'President',
           projectRefNo: projectRefNo || activeProject?.refNo || 'PhilGEPS-2026',
-          projectTitle: projectTitle || activeProject?.title || 'Target Procurement Project'
+          projectTitle: projectTitle || activeProject?.title || 'Target Procurement Project',
+          stampColor: effectiveColor
         }
       );
 
@@ -393,6 +410,13 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
   }, [isOpen, activeFolder, items]);
 
   if (!isOpen) return null;
+
+  const handleStampColorChange = async (newColor: StampColor) => {
+    if (newColor === stampColor) return;
+    setStampColor(newColor);
+    setCompiledPdfs({ ORIGINAL: null, COPY_1: null, COPY_2: null });
+    await compileFolderPdf(activeFolder, newColor);
+  };
 
   // Single Download Trigger
   const handleDownloadCopy = async (folderCopy: FolderCopyType) => {
@@ -525,8 +549,41 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
           </div>
         </div>
 
-        {/* 3 FOLDERS NAVIGATION TABS */}
-        <div className="px-4 sm:px-6 py-3 bg-slate-950/80 border-b border-slate-800 shrink-0">
+        {/* 3 FOLDERS NAVIGATION TABS & STAMP COLOR SELECTOR */}
+        <div className="px-4 sm:px-6 py-2.5 bg-slate-950/80 border-b border-slate-800 shrink-0 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs font-bold text-slate-300 flex items-center gap-2">
+              <Folder className="w-3.5 h-3.5 text-purple-400" />
+              <span>Submission Packages:</span>
+            </div>
+
+            {/* STAMP COLOR SELECTOR (Blue, Red, Purple, Black, Green) */}
+            <div className="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 shadow-sm">
+              <span className="text-[11px] font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Stamp className="w-3.5 h-3.5 text-amber-400" />
+                Rubber Stamp Color:
+              </span>
+              <div className="flex items-center gap-1">
+                {STAMP_COLORS.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => handleStampColorChange(c.id)}
+                    className={`px-2.5 py-1 rounded-lg text-[10.5px] font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      stampColor === c.id
+                        ? 'bg-white text-slate-950 shadow-md scale-105 ring-2 ring-purple-400 font-black'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                    title={`Change Certified True Copy Stamp color to ${c.label}`}
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full ${c.bgClass} inline-block border border-white/40`} />
+                    <span>{c.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {folderTabs.map((tab) => {
               const isSelected = activeFolder === tab.id;
@@ -695,6 +752,10 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
                   <div className="flex items-center gap-2 text-slate-300 font-medium">
                     <Eye className="w-3.5 h-3.5 text-blue-400" />
                     <span>Live PDF Preview: <strong className="text-white">{activeFolder} COPY</strong></span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold text-white bg-slate-800 border border-slate-700 flex items-center gap-1">
+                      <span className={`w-2 h-2 rounded-full ${STAMP_COLORS.find(c => c.id === stampColor)?.bgClass}`} />
+                      Stamp: {stampColor.toUpperCase()}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <a

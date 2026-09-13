@@ -4,7 +4,6 @@ import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine
 import { savePdfData, loadPdfData } from '../../../utils/vaultIndexedDB';
 import { PDFDocument } from 'pdf-lib';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import html2canvas from 'html2canvas';
 import {
   X,
@@ -1001,30 +1000,7 @@ export const StatementOngoingContractsModal: React.FC<StatementOngoingContractsM
                 <div className="p-2.5 rounded-lg bg-slate-100 border border-slate-300 text-[10px] text-slate-800 font-medium">
                   <strong>This Statement Must be Supported With:</strong> 1.Notice of Award or 2. Contract or 3. Notice to Proceed </div>
 
-                <div className="flex items-end justify-between gap-6 pt-1">
-                  {/* Arrow 3: Verification QR Code (Company & Project Details) */}
-                  <div className="flex items-center gap-2.5">
-                    <DocumentQrCode
-                      details={{
-                        companyName: tenant?.companyName || 'Bidding Entity Corporate Name',
-                        documentName: 'Statement of All Ongoing Contracts (Item b)',
-                        documentNumber: `ONGOING-${projectRefNo || '2026-901283'}`,
-                        projectTitle: projectTitle,
-                        projectRefNo: projectRefNo,
-                        procuringEntity: procuringEntity,
-                        dateTimeSubmitted: formatDateDisplay(dateTimeSubmitted),
-                        documentCategory: 'Financial Eligibility',
-                        generatedBy: tenant?.companyName
-                      }}
-                      size={70}
-                      showCaption={false}
-                    />
-                    <div className="text-[9px] font-mono text-slate-700 leading-tight">
-                      <span className="font-black text-slate-950 block uppercase">Document Verification QR</span>
-                      <span className="block text-slate-600">Ref: {projectRefNo || 'UNLINKED'}</span>
-                      <span className="block font-bold text-emerald-800">✓ Official Bidding Record</span>
-                    </div>
-                  </div>
+                <div className="flex items-end justify-end gap-6 pt-1">
 
                   {/* Arrow 1 & 2: Moved "Submitted By" into Signature Block */}
                   <div className="text-right space-y-1 min-w-[260px]">

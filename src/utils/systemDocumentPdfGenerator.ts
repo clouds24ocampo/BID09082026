@@ -320,39 +320,62 @@ const drawOfficialFooter = async (
     color: rgb(0.4, 0.45, 0.5)
   });
 
-  // Generate & Embed Official Verification QR Code
-  try {
-    const qrDataUrl = await generateQrCodeDataUrl({
-      documentName: docName,
-      documentNumber: projectRefNo || 'DOC-2026',
-      projectName: projectTitle,
-      companyName: tenant?.companyName,
-      dateTimeSubmitted: 'August 30, 2026 at 02:00 PM'
-    });
+  // Generate & Embed Official Verification QR Code (Skipped for Financial Documents, Organizational Chart, Equipment, After-Sales & NFCC per user request)
+  const dLower = docName.toLowerCase();
+  const isFinancialDoc = dLower.includes('bid form') ||
+    dLower.includes('bill of quantities') ||
+    dLower.includes('boq') ||
+    dLower.includes('detailed estimate') ||
+    dLower.includes('form l') ||
+    dLower.includes('price schedule') ||
+    dLower.includes('summary of bid') ||
+    dLower.includes('cash flow') ||
+    dLower.includes('financial');
 
-    if (qrDataUrl && qrDataUrl.startsWith('data:image/png;base64,')) {
-      const qrBase64 = qrDataUrl.split(',')[1];
-      const qrBytes = Uint8Array.from(atob(qrBase64), c => c.charCodeAt(0));
-      const qrImage = await pdfDoc.embedPng(qrBytes);
-      const qrSize = 55;
-      page.drawImage(qrImage, {
-        x: pageWidth - 36 - qrSize,
-        y: footerY + 6,
-        width: qrSize,
-        height: qrSize
+  if (
+    !isFinancialDoc &&
+    !dLower.includes('organizational chart') &&
+    !dLower.includes('equipment') &&
+    !dLower.includes('after-sales') &&
+    !dLower.includes('warranty') &&
+    !dLower.includes('nfcc') &&
+    !dLower.includes('ongoing') &&
+    !dLower.includes('slcc') &&
+    !dLower.includes('single largest')
+  ) {
+    try {
+      const qrDataUrl = await generateQrCodeDataUrl({
+        documentName: docName,
+        documentNumber: projectRefNo || 'DOC-2026',
+        projectName: projectTitle,
+        companyName: tenant?.companyName,
+        dateTimeSubmitted: 'August 30, 2026 at 02:00 PM'
       });
 
-      page.drawRectangle({
-        x: pageWidth - 37 - qrSize,
-        y: footerY + 5,
-        width: qrSize + 2,
-        height: qrSize + 2,
-        borderColor: rgb(0.7, 0.75, 0.8),
-        borderWidth: 0.8
-      });
+      if (qrDataUrl && qrDataUrl.startsWith('data:image/png;base64,')) {
+        const qrBase64 = qrDataUrl.split(',')[1];
+        const qrBytes = Uint8Array.from(atob(qrBase64), c => c.charCodeAt(0));
+        const qrImage = await pdfDoc.embedPng(qrBytes);
+        const qrSize = 55;
+        page.drawImage(qrImage, {
+          x: pageWidth - 36 - qrSize,
+          y: footerY + 6,
+          width: qrSize,
+          height: qrSize
+        });
+
+        page.drawRectangle({
+          x: pageWidth - 37 - qrSize,
+          y: footerY + 5,
+          width: qrSize + 2,
+          height: qrSize + 2,
+          borderColor: rgb(0.7, 0.75, 0.8),
+          borderWidth: 0.8
+        });
+      }
+    } catch (err) {
+      console.warn('[PDFGen] Note generating footer QR code:', err);
     }
-  } catch (err) {
-    console.warn('[PDFGen] Note generating footer QR code:', err);
   }
 };
 
@@ -976,11 +999,11 @@ export async function generateSectionViRequirementsPdf(ctx: DocResolveContext): 
     page.drawText(qtyStr, { x: startX + 256 + (55 - fontReg.widthOfTextAtSize(qtyStr, 6.8)) / 2, y: currentY - 14, size: 6.8, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
 
     // Column 4: Unit Cost
-    const ucStr = formatCurrency(it.unitAmount || totNum);
+    const ucStr = formatNumber(it.unitAmount || totNum);
     page.drawText(ucStr, { x: startX + 311 + 75 - fontReg.widthOfTextAtSize(ucStr, 6.8) - 4, y: currentY - 14, size: 6.8, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
 
     // Column 5: Total
-    const totStrVal = formatCurrency(totNum);
+    const totStrVal = formatNumber(totNum);
     page.drawText(totStrVal, { x: startX + 386 + 75 - fontBold.widthOfTextAtSize(totStrVal, 7) - 4, y: currentY - 14, size: 7, font: fontBold, color: rgb(0.08, 0.25, 0.12) });
 
     // Column 6: Delivered
@@ -1032,7 +1055,7 @@ export async function generateSectionViRequirementsPdf(ctx: DocResolveContext): 
     color: rgb(0.08, 0.12, 0.22)
   });
 
-  const totStr = formatCurrency(grandTotal);
+  const totStr = formatNumber(grandTotal);
   const totW = fontBold.widthOfTextAtSize(totStr, 8.5);
   page.drawText(totStr, {
     x: startX + tableWidth - totW - 6,
@@ -1410,11 +1433,11 @@ export async function generateFrameworkAgreementListPdf(ctx: DocResolveContext):
     page.drawText(qtyStr, { x: startX + 250 + (55 - fontReg.widthOfTextAtSize(qtyStr, 6.8)) / 2, y: currentY - 14, size: 6.8, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
 
     // Column 4: Max Unit Price
-    const unitStr = formatCurrency(it.unitAmount || '0');
+    const unitStr = formatNumber(it.unitAmount || '0');
     page.drawText(unitStr, { x: startX + 305 + 80 - fontReg.widthOfTextAtSize(unitStr, 6.8) - 4, y: currentY - 14, size: 6.8, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
 
     // Column 5: Total Price
-    const totalStr = formatCurrency(it.total || it.unitAmount || '0');
+    const totalStr = formatNumber(it.total || it.unitAmount || '0');
     page.drawText(totalStr, { x: startX + 385 + 80 - fontReg.widthOfTextAtSize(totalStr, 6.8) - 4, y: currentY - 14, size: 6.8, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
 
     // Column 6: Indicative Timeframe
@@ -3243,6 +3266,63 @@ export async function generateMayorsPermitPdf(ctx: DocResolveContext): Promise<s
 }
 
 /**
+ * ─── 22A. CORPORATE LEGAL: BIR CERTIFICATE OF REGISTRATION (BIR FORM 2303) ───
+ */
+export async function generateBirRegistrationPdf(ctx: DocResolveContext): Promise<string> {
+  const pdfDoc = await PDFDocument.create();
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  const page = pdfDoc.addPage(LEGAL_PORTRAIT);
+  drawOfficialHeader(
+    page, fontBold, fontReg, ctx.tenant,
+    'BIR Certificate of Registration (BIR Form 2303)',
+    'Republic of the Philippines - Department of Finance - Bureau of Internal Revenue',
+    ctx.projectRefNo, ctx.projectTitle, false
+  );
+
+  const startX = 36;
+  let currentY = 810;
+  const boxWidth = 540;
+
+  page.drawRectangle({
+    x: startX,
+    y: currentY - 260,
+    width: boxWidth,
+    height: 260,
+    color: rgb(0.98, 0.99, 1),
+    borderColor: rgb(0.7, 0.75, 0.85),
+    borderWidth: 1
+  });
+
+  page.drawText('CERTIFICATE OF REGISTRATION (BIR FORM 2303)', { x: startX + 115, y: currentY - 22, size: 9, font: fontBold, color: rgb(0.08, 0.15, 0.3) });
+  page.drawText(`TIN: ${ctx.tenant?.tin || '000-000-000-000'} | STATUS: REGISTERED & ACTIVE TAXPAYER`, { x: startX + 110, y: currentY - 36, size: 7.5, font: fontBold, color: rgb(0.05, 0.45, 0.15) });
+
+  const birDetails = [
+    { label: 'Taxpayer Name:', val: ctx.tenant?.companyName || 'Bidding Enterprise Corporation' },
+    { label: 'Registered Business Address:', val: ctx.tenant?.address || 'Metro Manila, Philippines' },
+    { label: 'Revenue District Office (RDO):', val: 'RDO No. 034 - Regional District Office' },
+    { label: 'Registration Date / Date Issued:', val: 'January 15, 2020 (Permanent Record)' },
+    { label: 'Registered Tax Types:', val: 'Income Tax, Value-Added Tax (VAT), Withholding Tax - Expanded' },
+    { label: 'Line of Business / Industry:', val: 'General Contracting, Procurement Supplies, Construction & IT Services' }
+  ];
+
+  let tY = currentY - 65;
+  birDetails.forEach(t => {
+    page.drawText(t.label, { x: startX + 15, y: tY, size: 7.5, font: fontBold, color: rgb(0.15, 0.2, 0.3) });
+    page.drawText(t.val, { x: startX + 180, y: tY, size: 7.2, font: fontReg, color: rgb(0.2, 0.25, 0.35) });
+    tY -= 28;
+  });
+
+  await drawOfficialFooter(
+    pdfDoc, page, fontBold, fontReg, ctx.tenant,
+    'BIR Certificate of Registration (Form 2303)', ctx.projectRefNo, ctx.projectTitle, false
+  );
+
+  return await exportPdfDocAsDataUri(pdfDoc);
+}
+
+/**
  * ─── 22. CORPORATE LEGAL: BIR TAX CLEARANCE ───
  */
 export async function generateTaxClearancePdf(ctx: DocResolveContext): Promise<string> {
@@ -3889,7 +3969,7 @@ export async function resolveDocumentPdfAttachment(
         return vCode === 'DOC-1' || vCode.includes('PHILGEPS') || vName.includes('philgeps');
       }
       if ((dCode === 'SEC_DTI_REG' || dCode === 'DOC-2' || dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) {
-        return (vCode === 'DOC-2' || vCode.includes('SEC') || vCode.includes('DTI') || vName.includes('sec') || vName.includes('dti') || vName.includes('incorporation') || (vName.includes('business registration') && !vName.includes('permit') && !vName.includes('mayor'))) && !vName.includes('section') && !vName.includes('philgeps') && !vName.includes('bir');
+        return (vCode === 'DOC-2' || (vCode.includes('SEC') && !vCode.includes('SEC_CERT')) || vCode.includes('DTI') || (vName.includes('sec') && !vName.includes('secretary')) || vName.includes('dti') || vName.includes('incorporation') || (vName.includes('business registration') && !vName.includes('permit') && !vName.includes('mayor'))) && !vName.includes('section') && !vName.includes('secretary') && !vName.includes('philgeps') && !vName.includes('bir') && vCode !== 'DOC-13';
       }
       if ((dCode === 'MAYORS_PERMIT' || dCode === 'DOC-3' || dName.includes('mayor') || (dName.includes('business permit') && !dName.includes('barangay'))) && !dName.includes('ongoing') && !dName.includes('slcc') && !dName.includes('section')) {
         return vCode === 'DOC-3' || vCode === 'DOC-4' || vCode.includes('MAYOR') || vName.includes('mayor') || vName.includes('business permit');
@@ -3900,11 +3980,11 @@ export async function resolveDocumentPdfAttachment(
       if (dCode === 'DOC-5' || dName.includes('business plate')) {
         return vCode === 'DOC-5' || vName.includes('business plate');
       }
-      if (dCode === 'DOC-6' || (dName.includes('bir') && dName.includes('2303'))) {
-        return vCode === 'DOC-6' || vName.includes('2303');
+      if (dCode === 'DOC-6' || dCode === 'BIR_REGISTRATION' || ((dName.includes('bir') || dName.includes('2303')) && (dName.includes('registration') || dName.includes('certificate') || dName.includes('cor') || dName.includes('2303')) && !dName.includes('clearance'))) {
+        return vCode === 'DOC-6' || vName.includes('2303') || (vName.includes('bir') && (vName.includes('registration') || vName.includes('cor') || vName.includes('certificate of registration')));
       }
-      if (dCode === 'TAX_CLEARANCE' || dCode === 'DOC-7' || (dName.includes('tax') && (dName.includes('clearance') || dName.includes('bir')))) {
-        return vCode === 'DOC-7' || vCode === 'DOC-4' || vCode.includes('TAX') || (vName.includes('tax') && vName.includes('clearance')) || vName.includes('bir');
+      if (dCode === 'TAX_CLEARANCE' || dCode === 'DOC-7' || (dName.includes('tax') && (dName.includes('clearance') || dName.includes('tax clearance')))) {
+        return (vCode === 'DOC-7' || vCode.includes('TAX') || (vName.includes('tax') && vName.includes('clearance'))) && vCode !== 'DOC-6' && !vName.includes('2303');
       }
       if (dCode === 'AUDITED_FS' || dCode === 'DOC-15' || dName.includes('audited') || dName.includes('afs') || (dName.includes('financial statement') && !dName.includes('bid form'))) {
         return vCode === 'DOC-15' || vCode === 'DOC-5' || vCode.includes('AFS') || vCode.includes('AUDITED') || vName.includes('audited') || vName.includes('financial statement') || vName.includes('afs');
@@ -4143,7 +4223,10 @@ export async function resolveDocumentPdfAttachment(
   if (docIdUpper.includes('MAYOR') || dName.includes('mayor') || dName.includes('business permit')) {
     return await generateMayorsPermitPdf(ctx);
   }
-  if (docIdUpper.includes('TAX') || dName.includes('tax clearance') || dName.includes('bir')) {
+  if (docIdUpper.includes('BIR_REG') || docIdUpper.includes('2303') || docIdUpper === 'DOC-6' || (dName.includes('bir') && (dName.includes('registration') || dName.includes('cor') || dName.includes('2303')))) {
+    return await generateBirRegistrationPdf(ctx);
+  }
+  if (docIdUpper.includes('TAX') || dName.includes('tax clearance')) {
     return await generateTaxClearancePdf(ctx);
   }
   if (docIdUpper.includes('AUDITED') || docIdUpper.includes('AFS') || dName.includes('audited') || dName.includes('afs') || dName.includes('financial statement')) {

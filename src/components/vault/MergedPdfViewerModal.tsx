@@ -6,16 +6,16 @@ import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGener
 import { loadPdfData } from '../../utils/vaultIndexedDB';
 import { 
   X, 
-  Layers, 
-  Printer, 
-  ArrowUp, 
-  ArrowDown, 
   CheckCircle2, 
   GripVertical,
   ShieldCheck,
-  FolderPlus,
   Download,
-  Loader2
+  Loader2,
+  Layers,
+  Printer,
+  FolderPlus,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 
 interface MergedPdfViewerModalProps {
@@ -178,7 +178,9 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
           title: doc.documentName,
           coverElement: coverEl || null,
           fileDataUrl: resolvedList[idx] || null,
-          documentName: doc.documentName
+          documentName: doc.documentName,
+          documentCode: doc.documentCode || (doc as any).code,
+          fileName: (doc as any).fileName
         };
       });
 

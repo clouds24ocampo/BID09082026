@@ -4,17 +4,16 @@ import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl } fro
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import { autoFitPageChunks, calculateRowHeight } from '../../../utils/autoFitEngine';
 import { savePdfData } from '../../../utils/vaultIndexedDB';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
   Printer,
   Download,
   Building2,
+  RefreshCw,
+  CheckCircle2,
   Table,
   Calculator,
-  Lock,
-  RefreshCw,
-  CheckCircle2
+  Lock
 } from 'lucide-react';
 
 export interface PriceScheduleItemRow {
@@ -1124,50 +1123,9 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
 
                           </div>
 
-                          {/* 5. QR CODE VERIFICATION SEAL BLOCK (Rendered on Final Page) */}
-                          {isLastPage && (
-                            <div className="pt-2 pb-1 border-t border-slate-300 flex items-center justify-between text-[8pt] font-mono text-black shrink-0 mt-3">
-                              <div className="flex items-center gap-3">
-                                <DocumentQrCode
-                                  details={{
-                                    companyName: bidderName || 'Bidding Entity',
-                                    documentName: `Price Schedule for ${categoryLabel} (Page ${currentPageNumber} of ${totalPagesCount})`,
-                                    documentNumber: `FIN-PRICESCHED-${projectRefNo || 'SCHED'}-P${currentPageNumber}`,
-                                    projectTitle: projectTitle,
-                                    projectRefNo: projectRefNo,
-                                    procuringEntity: procuringEntity,
-                                    dateTimeSubmitted: dateSubmitted || 'March 19, 2026',
-                                    documentCategory: 'Financial Documents',
-                                    generatedBy: bidderName || 'Bidding Entity'
-                                  }}
-                                  size={42}
-                                  showCaption={false}
-                                />
-                                <div className="space-y-0.5 text-[7.5pt]">
-                                  <p className="font-bold text-black uppercase">OFFICIAL GPPB FINANCIAL EXHIBIT VERIFICATION</p>
-                                  <p className="text-slate-700">PBDs SECTION VIII PRICE SCHEDULE FOR {categoryLabel.toUpperCase()} (COLS 1-10)</p>
-                                </div>
-                              </div>
-                              <div className="text-right text-[7.5pt] font-mono text-slate-700">
-                                <span>VERIFIED BY BIDMAE VAULT SYSTEM</span>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* 6. GLOBAL INFORMATIVE DOCUMENT FOOTER (ON EVERY PAGE: COMPANY NAME | REF NO | PROJECT TITLE | PAGE X OF N) */}
-                          <div className="pt-1.5 border-t-2 border-black flex items-center justify-between text-[8pt] font-mono text-black shrink-0 mt-2">
-                            <div className="flex items-center gap-2 max-w-[80%] truncate">
-                              <span className="font-extrabold uppercase text-black">{bidderName || 'QUANTUM CLOUD CORPORATION'}</span>
-                              <span className="text-slate-400 font-normal">|</span>
-                              <span className="font-bold text-black">REF NO: <strong className="font-bold font-mono">{projectRefNo || 'N/A'}</strong></span>
-                              {projectTitle && (
-                                <>
-                                  <span className="text-slate-400 font-normal">|</span>
-                                  <span className="font-semibold text-slate-900 truncate uppercase">PROJECT: {projectTitle}</span>
-                                </>
-                              )}
-                            </div>
-                            <div className="font-extrabold font-mono text-black shrink-0 ml-4">
+                          {/* 5. GLOBAL INFORMATIVE DOCUMENT FOOTER */}
+                          <div className="pt-1.5 border-t-2 border-black flex items-center justify-end text-[8pt] font-mono text-black shrink-0 mt-2">
+                            <div className="font-extrabold font-mono text-black shrink-0">
                               PAGE {currentPageNumber} OF {totalPagesCount}
                             </div>
                           </div>

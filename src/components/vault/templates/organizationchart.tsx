@@ -3,7 +3,6 @@ import { Tenant } from '../../../types';
 import { PDFDocument } from 'pdf-lib';
 import {
   X,
-  Printer,
   Download,
   Plus,
   RotateCcw,
@@ -18,7 +17,6 @@ import {
   Award,
   Wrench
 } from 'lucide-react';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import html2canvas from 'html2canvas';
 
@@ -384,9 +382,6 @@ export const OrganizationalChartModal: React.FC<OrganizationalChartModalProps> =
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
 
   const handleExportPdf = async () => {
     setIsProcessing(true);
@@ -517,12 +512,6 @@ export const OrganizationalChartModal: React.FC<OrganizationalChartModalProps> =
             <div>
               <h2 className="text-sm font-bold text-white flex items-center gap-2">
                 <span>Item {item.code} — Organizational Chart for Contract to be Bid</span>
-                <span className="px-2 py-0.5 bg-blue-900/50 text-blue-300 text-[10px] font-mono rounded border border-blue-700/50 font-bold">
-                  8.5" × 13" Landscape (Legal)
-                </span>
-                <span className="px-2 py-0.5 bg-emerald-950 text-emerald-300 text-[10px] font-mono rounded border border-emerald-700/50 font-bold">
-                  {nodes.length} Staff Units
-                </span>
               </h2>
               <p className="text-[11px] text-slate-400 font-serif">
                 Official Class A Statutory Technical Exhibit • Complete Command Tree Hierarchy
@@ -572,15 +561,6 @@ export const OrganizationalChartModal: React.FC<OrganizationalChartModalProps> =
             >
               <Download className="w-3.5 h-3.5" />
               <span>{isProcessing ? 'Generating...' : 'Download PDF'}</span>
-            </button>
-
-            <button
-              onClick={handlePrint}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5 cursor-pointer"
-              title="Print document directly in Landscape format"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print</span>
             </button>
 
             <button
@@ -988,28 +968,7 @@ export const OrganizationalChartModal: React.FC<OrganizationalChartModalProps> =
                 </div>
 
                 <div className="flex items-end justify-between font-serif text-slate-950 pt-0.5">
-                  {/* QR Code */}
-                  <div className="flex items-center gap-2">
-                    <DocumentQrCode
-                      details={{
-                        companyName: companyName,
-                        documentName: `Item ${item.code} — ORGANIZATIONAL CHART`,
-                        documentNumber: `EXHIBIT-${item.code.replace(/[^a-zA-Z0-9]/g, '')}-${projectRefNo || '2026-901283'}`,
-                        projectTitle: projectTitle,
-                        projectRefNo: projectRefNo,
-                        procuringEntity: procuringEntity,
-                        dateTimeSubmitted: dateTimeSubmitted || todayStr,
-                        documentCategory: 'Technical Eligibility',
-                        generatedBy: companyName
-                      }}
-                      size={38}
-                      showCaption={false}
-                    />
-                    <div className="text-[7.5px] leading-tight">
-                      <p className="font-bold">Official GPPB Exhibit</p>
-                      <p className="font-mono text-slate-600">Scan QR to verify</p>
-                    </div>
-                  </div>
+                  <div />
 
                   {/* Authorized Signatory */}
                   <div className="text-center space-y-0.5 font-serif text-slate-950 min-w-[280px]">

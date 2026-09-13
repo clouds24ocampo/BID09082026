@@ -120,4 +120,26 @@ describe('Auto-Fit Page Packing Engine', () => {
     expect(getAutoFitTypographyClass(3000, 12)).toBe('text-[10px] leading-snug');
     expect(getAutoFitTypographyClass(500, 3)).toBe('text-[10.5px] leading-normal');
   });
+
+  it('packs items greedily to capacity when strategy is greedy', () => {
+    // 10 items of 70px each (700px total). Single page capacity is 750px.
+    // In greedy mode, all 10 items must fit on 1 page without splitting.
+    const items = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, height: 70 }));
+    const pages = autoFitPageChunks(
+      items,
+      (it) => it.height,
+      {
+        orientation: 'portrait',
+        headerHeightPx: 150,
+        footerHeightPx: 210,
+        runningFooterPx: 32,
+        continuationTheadHeightPx: 28,
+        safetyBufferPx: 15,
+        strategy: 'greedy'
+      }
+    );
+
+    expect(pages.length).toBe(1);
+    expect(pages[0].length).toBe(10);
+  });
 });

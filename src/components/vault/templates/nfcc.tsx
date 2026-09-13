@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import VaultErrorBoundary from '../../common/VaultErrorBoundary';
 import {
   X,
@@ -12,7 +11,8 @@ import {
   Calculator,
   CheckCircle2,
   FileText,
-  Edit3
+  Edit3,
+  Lock
 } from 'lucide-react';
 
 export interface NfccModalProps {
@@ -235,25 +235,89 @@ export const NfccModalContent: React.FC<NfccModalProps> = ({
     if (tenant?.authorizedSignatory?.name) setSignatoryName(tenant.authorizedSignatory.name);
     if (tenant?.authorizedSignatory?.title) setSignatoryTitle(tenant.authorizedSignatory.title);
 
-    const initialRefNo = activeProjectRefNo || (list.length > 0 ? list[0].refNo : '');
-    const initialOppId = list.length > 0 ? list[0].id : '';
+    let targetMatch: OpportunityProjectOption | undefined;
+    if (activeProjectRefNo) {
+      targetMatch = list.find((p) => p.refNo === activeProjectRefNo || p.id === activeProjectRefNo);
+      if (!targetMatch && activeProjectTitle) {
+        targetMatch = list.find((p) => p.title === activeProjectTitle);
+      }
+    } else if (activeProjectTitle) {
+      targetMatch = list.find((p) => p.title === activeProjectTitle);
+    } else if (list.length > 0) {
+      targetMatch = list[0];
+    }
+
+    const effectiveRefNo = activeProjectRefNo || (targetMatch ? targetMatch.refNo : '');
+    const effectiveOppId = targetMatch ? targetMatch.id : (activeProjectRefNo ? activeProjectRefNo : '');
+
+    if (targetMatch) {
+      setSelectedOppId(targetMatch.id);
+      setProjectRefNo(targetMatch.refNo);
+      setProjectTitle(targetMatch.title);
+      if (targetMatch.procuringEntity) {
+        const cleanEntity = targetMatch.procuringEntity.toUpperCase().replace(/,\s*BENGUET$/i, '');
+        setProcuringEntityLocation(cleanEntity);
+        setProjectLocation(cleanEntity);
+      }
+      if (targetMatch.solicitationNo) {
+        setStandardFormNo(targetMatch.solicitationNo);
+      } else if (propSolicitationNumber) {
+        setStandardFormNo(propSolicitationNumber);
+      }
+      if (targetMatch.dateTimeSubmitted) {
+        setSignatoryDate(formatCleanDateString(targetMatch.dateTimeSubmitted));
+        setSubmissionDateTime(formatCleanDateTimeWithTime(targetMatch.dateTimeSubmitted));
+      } else if (propDateTimeSubmitted) {
+        setSignatoryDate(formatCleanDateString(propDateTimeSubmitted));
+        setSubmissionDateTime(formatCleanDateTimeWithTime(propDateTimeSubmitted));
+      }
+    } else if (activeProjectRefNo) {
+      setSelectedOppId(activeProjectRefNo);
+      setProjectRefNo(activeProjectRefNo);
+      if (activeProjectTitle) setProjectTitle(activeProjectTitle);
+      if (activeProcuringEntity) {
+        const cleanEntity = activeProcuringEntity.toUpperCase().replace(/,\s*BENGUET$/i, '');
+        setProcuringEntityLocation(cleanEntity);
+        setProjectLocation(cleanEntity);
+      }
+      if (propSolicitationNumber) setStandardFormNo(propSolicitationNumber);
+      if (propDateTimeSubmitted) {
+        setSignatoryDate(formatCleanDateString(propDateTimeSubmitted));
+        setSubmissionDateTime(formatCleanDateTimeWithTime(propDateTimeSubmitted));
+      }
+    } else if (list.length > 0) {
+      const first = list[0];
+      setSelectedOppId(first.id);
+      setProjectRefNo(first.refNo);
+      setProjectTitle(first.title);
+      const cleanEntity = first.procuringEntity.toUpperCase().replace(/,\s*BENGUET$/i, '');
+      setProcuringEntityLocation(cleanEntity);
+      setProjectLocation(cleanEntity);
+      if (first.solicitationNo) setStandardFormNo(first.solicitationNo);
+      if (first.dateTimeSubmitted) {
+        setSignatoryDate(formatCleanDateString(first.dateTimeSubmitted));
+        setSubmissionDateTime(formatCleanDateTimeWithTime(first.dateTimeSubmitted));
+      }
+    }
 
     // Auto-sync ongoing contracts total strictly for this project
-    const autoOngoing = fetchOngoingContractsTotal(tenantId, initialRefNo, initialOppId);
+    const autoOngoing = fetchOngoingContractsTotal(tenantId, effectiveRefNo, effectiveOppId);
     setOngoingContractsValue(formatCurrency(autoOngoing));
 
-    const storageKey = `bidocs_nfcc_${tenantId}_${initialRefNo || 'default'}`;
+    const storageKey = `bidocs_nfcc_${tenantId}_${effectiveRefNo || 'default'}`;
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.companyName) setCompanyName(parsed.companyName);
-        if (parsed.procuringEntityLocation) setProcuringEntityLocation(parsed.procuringEntityLocation.replace(/,\s*BENGUET$/i, ''));
-        if (parsed.projectRefNo) setProjectRefNo(parsed.projectRefNo);
-        if (parsed.projectTitle) setProjectTitle(parsed.projectTitle);
-        if (parsed.projectLocation) setProjectLocation(parsed.projectLocation.replace(/,\s*BENGUET$/i, ''));
-        if (parsed.standardFormNo) setStandardFormNo(parsed.standardFormNo);
-        if (parsed.submissionDateTime) setSubmissionDateTime(parsed.submissionDateTime);
+        if (!activeProjectRefNo) {
+          if (parsed.procuringEntityLocation) setProcuringEntityLocation(parsed.procuringEntityLocation.replace(/,\s*BENGUET$/i, ''));
+          if (parsed.projectRefNo) setProjectRefNo(parsed.projectRefNo);
+          if (parsed.projectTitle) setProjectTitle(parsed.projectTitle);
+          if (parsed.projectLocation) setProjectLocation(parsed.projectLocation.replace(/,\s*BENGUET$/i, ''));
+          if (parsed.standardFormNo) setStandardFormNo(parsed.standardFormNo);
+          if (parsed.submissionDateTime) setSubmissionDateTime(parsed.submissionDateTime);
+        }
         if (parsed.fiscalYear) setFiscalYear(parsed.fiscalYear);
         if (parsed.totalAssets) setTotalAssets(parsed.totalAssets);
         if (parsed.currentAssets) setCurrentAssets(parsed.currentAssets);
@@ -268,25 +332,11 @@ export const NfccModalContent: React.FC<NfccModalProps> = ({
         if (parsed.signatoryName) setSignatoryName(parsed.signatoryName);
         if (parsed.signatoryTitle) setSignatoryTitle(parsed.signatoryTitle);
         if (parsed.signatoryDate) setSignatoryDate(parsed.signatoryDate);
-      } else if (list.length > 0 && !selectedOppId) {
-        const first = list[0];
-        setSelectedOppId(first.id);
-        setProjectRefNo(first.refNo);
-        setProjectTitle(first.title);
-        setProcuringEntityLocation(first.procuringEntity.toUpperCase());
-        setProjectLocation(first.procuringEntity.toUpperCase());
-        if (first.solicitationNo) setStandardFormNo(first.solicitationNo);
-        if (first.dateTimeSubmitted) {
-          setSignatoryDate(first.dateTimeSubmitted);
-          setSubmissionDateTime(formatCleanDateTimeWithTime(first.dateTimeSubmitted));
-        }
-        const oppOngoing = fetchOngoingContractsTotal(tenantId, first.refNo, first.id);
-        setOngoingContractsValue(formatCurrency(oppOngoing));
       }
     } catch (e) {
       console.error('[NFCC] Draft load error:', e);
     }
-  }, [tenant, activeProjectRefNo]);
+  }, [tenant, activeProjectRefNo, activeProjectTitle, activeProcuringEntity, propSolicitationNumber, propDateTimeSubmitted]);
 
   // Save State
   const saveState = () => {
@@ -464,25 +514,33 @@ export const NfccModalContent: React.FC<NfccModalProps> = ({
                 <Building2 className="w-4 h-4 text-emerald-400" />
                 Financial Figures & Project Metadata Controls
               </span>
-              {oppProjects.length > 0 && (
+              {(oppProjects.length > 0 || Boolean(activeProjectRefNo)) && (
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-slate-300">Target Bidding Project:</span>
                   </div>
+                  {(activeProjectRefNo || (selectedOppId && selectedOppId !== '')) && (
+                    <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                      <Lock className="w-3 h-3 text-amber-400" />
+                      <span>Project Locked (Strict Isolation Active)</span>
+                    </span>
+                  )}
                   <select
-                    value={selectedOppId}
+                    value={selectedOppId || projectRefNo}
+                    disabled={Boolean(activeProjectRefNo)}
                     onChange={(e) => {
                       const id = e.target.value;
                       setSelectedOppId(id);
-                      const proj = oppProjects.find(p => p.id === id);
+                      const proj = oppProjects.find(p => p.id === id || p.refNo === id);
                       if (proj) {
                         setProjectRefNo(proj.refNo);
                         setProjectTitle(proj.title);
-                        setProcuringEntityLocation(proj.procuringEntity.toUpperCase());
-                        setProjectLocation(proj.procuringEntity.toUpperCase());
+                        const cleanEntity = proj.procuringEntity.toUpperCase().replace(/,\s*BENGUET$/i, '');
+                        setProcuringEntityLocation(cleanEntity);
+                        setProjectLocation(cleanEntity);
                         if (proj.solicitationNo) setStandardFormNo(proj.solicitationNo);
                         if (proj.dateTimeSubmitted) {
-                          setSignatoryDate(proj.dateTimeSubmitted);
+                          setSignatoryDate(formatCleanDateString(proj.dateTimeSubmitted));
                           setSubmissionDateTime(formatCleanDateTimeWithTime(proj.dateTimeSubmitted));
                         }
                         const oppOngoing = fetchOngoingContractsTotal(tenant?.id || 'default', proj.refNo, proj.id);
@@ -496,6 +554,9 @@ export const NfccModalContent: React.FC<NfccModalProps> = ({
                     {oppProjects.map(p => (
                       <option key={p.id} value={p.id}>[{p.refNo}] {p.title}</option>
                     ))}
+                    {activeProjectRefNo && !oppProjects.some(p => p.id === activeProjectRefNo || p.refNo === activeProjectRefNo) && (
+                      <option value={activeProjectRefNo}>[{activeProjectRefNo}] {projectTitle || activeProjectTitle}</option>
+                    )}
                   </select>
                 </div>
               )}
@@ -703,8 +764,9 @@ export const NfccModalContent: React.FC<NfccModalProps> = ({
                     <input
                       type="text"
                       value={procuringEntityLocation}
+                      readOnly={Boolean(activeProjectRefNo)}
                       onChange={(e) => { setProcuringEntityLocation(e.target.value); saveState(); }}
-                      className="w-full bg-transparent border-b border-dashed border-slate-300 font-serif text-[11px] uppercase focus:outline-none focus:bg-blue-50"
+                      className={`w-full bg-transparent border-b border-dashed border-slate-300 font-serif text-[11px] uppercase focus:outline-none focus:bg-blue-50 ${Boolean(activeProjectRefNo) ? 'cursor-not-allowed select-none' : ''}`}
                     />
                   </div>
                   <div className="flex items-center gap-1 shrink-0 pl-3 font-serif">
@@ -712,8 +774,9 @@ export const NfccModalContent: React.FC<NfccModalProps> = ({
                     <input
                       type="text"
                       value={projectRefNo}
+                      readOnly={Boolean(activeProjectRefNo)}
                       onChange={(e) => { setProjectRefNo(e.target.value); saveState(); }}
-                      className="w-36 bg-transparent border-b border-dashed border-slate-300 font-serif font-bold text-[11px] focus:outline-none focus:bg-blue-50 text-right"
+                      className={`w-36 bg-transparent border-b border-dashed border-slate-300 font-serif font-bold text-[11px] focus:outline-none focus:bg-blue-50 text-right ${Boolean(activeProjectRefNo) ? 'cursor-not-allowed select-none' : ''}`}
                     />
                   </div>
                 </div>
@@ -722,10 +785,10 @@ export const NfccModalContent: React.FC<NfccModalProps> = ({
                 <div className="pt-0.5 flex items-start gap-1">
                   <span className="font-bold shrink-0">Name of Project:</span>
                   <div
-                    contentEditable
+                    contentEditable={!Boolean(activeProjectRefNo)}
                     suppressContentEditableWarning
                     onBlur={(e) => { setProjectTitle(e.currentTarget.innerText); saveState(); }}
-                    className="w-full bg-transparent border-b border-dashed border-slate-300 font-serif font-bold text-[11px] uppercase focus:outline-none focus:bg-blue-50 leading-relaxed whitespace-pre-wrap break-words min-h-[1.25rem] cursor-text"
+                    className={`w-full bg-transparent border-b border-dashed border-slate-300 font-serif font-bold text-[11px] uppercase focus:outline-none focus:bg-blue-50 leading-relaxed whitespace-pre-wrap break-words min-h-[1.25rem] ${Boolean(activeProjectRefNo) ? 'cursor-not-allowed select-none' : 'cursor-text'}`}
                   >
                     {projectTitle}
                   </div>
@@ -735,10 +798,10 @@ export const NfccModalContent: React.FC<NfccModalProps> = ({
                 <div className="pt-0.5 flex items-start gap-1">
                   <span className="font-bold shrink-0">Location of the Project:</span>
                   <div
-                    contentEditable
+                    contentEditable={!Boolean(activeProjectRefNo)}
                     suppressContentEditableWarning
                     onBlur={(e) => { setProjectLocation(e.currentTarget.innerText); saveState(); }}
-                    className="w-full bg-transparent border-b border-dashed border-slate-300 font-serif font-medium underline text-[11px] focus:outline-none focus:bg-blue-50 leading-normal whitespace-pre-wrap break-words min-h-[1.25rem] cursor-text"
+                    className={`w-full bg-transparent border-b border-dashed border-slate-300 font-serif font-medium underline text-[11px] focus:outline-none focus:bg-blue-50 leading-normal whitespace-pre-wrap break-words min-h-[1.25rem] ${Boolean(activeProjectRefNo) ? 'cursor-not-allowed select-none' : 'cursor-text'}`}
                   >
                     {projectLocation}
                   </div>
@@ -973,28 +1036,7 @@ export const NfccModalContent: React.FC<NfccModalProps> = ({
                 <span className="text-[9px] text-slate-400 font-sans mt-0.5">Saves directly to Document Vault</span>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
-                <DocumentQrCode
-                  details={{
-                    companyName: companyName,
-                    documentName: 'NET FINANCIAL CONTRACTING CAPACITY (NFCC)',
-                    documentNumber: `EXHIBIT-NFCC-${projectRefNo || '12795242'}`,
-                    projectTitle: projectTitle,
-                    projectRefNo: projectRefNo || '12795242',
-                    procuringEntity: procuringEntityLocation,
-                    dateTimeSubmitted: formatCleanDateString(signatoryDate || submissionDateTime),
-                    documentCategory: 'Financial Eligibility',
-                    generatedBy: companyName
-                  }}
-                  size={46}
-                  showCaption={false}
-                />
-                <div className="text-[9px] font-mono leading-tight text-slate-800 space-y-0.5">
-                  <p className="font-bold text-slate-950 uppercase truncate max-w-[260px]">{companyName}</p>
-                  <p className="font-semibold text-slate-900 truncate max-w-[260px]">REF NO: {projectRefNo || '12795242'}</p>
-                  <p className="font-bold text-emerald-950 truncate max-w-[260px]">NFCC: Php {formatCurrency(calculatedNfcc)}</p>
-                </div>
-              </div>
+              <div />
             </div>
 
           </div>

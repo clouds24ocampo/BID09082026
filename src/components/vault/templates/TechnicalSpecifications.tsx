@@ -1,32 +1,32 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
 import { buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit, PdfAttachmentSource } from '../../../utils/pdfExportEngine';
+import { generateSectionViiVectorPdf } from '../../../utils/vectorPdfGenerator';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import { autoFitPageChunks, calculateRowHeight, getAutoFitTypographyClass } from '../../../utils/autoFitEngine';
 import { formatDescriptionText } from './SectionViScheduleOfRequirements';
 import { savePdfData, loadPdfData } from '../../../utils/vaultIndexedDB';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
   Printer,
   Download,
-  FileSignature,
   Building2,
-  ShieldCheck,
   CheckCircle2,
-  FileSpreadsheet,
-  Type,
   Check,
   AlertCircle,
   Paperclip,
   FileText,
   Upload,
   RefreshCw,
-  Tag,
-  Sparkles,
   Trash2,
+  Eye,
+  ShieldCheck,
+  Type,
+  Sparkles,
   Lock,
-  Eye
+  Tag,
+  FileSignature,
+  FileSpreadsheet
 } from 'lucide-react';
 
 export interface TechSpecItem {
@@ -514,25 +514,32 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
   };
 
   const buildFinalPdfDataUrl = async (): Promise<string | undefined> => {
-    const containerElem = document.getElementById('section-vii-pages-container') || document.getElementById('section-vii-paper');
+    const vectorPdfDataUrl = await generateSectionViiVectorPdf({
+      companyName,
+      companyAddress,
+      projectTitle,
+      projectRefNo: philgepsRefNo || projectRefNo,
+      procuringEntity,
+      dateTimeSubmitted,
+      signatoryName,
+      signatoryTitle,
+      items
+    });
+
     const bSource = brochurePdfFile || brochurePdfDataUrl;
     const dSource = drawingPdfFile || drawingPdfDataUrl;
     const attachmentSources: PdfAttachmentSource[] = [bSource, dSource].filter(Boolean) as PdfAttachmentSource[];
 
-    if (!containerElem && attachmentSources.length === 0) {
-      return undefined;
-    }
+    const units: ExportDocumentUnit[] = [
+      {
+        title: item.name,
+        fileSource: vectorPdfDataUrl
+      }
+    ];
 
-    const units: ExportDocumentUnit[] = [];
-    if (containerElem) {
+    if (attachmentSources[0]) {
       units.push({
-        title: item.name,
-        formElement: containerElem,
-        fileSource: attachmentSources[0]
-      });
-    } else if (attachmentSources[0]) {
-      units.push({
-        title: item.name,
+        title: `${item.name} Attached Brochure`,
         fileSource: attachmentSources[0]
       });
     }
@@ -678,12 +685,12 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
 
   const { charsPerLine, lineHeightPx, basePaddingPx } = useMemo(() => {
     if (fontSizeMode === 'fine' || (fontSizeMode === 'xs' && totalCharactersInDoc > 5000)) {
-      return { charsPerLine: 62, lineHeightPx: 13, basePaddingPx: 14 };
+      return { charsPerLine: 72, lineHeightPx: 14.5, basePaddingPx: 8 };
     }
     if (fontSizeMode === 'sm') {
-      return { charsPerLine: 44, lineHeightPx: 20, basePaddingPx: 18 };
+      return { charsPerLine: 58, lineHeightPx: 18, basePaddingPx: 10 };
     }
-    return { charsPerLine: 52, lineHeightPx: 16.5, basePaddingPx: 16 };
+    return { charsPerLine: 66, lineHeightPx: 15.5, basePaddingPx: 8 };
   }, [fontSizeMode, totalCharactersInDoc]);
 
   // --- DYNAMIC AUTO-FIT PAGE-PACKING ENGINE ---
@@ -702,11 +709,12 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
       {
         orientation: 'portrait',
         columnCharWidth: charsPerLine,
-        headerHeightPx: 170,
-        footerHeightPx: 260,
-        runningFooterPx: 42,
+        headerHeightPx: 185,
+        footerHeightPx: 270,
+        runningFooterPx: 45,
         continuationTheadHeightPx: 0,
-        safetyBufferPx: 45
+        safetyBufferPx: 30,
+        strategy: 'greedy'
       }
     );
   }, [items, charsPerLine, lineHeightPx, basePaddingPx]);
@@ -717,9 +725,9 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
     <div
       key={`sec-7-page-${pIdx}`}
       id={pIdx === 0 ? 'section-vii-paper' : `section-vii-paper-p${pIdx + 1}`}
-      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col font-serif mb-8 box-border relative text-slate-950"
+      className="single-page-paper print-document-sheet portrait bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] h-auto max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
     >
-      <div>
+      <div className="w-full">
         {/* COMPANY & PROJECT HEADER BLOCK (PAGE 1 ONLY) */}
         {pIdx === 0 ? (
           <div className="mb-3 pb-2.5 border-b-2 border-slate-900 font-serif">
@@ -771,21 +779,21 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
         <div className="w-full overflow-x-auto">
           <table className="w-full border-collapse border border-black text-xs font-serif table-fixed">
             <colgroup>
-              <col className="w-[6%]" />
-              <col className="w-[8%]" />
-              <col className="w-[58%]" />
-              <col className="w-[28%]" />
+              <col className="w-[5%]" />
+              <col className="w-[5%]" />
+              <col className="w-[75%]" />
+              <col className="w-[15%]" />
             </colgroup>
             {pIdx === 0 && (
               <thead>
                 <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[11px]">
-                  <th className="border border-black px-1 py-1 w-[6%]">Item No.</th>
-                  <th className="border border-black px-1.5 py-1.5 w-[8%]">Qty</th>
-                  <th className="border border-black px-3 py-1.5 text-center w-[58%]">Technical Specifications / Scope of Work</th>
-                  <th className="border border-black px-3 py-1.5 text-left w-[28%]">
+                  <th className="border border-black px-1 py-1 w-[5%]">Item No.</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[5%]">Qty</th>
+                  <th className="border border-black px-3 py-1.5 text-center w-[75%]">Technical Specifications / Scope of Work</th>
+                  <th className="border border-black px-3 py-1.5 text-left w-[15%]">
                     <div className="font-bold text-black">Statement of Compliance</div>
                     <div className="text-[8.5px] font-serif leading-tight text-slate-800 font-normal normal-case mt-0.5 p-1 bg-amber-50/70 rounded border border-amber-200/80 break-words">
-                      [Bidders must state <strong>"Comply"</strong> or <strong>"Not Comply"</strong> against each individual parameter supported by evidence.]
+                      <strong></strong>  <strong>Comply / Not Comply</strong>
                     </div>
                   </th>
                 </tr>
@@ -903,43 +911,20 @@ export const TechnicalSpecifications: React.FC<TechnicalSpecificationsProps> = (
       <div className="w-full shrink-0 mt-auto">
         {/* Signatory Block & GPPB QR Code (Final Page Only) */}
         {pIdx === totalPages - 1 && (
-          <div className="mt-6 pt-3 border-t border-slate-300 flex items-end justify-between text-xs font-serif signatory-block mb-3">
-            <div>
-              <p className="font-bold text-black uppercase">{companyName}</p>
-              <div className="mt-6 border-b border-black w-64"></div>
-              <p className="font-bold text-black mt-1 uppercase">{signatoryName}</p>
-              <p className="text-slate-700">{signatoryTitle}</p>
-            </div>
-
-            <div className="text-right flex flex-col items-end">
-              <DocumentQrCode
-                details={{
-                  companyName: companyName,
-                  documentName: 'Section VII. Technical Specifications',
-                  documentNumber: `SEC-VII-${philgepsRefNo || projectRefNo || '2026-901283'}`,
-                  projectTitle: projectTitle,
-                  projectRefNo: philgepsRefNo || projectRefNo || 'N/A',
-                  procuringEntity: procuringEntity,
-                  dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
-                  documentCategory: 'Technical Eligibility',
-                  generatedBy: companyName
-                }}
-                size={80}
-                showCaption={false}
-              />
-              <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
-                VERIFIED GPPB DOC • {philgepsRefNo || projectRefNo || 'N/A'}
-              </span>
+          <div className="mt-2.5 pt-2 border-t border-slate-300 font-serif text-xs mb-1.5 shrink-0">
+            <p className="font-bold text-black uppercase text-[10px] mb-1 tracking-wide">
+              I hereby certify to comply with all above technical specifications:
+            </p>
+            <div className="flex items-end justify-between signatory-block">
+              <div>
+                <p className="font-bold text-black uppercase text-[10.5px] tracking-wide">{companyName}</p>
+                <div className="mt-4 border-b border-black w-60"></div>
+                <p className="font-bold text-black mt-1 uppercase text-[11px] tracking-wider">{signatoryName || 'AUTHORIZED REPRESENTATIVE'}</p>
+                <p className="text-slate-700 text-[9.5px] font-medium">{signatoryTitle || 'Designation / Authorized Signatory'}</p>
+              </div>
             </div>
           </div>
         )}
-
-        {/* Running Page Footer (Rendered on EVERY Page) */}
-        <div className="mt-4 pt-2 border-t-2 border-black flex items-center justify-between text-[8.5pt] font-mono text-black shrink-0">
-          <div className="font-bold uppercase">{companyName}</div>
-          <div>SECTION VII TECHNICAL SPECIFICATIONS • REF: {philgepsRefNo || projectRefNo || 'N/A'}</div>
-          <div className="font-bold">PAGE {pIdx + 1} OF {totalPages}</div>
-        </div>
       </div>
     </div>
   ));

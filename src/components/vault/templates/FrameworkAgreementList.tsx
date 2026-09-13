@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
-import { generateAndDownloadThreeLayerPdf, generateThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
+import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import { generateFrameworkAgreementListVectorPdf } from '../../../utils/vectorPdfGenerator';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import { autoFitPageChunks, calculateRowHeight, getAutoFitTypographyClass } from '../../../utils/autoFitEngine';
 import { savePdfData } from '../../../utils/vaultIndexedDB';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
   Printer,
   Download,
   FileSignature,
   Building2,
-  ShieldCheck,
-  CheckCircle2,
-  Sparkles,
   FileSpreadsheet,
   Type,
-  Lock
+  Lock,
+  Sparkles,
+  ShieldCheck,
+  CheckCircle2
 } from 'lucide-react';
 
 export interface ScheduleItem {
@@ -73,6 +73,16 @@ const computeTotalAmount = (unitStr: string, qtyStr: string): string => {
   if (isNaN(unitNum) || isNaN(qtyNum)) return '';
   const total = unitNum * qtyNum;
   return `PHP ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+/**
+ * Strips currency label ('PHP') for paper/PDF view while formatting clean decimals
+ */
+export const formatPaperAmount = (val: string | number): string => {
+  if (val === undefined || val === null || val === '') return '';
+  const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return '';
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 export const computeTotalQuantity = (itemList: ScheduleItem[]): string => {
@@ -394,12 +404,29 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
   const handleExportPdf = async () => {
     setIsExporting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 80));
-      const fileName = `${projectRefNo}_Framework_Agreement_List_${todayStr}.pdf`;
-      const containerElem = document.getElementById('framework-pages-container') || document.getElementById('framework-paper');
-      if (containerElem) {
-        await generateAndDownloadThreeLayerPdf(null, containerElem, undefined, fileName);
-      }
+      const fileName = `${projectRefNo || 'FAL-01'}_Framework_Agreement_List_${todayStr}.pdf`;
+      const pdfDataUrl = await generateFrameworkAgreementListVectorPdf({
+        companyName,
+        companyAddress,
+        projectTitle,
+        projectRefNo,
+        procuringEntity,
+        dateTimeSubmitted,
+        signatoryName,
+        signatoryTitle,
+        items,
+        servicesDescription,
+        servicesCost: getServicesCostAmount(items, servicesPercentage, servicesCustomAmount),
+        grandTotal: getNumericGrandTotalMaterials(items) + getServicesCostAmount(items, servicesPercentage, servicesCustomAmount),
+        totalMaterials: getNumericGrandTotalMaterials(items),
+        totalQuantity: computeTotalQuantity(items)
+      });
+      const link = document.createElement('a');
+      link.href = pdfDataUrl;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (err) {
       console.error('PDF export error:', err);
     } finally {
@@ -454,32 +481,37 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
   const handleSave = async () => {
     setIsExporting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 80));
-      const containerElem = (document.getElementById('framework-pages-container') || document.getElementById('framework-paper')) as HTMLElement;
-      let dataUrl: string | undefined = undefined;
-      if (containerElem) {
-        dataUrl = await generateThreeLayerPdfDataUrl(
-          null,
-          containerElem,
-          undefined,
-          `${projectRefNo}_Framework_Agreement_List_${todayStr}.pdf`
-        );
-      }
+      const pdfDataUrl = await generateFrameworkAgreementListVectorPdf({
+        companyName,
+        companyAddress,
+        projectTitle,
+        projectRefNo,
+        procuringEntity,
+        dateTimeSubmitted,
+        signatoryName,
+        signatoryTitle,
+        items,
+        servicesDescription,
+        servicesCost: getServicesCostAmount(items, servicesPercentage, servicesCustomAmount),
+        grandTotal: getNumericGrandTotalMaterials(items) + getServicesCostAmount(items, servicesPercentage, servicesCustomAmount),
+        totalMaterials: getNumericGrandTotalMaterials(items),
+        totalQuantity: computeTotalQuantity(items)
+      });
 
       const tenantKey = tenant?.id || 'default';
       const scopeKey = selectedOppId || projectRefNo || activeProjectRefNo || 'default';
-      if (dataUrl) {
+      if (pdfDataUrl) {
         try {
-          await savePdfData(`fal_${tenantKey}_${scopeKey}`, dataUrl);
-          if (selectedOppId) await savePdfData(`fal_${tenantKey}_${selectedOppId}`, dataUrl);
-          if (projectRefNo) await savePdfData(`fal_${tenantKey}_${projectRefNo}`, dataUrl);
+          await savePdfData(`fal_${tenantKey}_${scopeKey}`, pdfDataUrl);
+          if (selectedOppId) await savePdfData(`fal_${tenantKey}_${selectedOppId}`, pdfDataUrl);
+          if (projectRefNo) await savePdfData(`fal_${tenantKey}_${projectRefNo}`, pdfDataUrl);
         } catch (_) {}
       }
 
       saveItemsToSharedStorage(items);
 
       if (onSaveAndComplete) {
-        onSaveAndComplete(dataUrl, item.name, projectRefNo, projectTitle, selectedOppId);
+        onSaveAndComplete(pdfDataUrl, item.name, projectRefNo, projectTitle, selectedOppId);
       }
     } catch (error) {
       console.error('Failed to generate Framework Agreement List PDF:', error);
@@ -507,12 +539,12 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
 
   const { charsPerLine, lineHeightPx, basePaddingPx } = useMemo(() => {
     if (fontSizeMode === 'fine' || (fontSizeMode === 'xs' && totalCharactersInDoc > 5000)) {
-      return { charsPerLine: 54, lineHeightPx: 14, basePaddingPx: 14 };
+      return { charsPerLine: 44, lineHeightPx: 15, basePaddingPx: 10 };
     }
     if (fontSizeMode === 'sm') {
-      return { charsPerLine: 40, lineHeightPx: 22, basePaddingPx: 18 };
+      return { charsPerLine: 36, lineHeightPx: 19, basePaddingPx: 12 };
     }
-    return { charsPerLine: 46, lineHeightPx: 18, basePaddingPx: 16 };
+    return { charsPerLine: 40, lineHeightPx: 16.5, basePaddingPx: 10 };
   }, [fontSizeMode, totalCharactersInDoc]);
 
   // --- DYNAMIC AUTO-FIT PAGE-PACKING ENGINE ---
@@ -528,11 +560,12 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       {
         orientation: 'portrait',
         columnCharWidth: charsPerLine,
-        headerHeightPx: 170,
-        footerHeightPx: 260,
-        runningFooterPx: 42,
+        headerHeightPx: 185,
+        footerHeightPx: 350,
+        runningFooterPx: 45,
         continuationTheadHeightPx: 32,
-        safetyBufferPx: 45
+        safetyBufferPx: 35,
+        strategy: 'greedy'
       }
     );
   }, [items, charsPerLine, lineHeightPx, basePaddingPx]);
@@ -543,9 +576,9 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     <div
       key={`fal-page-${pIdx}`}
       id={pIdx === 0 ? 'framework-paper' : `framework-paper-p${pIdx + 1}`}
-      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col font-serif mb-8 box-border relative text-slate-950"
+      className="single-page-paper print-document-sheet portrait bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] h-auto max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
     >
-      <div>
+      <div className="w-full">
         {/* COMPANY & PROJECT HEADER BLOCK (PAGE 1 ONLY) */}
         {pIdx === 0 ? (
           <div className="mb-3 pb-2.5 border-b-2 border-slate-900 font-serif">
@@ -597,30 +630,30 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
         <div className="w-full overflow-x-auto">
           <table className="w-full border-collapse border border-black text-xs font-serif table-fixed">
             <colgroup>
+              <col className="w-[5%]" />
+              <col className="w-[67%]" />
               <col className="w-[6%]" />
-              <col className="w-[48%]" />
+              <col className="w-[10%]" />
               <col className="w-[12%]" />
-              <col className="w-[16%]" />
-              <col className="w-[18%]" />
             </colgroup>
             {pIdx === 0 ? (
               <thead>
                 <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[11px]">
-                  <th className="border border-black px-1.5 py-1.5 w-[6%]">Item No.</th>
-                  <th className="border border-black px-2 py-1.5 text-left w-[48%]">Description</th>
-                  <th className="border border-black px-1.5 py-1.5 w-[12%]">Qty</th>
-                  <th className="border border-black px-2 py-1.5 w-[16%]">Unit Cost</th>
-                  <th className="border border-black px-2 py-1.5 w-[18%]">Total Cost</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[5%]">Item No.</th>
+                  <th className="border border-black px-2 py-1.5 text-left w-[67%]">Description</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[6%]">Qty</th>
+                  <th className="border border-black px-2 py-1.5 w-[10%]">Unit Cost</th>
+                  <th className="border border-black px-2 py-1.5 w-[12%]">Total Cost</th>
                 </tr>
               </thead>
             ) : (
               <thead>
                 <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[10px]">
-                  <th className="border border-black px-1.5 py-1 w-[6%]">Item No.</th>
-                  <th className="border border-black px-2 py-1 text-left w-[48%]">Description (Continuation)</th>
-                  <th className="border border-black px-1.5 py-1 w-[12%]">Qty</th>
-                  <th className="border border-black px-2 py-1 w-[16%]">Unit Cost</th>
-                  <th className="border border-black px-2 py-1 w-[18%]">Total Cost</th>
+                  <th className="border border-black px-1.5 py-1 w-[5%]">Item No.</th>
+                  <th className="border border-black px-2 py-1 text-left w-[67%]">Description (Continuation)</th>
+                  <th className="border border-black px-1.5 py-1 w-[6%]">Qty</th>
+                  <th className="border border-black px-2 py-1 w-[10%]">Unit Cost</th>
+                  <th className="border border-black px-2 py-1 w-[12%]">Total Cost</th>
                 </tr>
               </thead>
             )}
@@ -634,7 +667,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
 
                   {/* 2. Description (Read-Only) */}
                   <td className="border border-black px-3.5 py-2 font-serif align-top break-words">
-                    <div className={`font-serif text-slate-950 pt-0.5 whitespace-pre-wrap font-normal break-words [overflow-wrap:break-word] leading-relaxed text-justify ${getTableFontSizeClass()}`}>
+                    <div className={`font-serif text-slate-950 pt-0.5 whitespace-pre-wrap font-normal break-words [overflow-wrap:break-word] leading-normal text-justify ${getTableFontSizeClass()}`}>
                       {formatDescriptionText(rowItem.description)}
                     </div>
                   </td>
@@ -649,23 +682,37 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                   {/* 4. Unit Amount (Read-Only) */}
                   <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
                     <div className={`font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
-                      {rowItem.unitAmount
-                        ? rowItem.unitAmount.startsWith('PHP')
-                          ? rowItem.unitAmount
-                          : (() => {
-                              const clean = parseFloat(rowItem.unitAmount.replace(/[^0-9.]/g, ''));
-                              return !isNaN(clean)
-                                ? `PHP ${clean.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                : rowItem.unitAmount;
-                            })()
-                        : ''}
+                      <span className="print:hidden">
+                        {!isExporting
+                          ? (rowItem.unitAmount
+                              ? rowItem.unitAmount.startsWith('PHP')
+                                ? rowItem.unitAmount
+                                : (() => {
+                                    const clean = parseFloat(rowItem.unitAmount.replace(/[^0-9.]/g, ''));
+                                    return !isNaN(clean)
+                                      ? `PHP ${clean.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                      : rowItem.unitAmount;
+                                  })()
+                              : '')
+                          : formatPaperAmount(rowItem.unitAmount)}
+                      </span>
+                      <span className="hidden print:inline">
+                        {formatPaperAmount(rowItem.unitAmount)}
+                      </span>
                     </div>
                   </td>
 
                   {/* 5. Total Amount (Read-Only) */}
                   <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
                     <div className={`font-serif text-black text-center pt-0.5 font-semibold break-words ${getTableFontSizeClass()}`}>
-                      {computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total || ''}
+                      <span className="print:hidden">
+                        {!isExporting
+                          ? (computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total || '')
+                          : formatPaperAmount(computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total)}
+                      </span>
+                      <span className="hidden print:inline">
+                        {formatPaperAmount(computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total)}
+                      </span>
                     </div>
                   </td>
                 </tr>
@@ -697,7 +744,12 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                     —
                   </td>
                   <td className="border border-black px-2 py-1.5 text-center font-bold text-black text-xs font-mono break-words bg-amber-50/90">
-                    {computeGrandTotalMaterials(items)}
+                    <span className="print:hidden">
+                      {!isExporting ? computeGrandTotalMaterials(items) : formatPaperAmount(computeGrandTotalMaterials(items))}
+                    </span>
+                    <span className="hidden print:inline">
+                      {formatPaperAmount(computeGrandTotalMaterials(items))}
+                    </span>
                   </td>
                 </tr>
 
@@ -720,7 +772,14 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                     </td>
                     <td className="border border-black px-2 py-1 text-center font-bold text-blue-950 text-xs font-mono break-words bg-blue-50/80 align-middle">
                       <div className="font-mono text-blue-950 text-xs font-bold">
-                        {getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount)}
+                        <span className="print:hidden">
+                          {!isExporting
+                            ? getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount)
+                            : formatPaperAmount(getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount))}
+                        </span>
+                        <span className="hidden print:inline">
+                          {formatPaperAmount(getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount))}
+                        </span>
                       </div>
                     </td>
                   </tr>
@@ -738,7 +797,14 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                     —
                   </td>
                   <td className="border border-black px-2 py-2 text-center font-extrabold text-black text-sm font-mono break-words bg-amber-200">
-                    {getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount)}
+                    <span className="print:hidden">
+                      {!isExporting
+                        ? getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount)
+                        : formatPaperAmount(getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount))}
+                    </span>
+                    <span className="hidden print:inline">
+                      {formatPaperAmount(getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount))}
+                    </span>
                   </td>
                 </tr>
               </tfoot>
@@ -751,43 +817,20 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       <div className="w-full shrink-0 mt-auto">
         {/* Signatory Block & GPPB QR Code (Final Page Only) */}
         {pIdx === totalPages - 1 && (
-          <div className="mt-6 pt-3 border-t border-slate-300 flex items-end justify-between text-xs font-serif signatory-block mb-3">
-            <div>
-              <p className="font-bold text-black uppercase">{companyName}</p>
-              <div className="mt-6 border-b border-black w-64"></div>
-              <p className="font-bold text-black mt-1 uppercase">{signatoryName}</p>
-              <p className="text-slate-700">{signatoryTitle}</p>
-            </div>
-
-            <div className="text-right flex flex-col items-end">
-              <DocumentQrCode
-                details={{
-                  companyName: companyName,
-                  documentName: 'Framework Agreement List',
-                  documentNumber: `FAL-01-${projectRefNo || '2026-901283'}`,
-                  projectTitle: projectTitle,
-                  projectRefNo: projectRefNo,
-                  procuringEntity: procuringEntity,
-                  dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
-                  documentCategory: 'Bid Forms',
-                  generatedBy: companyName
-                }}
-                size={80}
-                showCaption={false}
-              />
-              <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
-                VERIFIED GPPB DOC • {projectRefNo}
-              </span>
+          <div className="mt-2.5 pt-2 border-t border-slate-300 font-serif text-xs mb-1.5 shrink-0">
+            <p className="font-bold text-black uppercase text-[10px] mb-1 tracking-wide">
+              I hereby certify to comply and deliver all the above requirements:
+            </p>
+            <div className="flex items-end justify-between signatory-block">
+              <div>
+                <p className="font-bold text-black uppercase text-[10.5px] tracking-wide">{companyName}</p>
+                <div className="mt-4 border-b border-black w-60"></div>
+                <p className="font-bold text-black mt-1 uppercase text-[11px] tracking-wider">{signatoryName || 'AUTHORIZED REPRESENTATIVE'}</p>
+                <p className="text-slate-700 text-[9.5px] font-medium">{signatoryTitle || 'Designation / Authorized Signatory'}</p>
+              </div>
             </div>
           </div>
         )}
-
-        {/* Running Page Footer (Rendered on EVERY Page) */}
-        <div className="mt-4 pt-2 border-t-2 border-black flex items-center justify-between text-[8.5pt] font-mono text-black shrink-0">
-          <div className="font-bold uppercase">{companyName}</div>
-          <div>FRAMEWORK AGREEMENT LIST • REF: {projectRefNo || 'N/A'}</div>
-          <div className="font-bold">PAGE {pIdx + 1} OF {totalPages}</div>
-        </div>
       </div>
     </div>
   ));

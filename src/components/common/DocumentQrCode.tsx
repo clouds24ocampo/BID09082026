@@ -18,8 +18,8 @@ export const DocumentQrCode: React.FC<DocumentQrCodeProps> = ({
   const [dataUrl, setDataUrl] = useState<string>(() => getCachedQrCodeDataUrl(details) || '');
   const [showTextModal, setShowTextModal] = useState(false);
 
-  // Guarantee minimum physical dimension of at least 64px for phone camera & scanner sensor resolution
-  const displaySize = Math.max(64, size);
+  // Guarantee minimum physical dimension of at least 32px for camera & scanner sensor resolution
+  const displaySize = Math.max(32, size);
 
   useEffect(() => {
     let isMounted = true;

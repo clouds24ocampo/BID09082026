@@ -3,7 +3,6 @@ import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import { autoFitPageChunks, calculateRowHeight } from '../../../utils/autoFitEngine';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
   Printer,
@@ -825,29 +824,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                   </div>
 
                   {/* Document Running Footer on EVERY Page */}
-                  <div className="pt-2 border-t border-slate-300 flex items-center justify-between text-[7.5pt] font-mono text-slate-700 mt-2">
-                    <div className="flex items-center gap-3">
-                      <DocumentQrCode
-                        details={{
-                          companyName: companyName || 'Bidding Entity',
-                          documentName: 'Summary of Bid Prices',
-                          documentNumber: `FIN-SUMMARYBID-${projectRefNo || 'SCHED'}`,
-                          projectTitle: projectTitle,
-                          projectRefNo: projectRefNo,
-                          procuringEntity: procuringEntity,
-                          dateTimeSubmitted: dateSubmitted || 'March 19, 2026',
-                          documentCategory: 'Financial Documents',
-                          generatedBy: companyName || 'Bidding Entity'
-                        }}
-                        size={38}
-                        showCaption={false}
-                      />
-                      <div className="space-y-0.5">
-                        <p className="font-bold text-black uppercase">{companyName || 'QUANTUM CLOUD CORPORATION'}</p>
-                        <p>PROJECT: <strong>{projectTitle || 'N/A'}</strong></p>
-                        <p>REF NO: <strong>{projectRefNo || 'N/A'}</strong></p>
-                      </div>
-                    </div>
+                  <div className="pt-2 border-t border-slate-300 flex items-center justify-end text-[7.5pt] font-mono text-slate-700 mt-2">
                     <div className="text-right">
                       <span className="font-bold font-mono text-black text-[8.5pt]">Page {currentPageNum} of {totalPagesCount}</span>
                       <p className="text-[7pt] text-slate-500 uppercase"></p>

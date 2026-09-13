@@ -22,6 +22,7 @@ export interface AutoFitConfig {
   runningFooterPx?: number; // e.g. 38px for running page number footer
   continuationTheadHeightPx?: number; // Optional continuation table header height (0 if omitted on continuation pages)
   safetyBufferPx?: number;  // Safe bottom margin buffer to guarantee footers never clip
+  strategy?: 'greedy' | 'balanced'; // 'greedy' fills current page to capacity; 'balanced' distributes across pages
 }
 
 /**
@@ -53,7 +54,7 @@ export function calculateRowHeight(
 }
 
 /**
- * Packs items into the minimum number of balanced pages with zero wasted empty space
+ * Packs items into the minimum number of pages with zero wasted empty space
  * and zero lost/overflowed items.
  */
 export function autoFitPageChunks<T>(
@@ -91,6 +92,66 @@ export function autoFitPageChunks<T>(
   // 1. Single Page Check: If all items + header + summary + signature fit on Page 1
   if (totalContentHeight <= singlePageCapacity) {
     return [items];
+  }
+
+  // 2. Greedy Max-Fill Packing:
+  // Maximally fills Page 1 and continuation pages to full physical capacity
+  // before ever creating an additional page, eliminating big empty white voids.
+  if (config.strategy === 'greedy') {
+    const pages: T[][] = [];
+    let currentChunk: T[] = [];
+    let currentHeight = 0;
+    let pageIdx = 0;
+
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
+      const rHeight = rowHeights[idx];
+      const isPage1 = pageIdx === 0;
+
+      // Check if ALL remaining items from this point to the end fit in the final capacity
+      let remainingHeight = 0;
+      for (let r = idx; r < items.length; r++) {
+        remainingHeight += rowHeights[r];
+      }
+
+      const finalCap = isPage1 ? singlePageCapacity : finalContinuationCapacity;
+      const contCap = isPage1 ? page1ContinuationCapacity : continuationCapacity;
+
+      // If everything left fits with final footer on this current page, pack it and done!
+      if (currentHeight + remainingHeight <= finalCap) {
+        currentChunk.push(...items.slice(idx));
+        pages.push(currentChunk);
+        return pages;
+      }
+
+      // If this is the last item, it can only join currentChunk if it fits in finalCap (reserving footer)
+      const isLastItem = idx === items.length - 1;
+      const effectiveCap = (isLastItem && currentChunk.length > 0) ? finalCap : contCap;
+
+      if (currentHeight + rHeight <= effectiveCap) {
+        currentChunk.push(item);
+        currentHeight += rHeight;
+      } else {
+        // Current page is completely filled! Commit chunk and start new page
+        if (currentChunk.length > 0) {
+          pages.push(currentChunk);
+          pageIdx++;
+          currentChunk = [item];
+          currentHeight = rHeight;
+        } else {
+          currentChunk.push(item);
+          pages.push(currentChunk);
+          pageIdx++;
+          currentChunk = [];
+          currentHeight = 0;
+        }
+      }
+    }
+
+    if (currentChunk.length > 0) {
+      pages.push(currentChunk);
+    }
+    return pages;
   }
 
   // 2. Balanced Minimum-Page Allocation Engine

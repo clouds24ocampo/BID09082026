@@ -2,7 +2,7 @@ import React from 'react';
 import { DocumentVaultItem, Tenant } from '../../types';
 import { Award } from 'lucide-react';
 
-export interface DocumentCoverPageProps {
+export interface DocumentSeparatorCoverProps {
   item: Partial<DocumentVaultItem> & {
     procuringEntity?: string;
     approvedBudget?: number | string;
@@ -21,7 +21,7 @@ export interface DocumentCoverPageProps {
   envelopeName?: string;
 }
 
-export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({ 
+export const DocumentSeparatorCover: React.FC<DocumentSeparatorCoverProps> = ({ 
   item, 
   tenant, 
   incrementNumber = 1,
@@ -317,4 +317,4 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
   );
 };
 
-export default DocumentCoverPage;
+export default DocumentSeparatorCover;

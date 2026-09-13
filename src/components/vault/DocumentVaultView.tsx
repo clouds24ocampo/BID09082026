@@ -2198,7 +2198,8 @@ export const DocumentVaultView: React.FC = () => {
 
                         {/* Actions */}
                         <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                          <button
+                          {!item.isExpandable && (
+                            <button
                               type="button"
                               onClick={() => setFillingTemplateItem({ id: item.id, code: item.code, name: item.name })}
                               disabled={!canCreateForm}
@@ -2211,21 +2212,8 @@ export const DocumentVaultView: React.FC = () => {
                               <FileSignature className="w-3.5 h-3.5" />
                               <span>{projectDocExists ? 'Already Created' : 'Create Form'}</span>
                             </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                resetFormState();
-                                setCustomDocName(`Item ${item.code} — ${item.name}`);
-                                setCustomUploadCategory('TECHNICAL');
-                                setShowCustomUploadModal(true);
-                              }}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30"
-                            >
-                              <Upload className="w-3.5 h-3.5" />
-                              <span>Upload PDF</span>
-                            </button>
-                          </div>
+                          )}
+                        </div>
                         </div>
 
                       {/* Expandable Sub-Items Section for Item (f) */}

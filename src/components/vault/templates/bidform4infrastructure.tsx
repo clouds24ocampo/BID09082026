@@ -3,7 +3,6 @@ import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import { savePdfData } from '../../../utils/vaultIndexedDB';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import VaultErrorBoundary from '../../common/VaultErrorBoundary';
 import { numberToWords } from '../../../utils/numberToWords';
 import {
@@ -11,11 +10,11 @@ import {
   Printer,
   Download,
   Building2,
-  Edit3,
-  HardHat,
   CheckCircle2,
-  ShieldCheck,
-  FolderKanban
+  HardHat,
+  FolderKanban,
+  Edit3,
+  ShieldCheck
 } from 'lucide-react';
 
 export interface DiscountOfferRow {
@@ -985,17 +984,6 @@ export const BidFormForInfrastructureModalContent: React.FC<BidFormForInfrastruc
                   <div className="font-bold text-black uppercase">GPPB INFR-01</div>
                   <div>Ref: {projectRefNo}</div>
                 </div>
-                <DocumentQrCode
-                  details={{
-                    documentNumber: `FIN-BIDFORM-INFRA-${projectRefNo || 'PROJECT'}`,
-                    documentName: 'Bid Form for Infrastructure Projects',
-                    projectName: projectTitle,
-                    companyName: companyName,
-                    solicitationNo: solicitationNumber
-                  }}
-                  size={58}
-                  className="border border-black p-0.5 bg-white shrink-0"
-                />
               </div>
             </div>
 

@@ -10,10 +10,9 @@ import {
   Trash2,
   Upload,
   CheckCircle2,
-  ShieldCheck,
-  Eye
+  Eye,
+  ShieldCheck
 } from 'lucide-react';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import { savePdfData, loadPdfData } from '../../../utils/vaultIndexedDB';
 import html2canvas from 'html2canvas';
@@ -1010,29 +1009,7 @@ export const ContractorsMajorEquipment: React.FC<ContractorsMajorEquipmentProps>
                     {/* Footer Section: Signatory Block strictly on the Last Page (DIRECTLY UNDER LAST ITEM) */}
                     {isLastPage && (
                       <div className="mt-8 pt-4 border-t-2 border-slate-900 flex items-end justify-between px-2 pb-2 bg-white shrink-0">
-                        {/* Lower-Left: Official QR Verification Code */}
-                        <div className="flex items-center gap-2.5">
-                          <DocumentQrCode
-                            details={{
-                              companyName: companyName,
-                              documentName: `Item ${item.code} — EQUIPMENT LIST (Page ${pageIdx + 1} of ${totalPages})`,
-                              documentNumber: `EXHIBIT-${item.code.replace(/[^a-zA-Z0-9]/g, '')}-${projectRefNo || '2026-901283'}`,
-                              projectTitle: projectTitle,
-                              projectRefNo: projectRefNo,
-                              procuringEntity: procuringEntity,
-                              dateTimeSubmitted: dateTimeSubmitted || todayStr,
-                              documentCategory: 'Technical Eligibility',
-                              generatedBy: companyName
-                            }}
-                            size={42}
-                            showCaption={false}
-                          />
-                          <div className="text-[8px] font-mono leading-tight text-slate-700 space-y-0.5">
-                            <p className="font-bold text-slate-950 uppercase truncate max-w-[240px]">{companyName}</p>
-                            <p className="truncate max-w-[240px]">PROJECT: {projectTitle}</p>
-                            <p className="truncate max-w-[240px]">REF: {projectRefNo} • PAGE {pageIdx + 1} OF {totalPages}</p>
-                          </div>
-                        </div>
+                        <div />
 
                         {/* Middle Action: Save & Attach to Vault (Screen Only, Hidden in Print & PDF Export) */}
                         <div className="flex flex-col items-center justify-center px-2 print:hidden no-export my-auto">

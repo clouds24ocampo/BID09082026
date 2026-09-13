@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import VaultErrorBoundary from '../../common/VaultErrorBoundary';
 import { numberToWords } from '../../../utils/numberToWords';
 import {
@@ -10,12 +9,12 @@ import {
   Printer,
   Download,
   Building2,
-  FileSignature,
-  DollarSign,
-  Lock,
-  Edit3,
   HardHat,
-  FolderKanban
+  DollarSign,
+  FolderKanban,
+  Edit3,
+  Lock,
+  FileSignature
 } from 'lucide-react';
 
 export interface AgentCommissionRow {
@@ -1134,22 +1133,6 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
                     BID: Php {totalBidAmountFigures || '0.00'}
                   </p>
                 </div>
-
-                <DocumentQrCode
-                  details={{
-                    companyName: companyName,
-                    documentName: `BID FORM FOR ${projectCategory.toUpperCase()}`,
-                    documentNumber: `FIN-BIDFORM-${projectCategory.toUpperCase()}-${projectRefNo || '12795242'}`,
-                    projectTitle: projectTitle,
-                    projectRefNo: projectRefNo || '12795242',
-                    procuringEntity: procuringEntity,
-                    dateTimeSubmitted: dateSubmitted,
-                    documentCategory: 'Financial Documents',
-                    generatedBy: companyName
-                  }}
-                  size={52}
-                  showCaption={false}
-                />
               </div>
             </div>
 

@@ -12,7 +12,41 @@ export interface ExportDocumentUnit {
   fileDataUrl?: string | null;
   fileSource?: PdfAttachmentSource | null;
   documentName?: string;
+  documentCode?: string;
+  fileName?: string;
+  isPristineAttachment?: boolean;
 }
+
+/**
+ * Checks if a document unit represents an official PhilGEPS Certificate.
+ * Bidders upload their authentic government-issued PhilGEPS Platinum Certificate with official QR codes.
+ * According to Philippine Government Procurement Act (RA 9184 / RA 12009), official PhilGEPS
+ * verification QR codes must NEVER be scaled, clipped, overlaid with stamps, watermarked, or altered.
+ */
+export const isPhilgepsDocumentUnit = (unit: ExportDocumentUnit, docTitle?: string): boolean => {
+  if (unit.isPristineAttachment) return true;
+  const code = ((unit.documentCode || '') as string).toUpperCase();
+  if (code === 'DOC-1' || code.includes('PHILGEPS')) return true;
+
+  const t = (unit.title || '').toLowerCase();
+  const d = (unit.documentName || '').toLowerCase();
+  const dt = (docTitle || '').toLowerCase();
+  const fn = (unit.fileName || '').toLowerCase();
+
+  return (
+    t.includes('philgeps') ||
+    d.includes('philgeps') ||
+    dt.includes('philgeps') ||
+    fn.includes('philgeps') ||
+    t.includes('phil-geps') ||
+    d.includes('phil-geps') ||
+    dt.includes('phil-geps') ||
+    fn.includes('phil-geps') ||
+    t.includes('platinum certificate') ||
+    d.includes('platinum certificate') ||
+    dt.includes('platinum certificate')
+  );
+};
 
 const blobToDataUrl = async (blob: Blob): Promise<string> => {
   if (typeof FileReader !== 'undefined') {
@@ -149,6 +183,24 @@ export interface PdfProgressInfo {
   totalDocs: number;
 }
 
+export type StampColor = 'blue' | 'red' | 'purple' | 'black' | 'green';
+
+export const getStampColorRgb = (color?: StampColor) => {
+  switch (color) {
+    case 'red':
+      return rgb(0.82, 0.12, 0.12);
+    case 'purple':
+      return rgb(0.48, 0.12, 0.65);
+    case 'black':
+      return rgb(0.12, 0.12, 0.14);
+    case 'green':
+      return rgb(0.06, 0.48, 0.16);
+    case 'blue':
+    default:
+      return rgb(0.08, 0.22, 0.55);
+  }
+};
+
 export interface PdfExportOptions {
   folderCopy?: 'ORIGINAL' | 'COPY_1' | 'COPY_2';
   submissionDate?: string;
@@ -157,6 +209,7 @@ export interface PdfExportOptions {
   signatoryTitle?: string;
   projectRefNo?: string;
   projectTitle?: string;
+  stampColor?: StampColor;
 }
 
 // Standard Legal Size Dimensions in Points (72 dpi):
@@ -180,6 +233,7 @@ export async function buildMergedThreeLayerPdfBytes(
   debugLog('pdfExportEngine.ts:start', 'PDF build starting', { unitCount: units.length, outputFileName }, 'C');
 
   const pdfDoc = await PDFDocument.create();
+  const untouchedPhilgepsPageIndices = new Set<number>();
 
   for (let index = 0; index < units.length; index++) {
     // Yield to keep UI responsive
@@ -416,19 +470,68 @@ export async function buildMergedThreeLayerPdfBytes(
       }
     }
 
-    // â”€â”€ ATTACHED PDF / IMAGE FILE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── ATTACHED PDF / IMAGE FILE ─────────────────────────────────────────────
     const fileSource = unit.fileSource ?? unit.fileDataUrl;
     if (fileSource) {
       try {
         const pdfArrayBuffer = await normalizePdfSourceToArrayBuffer(fileSource);
+        const isPhilgeps = isPhilgepsDocumentUnit(unit, docTitle);
         try {
           const externalPdfDoc = await PDFDocument.load(pdfArrayBuffer, { ignoreEncryption: true });
           const pageIndices = externalPdfDoc.getPageIndices();
           const copiedPages = await pdfDoc.copyPages(externalPdfDoc, pageIndices);
-          copiedPages.forEach((copiedPage) => pdfDoc.addPage(copiedPage));
-          debugLog('pdfExportEngine.ts:attach', `Appended ${pageIndices.length} PDF pages`, { docTitle }, 'C');
+
+          if (isPhilgeps) {
+            // ZERO-TOUCH PRESERVATION FOR OFFICIAL PHILGEPS CERTIFICATE & QR CODE:
+            // Never scale, never translate, never resize, and never draw stamps/watermarks/pagination overlays.
+            // Preserves the user's authentic PhilGEPS upload 100% untouched for PhilGEPS QR verification compliance.
+            copiedPages.forEach((copiedPage) => {
+              const pageIdxInDoc = pdfDoc.getPageCount();
+              untouchedPhilgepsPageIndices.add(pageIdxInDoc);
+              pdfDoc.addPage(copiedPage);
+            });
+            debugLog('pdfExportEngine.ts:attach', `Appended ${pageIndices.length} pristine UNTOUCHED PhilGEPS pages (QR preserved)`, { docTitle }, 'C');
+          } else {
+            copiedPages.forEach((copiedPage) => {
+              const origW = copiedPage.getWidth();
+              const origH = copiedPage.getHeight();
+              const origRot = copiedPage.getRotation().angle;
+
+              // Normalize page rotation so all pages in the binder are uniformly upright (0 deg)
+              if (origRot !== 0) {
+                copiedPage.setRotation(degrees(0));
+              }
+
+              // Determine visual orientation:
+              const isLandscape = (origRot === 90 || origRot === 270)
+                ? origH > origW
+                : origW > origH;
+
+              // Use true orientation: LEGAL_LANDSCAPE [936, 612] for landscape uploads (including PCAB licenses),
+              // and LEGAL_PORTRAIT [612, 936] for portrait uploads.
+              const targetSize: [number, number] = isLandscape
+                ? LEGAL_LANDSCAPE
+                : LEGAL_PORTRAIT;
+              const targetW = targetSize[0];
+              const targetH = targetSize[1];
+
+              const scale = Math.min(targetW / origW, targetH / origH);
+              const scaledW = origW * scale;
+              const scaledH = origH * scale;
+              const dx = (targetW - scaledW) / 2;
+              const dy = (targetH - scaledH) / 2;
+
+              copiedPage.scaleContent(scale, scale);
+              if (scale > 0) {
+                copiedPage.translateContent(dx / scale, dy / scale);
+              }
+              copiedPage.setSize(targetW, targetH);
+              pdfDoc.addPage(copiedPage);
+            });
+            debugLog('pdfExportEngine.ts:attach', `Appended ${pageIndices.length} standardized Legal PDF pages`, { docTitle }, 'C');
+          }
         } catch (_pdfLoadErr) {
-          // Not a PDF â€” try embedding as image
+          // Not a PDF — try embedding as image
           try {
             let embeddedImage: any = null;
             if (typeof fileSource === 'string' && fileSource.includes('image/jpeg')) {
@@ -441,17 +544,23 @@ export async function buildMergedThreeLayerPdfBytes(
               }
             }
             if (embeddedImage) {
-              const isPortraitImg = embeddedImage.height > embeddedImage.width;
-              const imgPageSize: [number, number] = isPortraitImg ? LEGAL_PORTRAIT : LEGAL_LANDSCAPE;
-              const scale = Math.min(
-                imgPageSize[0] / embeddedImage.width,
-                imgPageSize[1] / embeddedImage.height
-              );
+              const isLandscapeImg = embeddedImage.width > embeddedImage.height;
+              const imgPageSize: [number, number] = isLandscapeImg
+                ? LEGAL_LANDSCAPE
+                : LEGAL_PORTRAIT;
+              const targetW = imgPageSize[0];
+              const targetH = imgPageSize[1];
+
+              const scale = Math.min(targetW / embeddedImage.width, targetH / embeddedImage.height);
               const drawW = embeddedImage.width * scale;
               const drawH = embeddedImage.height * scale;
-              const drawX = (imgPageSize[0] - drawW) / 2;
-              const drawY = imgPageSize[1] - drawH;
+              const drawX = (targetW - drawW) / 2;
+              const drawY = (targetH - drawH) / 2;
+
               const imgPage = pdfDoc.addPage(imgPageSize);
+              if (isPhilgeps) {
+                untouchedPhilgepsPageIndices.add(pdfDoc.getPageCount() - 1);
+              }
               imgPage.drawImage(embeddedImage, { x: drawX, y: drawY, width: drawW, height: drawH });
             }
           } catch (imgErr) {
@@ -572,39 +681,63 @@ export async function buildMergedThreeLayerPdfBytes(
         const height = page.getHeight();
         const rotationAngle = page.getRotation().angle;
 
-        // 1. DIAGONAL WATERMARK (APPROX 5% DARKER / MORE VISIBLE, CRISP BAC COMPLIANT)
-        if (effectiveFolderCopy && rotationAngle === 0) {
-          const watermarkText = effectiveFolderCopy === 'ORIGINAL'
+        const isUntouchedPhilgeps = untouchedPhilgepsPageIndices.has(pageIdx);
+
+        // 1. DIAGONAL WATERMARK (3-LINE: STATUS, COMPANY NAME, PHILGEPS REF - STRICTLY CONSTRAINED INSIDE PAPER)
+        if (effectiveFolderCopy && rotationAngle === 0 && !isUntouchedPhilgeps) {
+          const statusText = effectiveFolderCopy === 'ORIGINAL'
             ? 'ORIGINAL BID DOCUMENT'
-            : effectiveFolderCopy === 'COPY_1'
-            ? 'CERTIFIED TRUE COPY — COPY 1'
-            : 'CERTIFIED TRUE COPY — COPY 2';
+            : 'CERTIFIED TRUE COPY';
+          const companyText = (options?.companyName || 'QUANTUM CLOUD CORPORATION').toUpperCase().slice(0, 42);
+          const refText = `REF: ${refNo} • BAC COMPLIANT`;
 
-          const wmSize = width > 700 ? 36 : 28;
-          const wmW = helveticaBold.widthOfTextAtSize(watermarkText, wmSize);
+          const wmAngleDeg = 30;
+          const theta = (wmAngleDeg * Math.PI) / 180;
+          const cosT = Math.cos(theta);
+          const sinT = Math.sin(theta);
 
-          page.drawText(watermarkText, {
-            x: (width - wmW * 0.7) / 2,
-            y: height / 2 - 30,
-            size: wmSize,
-            font: helveticaBold,
-            color: rgb(0.72, 0.77, 0.85),
-            rotate: degrees(36),
-            opacity: 0.28
-          });
+          const cx = width / 2;
+          const cy = height / 2;
+
+          const wmColor = rgb(0.70, 0.74, 0.83);
+          const wmOpacity = 0.22;
+
+          const lines = [
+            { text: statusText, font: helveticaBold, size: width > 700 ? 22 : 18, offset: 16 },
+            { text: companyText, font: helveticaBold, size: width > 700 ? 12.5 : 10.5, offset: -2 },
+            { text: refText, font: helveticaFont, size: width > 700 ? 10 : 8.5, offset: -18 }
+          ];
+
+          for (const l of lines) {
+            const lineW = l.font.widthOfTextAtSize(l.text, l.size);
+            const lx = cx - (lineW / 2) * cosT - l.offset * sinT;
+            const ly = cy - (lineW / 2) * sinT + l.offset * cosT;
+
+            page.drawText(l.text, {
+              x: lx,
+              y: ly,
+              size: l.size,
+              font: l.font,
+              color: wmColor,
+              rotate: degrees(wmAngleDeg),
+              opacity: wmOpacity
+            });
+          }
         }
 
         // 2. OFFICIAL GOVERNMENT RUBBER STAMP (FOR ORIGINAL, COPY_1, AND COPY_2)
         // Perfectly rectangular, straight (0 deg rotation), crisp aligned text with solid backing box to prevent illegible overlap
-        if (effectiveFolderCopy && rotationAngle === 0) {
+        // Strictly NEVER stamped over untouched PhilGEPS uploads to preserve government verification QR code
+        if (effectiveFolderCopy && rotationAngle === 0 && !isUntouchedPhilgeps) {
           const isOrig = effectiveFolderCopy === 'ORIGINAL';
           const isCopy1 = effectiveFolderCopy === 'COPY_1';
           const stampW = 205;
           const stampH = 54;
-          const stampX = width - stampW - 18;
-          const stampY = height - stampH - 16;
+          // Positioned directly at the top of the "Page X of Y" pagination pill
+          const stampX = (width - stampW) / 2;
+          const stampY = 24;
 
-          const stampBlue = rgb(0.08, 0.22, 0.55);
+          const stampChosenColor = getStampColorRgb(options?.stampColor);
           const headerText = isOrig ? '* OFFICIAL ORIGINAL BID DOCUMENT *' : '* CERTIFIED TRUE COPY *';
           const subText = isOrig
             ? 'OFFICIAL SUBMISSION COPY'
@@ -612,14 +745,13 @@ export async function buildMergedThreeLayerPdfBytes(
             ? 'COPY 1 (FIRST CERTIFIED TRUE COPY)'
             : 'COPY 2 (SECOND CERTIFIED TRUE COPY)';
 
-          // Solid white backing card to prevent overlapping with any document headers/borders
+          // Transparent rubber stamp border (NO solid white backing to keep underlying text fully readable)
           page.drawRectangle({
             x: stampX,
             y: stampY,
             width: stampW,
             height: stampH,
-            color: rgb(1, 1, 1),
-            borderColor: stampBlue,
+            borderColor: stampChosenColor,
             borderWidth: 1.4
           });
 
@@ -629,7 +761,7 @@ export async function buildMergedThreeLayerPdfBytes(
             y: stampY + 2.5,
             width: stampW - 5,
             height: stampH - 5,
-            borderColor: stampBlue,
+            borderColor: stampChosenColor,
             borderWidth: 0.6
           });
 
@@ -640,7 +772,7 @@ export async function buildMergedThreeLayerPdfBytes(
             y: stampY + stampH - 12.5,
             size: 7.5,
             font: helveticaBold,
-            color: stampBlue
+            color: stampChosenColor
           });
 
           // Line 2: Copy Designation (Centered)
@@ -650,7 +782,7 @@ export async function buildMergedThreeLayerPdfBytes(
             y: stampY + stampH - 21.5,
             size: 6.2,
             font: helveticaBold,
-            color: stampBlue
+            color: stampChosenColor
           });
 
           // Line 3: Date of Submission (Left padded)
@@ -659,7 +791,7 @@ export async function buildMergedThreeLayerPdfBytes(
             y: stampY + stampH - 31,
             size: 5.8,
             font: helveticaFont,
-            color: stampBlue
+            color: stampChosenColor
           });
 
           // Line 4: Authorized Signatory (Left padded)
@@ -668,7 +800,7 @@ export async function buildMergedThreeLayerPdfBytes(
             y: stampY + stampH - 39.5,
             size: 5.8,
             font: helveticaFont,
-            color: stampBlue
+            color: stampChosenColor
           });
 
           // Line 5: Project Reference & BAC Compliance (Left padded)
@@ -677,97 +809,95 @@ export async function buildMergedThreeLayerPdfBytes(
             y: stampY + stampH - 48,
             size: 5.5,
             font: helveticaBold,
-            color: stampBlue
+            color: stampChosenColor
           });
         }
 
-        // 3. PAGE X OF Y PAGINATION (AT BOTTOM CENTER WITH CLEAN WHITE BACKING PILL)
-        // White backing pill guarantees pagination never collides or double-exposes on top of footer text
-        const pageText = `Page ${pageIdx + 1} of ${totalPageCount}`;
-        const fontSize = 7.5;
-        const textWidth = helveticaFont.widthOfTextAtSize(pageText, fontSize);
-        const pillW = textWidth + 18;
-        const pillH = 14;
+        // 3. PAGE X OF Y PAGINATION (AT BOTTOM CENTER WITH TRANSPARENT PILL)
+        // Strictly transparent so underlying text is never obscured
+        if (!isUntouchedPhilgeps) {
+          const pageText = `Page ${pageIdx + 1} of ${totalPageCount}`;
+          const fontSize = 7.5;
+          const textWidth = helveticaFont.widthOfTextAtSize(pageText, fontSize);
+          const pillW = textWidth + 18;
+          const pillH = 14;
 
-        if (rotationAngle === 0) {
-          const pillX = (width - pillW) / 2;
-          const pillY = 7;
-          page.drawRectangle({
-            x: pillX,
-            y: pillY,
-            width: pillW,
-            height: pillH,
-            color: rgb(1, 1, 1),
-            borderColor: rgb(0.8, 0.82, 0.88),
-            borderWidth: 0.6
-          });
-          page.drawText(pageText, {
-            x: (width - textWidth) / 2,
-            y: pillY + 3.5,
-            size: fontSize,
-            font: helveticaBold,
-            color: rgb(0.12, 0.16, 0.25)
-          });
-        } else if (rotationAngle === 90) {
-          const pillX = 7;
-          const pillY = (height - pillW) / 2;
-          page.drawRectangle({
-            x: pillX,
-            y: pillY,
-            width: pillH,
-            height: pillW,
-            color: rgb(1, 1, 1),
-            borderColor: rgb(0.8, 0.82, 0.88),
-            borderWidth: 0.6
-          });
-          page.drawText(pageText, {
-            x: pillX + 3.5,
-            y: (height - textWidth) / 2,
-            size: fontSize,
-            font: helveticaBold,
-            color: rgb(0.12, 0.16, 0.25),
-            rotate: degrees(90)
-          });
-        } else if (rotationAngle === 180) {
-          const pillX = (width - pillW) / 2;
-          const pillY = height - 21;
-          page.drawRectangle({
-            x: pillX,
-            y: pillY,
-            width: pillW,
-            height: pillH,
-            color: rgb(1, 1, 1),
-            borderColor: rgb(0.8, 0.82, 0.88),
-            borderWidth: 0.6
-          });
-          page.drawText(pageText, {
-            x: (width + textWidth) / 2,
-            y: pillY + 10.5,
-            size: fontSize,
-            font: helveticaBold,
-            color: rgb(0.12, 0.16, 0.25),
-            rotate: degrees(180)
-          });
-        } else if (rotationAngle === 270) {
-          const pillX = width - 21;
-          const pillY = (height - pillW) / 2;
-          page.drawRectangle({
-            x: pillX,
-            y: pillY,
-            width: pillH,
-            height: pillW,
-            color: rgb(1, 1, 1),
-            borderColor: rgb(0.8, 0.82, 0.88),
-            borderWidth: 0.6
-          });
-          page.drawText(pageText, {
-            x: pillX + 10.5,
-            y: (height + textWidth) / 2,
-            size: fontSize,
-            font: helveticaBold,
-            color: rgb(0.12, 0.16, 0.25),
-            rotate: degrees(270)
-          });
+          if (rotationAngle === 0) {
+            const pillX = (width - pillW) / 2;
+            const pillY = 7;
+            page.drawRectangle({
+              x: pillX,
+              y: pillY,
+              width: pillW,
+              height: pillH,
+              borderColor: rgb(0.8, 0.82, 0.88),
+              borderWidth: 0.6
+            });
+            page.drawText(pageText, {
+              x: (width - textWidth) / 2,
+              y: pillY + 3.5,
+              size: fontSize,
+              font: helveticaBold,
+              color: rgb(0.12, 0.16, 0.25)
+            });
+          } else if (rotationAngle === 90) {
+            const pillX = 7;
+            const pillY = (height - pillW) / 2;
+            page.drawRectangle({
+              x: pillX,
+              y: pillY,
+              width: pillH,
+              height: pillW,
+              borderColor: rgb(0.8, 0.82, 0.88),
+              borderWidth: 0.6
+            });
+            page.drawText(pageText, {
+              x: pillX + 3.5,
+              y: (height - textWidth) / 2,
+              size: fontSize,
+              font: helveticaBold,
+              color: rgb(0.12, 0.16, 0.25),
+              rotate: degrees(90)
+            });
+          } else if (rotationAngle === 180) {
+            const pillX = (width - pillW) / 2;
+            const pillY = height - 21;
+            page.drawRectangle({
+              x: pillX,
+              y: pillY,
+              width: pillW,
+              height: pillH,
+              borderColor: rgb(0.8, 0.82, 0.88),
+              borderWidth: 0.6
+            });
+            page.drawText(pageText, {
+              x: (width + textWidth) / 2,
+              y: pillY + 10.5,
+              size: fontSize,
+              font: helveticaBold,
+              color: rgb(0.12, 0.16, 0.25),
+              rotate: degrees(180)
+            });
+          } else if (rotationAngle === 270) {
+            const pillX = width - 21;
+            const pillY = (height - pillW) / 2;
+            page.drawRectangle({
+              x: pillX,
+              y: pillY,
+              width: pillH,
+              height: pillW,
+              borderColor: rgb(0.8, 0.82, 0.88),
+              borderWidth: 0.6
+            });
+            page.drawText(pageText, {
+              x: pillX + 10.5,
+              y: (height + textWidth) / 2,
+              size: fontSize,
+              font: helveticaBold,
+              color: rgb(0.12, 0.16, 0.25),
+              rotate: degrees(270)
+            });
+          }
         }
       }
     } catch (pageNumberErr) {

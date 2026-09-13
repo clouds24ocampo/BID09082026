@@ -205,8 +205,10 @@ export const BidPackageBuilderView: React.FC = () => {
       { id: 'PCAB_LICENSE', name: 'PCAB License and Special License (for Infrastructure)', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'PCAB_LICENSE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
       // 15. SEC / DTI Certificate of Business Registration
       { id: 'SEC_DTI_REG', name: 'SEC / DTI Certificate of Business Registration', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'SEC_DTI_REG', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
-      // 16. BIR Registration and Tax Clearance Certificate
-      { id: 'TAX_CLEARANCE', name: 'BIR Tax Clearance Certificate & BIR Registration', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'TAX_CLEARANCE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+      // 16. BIR Certificate of Registration (BIR Form 2303)
+      { id: 'BIR_REGISTRATION', name: 'BIR Certificate of Registration (BIR Form 2303)', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'BIR_REGISTRATION', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
+      // 17. BIR Tax Clearance Certificate for Bidding
+      { id: 'TAX_CLEARANCE', name: 'BIR Tax Clearance Certificate for Bidding (EO 398)', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'TAX_CLEARANCE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
       // 17. Secretary's Certificate / Board Resolution / SPA
       { id: 'SECRETARY_CERTIFICATE', name: "Secretary's Certificate / Board Resolution / Special Power of Attorney (SPA)", category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'SECRETARY_CERTIFICATE', vaultMatchCategory: 'ELIGIBILITY_CLASS_A' },
       { id: 'JOINT_VENTURE_AGREEMENT', name: 'Joint Venture Agreement (JVA) / Class B Legal Documents', category: 'LEGAL', envelope: 'ENVELOPE_1', code: 'JOINT_VENTURE_AGREEMENT', vaultMatchCategory: 'ELIGIBILITY_CLASS_B' },
@@ -522,6 +524,7 @@ export const BidPackageBuilderView: React.FC = () => {
         'PHILGEPS_PLATINUM',
         'SEC_DTI_REG',
         'MAYORS_PERMIT',
+        'BIR_REGISTRATION',
         'TAX_CLEARANCE',
         'AUDITED_FS',
         'PCAB_LICENSE',
@@ -542,19 +545,22 @@ export const BidPackageBuilderView: React.FC = () => {
             return vCode === 'DOC-1' || vCode.includes('PHILGEPS') || vName.includes('philgeps');
           }
           if (doc.id === 'SEC_DTI_REG') {
-            return vCode === 'DOC-2' || vCode.includes('SEC') || vCode.includes('DTI') || vName.includes('sec') || vName.includes('dti') || vName.includes('cda');
+            return (vCode === 'DOC-2' || vCode.includes('DTI') || vName.includes('dti') || vName.includes('incorporation') || vName.includes('securities and exchange') || (vName.includes('sec') && !vName.includes('secretary') && !vName.includes('section'))) && vCode !== 'DOC-13' && !vName.includes('secretary') && !vName.includes('section');
           }
           if (doc.id === 'MAYORS_PERMIT') {
             return vCode === 'DOC-3' || vCode.includes('MAYOR') || vName.includes('mayor') || vName.includes('business permit');
           }
+          if (doc.id === 'BIR_REGISTRATION') {
+            return vCode === 'DOC-6' || vCode.includes('2303') || vCode.includes('BIR_REG') || vName.includes('2303') || (vName.includes('bir') && (vName.includes('registration') || vName.includes('cor') || vName.includes('certificate of registration')));
+          }
           if (doc.id === 'TAX_CLEARANCE') {
-            return vCode === 'DOC-4' || vCode.includes('TAX') || vName.includes('tax clearance') || vName.includes('bir');
+            return (vCode === 'DOC-7' || vCode.includes('TAX') || vName.includes('tax clearance')) && vCode !== 'DOC-4' && vCode !== 'DOC-6' && !vName.includes('2303');
           }
           if (doc.id === 'AUDITED_FS') {
-            return vCode === 'DOC-5' || vCode.includes('AFS') || vCode.includes('AUDITED') || vName.includes('audited') || vName.includes('financial statement') || vName.includes('afs');
+            return vCode === 'DOC-15' || vCode === 'DOC-5' || vCode.includes('AFS') || vCode.includes('AUDITED') || vName.includes('audited') || vName.includes('financial statement') || vName.includes('afs');
           }
           if (doc.id === 'PCAB_LICENSE') {
-            return vCode === 'DOC-6' || vCode.includes('PCAB') || vName.includes('pcab') || vName.includes('contractor license');
+            return (vCode === 'DOC-8' || vCode.includes('PCAB') || vName.includes('pcab') || vName.includes('contractor license')) && vCode !== 'DOC-6' && !vName.includes('2303') && !vName.includes('bir');
           }
           if (doc.id === 'SECRETARY_CERTIFICATE') {
             return vCode === 'DOC-13' || vCode.includes('SEC_CERT') || vCode.includes('BOARD_RES') || vCode.includes('SPA') || vName.includes('secretary') || vName.includes('board resolution') || vName.includes('power of attorney') || vName.includes('spa');
@@ -693,9 +699,10 @@ export const BidPackageBuilderView: React.FC = () => {
         'MAYORS_PERMIT': 15,
         'PCAB_LICENSE': 16,
         'SEC_DTI_REG': 17,
-        'TAX_CLEARANCE': 18,
-        'SECRETARY_CERTIFICATE': 19,
-        'JOINT_VENTURE_AGREEMENT': 20,
+        'BIR_REGISTRATION': 18,
+        'TAX_CLEARANCE': 19,
+        'SECRETARY_CERTIFICATE': 20,
+        'JOINT_VENTURE_AGREEMENT': 21,
         // Envelope 2: 1. Bid Form, 2. BOQ, 3. Form L, 4. Price Schedule, 5. Bid Summary, 6. Cash Flow
         'FINANCIAL_BID_FORM_GOODS': 21,
         'FINANCIAL_BID_FORM_INFRA': 21,
@@ -774,77 +781,6 @@ export const BidPackageBuilderView: React.FC = () => {
     return 50;
   };
 
-  // Master Helper: Guarantee BSD and OSS Cover Pages are ALWAYS active in Envelope 1
-  const ensureMandatoryStatutoryDocs = (items: PackageItem[], currentRef: string): PackageItem[] => {
-    const originalItems = items.filter(item => item.folderCopy === 'ORIGINAL');
-    let updatedOriginal = [...originalItems];
-
-    const hasBsd = updatedOriginal.some(
-      item => item.envelope === 'ENVELOPE_1' && (
-        item.code === 'BID_SECURING_DECLARATION' ||
-        item.id === 'BID_SECURING_DECLARATION' ||
-        item.id.includes('bsd') ||
-        item.documentName.toLowerCase().includes('bid securing declaration') ||
-        item.documentName.toLowerCase().includes('surety bond') ||
-        item.documentName.toLowerCase().includes('bsd')
-      )
-    );
-
-    if (!hasBsd) {
-      const bsdDef = statutoryDocsList.find(d => d.id === 'BID_SECURING_DECLARATION');
-      const bsdReadiness = checkDocReadiness(bsdDef || { id: 'BID_SECURING_DECLARATION', name: '', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'BID_SECURING_DECLARATION' });
-      updatedOriginal.push({
-        id: 'pkg-bsd-statutory',
-        documentName: bsdDef?.name || 'Bid Securing Declaration / Bid Security or Surety Bond (BSD)',
-        documentNumber: currentRef,
-        category: 'TECHNICAL',
-        envelope: 'ENVELOPE_1',
-        folderCopy: 'ORIGINAL',
-        code: 'BID_SECURING_DECLARATION',
-        vaultDocId: bsdReadiness.vaultId,
-        fileSizeBytes: 1048576,
-        dateAdded: new Date().toISOString(),
-        isAutoDetected: true
-      });
-    }
-
-    const hasOss = updatedOriginal.some(
-      item => item.envelope === 'ENVELOPE_1' && (
-        item.code === 'OMNIBUS_SWORN_STATEMENT' ||
-        item.id === 'OMNIBUS_SWORN_STATEMENT' ||
-        item.id.includes('oss') ||
-        item.documentName.toLowerCase().includes('omnibus sworn statement') ||
-        item.documentName.toLowerCase().includes('oss')
-      )
-    );
-
-    if (!hasOss) {
-      const ossDef = statutoryDocsList.find(d => d.id === 'OMNIBUS_SWORN_STATEMENT');
-      const ossReadiness = checkDocReadiness(ossDef || { id: 'OMNIBUS_SWORN_STATEMENT', name: '', category: 'TECHNICAL', envelope: 'ENVELOPE_1', code: 'OMNIBUS_SWORN_STATEMENT' });
-      updatedOriginal.push({
-        id: 'pkg-oss-statutory',
-        documentName: ossDef?.name || 'Omnibus Sworn Statement (OSS)',
-        documentNumber: currentRef,
-        category: 'TECHNICAL',
-        envelope: 'ENVELOPE_1',
-        folderCopy: 'ORIGINAL',
-        code: 'OMNIBUS_SWORN_STATEMENT',
-        vaultDocId: ossReadiness.vaultId,
-        fileSizeBytes: 1048576,
-        dateAdded: new Date().toISOString(),
-        isAutoDetected: true
-      });
-    }
-
-    // Sort active envelope items in statutory rank order
-    const env1Sorted = updatedOriginal
-      .filter(i => i.envelope === 'ENVELOPE_1')
-      .sort((a, b) => getDocumentChecklistRank(a) - getDocumentChecklistRank(b));
-    const otherEnvs = updatedOriginal.filter(i => i.envelope !== 'ENVELOPE_1');
-
-    return [...otherEnvs, ...env1Sorted];
-  };
-
   // Master Helper: Guarantee COPY 1 and COPY 2 are 100% IDENTICAL to ORIGINAL in content, envelope, and sequence
   const syncOriginalToCopies = (items: PackageItem[]): PackageItem[] => {
     const originalItems = items.filter(item => item.folderCopy === 'ORIGINAL');
@@ -866,8 +802,7 @@ export const BidPackageBuilderView: React.FC = () => {
 
   // Persist package items per project with automatic 100% synchronization to COPY 1 and COPY 2
   const savePackageItems = (newItems: PackageItem[]) => {
-    const withMandatory = ensureMandatoryStatutoryDocs(newItems, projectRefNo);
-    const fullySynced = syncOriginalToCopies(withMandatory);
+    const fullySynced = syncOriginalToCopies(newItems);
     setPackageItems(fullySynced);
     if (tenantId && projectScopeKey) {
       const storageKey = `bidocs_package_items_${tenantId}_${projectScopeKey}`;
@@ -914,8 +849,7 @@ export const BidPackageBuilderView: React.FC = () => {
       return item;
     });
 
-    const withMandatory = ensureMandatoryStatutoryDocs(sanitizedItems, projectRefNo);
-    const fullySynced = syncOriginalToCopies(withMandatory);
+    const fullySynced = syncOriginalToCopies(sanitizedItems);
     setPackageItems(fullySynced);
     localStorage.setItem(storageKey, JSON.stringify(fullySynced));
   }, [tenantId, projectScopeKey, projectRefNo]);
@@ -1066,10 +1000,22 @@ export const BidPackageBuilderView: React.FC = () => {
       return;
     }
 
+    const cleanTargetId = target.id.replace(/^pkg-c[12]-/, '');
+    const targetName = (target.documentName || '').trim().toLowerCase();
+    const targetCode = ((target.code || target.id || '') as string).toUpperCase();
+
     const originalItems = packageItems.filter(item => item.folderCopy === 'ORIGINAL');
-    const updatedOriginal = originalItems.filter(
-      item => !(item.id === id || (item.documentName === target.documentName && item.envelope === target.envelope))
-    );
+    const updatedOriginal = originalItems.filter(item => {
+      const cleanItemId = item.id.replace(/^pkg-c[12]-/, '');
+      const itemName = (item.documentName || '').trim().toLowerCase();
+      const itemCode = ((item.code || item.id || '') as string).toUpperCase();
+
+      if (cleanItemId === cleanTargetId || item.id === id) return false;
+      if (item.envelope === target.envelope && itemName === targetName) return false;
+      if (item.envelope === target.envelope && targetCode && itemCode === targetCode) return false;
+
+      return true;
+    });
     savePackageItems(updatedOriginal);
   };
 
@@ -1354,11 +1300,12 @@ export const BidPackageBuilderView: React.FC = () => {
         ((v as any).code && doc.code && (v as any).code.toLowerCase() === doc.code.toLowerCase()) ||
         (v.documentName && doc.documentName && v.documentName.trim().toLowerCase() === doc.documentName.trim().toLowerCase()) ||
         (dName.includes('philgeps') && (v.documentCode === 'DOC-1' || (v.documentName || '').toLowerCase().includes('philgeps'))) ||
-        (((dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) && (v.documentCode === 'DOC-2' || ((v.documentName || '').toLowerCase().includes('incorporation') || (v.documentName || '').toLowerCase().includes('business registration') || (v.documentName || '').toLowerCase().includes('dti') || (v.documentName || '').toLowerCase().includes('sec')) && !(v.documentName || '').toLowerCase().includes('philgeps') && !(v.documentName || '').toLowerCase().includes('bir'))) ||
+        (((dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) && (v.documentCode === 'DOC-2' || ((v.documentName || '').toLowerCase().includes('incorporation') || (v.documentName || '').toLowerCase().includes('securities and exchange') || (v.documentName || '').toLowerCase().includes('dti') || ((v.documentName || '').toLowerCase().includes('sec') && !(v.documentName || '').toLowerCase().includes('secretary') && !(v.documentName || '').toLowerCase().includes('section'))) && !(v.documentName || '').toLowerCase().includes('philgeps') && !(v.documentName || '').toLowerCase().includes('bir') && !(v.documentName || '').toLowerCase().includes('secretary') && v.documentCode !== 'DOC-13')) ||
         ((dName.includes('mayor') || (dName.includes('business permit') && !dName.includes('barangay'))) && (v.documentCode === 'DOC-3' || (v.documentName || '').toLowerCase().includes('permit'))) ||
-        (dName.includes('tax') && (v.documentCode === 'DOC-4' || v.documentCode === 'DOC-7' || (v.documentName || '').toLowerCase().includes('clearance'))) ||
+        (((dName.includes('bir') || dName.includes('2303')) && (dName.includes('registration') || dName.includes('certificate') || dName.includes('cor') || dName.includes('2303')) && !dName.includes('clearance')) && (v.documentCode === 'DOC-6' || (v.documentName || '').toLowerCase().includes('2303') || ((v.documentName || '').toLowerCase().includes('bir') && (v.documentName || '').toLowerCase().includes('registration')))) ||
+        (dName.includes('tax') && (v.documentCode === 'DOC-7' || (v.documentName || '').toLowerCase().includes('clearance')) && v.documentCode !== 'DOC-6' && !(v.documentName || '').toLowerCase().includes('2303')) ||
         (dName.includes('audited') && (v.documentCode === 'DOC-5' || v.documentCode === 'DOC-15' || (v.documentName || '').toLowerCase().includes('audited'))) ||
-        (dName.includes('pcab') && (v.documentCode === 'DOC-6' || v.documentCode === 'DOC-8' || (v.documentName || '').toLowerCase().includes('pcab'))) ||
+        (dName.includes('pcab') && (v.documentCode === 'DOC-8' || (v.documentName || '').toLowerCase().includes('pcab')) && v.documentCode !== 'DOC-6' && !(v.documentName || '').toLowerCase().includes('bir') && !(v.documentName || '').toLowerCase().includes('2303')) ||
         ((dName.includes('secretary') || dName.includes('board res') || dName.includes('spa')) && !dName.includes('section') && (v.documentCode === 'DOC-13' || (v.documentName || '').toLowerCase().includes('secretary') || (v.documentName || '').toLowerCase().includes('spa'))) ||
         (dName.includes('joint') && (v.documentCode === 'DOC-14' || (v.documentName || '').toLowerCase().includes('joint') || (v.documentName || '').toLowerCase().includes('jva')))
       );
@@ -1462,7 +1409,9 @@ export const BidPackageBuilderView: React.FC = () => {
           title: doc.documentName,
           coverElement: coverElem || null,
           fileDataUrl: fileDataUrl || null,
-          documentName: doc.documentName
+          documentName: doc.documentName,
+          documentCode: doc.code || (doc as any).documentCode,
+          fileName: doc.fileName
         });
       }
 
@@ -2090,12 +2039,6 @@ export const BidPackageBuilderView: React.FC = () => {
                               Verified Project Document
                             </span>
                           )}
-                          {(doc.code === 'BID_SECURING_DECLARATION' || doc.code === 'OMNIBUS_SWORN_STATEMENT' || doc.id.includes('bsd') || doc.id.includes('oss') || doc.documentName.toLowerCase().includes('bid securing') || doc.documentName.toLowerCase().includes('surety bond') || doc.documentName.toLowerCase().includes('omnibus')) && (
-                            <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-[10px] font-bold flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-amber-400" />
-                              <span>Cover Page Always Active • Attach Notarized Original</span>
-                            </span>
-                          )}
                         </div>
 
                         <h4 className="text-xs sm:text-sm font-bold text-white truncate">
@@ -2197,11 +2140,11 @@ export const BidPackageBuilderView: React.FC = () => {
                               const vName = (v.documentName || '').toLowerCase();
                               const vCode = (v.documentCode || '').toUpperCase();
                               if (dName.includes('philgeps') && (vCode === 'DOC-1' || vName.includes('philgeps'))) return true;
-                              if (((dName.includes('sec ') || dName.includes('securities') || dName.includes('dti')) && !dName.includes('section') && !dName.includes('secretary')) && (vCode === 'DOC-2' || vName.includes('registration'))) return true;
-                              if ((dName.includes('mayor') || (dName.includes('business permit') && !dName.includes('barangay'))) && (vCode === 'DOC-3' || vCode === 'DOC-4' || vName.includes('permit'))) return true;
-                              if (dName.includes('tax') && (vCode === 'DOC-7' || vCode === 'DOC-6' || vName.includes('tax') || vName.includes('clearance'))) return true;
-                              if ((dName.includes('financial') || dName.includes('afs') || dName.includes('audited')) && (vCode === 'DOC-15' || vName.includes('afs') || vName.includes('financial') || vName.includes('audited'))) return true;
-                              if (dName.includes('pcab') && (vCode === 'DOC-8' || vName.includes('pcab'))) return true;
+                              if (((dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) && (vCode === 'DOC-2' || ((vName.includes('incorporation') || vName.includes('securities and exchange') || vName.includes('dti') || (vName.includes('sec') && !vName.includes('secretary') && !vName.includes('section'))) && !vName.includes('philgeps') && !vName.includes('bir') && !vName.includes('secretary') && vCode !== 'DOC-13' && vCode !== 'DOC-6'))) return true;
+                              if (((dName.includes('bir') || dName.includes('2303')) && (dName.includes('registration') || dName.includes('certificate') || dName.includes('cor') || dName.includes('2303')) && !dName.includes('clearance')) && (vCode === 'DOC-6' || vName.includes('2303') || (vName.includes('bir') && vName.includes('registration')))) return true;
+                              if (dName.includes('tax') && (vCode === 'DOC-7' || vName.includes('tax clearance')) && vCode !== 'DOC-4' && vCode !== 'DOC-6' && !vName.includes('2303')) return true;
+                              if ((dName.includes('financial') || dName.includes('afs') || dName.includes('audited')) && (vCode === 'DOC-15' || vCode === 'DOC-5' || vName.includes('afs') || vName.includes('financial') || vName.includes('audited'))) return true;
+                              if (dName.includes('pcab') && (vCode === 'DOC-8' || (vName.includes('pcab') && !vName.includes('bir') && !vName.includes('2303'))) && vCode !== 'DOC-6') return true;
                               if (dName.includes('secretary') && !dName.includes('section') && (vCode === 'DOC-13' || vName.includes('secretary') || vName.includes('board') || vName.includes('attorney'))) return true;
                               if ((dName.includes('joint venture') || dName.includes('jva')) && (vCode === 'DOC-14' || vName.includes('joint') || vName.includes('jva'))) return true;
                               return false;
@@ -2751,88 +2694,98 @@ export const BidPackageBuilderView: React.FC = () => {
                       </p>
                     </div>
 
-                    {/* MIDDLE SECTION: 2-Column Grid */}
-                    <div className="grid grid-cols-12 gap-4 my-2 relative z-10">
-                      
-                      {/* Left Column (5 cols): Addressee & Outer Enclosures */}
-                      <div className="col-span-5 space-y-3">
-                        <div className="p-3 border-2 border-black bg-slate-50 rounded-xl space-y-1 text-left">
-                          <p className="text-[10px] uppercase font-mono font-black tracking-widest text-slate-600">SUBMITTED TO:</p>
-                          <h2 className="text-lg font-black uppercase text-blue-950 leading-tight">
-                            THE BIDS AND AWARDS COMMITTEE (BAC)
-                          </h2>
-                          <h3 className="text-sm font-black text-slate-900 uppercase">
-                            {procuringEntity}
-                          </h3>
-                        </div>
+                    {/* SECTION 1: SUBMITTED TO (Stretched Full Width) */}
+                    <div className="p-3 border-2 border-black bg-slate-50 rounded-xl space-y-1 text-left shadow-sm relative z-10 my-2">
+                      <p className="text-[10px] uppercase font-mono font-black tracking-widest text-slate-600">SUBMITTED TO:</p>
+                      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                        <h2 className="text-lg font-black uppercase text-blue-950 leading-tight">
+                          THE BIDS AND AWARDS COMMITTEE (BAC)
+                        </h2>
+                        <h3 className="text-sm font-black text-slate-900 uppercase">
+                          {procuringEntity}
+                        </h3>
+                      </div>
+                    </div>
 
-                        <div className="p-3 border-2 border-slate-900 bg-slate-100 rounded-xl text-left space-y-1 font-sans text-xs">
-                          <p className="font-black text-black uppercase border-b border-slate-400 pb-1 text-[11px]">
+                    {/* SECTION 2: PROJECT TITLE (Directly below SUBMITTED TO, Full Width) */}
+                    <div className="border-2 border-black p-3 bg-slate-50 rounded-xl space-y-1.5 text-left shadow-sm relative z-10 mb-2.5">
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">PROJECT TITLE:</span>
+                        <p className="text-sm font-black text-black uppercase leading-tight">
+                          {projectTitle || 'INFRASTRUCTURE & IT MODERNIZATION PROJECT'}
+                        </p>
+                      </div>
+
+                      <div className="pt-1.5 border-t border-slate-300 grid grid-cols-3 gap-2 text-xs font-mono">
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block uppercase font-bold">PhilGEPS Ref No.</span>
+                          <strong className="text-blue-950 font-black truncate block">{projectRefNo || 'PhilGEPS-2026-001'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Solicitation No.</span>
+                          <strong className="text-blue-950 font-black truncate block">{activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Approved Budget (ABC)</span>
+                          <strong className="text-emerald-800 font-black block">{activeProject?.abc || '₱12,500,000.00'}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 3: 2-COLUMN GRID (Enclosures & Expanded Warning Box) */}
+                    <div className="grid grid-cols-12 gap-4 relative z-10 items-stretch mb-2.5">
+                      
+                      {/* Left Column (5 cols): Outer Enclosures */}
+                      <div className="col-span-5">
+                        <div className="p-2.5 sm:p-3 border-2 border-slate-900 bg-slate-100 rounded-xl text-left space-y-1.5 font-sans text-xs shadow-sm h-full flex flex-col justify-center">
+                          <p className="font-black text-black uppercase border-b border-slate-400 pb-1 text-[10.5px]">
                             📦 ENCLOSED ENVELOPES IN THIS MOTHER BOX:
                           </p>
-                          <div className="space-y-1.5 pt-1 text-[11px]">
+                          <div className="space-y-1.5 pt-0.5 text-[11px]">
                             <div className="p-1.5 rounded bg-blue-50 border border-blue-200">
-                              <strong className="text-blue-950 font-bold block">1. ENVELOPE 1: LEGAL & TECHNICAL DOCUMENTS</strong>
+                              <strong className="text-blue-950 font-bold block text-xs">1. ENVELOPE 1: LEGAL & TECHNICAL DOCUMENTS</strong>
                               <span className="text-slate-700 text-[10px] block">Includes: Original, Copy 1 (Duplicate), Copy 2 (Triplicate)</span>
                             </div>
                             <div className="p-1.5 rounded bg-emerald-50 border border-emerald-200">
-                              <strong className="text-emerald-950 font-bold block">2. ENVELOPE 2: FINANCIAL BID PROPOSAL</strong>
+                              <strong className="text-emerald-950 font-bold block text-xs">2. ENVELOPE 2: FINANCIAL BID PROPOSAL</strong>
                               <span className="text-slate-700 text-[10px] block">Includes: Original, Copy 1 (Duplicate), Copy 2 (Triplicate)</span>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Right Column (7 cols): Full Project Details, Mother Banner, and Warning */}
-                      <div className="col-span-7 space-y-2.5 text-left">
-                        
-                        {/* Project Details Box */}
-                        <div className="border-2 border-black p-3.5 bg-slate-50 rounded-xl space-y-2">
-                          <div>
-                            <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">Project Title / Description:</span>
-                            <p className="text-sm font-black text-black uppercase leading-tight">
-                              {projectTitle || 'INFRASTRUCTURE & IT MODERNIZATION PROJECT'}
-                            </p>
-                          </div>
-
-                          <div className="pt-2 border-t border-slate-300 grid grid-cols-3 gap-2 text-xs font-mono">
-                            <div>
-                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">PhilGEPS Ref No.</span>
-                              <strong className="text-blue-950 font-black truncate block">{projectRefNo || 'PhilGEPS-2026-001'}</strong>
-                            </div>
-                            <div>
-                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Solicitation No.</span>
-                              <strong className="text-blue-950 font-black truncate block">{activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'}</strong>
-                            </div>
-                            <div>
-                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Approved Budget (ABC)</span>
-                              <strong className="text-emerald-800 font-black block">{activeProject?.abc || '₱12,500,000.00'}</strong>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Large Mother Envelope Identifier */}
-                        <div className="p-3 border-4 border-black bg-black text-white text-center rounded-xl space-y-0.5 shadow-md">
-                          <div className="font-mono font-black text-base uppercase tracking-wider text-amber-300">
-                            MOTHER ENVELOPE: OFFICIAL BID PROPOSAL
-                          </div>
-                          <div className="text-[10px] font-sans font-semibold text-slate-200 uppercase">
-                            MASTER OUTER ENVELOPE / ENCLOSING CONTAINER PURSUANT TO RA 12009 / RA 9184
-                          </div>
-                        </div>
-
-                        {/* Prominent Red Warning Box */}
-                        <div className="p-2.5 border-2 border-red-600 bg-red-50 text-center rounded-xl space-y-0.5">
-                          <h4 className="text-xs sm:text-sm font-black text-red-600 uppercase tracking-wide leading-tight">
-                            ⚠️ WARNING: DO NOT OPEN BEFORE SCHEDULED BID OPENING DATE & TIME!
+                      {/* Right Column (7 cols): Expanded Prominent Red Warning Box */}
+                      <div className="col-span-7">
+                        <div className="p-3.5 sm:p-4 border-2 border-red-600 bg-red-50 text-center rounded-xl flex flex-col justify-center items-center h-full space-y-1.5 shadow-sm">
+                          <h4 className="text-xs sm:text-sm font-black text-red-600 uppercase tracking-wide leading-tight flex items-center justify-center gap-1.5">
+                            <span>⚠️</span> WARNING: DO NOT OPEN BEFORE SCHEDULED BID OPENING DATE & TIME!
                           </h4>
-                          <p className="text-[11px] font-black text-red-900 font-mono uppercase">
-                            SCHEDULED BID OPENING: <span className="bg-red-600 text-white px-2 py-0.2 rounded font-black">{submissionDeadline}</span>
+                          <p className="text-[10px] sm:text-[10.5px] font-bold text-red-800 uppercase leading-snug">
+                            Any bid submitted after the deadline shall not be accepted. Bids opened prematurely shall be disqualified pursuant to RA 12009 / RA 9184.
                           </p>
+                          <div className="pt-1 flex flex-wrap items-center justify-center gap-2">
+                            <span className="text-xs sm:text-sm font-black text-red-950 font-mono uppercase tracking-wide">
+                              SCHEDULED BID OPENING:
+                            </span>
+                            <span className="bg-red-600 text-white px-3 py-1 rounded-lg font-black text-sm sm:text-base font-mono tracking-wider shadow-sm">
+                              {submissionDeadline}
+                            </span>
+                          </div>
                         </div>
-
                       </div>
 
+                    </div>
+
+                    {/* SECTION 4: MOTHER ENVELOPE IDENTIFIER BANNER (White Background with Ink Blue Text - Prominent & Big) */}
+                    <div className="my-2.5 relative z-10">
+                      <div className="p-3.5 sm:p-4.5 border-3 sm:border-4 border-blue-950 bg-white text-center rounded-2xl space-y-1 shadow-md">
+                        <div className="font-mono font-black text-xl sm:text-2xl uppercase tracking-widest text-blue-950 leading-tight">
+                          MOTHER ENVELOPE: OFFICIAL BID PROPOSAL
+                        </div>
+                        <div className="text-xs sm:text-sm font-sans font-bold text-blue-950/85 uppercase tracking-wider">
+                          MASTER OUTER ENVELOPE / ENCLOSING CONTAINER PURSUANT TO RA 12009 / RA 9184
+                        </div>
+                      </div>
                     </div>
 
                     {/* BOTTOM FOOTER: Signatory & QR Code */}
@@ -2861,8 +2814,9 @@ export const BidPackageBuilderView: React.FC = () => {
                             companyName: currentTenant?.companyName,
                             solicitationNo: activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'
                           }}
-                          size={65}
-                          className="border-2 border-black p-1 bg-white shrink-0"
+                          size={50}
+                          showCaption={false}
+                          className="shrink-0"
                         />
                       </div>
                     </div>
@@ -2890,22 +2844,51 @@ export const BidPackageBuilderView: React.FC = () => {
                     </div>
 
                     {/* MIDDLE SECTION: 2-Column Grid */}
-                    <div className="grid grid-cols-12 gap-4 my-2 relative z-10">
-                      
-                      {/* Left Column (5 cols): Addressee & Envelope Breakdown */}
-                      <div className="col-span-5 space-y-3">
-                        <div className="p-3 border-2 border-black bg-slate-50 rounded-xl space-y-1 text-left">
-                          <p className="text-[10px] uppercase font-mono font-black tracking-widest text-slate-600">SUBMITTED TO:</p>
-                          <h2 className="text-lg font-black uppercase text-blue-950 leading-tight">
-                            THE BIDS AND AWARDS COMMITTEE (BAC)
-                          </h2>
-                          <h3 className="text-sm font-black text-slate-900 uppercase">
-                            {procuringEntity}
-                          </h3>
-                        </div>
+                    {/* SECTION 1: SUBMITTED TO (Stretched Full Width) */}
+                    <div className="p-3 border-2 border-black bg-slate-50 rounded-xl space-y-1 text-left shadow-sm relative z-10 my-2">
+                      <p className="text-[10px] uppercase font-mono font-black tracking-widest text-slate-600">SUBMITTED TO:</p>
+                      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                        <h2 className="text-lg font-black uppercase text-blue-950 leading-tight">
+                          THE BIDS AND AWARDS COMMITTEE (BAC)
+                        </h2>
+                        <h3 className="text-sm font-black text-slate-900 uppercase">
+                          {procuringEntity}
+                        </h3>
+                      </div>
+                    </div>
 
-                        <div className="p-3 border-2 border-slate-900 bg-slate-100 rounded-xl text-left space-y-1 font-sans text-xs">
-                          <p className="font-black text-black uppercase border-b border-slate-400 pb-1 text-[11px]">
+                    {/* SECTION 2: PROJECT TITLE (Directly below SUBMITTED TO, Full Width) */}
+                    <div className="border-2 border-black p-3 bg-slate-50 rounded-xl space-y-1.5 text-left shadow-sm relative z-10 mb-2.5">
+                      <div>
+                        <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">PROJECT TITLE:</span>
+                        <p className="text-sm font-black text-black uppercase leading-tight">
+                          {projectTitle || 'INFRASTRUCTURE & IT MODERNIZATION PROJECT'}
+                        </p>
+                      </div>
+
+                      <div className="pt-1.5 border-t border-slate-300 grid grid-cols-3 gap-2 text-xs font-mono">
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block uppercase font-bold">PhilGEPS Ref No.</span>
+                          <strong className="text-blue-950 font-black truncate block">{projectRefNo || 'PhilGEPS-2026-001'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Solicitation No.</span>
+                          <strong className="text-blue-950 font-black truncate block">{activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Approved Budget (ABC)</span>
+                          <strong className="text-emerald-800 font-black block">{activeProject?.abc || '₱12,500,000.00'}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 3: 2-COLUMN GRID (Included Folders & Expanded Warning Box) */}
+                    <div className="grid grid-cols-12 gap-4 relative z-10 items-stretch mb-2.5">
+                      
+                      {/* Left Column (5 cols): Included Folders */}
+                      <div className="col-span-5">
+                        <div className="p-2.5 sm:p-3 border-2 border-slate-900 bg-slate-100 rounded-xl text-left space-y-1 font-sans text-xs shadow-sm h-full flex flex-col justify-center">
+                          <p className="font-black text-black uppercase border-b border-slate-400 pb-1 text-[10.5px]">
                             📦 INCLUDED FOLDERS IN THIS ENVELOPE:
                           </p>
                           <ul className="text-[11px] text-slate-800 space-y-0.5 pt-0.5 font-medium">
@@ -2916,58 +2899,40 @@ export const BidPackageBuilderView: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Right Column (7 cols): Full Project Details, Envelope Title, and Warning */}
-                      <div className="col-span-7 space-y-2.5 text-left">
-                        
-                        {/* Project Details Box */}
-                        <div className="border-2 border-black p-3.5 bg-slate-50 rounded-xl space-y-2">
-                          <div>
-                            <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">Project Title / Description:</span>
-                            <p className="text-sm font-black text-black uppercase leading-tight">
-                              {projectTitle || 'INFRASTRUCTURE & IT MODERNIZATION PROJECT'}
-                            </p>
-                          </div>
-
-                          <div className="pt-2 border-t border-slate-300 grid grid-cols-3 gap-2 text-xs font-mono">
-                            <div>
-                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">PhilGEPS Ref No.</span>
-                              <strong className="text-blue-950 font-black truncate block">{projectRefNo || 'PhilGEPS-2026-001'}</strong>
-                            </div>
-                            <div>
-                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Solicitation No.</span>
-                              <strong className="text-blue-950 font-black truncate block">{activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'}</strong>
-                            </div>
-                            <div>
-                              <span className="text-[9.5px] text-slate-500 block uppercase font-bold">Approved Budget (ABC)</span>
-                              <strong className="text-emerald-800 font-black block">{activeProject?.abc || '₱12,500,000.00'}</strong>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Large Envelope Identifier */}
-                        <div className="p-3 border-4 border-black bg-black text-white text-center rounded-xl space-y-0.5 shadow-md">
-                          <div className="font-mono font-black text-base uppercase tracking-wider text-amber-300">
-                            {coverEnvelopeChoice === 'ENVELOPE_1' 
-                              ? 'ENVELOPE NO. 1: TECHNICAL & ELIGIBILITY COMPONENT'
-                              : 'ENVELOPE NO. 2: FINANCIAL BID PROPOSAL COMPONENT'}
-                          </div>
-                          <div className="text-[10px] font-sans font-semibold text-slate-200 uppercase">
-                            Official Sealed Envelope Submission pursuant to RA 12009 / RA 9184
-                          </div>
-                        </div>
-
-                        {/* Prominent Red Warning Box */}
-                        <div className="p-2.5 border-2 border-red-600 bg-red-50 text-center rounded-xl space-y-0.5">
-                          <h4 className="text-xs sm:text-sm font-black text-red-600 uppercase tracking-wide leading-tight">
-                            ⚠️ WARNING: DO NOT OPEN BEFORE SCHEDULED BID OPENING DATE & TIME!
+                      {/* Right Column (7 cols): Expanded Prominent Red Warning Box */}
+                      <div className="col-span-7">
+                        <div className="p-3.5 sm:p-4 border-2 border-red-600 bg-red-50 text-center rounded-xl flex flex-col justify-center items-center h-full space-y-1.5 shadow-sm">
+                          <h4 className="text-xs sm:text-sm font-black text-red-600 uppercase tracking-wide leading-tight flex items-center justify-center gap-1.5">
+                            <span>⚠️</span> WARNING: DO NOT OPEN BEFORE SCHEDULED BID OPENING DATE & TIME!
                           </h4>
-                          <p className="text-[11px] font-black text-red-900 font-mono uppercase">
-                            SCHEDULED BID OPENING: <span className="bg-red-600 text-white px-2 py-0.2 rounded font-black">{submissionDeadline}</span>
+                          <p className="text-[10px] sm:text-[10.5px] font-bold text-red-800 uppercase leading-snug">
+                            Any bid submitted after the deadline shall not be accepted. Bids opened prematurely shall be disqualified pursuant to RA 12009 / RA 9184.
                           </p>
+                          <div className="pt-1 flex flex-wrap items-center justify-center gap-2">
+                            <span className="text-xs sm:text-sm font-black text-red-950 font-mono uppercase tracking-wide">
+                              SCHEDULED BID OPENING:
+                            </span>
+                            <span className="bg-red-600 text-white px-3 py-1 rounded-lg font-black text-sm sm:text-base font-mono tracking-wider shadow-sm">
+                              {submissionDeadline}
+                            </span>
+                          </div>
                         </div>
-
                       </div>
 
+                    </div>
+
+                    {/* SECTION 4: ENVELOPE IDENTIFIER BANNER (White Background with Ink Blue Text - Prominent & Big) */}
+                    <div className="my-2.5 relative z-10">
+                      <div className="p-3.5 sm:p-4.5 border-3 sm:border-4 border-blue-950 bg-white text-center rounded-2xl space-y-1 shadow-md">
+                        <div className="font-mono font-black text-xl sm:text-2xl uppercase tracking-widest text-blue-950 leading-tight">
+                          {coverEnvelopeChoice === 'ENVELOPE_1' 
+                            ? 'ENVELOPE NO. 1: TECHNICAL & ELIGIBILITY COMPONENT'
+                            : 'ENVELOPE NO. 2: FINANCIAL BID PROPOSAL COMPONENT'}
+                        </div>
+                        <div className="text-xs sm:text-sm font-sans font-bold text-blue-950/85 uppercase tracking-wider">
+                          Official Sealed Envelope Submission pursuant to RA 12009 / RA 9184
+                        </div>
+                      </div>
                     </div>
 
                     {/* BOTTOM FOOTER: Signatory & QR Code */}
@@ -2996,8 +2961,9 @@ export const BidPackageBuilderView: React.FC = () => {
                             companyName: currentTenant?.companyName,
                             solicitationNo: activeProject?.solicitationNo || (activeProject as any)?.solicitationNumber || 'SOL-2026-001'
                           }}
-                          size={65}
-                          className="border-2 border-black p-0.5 bg-white shrink-0"
+                          size={50}
+                          showCaption={false}
+                          className="shrink-0"
                         />
                       </div>
                     </div>

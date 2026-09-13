@@ -1,24 +1,24 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
-import { generateAndDownloadThreeLayerPdf, generateThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
+import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
+import { generateSectionViVectorPdf } from '../../../utils/vectorPdfGenerator';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import { autoFitPageChunks, calculateRowHeight, getAutoFitTypographyClass } from '../../../utils/autoFitEngine';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
   Printer,
   Download,
-  FileSignature,
   Plus,
   Trash2,
   Building2,
-  ShieldCheck,
   CheckCircle2,
   RefreshCw,
-  Sparkles,
   FileSpreadsheet,
   Type,
-  Lock
+  Lock,
+  FileSignature,
+  Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 
 export interface ScheduleItem {
@@ -75,6 +75,16 @@ const computeTotalAmount = (unitStr: string, qtyStr: string): string => {
   if (isNaN(unitNum) || isNaN(qtyNum)) return '';
   const total = unitNum * qtyNum;
   return `PHP ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+/**
+ * Strips currency label ('PHP') for paper/PDF view while formatting clean decimals
+ */
+export const formatPaperAmount = (val: string | number): string => {
+  if (val === undefined || val === null || val === '') return '';
+  const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) return '';
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 export const computeTotalQuantity = (itemList: ScheduleItem[]): string => {
@@ -234,6 +244,49 @@ interface PageRow {
   item: ScheduleItem;
   index: number;
 }
+
+interface AutoResizeTextareaProps {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  className?: string;
+}
+
+const AutoResizeTextarea: React.FC<AutoResizeTextareaProps> = ({
+  value,
+  onChange,
+  placeholder,
+  className
+}) => {
+  const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+
+  const adjustHeight = React.useCallback(() => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.max(26, el.scrollHeight)}px`;
+    }
+  }, []);
+
+  React.useLayoutEffect(() => {
+    adjustHeight();
+  }, [value, adjustHeight]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      rows={1}
+      value={value}
+      onChange={(e) => {
+        onChange(e.target.value);
+        adjustHeight();
+      }}
+      onInput={adjustHeight}
+      placeholder={placeholder}
+      className={`${className} resize-none overflow-hidden block`}
+    />
+  );
+};
 
 export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequirementsProps> = ({
   item = {
@@ -516,12 +569,29 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   const handleExportPdf = async () => {
     setIsExporting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 80));
-      const fileName = `${projectRefNo}_Section_VI_Schedule_of_Requirements_${todayStr}.pdf`;
-      const containerElem = document.getElementById('section-vi-pages-container') || document.getElementById('section-vi-paper');
-      if (containerElem) {
-        await generateAndDownloadThreeLayerPdf(null, containerElem, undefined, fileName);
-      }
+      const fileName = `${projectRefNo || 'SEC-VI'}_Section_VI_Schedule_of_Requirements_${todayStr}.pdf`;
+      const pdfDataUrl = await generateSectionViVectorPdf({
+        companyName,
+        companyAddress,
+        projectTitle,
+        projectRefNo,
+        procuringEntity,
+        dateTimeSubmitted,
+        signatoryName,
+        signatoryTitle,
+        items,
+        servicesDescription,
+        servicesCost: getServicesCostAmount(items, servicesPercentage, servicesCustomAmount),
+        grandTotal: getNumericGrandTotalMaterials(items) + getServicesCostAmount(items, servicesPercentage, servicesCustomAmount),
+        totalMaterials: getNumericGrandTotalMaterials(items),
+        totalQuantity: computeTotalQuantity(items)
+      });
+      const link = document.createElement('a');
+      link.href = pdfDataUrl;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (err) {
       console.error('PDF export error:', err);
     } finally {
@@ -577,19 +647,24 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   const handleSave = async () => {
     setIsExporting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 80));
-      const containerElem = (document.getElementById('section-vi-pages-container') || document.getElementById('section-vi-paper')) as HTMLElement;
-      let dataUrl: string | undefined = undefined;
-      if (containerElem) {
-        dataUrl = await generateThreeLayerPdfDataUrl(
-          null,
-          containerElem,
-          undefined,
-          `${projectRefNo}_Section_VI_Schedule_of_Requirements_${todayStr}.pdf`
-        );
-      }
+      const pdfDataUrl = await generateSectionViVectorPdf({
+        companyName,
+        companyAddress,
+        projectTitle,
+        projectRefNo,
+        procuringEntity,
+        dateTimeSubmitted,
+        signatoryName,
+        signatoryTitle,
+        items,
+        servicesDescription,
+        servicesCost: getServicesCostAmount(items, servicesPercentage, servicesCustomAmount),
+        grandTotal: getNumericGrandTotalMaterials(items) + getServicesCostAmount(items, servicesPercentage, servicesCustomAmount),
+        totalMaterials: getNumericGrandTotalMaterials(items),
+        totalQuantity: computeTotalQuantity(items)
+      });
       if (onSaveAndComplete) {
-        onSaveAndComplete(dataUrl, item.name, projectRefNo, projectTitle, selectedOppId);
+        onSaveAndComplete(pdfDataUrl, item.name, projectRefNo, projectTitle, selectedOppId);
       }
     } catch (error) {
       console.error('Failed to generate Section VI PDF:', error);
@@ -616,17 +691,21 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   };
 
   const { charsPerLine, lineHeightPx, basePaddingPx } = useMemo(() => {
-    if (fontSizeMode === 'fine' || (fontSizeMode === 'xs' && totalCharactersInDoc > 5000)) {
-      return { charsPerLine: 48, lineHeightPx: 14, basePaddingPx: 14 };
+    if (fontSizeMode === 'fine' || (fontSizeMode === 'xs' && (totalCharactersInDoc > 1800 || items.length > 14))) {
+      return { charsPerLine: 72, lineHeightPx: 14.5, basePaddingPx: 8 };
     }
     if (fontSizeMode === 'sm') {
-      return { charsPerLine: 35, lineHeightPx: 22, basePaddingPx: 18 };
+      return { charsPerLine: 56, lineHeightPx: 18, basePaddingPx: 10 };
     }
-    return { charsPerLine: 40, lineHeightPx: 18, basePaddingPx: 16 };
-  }, [fontSizeMode, totalCharactersInDoc]);
+    if (fontSizeMode === 'xs' && (totalCharactersInDoc > 900 || items.length > 8)) {
+      return { charsPerLine: 68, lineHeightPx: 15.5, basePaddingPx: 8 };
+    }
+    return { charsPerLine: 64, lineHeightPx: 16.5, basePaddingPx: 8 };
+  }, [fontSizeMode, totalCharactersInDoc, items.length]);
 
   // --- DYNAMIC AUTO-FIT PAGE-PACKING ENGINE ---
-  // Calibrated for 41% column width (315px @ 96DPI) with zero empty space & safe footer margin
+  // Calibrated for portrait Legal paper with greedy maximal page packing:
+  // Maximally fills Page 1 before ever splitting into continuation pages.
   const pageChunks = useMemo<PageRow[][]>(() => {
     if (items.length === 0) return [[]];
     const indexedItems: PageRow[] = items.map((it, idx) => ({ item: it, index: idx }));
@@ -639,11 +718,12 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       {
         orientation: 'portrait',
         columnCharWidth: charsPerLine,
-        headerHeightPx: 170,
-        footerHeightPx: 260,
-        runningFooterPx: 42,
+        headerHeightPx: 185,
+        footerHeightPx: 320,
+        runningFooterPx: 45,
         continuationTheadHeightPx: 32,
-        safetyBufferPx: 45
+        safetyBufferPx: 30,
+        strategy: 'greedy'
       }
     );
   }, [items, charsPerLine, lineHeightPx, basePaddingPx]);
@@ -654,9 +734,9 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
     <div
       key={`sec-6-page-${pIdx}`}
       id={pIdx === 0 ? 'section-vi-paper' : `section-vi-paper-p${pIdx + 1}`}
-      className="single-page-paper print-document-sheet portrait aspect-[8.5/13] bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] max-w-[816px] flex flex-col font-serif mb-8 box-border relative text-slate-950"
+      className="single-page-paper print-document-sheet portrait bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] h-auto max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
     >
-      <div>
+      <div className="w-full">
         {/* COMPANY & PROJECT HEADER BLOCK (PAGE 1 ONLY) */}
         {pIdx === 0 ? (
           <div className="mb-2 pb-2 border-b-2 border-slate-900 font-serif">
@@ -711,32 +791,32 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
           <table className="w-full border-collapse border border-black text-xs font-serif table-fixed">
             <colgroup>
               <col className="w-[5%]" />
-              <col className="w-[41%]" />
-              <col className="w-[9%]" />
-              <col className="w-[14%]" />
-              <col className="w-[15%]" />
-              <col className="w-[16%]" />
+              <col className="w-[56%]" />
+              <col className="w-[5%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[10%]" />
             </colgroup>
             {pIdx === 0 ? (
               <thead>
                 <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[10.5px]">
                   <th className="border border-black px-1 py-1.5 w-[5%]">Item No.</th>
-                  <th className="border border-black px-2 py-1.5 text-left w-[41%]">Description</th>
-                  <th className="border border-black px-1 py-1.5 w-[9%]">Qty</th>
-                  <th className="border border-black px-1.5 py-1.5 w-[14%]">Unit Cost</th>
-                  <th className="border border-black px-1.5 py-1.5 w-[15%]">Total Cost</th>
-                  <th className="border border-black px-1.5 py-1.5 w-[16%] text-center">Delivered, Weeks/Months</th>
+                  <th className="border border-black px-2 py-1.5 text-left w-[56%]">Description</th>
+                  <th className="border border-black px-1 py-1.5 w-[5%]">Qty</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[12%]">Unit Cost</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[12%]">Total Cost</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[10%] text-center">Delivered in,</th>
                 </tr>
               </thead>
             ) : (
               <thead>
                 <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[10px]">
                   <th className="border border-black px-1 py-1 w-[5%]">Item No.</th>
-                  <th className="border border-black px-2 py-1 text-left w-[41%]">Description (Continuation)</th>
-                  <th className="border border-black px-1 py-1 w-[9%]">Qty</th>
-                  <th className="border border-black px-1.5 py-1 w-[14%]">Unit Cost</th>
-                  <th className="border border-black px-1.5 py-1 w-[15%]">Total Cost</th>
-                  <th className="border border-black px-1.5 py-1 w-[16%] text-center">Delivered</th>
+                  <th className="border border-black px-2 py-1 text-left w-[56%]">Description (Continuation)</th>
+                  <th className="border border-black px-1 py-1 w-[5%]">Qty</th>
+                  <th className="border border-black px-1.5 py-1 w-[12%]">Unit Cost</th>
+                  <th className="border border-black px-1.5 py-1 w-[12%]">Total Cost</th>
+                  <th className="border border-black px-1.5 py-1 w-[10%] text-center">Delivered</th>
                 </tr>
               </thead>
             )}
@@ -751,14 +831,14 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                 chunk.map(({ item: rowItem, index: itemIdx }) => (
                   <tr key={rowItem.id} className="border-b border-black hover:bg-amber-50/20 even:bg-slate-50/30 transition-colors">
                     {/* 1. Item # */}
-                    <td className="border border-black px-1 py-1.5 text-center font-serif font-bold align-top text-slate-950">
-                      <div className="flex flex-col items-center justify-between h-full">
-                        <span className="block pt-0.5 font-bold text-xs">{itemIdx + 1}</span>
+                    <td className="border border-black px-1 py-1 text-center font-serif font-bold align-top text-slate-950">
+                      <div className="flex items-center justify-center gap-1 pt-0.5">
+                        <span className="font-bold text-xs">{itemIdx + 1}</span>
                         {!isExporting && (
                           <button
                             type="button"
                             onClick={() => handleRemoveItem(itemIdx)}
-                            className="text-red-500 hover:text-red-700 mt-2 print:hidden no-export p-1 hover:bg-red-50 rounded"
+                            className="text-red-400 hover:text-red-700 print:hidden no-export p-0.5 hover:bg-red-50 rounded"
                             title="Delete row"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -768,30 +848,29 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                     </td>
 
                   {/* 2. Description */}
-                  <td className="border border-black px-2.5 py-1.5 font-serif align-top break-words">
+                  <td className="border border-black px-2 py-1 font-serif align-top break-words">
                     {!isExporting ? (
-                      <textarea
-                        rows={Math.max(2, Math.ceil((rowItem.description || '').length / 85))}
+                      <AutoResizeTextarea
                         value={rowItem.description}
-                        onChange={(e) => handleFieldChange(itemIdx, 'description', e.target.value)}
+                        onChange={(val) => handleFieldChange(itemIdx, 'description', val)}
                         placeholder="Enter detailed technical specification..."
-                        className={`w-full bg-transparent resize-y outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 font-normal leading-relaxed text-justify ${getTableFontSizeClass()}`}
+                        className={`w-full bg-transparent outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-0.5 rounded border border-slate-200 hover:border-slate-400 font-normal leading-normal text-justify ${getTableFontSizeClass()}`}
                       />
                     ) : null}
-                    <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-slate-950 pt-0.5 whitespace-pre-wrap font-normal break-words [overflow-wrap:break-word] leading-relaxed text-justify ${getTableFontSizeClass()}`}>
+                    <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-slate-950 pt-0.5 whitespace-pre-wrap font-normal break-words [overflow-wrap:break-word] leading-normal text-justify ${getTableFontSizeClass()}`}>
                       {formatDescriptionText(rowItem.description)}
                     </div>
                   </td>
 
                   {/* 3. Quantity */}
-                  <td className="border border-black px-1 py-1.5 font-serif text-center align-top">
+                  <td className="border border-black px-1 py-1 font-serif text-center align-top">
                     {!isExporting ? (
                       <input
                         type="text"
                         value={rowItem.quantity}
                         onChange={(e) => handleFieldChange(itemIdx, 'quantity', e.target.value)}
                         placeholder="Qty"
-                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
+                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-0.5 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
                       />
                     ) : null}
                     <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
@@ -800,7 +879,7 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                   </td>
 
                   {/* 4. Unit Amount */}
-                  <td className="border border-black px-1.5 py-1.5 font-serif text-center align-top break-words">
+                  <td className="border border-black px-1.5 py-1 font-serif text-center align-top break-words">
                     {!isExporting ? (
                       <input
                         type="text"
@@ -820,48 +899,51 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                           }
                         }}
                         placeholder="Unit Amount"
-                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
+                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-0.5 rounded border border-slate-200 hover:border-slate-400 ${getTableFontSizeClass()}`}
                       />
                     ) : null}
                     <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
-                      {rowItem.unitAmount
-                        ? rowItem.unitAmount.startsWith('PHP')
-                          ? rowItem.unitAmount
-                          : (() => {
-                              const clean = parseFloat(rowItem.unitAmount.replace(/[^0-9.]/g, ''));
-                              return !isNaN(clean)
-                                ? `PHP ${clean.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                : rowItem.unitAmount;
-                            })()
-                        : ''}
+                      <span className="print:hidden">
+                        {!isExporting ? (rowItem.unitAmount || '') : formatPaperAmount(rowItem.unitAmount)}
+                      </span>
+                      <span className="hidden print:inline">
+                        {formatPaperAmount(rowItem.unitAmount)}
+                      </span>
                     </div>
                   </td>
 
                   {/* 5. Total Amount */}
-                  <td className="border border-black px-1.5 py-1.5 font-serif text-center align-top break-words">
+                  <td className="border border-black px-1.5 py-1 font-serif text-center align-top break-words">
                     {!isExporting ? (
                       <input
                         type="text"
                         value={computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total}
                         onChange={(e) => handleFieldChange(itemIdx, 'total', e.target.value)}
                         placeholder="Total Amount"
-                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 font-semibold ${getTableFontSizeClass()}`}
+                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-0.5 rounded border border-slate-200 hover:border-slate-400 font-semibold ${getTableFontSizeClass()}`}
                       />
                     ) : null}
                     <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-serif text-black text-center pt-0.5 font-semibold break-words ${getTableFontSizeClass()}`}>
-                      {computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total || ''}
+                      <span className="print:hidden">
+                        {!isExporting
+                          ? (computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total || '')
+                          : formatPaperAmount(computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total)}
+                      </span>
+                      <span className="hidden print:inline">
+                        {formatPaperAmount(computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total)}
+                      </span>
                     </div>
                   </td>
 
                   {/* 6. Delivered, Weeks/Months */}
-                  <td className="border border-black px-1.5 py-1.5 font-serif text-center align-top break-words bg-emerald-50/20">
+                  <td className="border border-black px-1.5 py-1 font-serif text-center align-top break-words bg-emerald-50/20">
                     {!isExporting ? (
                       <input
                         type="text"
                         value={rowItem.delivered || ''}
                         onChange={(e) => handleFieldChange(itemIdx, 'delivered', e.target.value)}
                         placeholder="e.g. 30 Calendar Days"
-                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-1 rounded border border-slate-200 hover:border-slate-400 font-medium ${getTableFontSizeClass()}`}
+                        className={`w-full bg-transparent text-center outline-none font-serif text-black placeholder-slate-400 focus:bg-amber-50/40 print:hidden p-0.5 rounded border border-slate-200 hover:border-slate-400 font-medium ${getTableFontSizeClass()}`}
                         title="Delivery Schedule (Editing Line 1 cascades to all rows)"
                       />
                     ) : null}
@@ -928,7 +1010,12 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                     —
                   </td>
                   <td className="border border-black px-1.5 py-1.5 text-center font-bold text-black text-xs font-mono break-words bg-amber-50/90">
-                    {computeGrandTotalMaterials(items)}
+                    <span className="print:hidden">
+                      {!isExporting ? computeGrandTotalMaterials(items) : formatPaperAmount(computeGrandTotalMaterials(items))}
+                    </span>
+                    <span className="hidden print:inline">
+                      {formatPaperAmount(computeGrandTotalMaterials(items))}
+                    </span>
                   </td>
                   <td className="border border-black px-1.5 py-1.5 text-center text-xs font-serif text-slate-500">
                     —
@@ -985,7 +1072,14 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                         </div>
                       ) : null}
                       <div className={`${!isExporting ? 'hidden print:block' : 'block'} font-mono text-blue-950 text-xs font-bold`}>
-                        {getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount)}
+                        <span className="print:hidden">
+                          {!isExporting
+                            ? getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount)
+                            : formatPaperAmount(getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount))}
+                        </span>
+                        <span className="hidden print:inline">
+                          {formatPaperAmount(getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount))}
+                        </span>
                       </div>
                     </td>
                     <td className="border border-black px-1.5 py-1 text-center text-xs font-serif text-slate-500 align-middle">
@@ -1006,7 +1100,14 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                     —
                   </td>
                   <td className="border border-black px-1.5 py-2 text-center font-extrabold text-black text-sm font-mono break-words bg-amber-200">
-                    {getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount)}
+                    <span className="print:hidden">
+                      {!isExporting
+                        ? getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount)
+                        : formatPaperAmount(getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount))}
+                    </span>
+                    <span className="hidden print:inline">
+                      {formatPaperAmount(getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount))}
+                    </span>
                   </td>
                   <td className="border border-black px-1.5 py-2 text-center text-xs font-serif text-slate-600">
                     —
@@ -1022,48 +1123,20 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       <div className="w-full shrink-0 mt-auto">
         {/* Signatory Block & GPPB QR Code (Final Page Only) */}
         {pIdx === totalPages - 1 && (
-          <div className="mt-4 pt-2.5 border-t border-slate-300 font-serif text-xs mb-2">
-            <p className="font-bold text-black uppercase text-[11px] mb-2 tracking-wide">
+          <div className="mt-2.5 pt-2 border-t border-slate-300 font-serif text-xs mb-1.5 shrink-0">
+            <p className="font-bold text-black uppercase text-[10px] mb-1 tracking-wide">
               I hereby certify to comply and deliver all the above requirements:
             </p>
             <div className="flex items-end justify-between signatory-block">
               <div>
-                <p className="font-bold text-black uppercase">{companyName}</p>
-                <div className="mt-5 border-b border-black w-64"></div>
-                <p className="font-bold text-black mt-1 uppercase">{signatoryName}</p>
-                <p className="text-slate-700">{signatoryTitle}</p>
-              </div>
-
-              <div className="text-right flex flex-col items-end">
-                <DocumentQrCode
-                  details={{
-                    companyName: companyName,
-                    documentName: 'Section VI. Schedule of Requirements',
-                    documentNumber: `SEC-VI-${projectRefNo || '2026-901283'}`,
-                    projectTitle: projectTitle,
-                    projectRefNo: projectRefNo,
-                    procuringEntity: procuringEntity,
-                    dateTimeSubmitted: formatDateTimeDisplay(dateTimeSubmitted),
-                    documentCategory: 'Bid Forms',
-                    generatedBy: companyName
-                  }}
-                  size={75}
-                  showCaption={false}
-                />
-                <span className="text-[9px] font-mono text-slate-600 uppercase mt-1">
-                  VERIFIED GPPB DOC • {projectRefNo}
-                </span>
+                <p className="font-bold text-black uppercase text-[10.5px] tracking-wide">{companyName}</p>
+                <div className="mt-4 border-b border-black w-60"></div>
+                <p className="font-bold text-black mt-1 uppercase text-[11px] tracking-wider">{signatoryName || 'AUTHORIZED REPRESENTATIVE'}</p>
+                <p className="text-slate-700 text-[9.5px] font-medium">{signatoryTitle || 'Designation / Authorized Signatory'}</p>
               </div>
             </div>
           </div>
         )}
-
-        {/* Running Page Footer (Rendered on EVERY Page) */}
-        <div className="mt-4 pt-2 border-t-2 border-black flex items-center justify-between text-[8.5pt] font-mono text-black shrink-0">
-          <div className="font-bold uppercase">{companyName}</div>
-          <div>SECTION VI SCHEDULE OF REQUIREMENTS • REF: {projectRefNo || 'N/A'}</div>
-          <div className="font-bold">PAGE {pIdx + 1} OF {totalPages}</div>
-        </div>
       </div>
     </div>
   ));

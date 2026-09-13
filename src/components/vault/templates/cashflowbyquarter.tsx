@@ -2,15 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
   Printer,
   Download,
   Building2,
-  TrendingUp,
   Loader2,
   CheckCircle2,
+  TrendingUp,
   FolderKanban
 } from 'lucide-react';
 
@@ -753,29 +752,7 @@ export const CashFlowByQuarterModal: React.FC<CashFlowByQuarterModalProps> = ({
               </div>
 
               {/* Document Footer */}
-              <div className="pt-4 border-t border-slate-300 flex items-center justify-between text-[8.5pt] font-mono text-slate-700">
-                <div className="flex items-center gap-3">
-                  <DocumentQrCode
-                    details={{
-                      companyName: companyName || 'Bidding Entity',
-                      documentName: 'Cash Flow by Quarter (SF-INFR-56)',
-                      documentNumber: `FIN-CASHFLOW-${contractRefNo || 'SCHED'}`,
-                      projectTitle: contractName,
-                      projectRefNo: contractRefNo,
-                      procuringEntity: procuringEntity,
-                      dateTimeSubmitted: dateSubmitted || 'March 19, 2026',
-                      documentCategory: 'Financial Documents',
-                      generatedBy: companyName || 'Bidding Entity'
-                    }}
-                    size={45}
-                    showCaption={false}
-                  />
-                  <div className="space-y-0.5">
-                    <p className="font-bold text-slate-950 uppercase">{companyName || 'BIDDING ENTITY'}</p>
-                    <p>CONTRACT: <strong>{contractName || 'N/A'}</strong></p>
-                    <p>REF NO: <strong>{contractRefNo || 'N/A'}</strong> • PROCURING ENTITY: <strong>{procuringEntity || 'N/A'}</strong></p>
-                  </div>
-                </div>
+              <div className="pt-4 border-t border-slate-300 flex items-center justify-end text-[8.5pt] font-mono text-slate-700">
                 <div className="text-right">
                   <span className="font-bold font-mono">Page 1 of 1</span>
                   <p className="text-[7.5pt] text-slate-500">Cash Flow by Quarter & Payment Schedule</p>

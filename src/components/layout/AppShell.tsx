@@ -19,7 +19,9 @@ import {
   AlertTriangle, 
   Key, 
   CheckCircle2, 
-  Trash2 
+  Trash2,
+  Box,
+  Briefcase 
 } from 'lucide-react';
 
 import { AuroraBackground } from '../common/AuroraBackground';
@@ -83,8 +85,10 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'opportunities', label: 'Opportunity Finder', icon: Search, badge: 'Philgeps' },
+    { id: 'project-profile', label: 'Project Profile', icon: Briefcase, badge: 'Projects' },
     { id: 'vault', label: 'Document Vault', icon: FileCheck, badge: 'Secure' },
     { id: 'bids', label: 'Bid Packages', icon: FolderKanban, badge: 'Envelopes' },
+    { id: 'covers', label: 'Labels & Covers', icon: Box, badge: 'Samples' },
     { id: 'forms', label: 'Notarized Documents', icon: ShieldCheck, badge: 'Legal' },
     { id: 'profile', label: 'Company Profile', icon: Building2, badge: 'Profile' },
     { id: 'settings', label: 'Tenant Settings', icon: Settings },

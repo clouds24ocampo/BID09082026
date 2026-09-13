@@ -666,23 +666,40 @@ export const KeyPersonnelModal: React.FC<KeyPersonnelModalProps> = ({
           windowWidth: 1300,
           onclone: (clonedDoc) => {
             clonedDoc.querySelectorAll('input').forEach((inp) => {
-              const span = clonedDoc.createElement('span');
-              span.textContent = inp.value || '';
-              span.className = inp.className;
-              span.style.cssText = window.getComputedStyle(inp).cssText;
-              span.style.display = 'inline-block';
-              span.style.border = 'none';
-              span.style.background = 'transparent';
-              span.style.color = '#000000';
-              if (inp.parentNode) inp.parentNode.replaceChild(span, inp);
+              const div = clonedDoc.createElement('div');
+              div.textContent = inp.value || '';
+              div.className = inp.className;
+              div.style.cssText = window.getComputedStyle(inp).cssText;
+              div.style.display = 'flex';
+              div.style.alignItems = 'center';
+              div.style.justifyContent = 'center';
+              div.style.width = '100%';
+              div.style.maxWidth = '100%';
+              div.style.wordBreak = 'break-word';
+              div.style.overflowWrap = 'break-word';
+              div.style.whiteSpace = 'normal';
+              div.style.overflow = 'hidden';
+              div.style.boxSizing = 'border-box';
+              div.style.border = 'none';
+              div.style.background = 'transparent';
+              div.style.color = '#000000';
+              if (inp.parentNode) inp.parentNode.replaceChild(div, inp);
             });
             clonedDoc.querySelectorAll('textarea').forEach((ta) => {
               const div = clonedDoc.createElement('div');
               div.textContent = ta.value || '';
               div.className = ta.className;
               div.style.cssText = window.getComputedStyle(ta).cssText;
+              div.style.display = 'flex';
+              div.style.alignItems = 'center';
+              div.style.justifyContent = 'center';
+              div.style.width = '100%';
+              div.style.maxWidth = '100%';
+              div.style.wordBreak = 'break-word';
+              div.style.overflowWrap = 'break-word';
               div.style.whiteSpace = 'pre-wrap';
-              div.style.display = 'block';
+              div.style.overflow = 'hidden';
+              div.style.boxSizing = 'border-box';
               div.style.border = 'none';
               div.style.background = 'transparent';
               div.style.color = '#000000';
@@ -2074,12 +2091,12 @@ export const KeyPersonnelModal: React.FC<KeyPersonnelModalProps> = ({
                           );
                         }
                         return (
-                          <td key={col.id} className="p-0.5 border border-slate-900 font-bold text-slate-950">
-                            <input
-                              type="text"
+                          <td key={col.id} className="p-0.5 border border-slate-900 font-bold text-slate-950 max-w-0 overflow-hidden">
+                            <textarea
                               value={col.name}
                               onChange={(e) => updateKeyPersonnelColInPage('page-1', col.id, 'name', e.target.value)}
-                              className="w-full bg-transparent border-none p-0 text-center font-bold text-[9.5px] focus:outline-none focus:bg-blue-50/50"
+                              className="w-full bg-transparent border-none p-0 text-center font-bold text-[8.5px] focus:outline-none focus:bg-blue-50/50 resize-none leading-tight break-words whitespace-normal overflow-hidden"
+                              rows={col.name.includes('\n') || col.name.length > 15 ? 2 : 1}
                             />
                           </td>
                         );

@@ -4,7 +4,6 @@ import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine
 import { savePdfData, loadPdfData } from '../../../utils/vaultIndexedDB';
 import { PDFDocument } from 'pdf-lib';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import html2canvas from 'html2canvas';
 import {
   X,
@@ -980,30 +979,7 @@ export const StatementSlccModal: React.FC<StatementSlccModalProps> = ({
                   <strong>This Statement Must be Supported With:</strong> 1. Contract / Purchase Order 2. Certificate of Completion or Certificate of Acceptance 3. Official Receipt / Sales Invoice
                 </div>
 
-                <div className="flex items-end justify-between gap-6 pt-1">
-                  {/* Arrow 3: Verification QR Code (Company & Project Details) */}
-                  <div className="flex items-center gap-2.5">
-                    <DocumentQrCode
-                      details={{
-                        companyName: tenant?.companyName || 'Bidding Entity Corporate Name',
-                        documentName: 'Statement of Single Largest Completed Contract (SLCC Item c)',
-                        documentNumber: `SLCC-${projectRefNo || '2026-901283'}`,
-                        projectTitle: projectTitle,
-                        projectRefNo: projectRefNo,
-                        procuringEntity: procuringEntity,
-                        dateTimeSubmitted: formatDateDisplay(dateTimeSubmitted),
-                        documentCategory: 'Financial Eligibility',
-                        generatedBy: tenant?.companyName
-                      }}
-                      size={70}
-                      showCaption={false}
-                    />
-                    <div className="text-[9px] font-mono text-slate-700 leading-tight">
-                      <span className="font-black text-slate-950 block uppercase">Document Verification QR</span>
-                      <span className="block text-slate-600">Ref: {projectRefNo || 'UNLINKED'}</span>
-                      <span className="block font-bold text-emerald-800">✓ Official Bidding Record</span>
-                    </div>
-                  </div>
+                <div className="flex items-end justify-end gap-6 pt-1">
 
                   {/* Arrow 1 & 2: Moved "Submitted By" into Signature Block */}
                   <div className="text-right space-y-1 min-w-[260px]">

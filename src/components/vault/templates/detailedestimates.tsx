@@ -3,7 +3,6 @@ import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, generateThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { autoFitPageChunks, calculateRowHeight } from '../../../utils/autoFitEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import VaultErrorBoundary from '../../common/VaultErrorBoundary';
 import { numberToWords } from '../../../utils/numberToWords';
 import {
@@ -1682,32 +1681,7 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
                   </div>
 
                   {/* Document Footer */}
-                  <div className="pt-2 border-t border-slate-300 flex items-center justify-between text-[7.5pt] font-mono text-slate-700">
-                    <div className="flex items-center gap-3">
-                      <DocumentQrCode
-                        details={{
-                          companyName: contractorName || 'Bidding Entity',
-                          documentName: `(L) Detailed Estimates Form - Page ${pageNumber}`,
-                          documentNumber: `FIN-DETEST-${projectRefNo || 'INFRA'}`,
-                          projectTitle: projectName,
-                          projectRefNo: projectRefNo,
-                          procuringEntity: ownerName,
-                          dateTimeSubmitted: estimateDate || 'March 19, 2026',
-                          documentCategory: 'Financial Documents',
-                          generatedBy: contractorName || 'Bidding Entity'
-                        }}
-                        size={36}
-                        showCaption={false}
-                      />
-                      <div className="space-y-0.5">
-                        <p className="font-bold text-slate-950 uppercase">{contractorName || 'BIDDING ENTITY'}</p>
-                        {isLastMaterialPage ? (
-                          <p>TOTAL ESTIMATED PROJECT COST: <strong>₱{fmtPeso(totalEstimatedProjectCost)}</strong></p>
-                        ) : (
-                          <p>PROJECT: <strong>{projectName || 'N/A'}</strong></p>
-                        )}
-                      </div>
-                    </div>
+                  <div className="pt-2 border-t border-slate-300 flex items-center justify-end text-[7.5pt] font-mono text-slate-700">
                     <div className="text-right">
                       <span className="font-bold font-mono">Page {pageNumber} of {totalPages}</span>
                       <p className="text-[7pt] text-slate-500">Statutory Form (L) Detailed Estimates</p>

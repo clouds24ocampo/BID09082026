@@ -3,7 +3,6 @@ import { Tenant } from '../../../types';
 import { PDFDocument } from 'pdf-lib';
 import html2canvas from 'html2canvas';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import VaultErrorBoundary from '../../common/VaultErrorBoundary';
 import {
   X,
@@ -11,9 +10,9 @@ import {
   Download,
   Plus,
   Trash2,
-  ShieldCheck,
   CheckCircle2,
   RotateCcw,
+  ShieldCheck,
   Lock
 } from 'lucide-react';
 
@@ -747,32 +746,9 @@ export const AfterSaleModalContent: React.FC<AfterSaleModalProps> = ({
               </div>
             </div>
 
-            {/* 7. Signatory Block & Verification QR Code Footer */}
+            {/* 7. Signatory Block Footer */}
             <div className="mt-8 pt-4 border-t-2 border-slate-900 flex items-end justify-between px-1 pb-1 bg-white shrink-0">
-              
-              {/* Lower Left: Official QR Verification Code */}
-              <div className="flex items-center gap-2">
-                <DocumentQrCode
-                  details={{
-                    companyName: companyName,
-                    documentName: 'AFTER SALES SERVICES & WARRANTY UNDERTAKING',
-                    documentNumber: `EXHIBIT-AFTERSALE-${projectRefNo || '2026-901283'}`,
-                    projectTitle: projectTitle,
-                    projectRefNo: projectRefNo,
-                    procuringEntity: procuringEntity,
-                    dateTimeSubmitted: dateTimeSubmitted || todayStr,
-                    documentCategory: 'Technical Eligibility',
-                    generatedBy: companyName
-                  }}
-                  size={38}
-                  showCaption={false}
-                />
-                <div className="text-[7.5px] font-mono leading-tight text-slate-700">
-                  <p className="font-bold text-slate-950 uppercase truncate max-w-[240px]">{companyName}</p>
-                  <p className="truncate max-w-[240px]">PROJECT: {projectTitle}</p>
-                  <p className="truncate max-w-[240px]">REF: {projectRefNo} • {dateTimeSubmitted}</p>
-                </div>
-              </div>
+              <div />
 
               {/* Middle Action: Save & Attach to Vault (Screen Only) */}
               <div className="flex flex-col items-center justify-center px-2 print:hidden no-export my-auto">

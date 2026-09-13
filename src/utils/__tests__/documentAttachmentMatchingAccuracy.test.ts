@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resolveDocumentPdfAttachment, DocResolveContext } from '../systemDocumentPdfGenerator';
 import { DocumentVaultItem, Tenant } from '../../types';
+import { buildMergedThreeLayerPdfBytes } from '../pdfExportEngine';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
 
 describe('Document Attachment Matching Accuracy & Corporate Isolation', () => {
   const storageMap: Record<string, string> = {};
@@ -103,6 +105,27 @@ describe('Document Attachment Matching Accuracy & Corporate Isolation', () => {
       status: 'ACTIVE',
       previousVersions: [],
       fileDataUrl: dummyPdfMayor
+    },
+    {
+      id: 'vault-doc-6',
+      tenantId: 'tenant-match-test',
+      documentName: 'BIR Certificate of Registration (BIR Form 2303)',
+      documentCode: 'DOC-6',
+      documentNumber: 'BIR-2303-9912',
+      category: 'ELIGIBILITY_CLASS_A',
+      procurementApplicability: ['GOODS', 'INFRASTRUCTURE'],
+      legalBasisReference: 'NIRC / BIR Regulations',
+      versionNumber: 1,
+      fileHash: 'hash-6',
+      fileSizeBytes: 1048576,
+      fileName: 'bir_form_2303.pdf',
+      uploadedByName: 'Cloud Ocampo',
+      isOptional: false,
+      requiresIssueDate: true,
+      requiresExpiryDate: false,
+      status: 'ACTIVE',
+      previousVersions: [],
+      fileDataUrl: 'data:application/pdf;base64,JVBERi0xLjQKJVRISVMgSVMgQklSIEZPUk0gMjMwMy...'
     },
     {
       id: 'vault-doc-7',
@@ -398,5 +421,222 @@ describe('Document Attachment Matching Accuracy & Corporate Isolation', () => {
     const loadedCopy2 = await PDFDocument.load(copy2Bytes);
     expect(loadedCopy2.getPageCount()).toBeGreaterThanOrEqual(1);
   });
+
+  it('Strict Separation: SEC/DTI registration must never match Secretary Certificate or BIR', async () => {
+    const dummySecPdf = 'data:application/pdf;base64,JVBERi0xLjQKJcTl8uXrp/Og0MTGCjQgMCBvYmoKPDwKL0xlbmd0aCAxMDUKPj4Kc3RyZWFtCnEKMSAwIDAgMSA1MCA3NTAgY20KQlQKL0YxIDEyIFRmCihTRUMgQ2VydGlmaWNhdGUpIFRqCkVUCnEKZW5kc3RyZWFtCmVuZG9iagoxIDAgb2JqCjw8Ci9UeXBlIC9QYWdlcwovQ291bnQgMQovS2lkcyBbMyAwIFJdCj4+CmVuZG9iagozIDAgb2JqCjw8Ci9UeXBlIC9QYWdlCi9QYXJlbnQgMSAwIFIKL01lZGlhQm94IFswIDAgNjEyIDc5Ml0KL0NvbnRlbnRzIDQgMCBSCi9SZXNvdXJjZXMgPDwKL0ZvbnQgPDwKL0YxIDw8Ci9UeXBlIC9Gb250Ci9TdWJ0eXBlIC9UeXBlMQovQmFzZUZvbnQgL0hlbHZldGljYQo+Pgo+Pgo+Pgo+PgplbmRvYmoKMiAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMSAwIFIKPj4KZW5kb2JqCnhyZWYKMCA1CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDE2MSAwMDAwMCBuIAowMDAwMDAwMzY4IDAwMDAwIG4gCjAwMDAwMDAyMTggMDAwMDAgbiAKMDAwMDAwMDAxOSAwMDAwMCBuIAp0cmFpbGVyCjw8Ci9TaXplIDUKL1Jvb3QgMiAwIFIKPj4Kc3RhcnR4cmVmCjQxOQolJUVPRgo=';
+    const dummySecCertPdf = 'data:application/pdf;base64,JVBERi0xLjQKJcTl8uXrp/Og0MTGCjQgMCBvYmoKPDwKL0xlbmd0aCAxMDUKPj4Kc3RyZWFtCnEKMSAwIDAgMSA1MCA3NTAgY20KQlQKL0YxIDEyIFRmCihTZWNyZXRhcnlzIENlcnRpZmljYXRlKSBUagpFVApxCmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PAovVHlwZSAvUGFnZXMKL0NvdW50IDEKL0tpZHMgWzMgMCBSXQo+PgplbmRvYmoKMyAwIG9iago8PAovVHlwZSAvUGFnZQovUGFyZW50IDEgMCBSCi9NZWRpYUJveCBbMCAwIDYxMiA3OTJdCi9Db250ZW50cyA0IDAgUgovUmVzb3VyY2VzIDw8Ci9Gb250IDw8Ci9GMSA8PAovVHlwZSAvRm9udAovU3VidHlwZSAvVHlwZTEKL0Jhc2VGb250IC9IZWx2ZXRpY2EKPj4KPj4KPj4KPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL0NhdGFsb2cKL1BhZ2VzIDEgMCBSCj4+CmVuZG9iagp4cmVmCjAgNQowMDAwMDAwMDAwIDY1NTM1IGYgCjAwMDAwMDAxNjEgMDAwMDAgbiAKMDAwMDAwMDM2OCAwMDAwMCBuIAowMDAwMDAwMjE4IDAwMDAwIG4gCjAwMDAwMDAwMTkgMDAwMDAgbiAKdHJhaWxlcgo8PAovU2l6ZSA1Ci9Sb290IDIgMCBSCj4+CnN0YXJ0eHJlZgo0MTkKJSVFT0YK';
+
+    const vaultDocsWithSecAndCert: DocumentVaultItem[] = [
+      {
+        id: 'vault-sec-cert-id',
+        tenantId: mockTenant.id,
+        documentName: "Secretary's Certificate / Board Resolution",
+        documentCode: 'DOC-13',
+        category: 'ELIGIBILITY_CLASS_A',
+        procurementApplicability: ['GOODS', 'INFRASTRUCTURE'],
+        legalBasisReference: 'RA 9184',
+        versionNumber: 1,
+        fileHash: 'cert13',
+        fileSizeBytes: 1024,
+        fileName: 'secretary_cert.pdf',
+        uploadedByName: 'Cloud Ocampo',
+        fileDataUrl: dummySecCertPdf,
+        isOptional: false,
+        requiresIssueDate: false,
+        requiresExpiryDate: false,
+        status: 'ACTIVE',
+        previousVersions: []
+      },
+      {
+        id: 'vault-sec-reg-id',
+        tenantId: mockTenant.id,
+        documentName: 'SEC Certificate of Registration',
+        documentCode: 'DOC-2',
+        category: 'ELIGIBILITY_CLASS_A',
+        procurementApplicability: ['GOODS', 'INFRASTRUCTURE'],
+        legalBasisReference: 'RA 9184',
+        versionNumber: 1,
+        fileHash: 'sec2',
+        fileSizeBytes: 1024,
+        fileName: 'sec_registration.pdf',
+        uploadedByName: 'Cloud Ocampo',
+        fileDataUrl: dummySecPdf,
+        isOptional: false,
+        requiresIssueDate: false,
+        requiresExpiryDate: false,
+        status: 'ACTIVE',
+        previousVersions: []
+      }
+    ];
+
+    const ctx: DocResolveContext = {
+      tenant: mockTenant,
+      vaultDocs: vaultDocsWithSecAndCert,
+      projectRefNo: 'PhilGEPS-2026-TEST',
+      projectTitle: 'Strict SEC Matching Test'
+    };
+
+    const secReqDoc = {
+      id: 'SEC_DTI_REG',
+      documentName: 'SEC / DTI Certificate of Business Registration',
+      documentCode: 'SEC_DTI_REG',
+      code: 'SEC_DTI_REG'
+    };
+
+    const resolved = await resolveDocumentPdfAttachment(secReqDoc, ctx);
+    expect(resolved).toBe(dummySecPdf);
+    expect(resolved).not.toBe(dummySecCertPdf);
+  });
+
+  it('Rubber Stamp Color Selection: accepts all colors and generates valid stamped PDF', async () => {
+    const testDoc = {
+      title: 'Technical Document',
+      documentName: 'Technical Document',
+      fileDataUrl: null
+    };
+
+    const colors = ['red', 'purple', 'black', 'green', 'blue'] as const;
+    for (const c of colors) {
+      const pdfBytes = await buildMergedThreeLayerPdfBytes([testDoc], `TEST_${c}.pdf`, undefined, {
+        projectRefNo: 'PhilGEPS-STAMP-TEST',
+        folderCopy: 'COPY_1',
+        stampColor: c,
+        companyName: 'Quantum Cloud Corporation',
+        signatoryName: 'Mark-Vin Ocampo',
+        submissionDate: '2026-09-30'
+      });
+
+      expect(pdfBytes).toBeTruthy();
+      const loaded = await PDFDocument.load(pdfBytes);
+      expect(loaded.getPageCount()).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('Uploaded Document Sizing: oversized scanned PDFs (like PCAB) are normalized to standard Legal dimensions', async () => {
+    // Simulate an oversized scanned PCAB license (1500pt x 2200pt)
+    const oversizedDoc = await PDFDocument.create();
+    const oversizedPage = oversizedDoc.addPage([1500, 2200]);
+    oversizedPage.drawText('PHILIPPINE CONTRACTORS ACCREDITATION BOARD - OVERSIZED SCAN', {
+      x: 100,
+      y: 2000,
+      size: 28
+    });
+    const oversizedBytes = await oversizedDoc.save();
+    const oversizedBase64 = `data:application/pdf;base64,${Buffer.from(oversizedBytes).toString('base64')}`;
+
+    const mergedBytes = await buildMergedThreeLayerPdfBytes([
+      {
+        title: 'PCAB License',
+        documentName: 'PCAB License and Special License',
+        fileDataUrl: oversizedBase64
+      }
+    ], 'MERGED_PCAB_STANDARDIZED.pdf', undefined, {
+      projectRefNo: 'PhilGEPS-PCAB-NORMALIZE',
+      folderCopy: 'COPY_1',
+      stampColor: 'blue'
+    });
+
+    expect(mergedBytes).toBeTruthy();
+    const loadedMerged = await PDFDocument.load(mergedBytes);
+    const pages = loadedMerged.getPages();
+    expect(pages.length).toBeGreaterThanOrEqual(1);
+
+    // Every page in the merged bundle must have standardized Legal Portrait dimensions (612 x 936)
+    for (const p of pages) {
+      expect(p.getWidth()).toBe(612);
+      expect(p.getHeight()).toBe(936);
+    }
+  });
+
+  it('should leave uploaded PhilGEPS documents and their QR codes 100% UNTOUCHED without scaling, stamps, or watermarks', async () => {
+    // 1. Create a custom PhilGEPS upload with specific dimensions and mock QR text
+    const rawPhilgepsDoc = await PDFDocument.create();
+    const pPage = rawPhilgepsDoc.addPage([595, 842]); // standard A4 upload from user
+    const helv = await rawPhilgepsDoc.embedFont(StandardFonts.Helvetica);
+    pPage.drawText('PHILGEPS OFFICIAL VERIFICATION QR CODE [DO NOT TOUCH]', {
+      x: 50,
+      y: 50,
+      size: 10,
+      font: helv
+    });
+    const rawPhilgepsBytes = await rawPhilgepsDoc.save();
+    const rawPhilgepsBase64 = `data:application/pdf;base64,${Buffer.from(rawPhilgepsBytes).toString('base64')}`;
+
+    // 2. Build merged package containing the PhilGEPS upload
+    const mergedBytes = await buildMergedThreeLayerPdfBytes([
+      {
+        title: 'DOC-1: PhilGEPS Certificate',
+        documentName: 'PhilGEPS Platinum Certificate of Registration (Annex A)',
+        documentCode: 'DOC-1',
+        fileName: 'philgeps_platinum_cert.pdf',
+        fileDataUrl: rawPhilgepsBase64
+      }
+    ], 'PhilGEPS_MERGED_PACKAGE.pdf', undefined, {
+      folderCopy: 'ORIGINAL',
+      stampColor: 'blue',
+      projectRefNo: 'PHILGEPS-QR-PROTECT'
+    });
+
+    expect(mergedBytes).toBeTruthy();
+    const loadedMerged = await PDFDocument.load(mergedBytes);
+    const pages = loadedMerged.getPages();
+    expect(pages.length).toBe(1);
+
+    // The uploaded PhilGEPS page MUST preserve its exact original dimensions (595 x 842) - ZERO-TOUCH PRESERVATION!
+    const philgepsPage = pages[0];
+    expect(philgepsPage.getWidth()).toBe(595);
+    expect(philgepsPage.getHeight()).toBe(842);
+  });
+
+  it('should separately resolve BIR Certificate of Registration (DOC-6 / BIR Form 2303) and BIR Tax Clearance (DOC-7) without cross-contamination', async () => {
+    const birRegDoc = {
+      id: 'BIR_REGISTRATION',
+      documentName: 'BIR Certificate of Registration (BIR Form 2303)',
+      documentCode: 'BIR_REGISTRATION',
+      code: 'BIR_REGISTRATION'
+    };
+
+    const taxClearanceDoc = {
+      id: 'TAX_CLEARANCE',
+      documentName: 'BIR Tax Clearance Certificate for Bidding (EO 398)',
+      documentCode: 'TAX_CLEARANCE',
+      code: 'TAX_CLEARANCE'
+    };
+
+    const birResolved = await resolveDocumentPdfAttachment(birRegDoc, ctx);
+    const taxResolved = await resolveDocumentPdfAttachment(taxClearanceDoc, ctx);
+
+    // BIR Registration must resolve to DOC-6 (BIR Form 2303)
+    expect(birResolved).toBe('data:application/pdf;base64,JVBERi0xLjQKJVRISVMgSVMgQklSIEZPUk0gMjMwMy...');
+    // Tax Clearance must resolve to DOC-7 (Tax Clearance)
+    expect(taxResolved).toBe(dummyPdfTax);
+    // They must never cross-contaminate or return each other
+    expect(birResolved).not.toBe(taxResolved);
+  });
+
+  it('should generate statutory BIR Certificate of Registration (BIR Form 2303) fallback if no vault doc is uploaded', async () => {
+    const emptyCtx: DocResolveContext = {
+      ...ctx,
+      vaultDocs: []
+    };
+
+    const birRegDoc = {
+      id: 'BIR_REGISTRATION',
+      documentName: 'BIR Certificate of Registration (BIR Form 2303)',
+      documentCode: 'BIR_REGISTRATION',
+      code: 'BIR_REGISTRATION'
+    };
+
+    const birResolved = await resolveDocumentPdfAttachment(birRegDoc, emptyCtx);
+    expect(birResolved).toBeTruthy();
+    expect(birResolved?.startsWith('data:application/pdf;base64,')).toBe(true);
+
+    // Verify it is a valid PDF
+    const base64Content = birResolved!.split(',')[1];
+    const pdfBytes = Uint8Array.from(atob(base64Content), c => c.charCodeAt(0));
+    const loadedDoc = await PDFDocument.load(pdfBytes);
+    expect(loadedDoc.getPages().length).toBeGreaterThanOrEqual(1);
+  });
 });
+
 
