@@ -64,6 +64,23 @@ import {
   UploadCloud
 } from 'lucide-react';
 
+// 15 Statutory Document Template Modals
+import RlaModal from '../vault/templates/RLA';
+import SwaModal from '../vault/templates/SWA';
+import ProgressphotoModal from '../vault/templates/Progressphoto';
+import MtsModal from '../vault/templates/MTS';
+import CaModal from '../vault/templates/CA';
+import AbpModal from '../vault/templates/ABP';
+import WsModal from '../vault/templates/WS';
+import BsModal from '../vault/templates/Bs';
+import CmsModal from '../vault/templates/CMS';
+import EupModal from '../vault/templates/EUP';
+import FplModal from '../vault/templates/FPL';
+import MpdsModal from '../vault/templates/mpds';
+import PertModal from '../vault/templates/pert';
+import SoteModal from '../vault/templates/sote';
+import ToaModal from '../vault/templates/toa';
+
 interface ProjectProfileViewProps {
   setActiveTab: (tab: string) => void;
 }
@@ -85,7 +102,7 @@ export interface StatutoryDocDefinition {
 export interface ProjectDocAttachment {
   slotKey: string;
   slotTitle: string;
-  category: 'WIN_DOCS' | 'FINAL_PAYMENT' | 'OTHER';
+  category: 'WIN_DOCS' | 'FINAL_PAYMENT' | 'STATUTORY' | 'OTHER';
   fileName?: string;
   fileSizeBytes?: number;
   uploadedAt?: string;
@@ -125,16 +142,141 @@ const WIN_DOC_SLOTS = [
   { key: 'post_qual', title: 'Post Qualification', desc: 'Post-Qualification Notice, Verification & Evaluation Clearances' },
   { key: 'noa', title: 'Notice of Award (NOA)', desc: 'Official Notice of Award issued by the Head of Procuring Entity' },
   { key: 'performance_bond', title: 'Performance Bond', desc: 'Callable upon demand Surety Bond / Bank Guarantee / Cash Bond' },
-  { key: 'contract', title: 'Contract', desc: 'Signed and Notarized Government Contract Agreement' },
+  { key: 'contract', title: 'Contract Agreement', desc: 'Signed and Notarized Government Contract Agreement' },
   { key: 'ntp', title: 'Notice to Proceed (NTP)', desc: 'Official Notice to Proceed with issuance date and contract effectivity' },
+  { key: 'delivery_receipt', title: 'Delivery Receipt (DR)', desc: 'Official Delivery Receipt (DR) signed and stamped by Procuring Entity receiving personnel' },
+  { key: 'delivery_proof', title: 'Delivery Proof / Turn-over Proof', desc: 'Photos of Delivered Goods, On-Site Turn-over Proof, or Inspection & Acceptance Report (IAR)' },
   { key: 'dole_cert', title: 'DOLE Certification (if applicable)', desc: 'DOLE BOSH / Approved Construction Safety and Health Program (CSHP)' }
 ];
 
 const FINAL_PAYMENT_DOC_SLOTS = [
-  { key: 'final_payment_cert', title: 'Final Payment for Government Contract', desc: 'Final Billing Statement, Certificate of Acceptance, Inspection & Acceptance Report (IAR)' },
+  { key: 'voucher', title: 'Disbursement Voucher / Payment Voucher', desc: 'Official Government Disbursement Voucher (DV) / Entity Payment Processing Voucher' },
+  { key: 'cert_completion_acceptance', title: 'Certificate of Completion / Letter of Acceptance', desc: 'Official Certificate of Project Completion and Letter of Final Acceptance from Procuring Entity' },
+  { key: 'pic_cheque', title: 'Picture of Cheque', desc: 'Photo / Scanned Copy of Government Issued Check, LDDAP-ADA, or Warrant of Payment' },
+  { key: 'pic_sales_invoice', title: 'Picture of Sales Invoice / Service Invoice', desc: 'Official Sales Invoice (SI), Billing Statement, or Service Invoice registered with BIR' },
+  { key: 'final_payment_cert', title: 'Final Billing & Inspection Acceptance (IAR)', desc: 'Final Statement of Account, Inspection & Acceptance Report, or Final Payment Clearance' },
   { key: 'brgy_cert', title: 'Certificate from Barangay (BRGY)', desc: 'Barangay Clearance & Project Completion Certificate from Local LGU' },
   { key: 'bir_tax_clearance', title: 'Tax Clearance from BIR', desc: 'Final BIR Tax Clearance & Certificate of Final Tax Withheld (BIR Form 2306/2307)' },
-  { key: 's_curve', title: 'S-Curve', desc: 'Final Progress S-Curve Chart, Physical vs Financial Accomplishment Report' }
+  { key: 's_curve', title: 'Final S-Curve / Progress Chart', desc: 'Final Progress S-Curve Chart, Physical vs Financial Accomplishment Report' }
+];
+
+export interface StatutoryTemplateSlot {
+  key: string;
+  name: string;
+  code: string;
+  templateType: 'RLA' | 'SWA' | 'PROGRESS_PHOTO' | 'MTS' | 'CA' | 'ABP' | 'WS' | 'BS' | 'CMS' | 'EUP' | 'FPL' | 'MPDS' | 'PERT' | 'SOTE' | 'TOA';
+  isUploadOnly?: boolean;
+  description: string;
+}
+
+export const STATUTORY_DOCUMENT_SLOTS: StatutoryTemplateSlot[] = [
+  {
+    key: 'rla',
+    name: 'Request Letter for Advance Payment / Mobilization',
+    code: 'RLA',
+    templateType: 'RLA',
+    description: 'Formal request letter for 15% mobilization fund with project details and bank guarantee references.'
+  },
+  {
+    key: 'swa',
+    name: 'Statement of Work Accomplished (SWA)',
+    code: 'SWA',
+    templateType: 'SWA',
+    description: 'Detailed billing breakdown of work items, percent accomplishment, recoupment and retention.'
+  },
+  {
+    key: 'progress_photo',
+    name: 'Progress Photos Documentation',
+    code: 'PHOTO',
+    templateType: 'PROGRESS_PHOTO',
+    isUploadOnly: true,
+    description: 'Upload PDF / site photo albums showing Before, During, and After milestones.'
+  },
+  {
+    key: 'mts',
+    name: 'Materials Testing Reports (MTS)',
+    code: 'MTS',
+    templateType: 'MTS',
+    description: 'Quality control and laboratory materials testing log (ASTM/DPWH standards).'
+  },
+  {
+    key: 'ca',
+    name: "Contractor's Affidavit (CA)",
+    code: 'CA',
+    templateType: 'CA',
+    description: 'Sworn notarial affidavit certifying full payment of labor, materials, suppliers and taxes.'
+  },
+  {
+    key: 'abp',
+    name: 'As-Built Plan (ABP)',
+    code: 'ABP',
+    templateType: 'ABP',
+    description: 'As-Built plan drawings index checklist and complete blueprint PDF attachment.'
+  },
+  {
+    key: 'ws',
+    name: 'Warranty Security (WS)',
+    code: 'WS',
+    templateType: 'WS',
+    isUploadOnly: true,
+    description: 'Upload official Warranty Bond / Bank Guarantee under Section 62 of RA 9184.'
+  },
+  {
+    key: 'bs',
+    name: 'Billing Statement (BS)',
+    code: 'BS',
+    templateType: 'BS',
+    description: 'Statement of account, statutory tax deductions, and bank remittance instructions.'
+  },
+  {
+    key: 'cms',
+    name: 'Construction Method Statement (CMS)',
+    code: 'CMS',
+    templateType: 'CMS',
+    description: 'Comprehensive engineering methodology and sequence of execution.'
+  },
+  {
+    key: 'eup',
+    name: 'Equipment Utilization Plan (EUP)',
+    code: 'EUP',
+    templateType: 'EUP',
+    description: 'Heavy equipment schedule, plate numbers, and monthly deployment timeline.'
+  },
+  {
+    key: 'fpl',
+    name: 'Final Payment Letter (FPL)',
+    code: 'FPL',
+    templateType: 'FPL',
+    description: 'Formal request letter for 100% completion billing and release of retention money.'
+  },
+  {
+    key: 'mpds',
+    name: 'Manpower Deployment Schedule (MPDS)',
+    code: 'MPDS',
+    templateType: 'MPDS',
+    description: 'Key personnel and labor workforce headcount distribution per month.'
+  },
+  {
+    key: 'pert',
+    name: 'PERT/CPM Network Schedule',
+    code: 'PERT',
+    templateType: 'PERT',
+    description: 'Activity schedule, early/late dates, float, critical path and milestone weights.'
+  },
+  {
+    key: 'sote',
+    name: 'Statement of Time Elapsed (SOTE)',
+    code: 'SOTE',
+    templateType: 'SOTE',
+    description: 'Contract duration tracking, NTP date, approved extensions, and slippage percentage.'
+  },
+  {
+    key: 'toa',
+    name: 'Turn-Over Agreement (TOA)',
+    code: 'TOA',
+    templateType: 'TOA',
+    description: 'Joint memorandum of agreement for official project turnover and acceptance.'
+  }
 ];
 
 const formatPhpCurrency = (val: number | string): string => {
@@ -272,7 +414,7 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
   // 6 Required Tabs
-  const [activeTabSection, setActiveTabSection] = useState<'general' | 'win_docs' | 'final_payment' | 'expenses' | 'bid_docs' | 'other_docs'>('general');
+  const [activeTabSection, setActiveTabSection] = useState<'general' | 'win_docs' | 'final_payment' | 'expenses' | 'bid_docs' | 'statutory_docs' | 'other_docs'>('general');
 
   // Active Project for the entire workspace
   const [activeWorkspaceRef, setActiveWorkspaceRef] = useState<string>(() => {
@@ -306,6 +448,27 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
     amountWords: 'ZERO PESOS ONLY',
     source: 'Bid Form'
   });
+
+  // ---------------------------------------------------------------------------
+  // 2. Win DOCs & Final Payment Docs & Statutory Docs & Other Docs State
+  // ---------------------------------------------------------------------------
+  const [winDocs, setWinDocs] = useState<Record<string, ProjectDocAttachment>>({});
+  const [finalPaymentDocs, setFinalPaymentDocs] = useState<Record<string, ProjectDocAttachment>>({});
+  const [statutoryDocs, setStatutoryDocs] = useState<Record<string, ProjectDocAttachment>>({});
+  const [activeStatutoryModal, setActiveStatutoryModal] = useState<string | null>(null);
+  const [otherDocs, setOtherDocs] = useState<ProjectDocAttachment[]>([]);
+  
+  // Expenses State
+  const [expenses, setExpenses] = useState<ProjectExpenseItem[]>([]);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<ProjectExpenseItem | null>(null);
+  
+  // Modals & PDF Previews
+  const [showAddEditModal, setShowAddEditModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [previewPdfModal, setPreviewPdfModal] = useState<{ title: string; dataUrl?: string; fileName: string } | null>(null);
+  const [showNewOtherDocModal, setShowNewOtherDocModal] = useState(false);
+  const [newOtherDocTitle, setNewOtherDocTitle] = useState('');
 
   // Re-sync Win Status & Bid Form Amount when selectedProject changes
   useEffect(() => {
@@ -380,25 +543,6 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
       console.error('[ProjectProfileView] Error saving win status:', e);
     }
   };
-
-  // ---------------------------------------------------------------------------
-  // 2. Win DOCs & Final Payment Docs & Other Docs State
-  // ---------------------------------------------------------------------------
-  const [winDocs, setWinDocs] = useState<Record<string, ProjectDocAttachment>>({});
-  const [finalPaymentDocs, setFinalPaymentDocs] = useState<Record<string, ProjectDocAttachment>>({});
-  const [otherDocs, setOtherDocs] = useState<ProjectDocAttachment[]>([]);
-  
-  // Expenses State
-  const [expenses, setExpenses] = useState<ProjectExpenseItem[]>([]);
-  const [showExpenseModal, setShowExpenseModal] = useState(false);
-  const [editingExpense, setEditingExpense] = useState<ProjectExpenseItem | null>(null);
-  
-  // Modals & PDF Previews
-  const [showAddEditModal, setShowAddEditModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [previewPdfModal, setPreviewPdfModal] = useState<{ title: string; dataUrl?: string; fileName: string } | null>(null);
-  const [showNewOtherDocModal, setShowNewOtherDocModal] = useState(false);
-  const [newOtherDocTitle, setNewOtherDocTitle] = useState('');
 
   // ---------------------------------------------------------------------------
   // 2B. Bid Docs Repository & Merged 3-Copy Package Viewer State
@@ -755,6 +899,18 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
       setFinalPaymentDocs({});
     }
 
+    // Load Statutory Docs Metadata
+    try {
+      const savedStatutory = localStorage.getItem(`bidocs_statutory_docs_${tenantId}_${projectScopeKey}`);
+      if (savedStatutory) {
+        setStatutoryDocs(JSON.parse(savedStatutory));
+      } else {
+        setStatutoryDocs({});
+      }
+    } catch {
+      setStatutoryDocs({});
+    }
+
     // Load Other Docs
     try {
       const savedOther = localStorage.getItem(`bidocs_other_docs_${tenantId}_${projectScopeKey}`);
@@ -789,8 +945,11 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
     category: 'WIN_DOCS' | 'FINAL_PAYMENT',
     file: File
   ) => {
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      alert('Please upload a valid PDF document.');
+    const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+    const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(file.name);
+
+    if (!isPdf && !isImage) {
+      alert('Please upload a valid PDF document or image file (PNG, JPG, JPEG, WEBP).');
       return;
     }
 
@@ -802,7 +961,7 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
       try {
         await savePdfData(docKey, dataUrl);
       } catch (err) {
-        console.error('[ProjectProfileView] Error saving PDF to IndexedDB:', err);
+        console.error('[ProjectProfileView] Error saving document to IndexedDB:', err);
       }
 
       const docItem: ProjectDocAttachment = {
@@ -887,6 +1046,83 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
       setFinalPaymentDocs(updated);
       localStorage.setItem(`bidocs_final_payment_docs_${tenantId}_${projectScopeKey}`, JSON.stringify(updated));
     }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Statutory Documents Handlers
+  // ---------------------------------------------------------------------------
+  const handleSaveStatutoryDoc = async (
+    slotKey: string,
+    fileDataUrl?: string,
+    customName?: string,
+    projectRef?: string,
+    projTitle?: string
+  ) => {
+    if (!fileDataUrl) return;
+
+    const docKey = `proj_statutory_${tenantId}_${projectScopeKey}_${slotKey}`;
+    try {
+      await savePdfData(docKey, fileDataUrl);
+    } catch (err) {
+      console.error('[Statutory] Error saving to IndexedDB:', err);
+    }
+
+    const docItem: ProjectDocAttachment = {
+      slotKey,
+      slotTitle: customName || slotKey.toUpperCase(),
+      category: 'STATUTORY',
+      fileName: `${(customName || slotKey).toLowerCase().replace(/[^a-z0-9]/g, '_')}.pdf`,
+      fileSizeBytes: fileDataUrl.length ? Math.round((fileDataUrl.length * 3) / 4) : 1024,
+      uploadedAt: new Date().toISOString(),
+      fileDataUrl
+    };
+
+    const updated = { ...statutoryDocs, [slotKey]: docItem };
+    setStatutoryDocs(updated);
+    try {
+      const cleanStorage = { ...updated };
+      Object.keys(cleanStorage).forEach(k => {
+        cleanStorage[k] = { ...cleanStorage[k], fileDataUrl: undefined };
+      });
+      localStorage.setItem(`bidocs_statutory_docs_${tenantId}_${projectScopeKey}`, JSON.stringify(cleanStorage));
+    } catch (e) {}
+  };
+
+  const handlePreviewStatutoryDoc = async (slotKey: string, slotTitle: string) => {
+    const docMeta = statutoryDocs[slotKey];
+    let dataUrl = docMeta?.fileDataUrl;
+    if (!dataUrl) {
+      const docKey = `proj_statutory_${tenantId}_${projectScopeKey}_${slotKey}`;
+      try {
+        dataUrl = await loadPdfData(docKey);
+      } catch (e) {}
+    }
+
+    if (dataUrl) {
+      setPreviewPdfModal({
+        title: slotTitle,
+        fileName: docMeta?.fileName || `${slotTitle}.pdf`,
+        dataUrl
+      });
+    } else {
+      alert('Statutory document PDF not found. Please fill or upload the form first.');
+    }
+  };
+
+  const handleDeleteStatutoryDoc = async (slotKey: string, slotTitle: string) => {
+    if (!confirm(`Are you sure you want to clear/delete ${slotTitle}?`)) return;
+
+    const docKey = `proj_statutory_${tenantId}_${projectScopeKey}_${slotKey}`;
+    try {
+      await deletePdfData(docKey);
+    } catch (e) {}
+
+    const updated = { ...statutoryDocs };
+    delete updated[slotKey];
+    setStatutoryDocs(updated);
+    try {
+      localStorage.setItem(`bidocs_statutory_docs_${tenantId}_${projectScopeKey}`, JSON.stringify(updated));
+    } catch (e) {}
   };
 
   // ---------------------------------------------------------------------------
@@ -1698,7 +1934,7 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                   { id: 'final_payment', label: 'Final Payment Document', icon: FileCheck2 },
                   { id: 'expenses', label: 'Expenses', icon: Receipt },
                   { id: 'bid_docs', label: 'Bid Docs', icon: FolderOpen },
-                  { id: 'other_docs', label: 'Other Documents', icon: FileText }
+                  { id: 'statutory_docs', label: 'Statutory Documents', icon: Building2 }
                 ].map(tab => {
                   const Icon = tab.icon;
                   const isActive = activeTabSection === tab.id;
@@ -1787,21 +2023,29 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                       </div>
 
                       <div className="p-3 bg-slate-950/70 border border-slate-800/90 rounded-xl space-y-1">
-                        <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">BAC Chairperson / Contact</span>
-                        <p className="text-xs font-bold text-white">{selectedProject.procuringEntityContactPerson || 'BAC Chairperson'}</p>
-                        <p className="text-[11px] text-slate-400">{selectedProject.procuringEntityPosition || 'BAC Chairman / Secretariat Head'}</p>
+                        <span className="text-[10px] font-mono uppercase text-emerald-400 font-bold block">Head of Procuring Entity (HoPE) / Signatory</span>
+                        <p className="text-xs font-bold text-white">{selectedProject.headOfProcuringEntity || selectedProject.procuringEntityContactPerson || 'Head of Procuring Entity'}</p>
+                        <p className="text-[11px] text-slate-400">{selectedProject.headOfProcuringEntityPosition || 'District Engineer / Regional Director / Mayor'}</p>
                       </div>
 
                       <div className="p-3 bg-slate-950/70 border border-slate-800/90 rounded-xl space-y-1">
+                        <span className="text-[10px] font-mono uppercase text-cyan-400 font-bold block">PhilGEPS Liaison / BAC Secretariat</span>
+                        <p className="text-xs font-bold text-white">{selectedProject.procuringEntityContactPerson || 'BAC Secretariat Head'}</p>
+                        <p className="text-[11px] text-slate-400">{selectedProject.procuringEntityPosition || 'Procurement Liaison / Secretariat'}</p>
+                      </div>
+
+                      <div className="p-3 bg-slate-950/70 border border-slate-800/90 rounded-xl space-y-1 sm:col-span-2">
                         <span className="text-[10px] font-mono uppercase text-slate-500 font-bold block">Contact Information</span>
-                        <p className="text-xs font-mono text-slate-300 flex items-center gap-1.5">
-                          <Phone className="w-3 h-3 text-cyan-400" />
-                          <span>{selectedProject.procuringEntityContactNumber || '(02) 8000-0000'}</span>
-                        </p>
-                        <p className="text-xs font-mono text-slate-300 flex items-center gap-1.5">
-                          <Mail className="w-3 h-3 text-amber-400" />
-                          <span>{selectedProject.procuringEntityEmail || 'bac@procuringentity.gov.ph'}</span>
-                        </p>
+                        <div className="flex flex-wrap items-center gap-4 pt-0.5">
+                          <p className="text-xs font-mono text-slate-300 flex items-center gap-1.5">
+                            <Phone className="w-3 h-3 text-cyan-400" />
+                            <span>{selectedProject.procuringEntityContactNumber || '(02) 8000-0000'}</span>
+                          </p>
+                          <p className="text-xs font-mono text-slate-300 flex items-center gap-1.5">
+                            <Mail className="w-3 h-3 text-amber-400" />
+                            <span>{selectedProject.procuringEntityEmail || 'bac@procuringentity.gov.ph'}</span>
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2397,15 +2641,15 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                     </div>
                   )}
 
-                  {/* 3. Statutory Post-Award Document Attachments (6 Slots) */}
+                  {/* 3. Statutory Post-Award Document Attachments */}
                   <div className="space-y-3 pt-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                         <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                        <span>Statutory Post-Award Document Attachments (6 Slots)</span>
+                        <span>Statutory Post-Award Document Attachments ({WIN_DOC_SLOTS.length} Slots)</span>
                       </span>
-                      <span className="text-[10px] font-mono text-slate-500">
-                        {Object.keys(winDocs).length} / 6 Documents Attached
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {Object.keys(winDocs).length} / {WIN_DOC_SLOTS.length} Documents Attached
                       </span>
                     </div>
 
@@ -2413,6 +2657,7 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                       {WIN_DOC_SLOTS.map(slot => {
                         const attached = winDocs[slot.key];
                         const hasFile = !!attached?.fileName;
+                        const isImg = attached?.fileName && /\.(png|jpe?g|webp)$/i.test(attached.fileName);
 
                         return (
                           <div
@@ -2429,7 +2674,11 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                                   Statutory Requirement
                                 </span>
                                 <h4 className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
-                                  <FileText className={`w-3.5 h-3.5 ${hasFile ? 'text-emerald-400' : 'text-slate-400'}`} />
+                                  {isImg ? (
+                                    <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
+                                  ) : (
+                                    <FileText className={`w-3.5 h-3.5 ${hasFile ? 'text-emerald-400' : 'text-slate-400'}`} />
+                                  )}
                                   <span>{slot.title}</span>
                                 </h4>
                               </div>
@@ -2462,7 +2711,7 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                                     type="button"
                                     onClick={() => handlePreviewSlotDoc(slot.key, slot.title, 'WIN_DOCS', attached)}
                                     className="p-1.5 bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white rounded-lg transition cursor-pointer"
-                                    title="Preview PDF"
+                                    title="Preview Document / Photo"
                                   >
                                     <Eye className="w-3.5 h-3.5" />
                                   </button>
@@ -2470,7 +2719,7 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                                     type="button"
                                     onClick={() => handleDeleteSlotDoc(slot.key, 'WIN_DOCS')}
                                     className="p-1.5 bg-red-600/30 hover:bg-red-600 text-red-300 hover:text-white rounded-lg transition cursor-pointer"
-                                    title="Delete PDF"
+                                    title="Delete Document / Photo"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -2482,10 +2731,10 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                             <div>
                               <label className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer">
                                 <Upload className="w-3.5 h-3.5 text-blue-400" />
-                                <span>{hasFile ? 'Replace PDF Document' : 'Upload PDF Document'}</span>
+                                <span>{hasFile ? 'Replace Document / Proof' : 'Upload Document / Proof'}</span>
                                 <input
                                   type="file"
-                                  accept=".pdf"
+                                  accept=".pdf,image/png,image/jpeg,image/jpg,image/webp"
                                   className="hidden"
                                   onChange={(e) => {
                                     const file = e.target.files?.[0];
@@ -2503,7 +2752,7 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
               )}
 
               {/* ═════════════════════════════════════════════════════════════ */}
-              {/* TAB 3: FINAL PAYMENT DOCUMENT (GOV FINAL, BRGY, BIR, S-CURVE) */}
+              {/* TAB 3: FINAL PAYMENT DOCUMENT (VOUCHER, CERT, CHEQUE, INVOICE) */}
               {/* ═════════════════════════════════════════════════════════════ */}
               {activeTabSection === 'final_payment' && (
                 <div className="space-y-4">
@@ -2514,15 +2763,19 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                         <span>Final Payment Document — Contract Completion & Clearance Dossier</span>
                       </h3>
                       <p className="text-xs text-slate-400">
-                        Upload required government project closeout documents, barangay certifications, BIR tax clearance, and final progress S-Curve.
+                        Upload required disbursement voucher, certificate of completion / acceptance, cheque photo, sales/service invoice, barangay certification, BIR tax clearance, and final progress S-Curve.
                       </p>
                     </div>
+                    <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                      {Object.keys(finalPaymentDocs).length} / {FINAL_PAYMENT_DOC_SLOTS.length} Uploaded
+                    </span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {FINAL_PAYMENT_DOC_SLOTS.map(slot => {
                       const attached = finalPaymentDocs[slot.key];
                       const hasFile = !!attached?.fileName;
+                      const isImg = attached?.fileName && /\.(png|jpe?g|webp)$/i.test(attached.fileName);
 
                       return (
                         <div
@@ -2536,10 +2789,14 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                           <div className="flex items-start justify-between gap-2">
                             <div>
                               <span className="text-[10px] font-mono uppercase font-bold text-slate-400 block">
-                                Completion Requirement
+                                Payment Closeout Item
                               </span>
                               <h4 className="text-xs font-bold text-white flex items-center gap-1.5 mt-0.5">
-                                <FileText className={`w-3.5 h-3.5 ${hasFile ? 'text-emerald-400' : 'text-slate-400'}`} />
+                                {isImg ? (
+                                  <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
+                                ) : (
+                                  <FileText className={`w-3.5 h-3.5 ${hasFile ? 'text-emerald-400' : 'text-slate-400'}`} />
+                                )}
                                 <span>{slot.title}</span>
                               </h4>
                             </div>
@@ -2572,7 +2829,7 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                                   type="button"
                                   onClick={() => handlePreviewSlotDoc(slot.key, slot.title, 'FINAL_PAYMENT', attached)}
                                   className="p-1.5 bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white rounded-lg transition cursor-pointer"
-                                  title="Preview PDF"
+                                  title="Preview Document / Photo"
                                 >
                                   <Eye className="w-3.5 h-3.5" />
                                 </button>
@@ -2580,7 +2837,7 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                                   type="button"
                                   onClick={() => handleDeleteSlotDoc(slot.key, 'FINAL_PAYMENT')}
                                   className="p-1.5 bg-red-600/30 hover:bg-red-600 text-red-300 hover:text-white rounded-lg transition cursor-pointer"
-                                  title="Delete PDF"
+                                  title="Delete Document / Photo"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -2592,10 +2849,10 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                           <div>
                             <label className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer">
                               <Upload className="w-3.5 h-3.5 text-emerald-400" />
-                              <span>{hasFile ? 'Replace PDF Document' : 'Upload PDF Document'}</span>
+                              <span>{hasFile ? 'Replace Document / Proof' : 'Upload Document / Proof'}</span>
                               <input
                                 type="file"
-                                accept=".pdf"
+                                accept=".pdf,image/png,image/jpeg,image/jpg,image/webp"
                                 className="hidden"
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];
@@ -3123,79 +3380,207 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
               )}
 
               {/* ═════════════════════════════════════════════════════════════ */}
-              {/* TAB 6: OTHER DOCUMENTS (CUSTOM SUPPLEMENTARY PROJECT FILES)   */}
+              {/* TAB 6: STATUTORY DOCUMENTS (15 STATUTORY PROCUREMENT FORMS)   */}
               {/* ═════════════════════════════════════════════════════════════ */}
-              {activeTabSection === 'other_docs' && (
-                <div className="space-y-4">
+              {(activeTabSection === 'statutory_docs' || activeTabSection === 'other_docs') && (
+                <div className="space-y-6">
+                  {/* Top Header & Metrics */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
                     <div>
                       <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-blue-400" />
-                        <span>Other Documents — Supplementary Attachments</span>
+                        <Building2 className="w-4 h-4 text-emerald-400" />
+                        <span>Statutory Construction & Procurement Documents (15 Forms)</span>
                       </h3>
                       <p className="text-xs text-slate-400">
-                        Upload and store custom supplemental bid bulletins, pre-bid minutes, site inspection logs, and technical notes for this project.
+                        Official Philippine Government (RA 9184 / RA 12009 / DPWH) statutory execution, billing, and close-out documents on Philippine Legal (8.5" x 13").
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => setShowNewOtherDocModal(true)}
-                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Other Document</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 bg-emerald-950/80 text-emerald-300 border border-emerald-700/50 rounded-lg text-xs font-mono font-bold">
+                        {Object.keys(statutoryDocs).length} / {STATUTORY_DOCUMENT_SLOTS.length} COMPLETED
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Other Docs List */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                    {otherDocs.length === 0 ? (
-                      <div className="col-span-2 p-8 text-center bg-slate-950/40 rounded-xl border border-dashed border-slate-800 text-slate-500 text-xs">
-                        No supplementary documents added yet. Click "+ Add Other Document" to attach additional files.
-                      </div>
-                    ) : (
-                      otherDocs.map(doc => (
-                        <div key={doc.slotKey} className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl flex items-center justify-between">
-                          <div className="truncate mr-3">
-                            <h4 className="text-xs font-bold text-white truncate">{doc.slotTitle}</h4>
-                            <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
-                              {doc.fileName} • {doc.fileSizeBytes ? `${(doc.fileSizeBytes / 1024).toFixed(1)} KB` : ''}
+                  {/* 15 Statutory Document Cards Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+                    {STATUTORY_DOCUMENT_SLOTS.map((slot) => {
+                      const docMeta = statutoryDocs[slot.key];
+                      const isCompleted = !!docMeta;
+
+                      return (
+                        <div
+                          key={slot.key}
+                          className={`p-4 rounded-xl border transition flex flex-col justify-between relative group ${
+                            isCompleted
+                              ? 'bg-slate-950/80 border-emerald-500/40 shadow-lg shadow-emerald-950/20 ring-1 ring-emerald-500/20'
+                              : 'bg-slate-950/50 hover:bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="px-2 py-0.5 bg-blue-950 text-blue-300 font-mono font-bold text-[10px] rounded border border-blue-800/60">
+                                {slot.code}
+                              </span>
+
+                              {isCompleted ? (
+                                <span className="text-[10px] font-bold bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-700/60 flex items-center gap-1 font-mono">
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                  READY / ATTACHED
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono">
+                                  PENDING
+                                </span>
+                              )}
+                            </div>
+
+                            <h4 className="text-xs font-bold text-white mt-2 leading-snug">
+                              {slot.name}
+                            </h4>
+
+                            <p className="text-[11px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                              {slot.description}
                             </p>
+
+                            {isCompleted && (
+                              <p className="text-[10px] text-slate-500 font-mono mt-2">
+                                {docMeta.fileName || `${slot.code}.pdf`} • {docMeta.fileSizeBytes ? `${(docMeta.fileSizeBytes / 1024).toFixed(1)} KB` : 'Attached'}
+                              </p>
+                            )}
                           </div>
 
-                          <div className="flex items-center gap-1 shrink-0">
+                          {/* Action Buttons */}
+                          <div className="flex items-center gap-1.5 pt-3 mt-3 border-t border-slate-800/80">
                             <button
-                              onClick={async () => {
-                                let dataUrl = doc.fileDataUrl;
-                                if (!dataUrl) {
-                                  dataUrl = await loadPdfData(`proj_other_${tenantId}_${projectScopeKey}_${doc.slotKey}`);
-                                }
-                                if (dataUrl) {
-                                  setPreviewPdfModal({ title: doc.slotTitle, fileName: doc.fileName || 'document.pdf', dataUrl });
-                                }
-                              }}
-                              className="p-1.5 bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white rounded-lg transition cursor-pointer"
-                              title="Preview"
+                              onClick={() => setActiveStatutoryModal(slot.templateType)}
+                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow ${
+                                isCompleted
+                                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-600/20'
+                              }`}
                             >
-                              <Eye className="w-3.5 h-3.5" />
+                              <Edit3 className="w-3 h-3" />
+                              <span>{isCompleted ? 'Edit Form' : slot.isUploadOnly ? 'Upload Doc' : 'Fill Form'}</span>
                             </button>
-                            <button
-                              onClick={() => {
-                                if (confirm(`Delete ${doc.slotTitle}?`)) {
-                                  const updated = otherDocs.filter(d => d.slotKey !== doc.slotKey);
-                                  setOtherDocs(updated);
-                                  localStorage.setItem(`bidocs_other_docs_${tenantId}_${projectScopeKey}`, JSON.stringify(updated));
-                                }
-                              }}
-                              className="p-1.5 bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white rounded-lg transition cursor-pointer"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+
+                            {isCompleted && (
+                              <>
+                                <button
+                                  onClick={() => handlePreviewStatutoryDoc(slot.key, slot.name)}
+                                  className="p-1.5 bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white rounded-lg transition cursor-pointer border border-blue-500/30"
+                                  title="View PDF"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    let dataUrl = docMeta?.fileDataUrl;
+                                    if (!dataUrl) {
+                                      const docKey = `proj_statutory_${tenantId}_${projectScopeKey}_${slot.key}`;
+                                      dataUrl = (await loadPdfData(docKey)) || '';
+                                    }
+                                    if (dataUrl) {
+                                      const a = document.createElement('a');
+                                      a.href = dataUrl;
+                                      a.download = `${slot.code}_${projectScopeKey}.pdf`;
+                                      document.body.appendChild(a);
+                                      a.click();
+                                      document.body.removeChild(a);
+                                    }
+                                  }}
+                                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition cursor-pointer border border-slate-700"
+                                  title="Download PDF"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteStatutoryDoc(slot.key, slot.name)}
+                                  className="p-1.5 bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white rounded-lg transition cursor-pointer border border-red-500/30"
+                                  title="Delete Attachment"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
-                      ))
-                    )}
+                      );
+                    })}
+                  </div>
+
+                  {/* Supplementary Attachments Section */}
+                  <div className="pt-6 border-t border-slate-800 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-xs font-bold text-white flex items-center gap-2">
+                          <FileText className="w-3.5 h-3.5 text-blue-400" />
+                          <span>Custom Supplementary Project Attachments</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          Upload supplemental bid bulletins, pre-bid minutes, site inspection logs, and custom technical notes.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => setShowNewOtherDocModal(true)}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Add Supplementary File</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {otherDocs.length === 0 ? (
+                        <div className="col-span-2 p-6 text-center bg-slate-950/40 rounded-xl border border-dashed border-slate-800 text-slate-500 text-xs">
+                          No supplemental files attached. Click "+ Add Supplementary File" to attach additional documents.
+                        </div>
+                      ) : (
+                        otherDocs.map(doc => (
+                          <div key={doc.slotKey} className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl flex items-center justify-between">
+                            <div className="truncate mr-3">
+                              <h4 className="text-xs font-bold text-white truncate">{doc.slotTitle}</h4>
+                              <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
+                                {doc.fileName} • {doc.fileSizeBytes ? `${(doc.fileSizeBytes / 1024).toFixed(1)} KB` : ''}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={async () => {
+                                  let dataUrl = doc.fileDataUrl;
+                                  if (!dataUrl) {
+                                    dataUrl = await loadPdfData(`proj_other_${tenantId}_${projectScopeKey}_${doc.slotKey}`);
+                                  }
+                                  if (dataUrl) {
+                                    setPreviewPdfModal({ title: doc.slotTitle, fileName: doc.fileName || 'document.pdf', dataUrl });
+                                  }
+                                }}
+                                className="p-1.5 bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white rounded-lg transition cursor-pointer"
+                                title="Preview"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Delete ${doc.slotTitle}?`)) {
+                                    const updated = otherDocs.filter(d => d.slotKey !== doc.slotKey);
+                                    setOtherDocs(updated);
+                                    localStorage.setItem(`bidocs_other_docs_${tenantId}_${projectScopeKey}`, JSON.stringify(updated));
+                                  }
+                                }}
+                                className="p-1.5 bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white rounded-lg transition cursor-pointer"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -3853,6 +4238,324 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
           procuringEntity={selectedProject.procuringEntity || 'Bids and Awards Committee'}
           activeEnvelope="ENVELOPE_1"
           initialFolderCopy={mergedModalFolderCopy}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* 15 STATUTORY DOCUMENT TEMPLATE MODALS (OVERLAYS)                    */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {activeStatutoryModal === 'RLA' && (
+        <RlaModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('rla', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'SWA' && (
+        <SwaModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('swa', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'PROGRESS_PHOTO' && (
+        <ProgressphotoModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('progress_photo', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'MTS' && (
+        <MtsModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('mts', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'CA' && (
+        <CaModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('ca', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'ABP' && (
+        <AbpModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('abp', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'WS' && (
+        <WsModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('ws', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'BS' && (
+        <BsModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('bs', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'CMS' && (
+        <CmsModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('cms', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'EUP' && (
+        <EupModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('eup', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'FPL' && (
+        <FplModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('fpl', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'MPDS' && (
+        <MpdsModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('mpds', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'PERT' && (
+        <PertModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('pert', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'SOTE' && (
+        <SoteModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('sote', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'TOA' && (
+        <ToaModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('toa', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
         />
       )}
 

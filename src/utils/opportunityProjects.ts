@@ -7,6 +7,10 @@ export interface OpportunityProjectOption {
   title: string;
   procuringEntity: string;
   procuringEntityAddress?: string;
+  procuringEntityContactPerson?: string;
+  procuringEntityPosition?: string;
+  headOfProcuringEntity?: string;
+  headOfProcuringEntityPosition?: string;
   location?: string;
   abc: string;
   category?: 'Goods' | 'Infrastructure' | string;
@@ -117,6 +121,10 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
             ? item.procuringEntity
             : item.procuringEntity?.name || item.procuringEntityName || 'Government Agency',
           procuringEntityAddress: projectAddress,
+          procuringEntityContactPerson: item.procuringEntityContactPerson || '',
+          procuringEntityPosition: item.procuringEntityPosition || '',
+          headOfProcuringEntity: item.headOfProcuringEntity || '',
+          headOfProcuringEntityPosition: item.headOfProcuringEntityPosition || '',
           location: projectAddress,
           abc: item.approvedBudgetStr || (item.approvedBudgetValue ? `₱${Number(item.approvedBudgetValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : (item.approvedBudget ? `₱${Number(item.approvedBudget).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '₱0.00')),
           category: (() => {

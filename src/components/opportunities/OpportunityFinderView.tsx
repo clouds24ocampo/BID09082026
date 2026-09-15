@@ -252,6 +252,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
   const [procuringEntityEmail, setProcuringEntityEmail] = useState('');
   const [procuringEntityPosition, setProcuringEntityPosition] = useState('');
   const [procuringEntityContactPerson, setProcuringEntityContactPerson] = useState('');
+  const [headOfProcuringEntity, setHeadOfProcuringEntity] = useState('');
+  const [headOfProcuringEntityPosition, setHeadOfProcuringEntityPosition] = useState('');
 
   const [procurementType, setProcurementType] = useState<ProcurementType>('Goods & Supply');
 
@@ -305,6 +307,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     setProcuringEntityEmail('');
     setProcuringEntityPosition('');
     setProcuringEntityContactPerson('');
+    setHeadOfProcuringEntity('');
+    setHeadOfProcuringEntityPosition('');
     setProcurementType('Goods & Supply');
     setDateCreated(new Date().toISOString().split('T')[0]);
     setDatePublished(new Date().toISOString().split('T')[0]);
@@ -338,6 +342,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     setProcuringEntityEmail(op.procuringEntityEmail || '');
     setProcuringEntityPosition(op.procuringEntityPosition || '');
     setProcuringEntityContactPerson(op.procuringEntityContactPerson || '');
+    setHeadOfProcuringEntity(op.headOfProcuringEntity || '');
+    setHeadOfProcuringEntityPosition(op.headOfProcuringEntityPosition || '');
     setProcurementType(op.procurementType || 'Goods & Supply');
     setDateCreated(op.dateCreated || new Date().toISOString().split('T')[0]);
     setDatePublished(op.datePublished || new Date().toISOString().split('T')[0]);
@@ -489,6 +495,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     const finalEmail = procuringEntityEmail.trim() || 'bac_secretariat@procuring.gov.ph';
     const finalPosition = procuringEntityPosition.trim() || 'BAC Secretariat Head';
     const finalContactPerson = procuringEntityContactPerson.trim();
+    const finalHope = headOfProcuringEntity.trim();
+    const finalHopePos = headOfProcuringEntityPosition.trim();
     const finalPdfName = resolvedPdfName || `${finalPhilgepsRefNo}_Notice.pdf`;
 
     if (editingItem) {
@@ -507,6 +515,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         procuringEntityEmail: finalEmail,
         procuringEntityPosition: finalPosition,
         procuringEntityContactPerson: finalContactPerson,
+        headOfProcuringEntity: finalHope,
+        headOfProcuringEntityPosition: finalHopePos,
         procurementType,
         approvedBudget: numBudget,
         dateCreated: dateCreated || new Date().toISOString().split('T')[0],
@@ -542,6 +552,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         procuringEntityEmail: finalEmail,
         procuringEntityPosition: finalPosition,
         procuringEntityContactPerson: finalContactPerson,
+        headOfProcuringEntity: finalHope,
+        headOfProcuringEntityPosition: finalHopePos,
         procurementType,
         legalRegime: 'RA_12009_NGPA',
         approvedBudget: numBudget,
@@ -887,13 +899,20 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
                     <span className="text-slate-400 text-[10px] uppercase font-mono block">Procuring Entity</span>
                     <p className="font-bold text-white">{viewingItem.procuringEntity}</p>
-                    {viewingItem.procuringEntityContactPerson && (
-                      <p className="text-[11px] text-cyan-400 font-semibold flex items-center gap-1 mt-0.5">
-                        <span className="text-slate-400">Contact:</span>
-                        <strong className="text-white">{viewingItem.procuringEntityContactPerson}</strong>
+                    {viewingItem.headOfProcuringEntity && (
+                      <p className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
+                        <span className="text-slate-400">HoPE/Signatory:</span>
+                        <strong className="text-white">{viewingItem.headOfProcuringEntity}</strong>
+                        <span className="text-slate-500 font-normal">({viewingItem.headOfProcuringEntityPosition || 'Head of Procuring Entity'})</span>
                       </p>
                     )}
-                    <p className="text-[11px] text-slate-400">{viewingItem.procuringEntityPosition || 'Procurement Officer'}</p>
+                    {viewingItem.procuringEntityContactPerson && (
+                      <p className="text-[11px] text-cyan-400 font-semibold flex items-center gap-1 mt-0.5">
+                        <span className="text-slate-400">BAC Contact:</span>
+                        <strong className="text-white">{viewingItem.procuringEntityContactPerson}</strong>
+                        <span className="text-slate-500 font-normal">({viewingItem.procuringEntityPosition || 'BAC Secretariat'})</span>
+                      </p>
+                    )}
                   </div>
 
                   <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
@@ -1237,24 +1256,52 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">Name of Contact Person</label>
+                        <label className="block text-slate-300 font-medium mb-1">
+                          Head of Procuring Entity (HoPE) / Official Signatory
+                        </label>
+                        <input
+                          type="text"
+                          value={headOfProcuringEntity}
+                          onChange={(e) => setHeadOfProcuringEntity(e.target.value)}
+                          placeholder="e.g. Engr. Melchor B. Valdez / Hon. Mayor Juan Doe"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-medium mb-1">HoPE Official Position / Title</label>
+                        <input
+                          type="text"
+                          value={headOfProcuringEntityPosition}
+                          onChange={(e) => setHeadOfProcuringEntityPosition(e.target.value)}
+                          placeholder="e.g. District Engineer / Regional Director / City Mayor"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-300 font-medium mb-1">
+                          BAC Contact Person (PhilGEPS Liaison)
+                        </label>
                         <input
                           type="text"
                           value={procuringEntityContactPerson}
                           onChange={(e) => setProcuringEntityContactPerson(e.target.value)}
                           placeholder="e.g. Engr. Maria A. Santos"
-                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">Officer Position</label>
+                        <label className="block text-slate-300 font-medium mb-1">BAC Officer Position</label>
                         <input
                           type="text"
                           value={procuringEntityPosition}
                           onChange={(e) => setProcuringEntityPosition(e.target.value)}
-                          placeholder="BAC Secretariat Head"
-                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                          placeholder="BAC Secretariat Head / Procurement Officer"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                         />
                       </div>
                     </div>
