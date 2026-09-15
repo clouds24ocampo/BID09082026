@@ -23,6 +23,7 @@ import {
   Clock,
   ShieldCheck,
   CheckCircle2,
+  FileSignature,
   Edit3,
   Trash2,
   Copy,
@@ -56,6 +57,7 @@ import {
   Sparkles,
   RefreshCw,
   HelpCircle,
+  BookOpen,
   Folder,
   FileStack,
   Maximize2,
@@ -80,6 +82,8 @@ import MpdsModal from '../vault/templates/mpds';
 import PertModal from '../vault/templates/pert';
 import SoteModal from '../vault/templates/sote';
 import ToaModal from '../vault/templates/toa';
+import PsdModal from '../vault/templates/psd';
+import StatutoryDocumentsGuideModal from '../vault/templates/StatutoryDocumentsGuideModal';
 
 interface ProjectProfileViewProps {
   setActiveTab: (tab: string) => void;
@@ -141,7 +145,7 @@ const EXPENSE_CATEGORIES = [
 const WIN_DOC_SLOTS = [
   { key: 'post_qual', title: 'Post Qualification', desc: 'Post-Qualification Notice, Verification & Evaluation Clearances' },
   { key: 'noa', title: 'Notice of Award (NOA)', desc: 'Official Notice of Award issued by the Head of Procuring Entity' },
-  { key: 'performance_bond', title: 'Performance Bond', desc: 'Callable upon demand Surety Bond / Bank Guarantee / Cash Bond' },
+  { key: 'performance_bond', title: 'Performance Security: PSD / Performance Bond', desc: 'Performance Securing Declaration (PSD) OR Callable Surety Bond / Bank Guarantee' },
   { key: 'contract', title: 'Contract Agreement', desc: 'Signed and Notarized Government Contract Agreement' },
   { key: 'ntp', title: 'Notice to Proceed (NTP)', desc: 'Official Notice to Proceed with issuance date and contract effectivity' },
   { key: 'delivery_receipt', title: 'Delivery Receipt (DR)', desc: 'Official Delivery Receipt (DR) signed and stamped by Procuring Entity receiving personnel' },
@@ -456,6 +460,9 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
   const [finalPaymentDocs, setFinalPaymentDocs] = useState<Record<string, ProjectDocAttachment>>({});
   const [statutoryDocs, setStatutoryDocs] = useState<Record<string, ProjectDocAttachment>>({});
   const [activeStatutoryModal, setActiveStatutoryModal] = useState<string | null>(null);
+  const [showPsdModal, setShowPsdModal] = useState(false);
+  const [showStatutoryGuideModal, setShowStatutoryGuideModal] = useState(false);
+  const [selectedStatutoryGuideCode, setSelectedStatutoryGuideCode] = useState<string>('RLA');
   const [otherDocs, setOtherDocs] = useState<ProjectDocAttachment[]>([]);
   
   // Expenses State
@@ -997,6 +1004,43 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleSavePsdToSlotDoc = async (dataUrl?: string, customName?: string) => {
+    if (!dataUrl) {
+      setShowPsdModal(false);
+      return;
+    }
+    const slotKey = 'performance_bond';
+    const slotTitle = 'Performance Security: PSD / Performance Bond';
+    const category = 'WIN_DOCS';
+    const docKey = `proj_${category.toLowerCase()}_${tenantId}_${projectScopeKey}_${slotKey}`;
+    try {
+      await savePdfData(docKey, dataUrl);
+    } catch (err) {
+      console.error('[ProjectProfileView] Error saving PSD to IndexedDB:', err);
+    }
+    const fileName = `${(customName || 'Performance_Securing_Declaration_PSD').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+    const approxBytes = Math.round((dataUrl.length * 3) / 4);
+    const docItem: ProjectDocAttachment = {
+      slotKey,
+      slotTitle,
+      category,
+      fileName,
+      fileSizeBytes: approxBytes,
+      uploadedAt: new Date().toISOString(),
+      fileDataUrl: dataUrl
+    };
+    const updated: Record<string, ProjectDocAttachment> = { ...winDocs, [slotKey]: docItem };
+    setWinDocs(updated);
+    try {
+      const cleanStorage: Record<string, ProjectDocAttachment> = { ...updated };
+      Object.keys(cleanStorage).forEach(k => {
+        cleanStorage[k] = { ...cleanStorage[k], fileDataUrl: undefined };
+      });
+      localStorage.setItem(`bidocs_win_docs_${tenantId}_${projectScopeKey}`, JSON.stringify(cleanStorage));
+    } catch (e) {}
+    setShowPsdModal(false);
   };
 
   const handlePreviewSlotDoc = async (
@@ -2728,21 +2772,54 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                             )}
 
                             {/* Upload / Replace Action */}
-                            <div>
-                              <label className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer">
-                                <Upload className="w-3.5 h-3.5 text-blue-400" />
-                                <span>{hasFile ? 'Replace Document / Proof' : 'Upload Document / Proof'}</span>
-                                <input
-                                  type="file"
-                                  accept=".pdf,image/png,image/jpeg,image/jpg,image/webp"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) handleUploadSlotDoc(slot.key, slot.title, 'WIN_DOCS', file);
-                                  }}
-                                />
-                              </label>
-                            </div>
+                            {slot.key === 'performance_bond' ? (
+                              <div className="space-y-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowPsdModal(true)}
+                                    className="w-full py-2 px-2.5 bg-gradient-to-r from-emerald-600/30 to-teal-600/30 hover:from-emerald-600/40 hover:to-teal-600/40 text-emerald-300 border border-emerald-500/40 hover:border-emerald-500/60 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
+                                    title="Fill statutory GPPB Performance Securing Declaration (PSD) template"
+                                  >
+                                    <FileSignature className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span className="truncate">{hasFile ? 'Re-generate PSD' : 'Fill PSD Template'}</span>
+                                  </button>
+
+                                  <label className="w-full py-2 px-2.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer">
+                                    <Upload className="w-3.5 h-3.5 text-blue-400" />
+                                    <span className="truncate">{hasFile ? 'Replace File' : 'Upload PSD / Bond'}</span>
+                                    <input
+                                      type="file"
+                                      accept=".pdf,image/png,image/jpeg,image/jpg,image/webp"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleUploadSlotDoc(slot.key, slot.title, 'WIN_DOCS', file);
+                                      }}
+                                    />
+                                  </label>
+                                </div>
+                                <p className="text-[10px] text-slate-400 font-mono text-center">
+                                  Upload signed PSD or Surety Bond / Bank Guarantee, or fill PSD template
+                                </p>
+                              </div>
+                            ) : (
+                              <div>
+                                <label className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer">
+                                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                                  <span>{hasFile ? 'Replace Document / Proof' : 'Upload Document / Proof'}</span>
+                                  <input
+                                    type="file"
+                                    accept=".pdf,image/png,image/jpeg,image/jpg,image/webp"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleUploadSlotDoc(slot.key, slot.title, 'WIN_DOCS', file);
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -3397,6 +3474,18 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedStatutoryGuideCode('RLA');
+                          setShowStatutoryGuideModal(true);
+                        }}
+                        className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20 cursor-pointer"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>📘 Filing & Answering Guide</span>
+                      </button>
+
                       <span className="px-2.5 py-1 bg-emerald-950/80 text-emerald-300 border border-emerald-700/50 rounded-lg text-xs font-mono font-bold">
                         {Object.keys(statutoryDocs).length} / {STATUTORY_DOCUMENT_SLOTS.length} COMPLETED
                       </span>
@@ -3420,9 +3509,23 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
                         >
                           <div>
                             <div className="flex items-start justify-between gap-2">
-                              <span className="px-2 py-0.5 bg-blue-950 text-blue-300 font-mono font-bold text-[10px] rounded border border-blue-800/60">
-                                {slot.code}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="px-2 py-0.5 bg-blue-950 text-blue-300 font-mono font-bold text-[10px] rounded border border-blue-800/60">
+                                  {slot.code}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedStatutoryGuideCode(slot.code);
+                                    setShowStatutoryGuideModal(true);
+                                  }}
+                                  className="px-1.5 py-0.5 bg-slate-800 hover:bg-emerald-950 text-slate-400 hover:text-emerald-300 border border-slate-700 hover:border-emerald-500/40 rounded text-[10px] font-mono flex items-center gap-1 transition cursor-pointer"
+                                  title={`View How to Answer Guide for ${slot.name}`}
+                                >
+                                  <HelpCircle className="w-3 h-3 text-emerald-400" />
+                                  <span>Guide</span>
+                                </button>
+                              </div>
 
                               {isCompleted ? (
                                 <span className="text-[10px] font-bold bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded border border-emerald-700/60 flex items-center gap-1 font-mono">
@@ -4556,6 +4659,33 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
             setActiveStatutoryModal(null);
           }}
           onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {showPsdModal && (
+        <PsdModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, customName) => {
+            handleSavePsdToSlotDoc(dataUrl, customName);
+          }}
+          onClose={() => setShowPsdModal(false)}
+        />
+      )}
+
+      {showStatutoryGuideModal && (
+        <StatutoryDocumentsGuideModal
+          initialCode={selectedStatutoryGuideCode}
+          onClose={() => setShowStatutoryGuideModal(false)}
         />
       )}
 

@@ -19,7 +19,7 @@ export default defineConfig({
     }
   ],
   build: {
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -43,6 +43,27 @@ export default defineConfig({
             return 'vendor';
           }
           if (normalized.includes('src/components/vault/templates/')) {
+            if (
+              normalized.includes('StatutoryDocumentsGuideModal') ||
+              normalized.includes('RLA') ||
+              normalized.includes('SWA') ||
+              normalized.includes('CA') ||
+              normalized.includes('MTS') ||
+              normalized.includes('sote') ||
+              normalized.includes('Bs') ||
+              normalized.includes('FPL') ||
+              normalized.includes('psd') ||
+              normalized.includes('pert') ||
+              normalized.includes('mpds') ||
+              normalized.includes('toa') ||
+              normalized.includes('EUP') ||
+              normalized.includes('CMS') ||
+              normalized.includes('ABP') ||
+              normalized.includes('WS') ||
+              normalized.includes('Progressphoto')
+            ) {
+              return 'statutory-templates';
+            }
             return 'vault-templates';
           }
           if (normalized.includes('src/components/covers/')) {

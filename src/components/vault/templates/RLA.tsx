@@ -15,8 +15,10 @@ import {
   FileText,
   DollarSign,
   ShieldCheck,
-  Briefcase
+  Briefcase,
+  BookOpen
 } from 'lucide-react';
+import StatutoryDocumentsGuideModal from './StatutoryDocumentsGuideModal';
 
 export interface RlaModalProps {
   item?: { id: string; code: string; name: string };
@@ -98,6 +100,7 @@ export const RlaModalContent: React.FC<RlaModalProps> = ({
   const [signatoryTitle, setSignatoryTitle] = useState<string>(tenant?.authorizedSignatory?.title || 'Authorized Managing Officer');
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [showGuideModal, setShowGuideModal] = useState<boolean>(false);
   const projectScopeKey = (projectRefNo || selectedOppId || activeProjectRefNo || 'default').replace(/[^a-zA-Z0-9]/g, '_');
 
   const advanceAmount = (contractAmount * (advanceRate / 100));
@@ -288,6 +291,15 @@ export const RlaModalContent: React.FC<RlaModalProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowGuideModal(true)}
+            className="px-3 py-1.5 bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border border-emerald-500/40 cursor-pointer"
+            title="View Step-by-Step Filing & Answering Guide"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Filing Guide</span>
+          </button>
+
           <button
             onClick={handleExportPdf}
             disabled={isSaving}
@@ -691,6 +703,13 @@ export const RlaModalContent: React.FC<RlaModalProps> = ({
           </div>
         </div>
       </div>
+
+      {showGuideModal && (
+        <StatutoryDocumentsGuideModal
+          initialCode="RLA"
+          onClose={() => setShowGuideModal(false)}
+        />
+      )}
     </div>
   );
 };

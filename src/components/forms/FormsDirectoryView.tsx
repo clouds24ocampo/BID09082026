@@ -6,6 +6,7 @@ import { TechnicalSpecifications } from '../vault/templates/TechnicalSpecificati
 import { FrameworkAgreementList } from '../vault/templates/FrameworkAgreementList';
 import { OmnibusSwornStatementModal } from '../vault/templates/OmnibusSwornStatementModal';
 import { BidSecuringDeclarationModal } from '../vault/templates/BidSecuringDeclarationModal';
+import PsdModal from '../vault/templates/psd';
 import { PdfPreviewModal } from '../vault/PdfPreviewModal';
 import VaultErrorBoundary from '../common/VaultErrorBoundary';
 import { savePdfData, loadPdfData as loadPdfDataFromDB } from '../../utils/vaultIndexedDB';
@@ -65,6 +66,16 @@ const OFFICIAL_NOTARIZED_DOCS: FormItem[] = [
     format: 'TEMPLATE',
     notaryRequirement: 'Requires Notary Public Jurat & Government-issued ID details',
     description: 'Statutory notarized bid security undertaking binding the bidder to execute the contract if awarded within bid validity period.'
+  },
+  {
+    id: 'form-psd',
+    formCode: 'GPPB-PSD-2025',
+    title: 'Performance Securing Declaration (Notarized PSD - GPPB Standard)',
+    category: 'NOTARIZED',
+    governingLaw: 'GPPB Res. No. 09-2020 / RA 9184 & RA 12009',
+    format: 'TEMPLATE',
+    notaryRequirement: 'Requires Notary Public Jurat & Government-issued ID details',
+    description: 'Official statutory alternative to performance bond guaranteeing faithful compliance within 10 days from Notice of Award (NOA).'
   }
 ];
 
@@ -87,7 +98,7 @@ export const FormsDirectoryView: React.FC = () => {
   const [activeProject, setActiveProject] = useState<OpportunityProjectOption | null>(null);
 
   // Active Interactive Template Modal State
-  const [activeTemplateModal, setActiveTemplateModal] = useState<'SEC-VI' | 'SEC-VII' | 'FAL-01' | 'GPPB-OSS-2025' | 'GPPB-BSD-2025' | null>(null);
+  const [activeTemplateModal, setActiveTemplateModal] = useState<'SEC-VI' | 'SEC-VII' | 'FAL-01' | 'GPPB-OSS-2025' | 'GPPB-BSD-2025' | 'GPPB-PSD-2025' | null>(null);
 
   // Load real saved opportunity projects & saved completed forms from IndexedDB + localStorage
   useEffect(() => {
@@ -224,6 +235,8 @@ export const FormsDirectoryView: React.FC = () => {
       setActiveTemplateModal('GPPB-OSS-2025');
     } else if (form.formCode === 'GPPB-BSD-2025') {
       setActiveTemplateModal('GPPB-BSD-2025');
+    } else if (form.formCode === 'GPPB-PSD-2025') {
+      setActiveTemplateModal('GPPB-PSD-2025');
     } else {
       alert(
         `Generates notarized template "${form.title}" pre-filled for project [${activeProject?.refNo || 'N/A'}] and corporate entity "${currentTenant?.companyName || 'Bidding Entity'}".`
@@ -700,6 +713,32 @@ export const FormsDirectoryView: React.FC = () => {
                 id: `notarized-bsd-${Date.now()}`,
                 formCode: 'GPPB-BSD-2025',
                 title: customName || 'Bid Securing Declaration / Bid Security',
+                projectRefNo: projRef || activeProject?.refNo || '',
+                projectTitle: projTitle || activeProject?.title || 'Bidding Opportunity',
+                procuringEntity: activeProject?.procuringEntity || 'Procuring Agency',
+                fileDataUrl: dataUrl,
+                completedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                versionNumber: 1
+              };
+              saveCompletedForm(newCompleted);
+              setActiveTemplateModal(null);
+              setFormsSubTab('COMPLETED');
+            }}
+            onClose={() => setActiveTemplateModal(null)}
+          />
+        )}
+
+        {activeTemplateModal === 'GPPB-PSD-2025' && (
+          <PsdModal
+            tenant={currentTenant}
+            activeProjectRefNo={activeProject?.refNo}
+            activeProjectTitle={activeProject?.title}
+            activeProcuringEntity={activeProject?.procuringEntity}
+            onSaveAndComplete={(dataUrl, customName, projRef, projTitle) => {
+              const newCompleted: CompletedNotarizedForm = {
+                id: `notarized-psd-${Date.now()}`,
+                formCode: 'GPPB-PSD-2025',
+                title: customName || 'Performance Securing Declaration (Notarized PSD)',
                 projectRefNo: projRef || activeProject?.refNo || '',
                 projectTitle: projTitle || activeProject?.title || 'Bidding Opportunity',
                 procuringEntity: activeProject?.procuringEntity || 'Procuring Agency',
