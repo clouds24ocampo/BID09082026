@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import {
   X,
   Printer,
@@ -441,25 +440,7 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
               </div>
 
               {/* Page 1 Footer */}
-              <div className="pt-2 border-t border-slate-300 flex items-center justify-between text-[8.5pt] font-mono text-slate-700">
-                <div className="flex items-center gap-2">
-                  <DocumentQrCode
-                    details={{
-                      companyName: companyName,
-                      documentName: 'Omnibus Sworn Statement (Page 1 of 2)',
-                      documentNumber: `EXHIBIT-OSS-${projectRefNo}-P1`,
-                      projectTitle: projectTitle,
-                      projectRefNo: projectRefNo,
-                      procuringEntity: procuringEntity,
-                      dateTimeSubmitted: dateTimeSubmitted || 'March 19, 2026',
-                      documentCategory: 'Notarized Documents',
-                      generatedBy: companyName
-                    }}
-                    size={42}
-                    showCaption={false}
-                  />
-                  <span className="text-[7.5pt] text-slate-500 font-sans uppercase tracking-wider font-semibold">Official Verification QR</span>
-                </div>
+              <div className="pt-2 border-t border-slate-300 flex items-center justify-end text-[8.5pt] font-mono text-slate-700">
                 <span className="font-bold font-mono">Page 1 of 2</span>
               </div>
 
@@ -531,25 +512,7 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
               </div>
 
               {/* Page 2 Footer */}
-              <div className="pt-2 border-t border-slate-300 flex items-center justify-between text-[8.5pt] font-mono text-slate-700">
-                <div className="flex items-center gap-2">
-                  <DocumentQrCode
-                    details={{
-                      companyName: companyName,
-                      documentName: 'Omnibus Sworn Statement (Page 2 of 2)',
-                      documentNumber: `EXHIBIT-OSS-${projectRefNo}-P2`,
-                      projectTitle: projectTitle,
-                      projectRefNo: projectRefNo,
-                      procuringEntity: procuringEntity,
-                      dateTimeSubmitted: dateTimeSubmitted || 'March 19, 2026',
-                      documentCategory: 'Notarized Documents',
-                      generatedBy: companyName
-                    }}
-                    size={42}
-                    showCaption={false}
-                  />
-                  <span className="text-[7.5pt] text-slate-500 font-sans uppercase tracking-wider font-semibold">Official Verification QR</span>
-                </div>
+              <div className="pt-2 border-t border-slate-300 flex items-center justify-end text-[8.5pt] font-mono text-slate-700">
                 <span className="font-bold font-mono">Page 2 of 2</span>
               </div>
 

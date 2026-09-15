@@ -1,29 +1,48 @@
-const DEBUG_ENDPOINT = 'http://127.0.0.1:7907/ingest/d6ebe6e0-0ba7-4730-81da-20a89f9eb1cb';
-const DEBUG_SESSION = '8f90b6';
+/**
+ * debugLog.ts
+ * Production-Safe Diagnostics & Telemetry Utility.
+ * 
+ * In development, provides formatted diagnostic traces in the browser console.
+ * In production, operates silently with zero network overhead unless a remote
+ * telemetry endpoint is explicitly configured via VITE_TELEMETRY_ENDPOINT.
+ */
+
+const metaEnv = typeof import.meta !== 'undefined' ? (import.meta as any).env : undefined;
+const REMOTE_ENDPOINT = metaEnv?.VITE_TELEMETRY_ENDPOINT;
+const IS_DEV = metaEnv ? Boolean(metaEnv.DEV) : false;
 
 export function debugLog(
   location: string,
   message: string,
   data: Record<string, unknown> = {},
   hypothesisId?: string,
-  runId = 'pre-fix'
+  runId = 'prod'
 ): void {
-  // #region agent log
-  fetch(DEBUG_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': DEBUG_SESSION
-    },
-    body: JSON.stringify({
-      sessionId: DEBUG_SESSION,
-      runId,
-      hypothesisId,
-      location,
-      message,
-      data,
-      timestamp: Date.now()
-    })
-  }).catch(() => {});
-  // #endregion
+  // 1. Console diagnostics for local debugging (non-blocking)
+  if (IS_DEV && typeof console !== 'undefined' && console.debug) {
+    if (Object.keys(data).length > 0) {
+      console.debug(`[BiDOCS] ${location} -> ${message}`, data);
+    } else {
+      console.debug(`[BiDOCS] ${location} -> ${message}`);
+    }
+  }
+
+  // 2. Remote ingest only if explicitly configured
+  if (REMOTE_ENDPOINT && typeof fetch === 'function') {
+    fetch(REMOTE_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        runId,
+        hypothesisId,
+        location,
+        message,
+        data,
+        timestamp: Date.now()
+      })
+    }).catch(() => {});
+  }
 }
+

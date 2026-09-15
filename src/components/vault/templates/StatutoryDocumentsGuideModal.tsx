@@ -43,6 +43,76 @@ export interface StatutoryDocGuideItem {
 
 export const STATUTORY_GUIDES: StatutoryDocGuideItem[] = [
   {
+    code: 'PSD',
+    templateType: 'PSD',
+    name: 'Performance Securing Declaration (PSD - Section 76 RA 12009 / Framework Agreement)',
+    category: 'MOBILIZATION',
+    legalBasis: 'Section 76, Revised IRR of RA 12009 (NGPA) / GPPB Resolution No. 09-2020 / RA 9184',
+    submissionTiming: 'Within ten (10) calendar days from receipt of the Notice of Award (NOA), strictly prior to signing of the Contract.',
+    summary: 'Statutory notarized undertaking guaranteeing faithful performance by the winning bidder under the Contract in lieu of cash, bank guarantee, or surety bond. In Framework Agreements, it remains valid until replaced with an allowable performance security under Section 68.4 and 68.5 of IRR of RA 12009 or until issuance of Certificate of Final Acceptance.',
+    howToAnswer: [
+      {
+        field: 'Procuring Entity & Address',
+        description: 'Exact official name and office address of the Procuring Entity (Department, Bureau, LGU, SUC, or GOCC) as indicated in the Bidding Documents.',
+        recommendedValue: 'e.g. City Government of Pasig / DPWH Rizal 2nd District Engineering Office',
+        auditTip: 'Must match the Notice of Award (NOA) addressee exactly.'
+      },
+      {
+        field: 'Invitation to Bid / Reference No.',
+        description: 'Bidding Document Solicitation / Reference Number, PhilGEPS Reference Number, or Contract ID.',
+        recommendedValue: 'e.g. ITB No. 2026-INFRA-048 / PhilGEPS Ref No. 11094821'
+      },
+      {
+        field: 'Affiant / Authorized Signatory',
+        description: 'Full name and official corporate designation of the Authorized Managing Officer (AMO) or Designated Representative.',
+        recommendedValue: 'e.g. JUAN CARLOS DELA CRUZ (Authorized Managing Officer)',
+        auditTip: 'Must be backed by an active Notarized Secretary’s Certificate (for Corporation) or Special Power of Attorney (for Sole Proprietorship/JV).'
+      },
+      {
+        field: 'Legal Framework & Framework Agreement Clause',
+        description: 'Select RA 12009 (Section 76) or RA 9184. If the procurement involves a Framework Agreement, include paragraph 3(b) (Section 68.4 and 68.5 IRR of RA 12009).',
+        recommendedValue: 'Section 76 of IRR of RA 12009 (Framework Agreement checked if applicable)',
+        auditTip: 'Failure to retain paragraph 3(b) in Framework Agreement procurements is a ground for BAC rejection.'
+      },
+      {
+        field: 'Competent Evidence of Identity (Jurat)',
+        description: 'Government-issued photo identification as defined under 2004 Rules on Notarial Practice (A.M. No. 02-8-13-SC).',
+        recommendedValue: 'e.g. Philippine Passport / UMID / Driver’s License with ID No., date of issuance, and place of issuance',
+        auditTip: 'Community Tax Certificates (Cedula) alone are NOT acceptable as competent evidence of identity under Supreme Court rules.'
+      },
+      {
+        field: 'Notary Public Docket & Commission',
+        description: 'Notary’s commission details, Roll of Attorneys number, PTR number, IBP number, and docket numbers (Doc No., Page No., Book No., Series of 2026).',
+        recommendedValue: 'Completed upon notarization before a commissioned Notary Public in the jurisdiction of execution.'
+      }
+    ],
+    attachmentsChecklist: [
+      'Copy of Notice of Award (NOA) received by bidder',
+      'Board Resolution & Notarized Secretary’s Certificate or Special Power of Attorney (SPA)',
+      'Photocopy of Competent Government-issued ID of Affiant (with 3 specimen signatures)',
+      'Covering letter transmitting the signed PSD to the BAC Secretariat / Head of Procuring Entity'
+    ],
+    requiredSignatories: [
+      'Affiant (Authorized Managing Officer / Representative)',
+      'Commissioned Notary Public (with official notary seal and dry seal)'
+    ],
+    coaAuditTraps: [
+      'Submission after the 10-calendar-day window from NOA receipt constitutes failure to enter into contract and warrants forfeiture of bid security / blacklisting.',
+      'Using an expired Government ID or Cedula in the Jurat invalidates the notarization before BAC post-qualification and COA inspection.',
+      'Mismatch between the Affiant’s name on the PSD and the Secretary’s Certificate / Omnibus Sworn Statement.'
+    ],
+    officialCopySnippet: `I/We understand that, according to your conditions, to guarantee the faithful performance by the supplier/distributor/manufacturer/contractor/consultant of its obligations under the Contract, I/we shall submit a Performance Securing Declaration within a maximum period of ten (10) calendar days from the receipt of the Notice of Award prior to the signing of the Contract;
+
+I/We accept that: I/we will be automatically disqualified from bidding for any procurement contract with any Procuring Entity, upon receipt of your Blacklisting Order if I/We have violated my/our obligations under the Contract; and
+
+I/We understand that this Performance Securing Declaration shall cease to be valid upon:
+a. Issuance by the Procuring Entity of the Certificate of Final Acceptance, subject to the following conditions:
+   i.   Procuring Entity has no claims filed against the contract awardee;
+   ii.  Procuring Entity has no claims for labor and materials filed against the contractor; and
+   iii. Other terms of the contract; or
+b. replacement by the winning bidder of the submitted PSD with a performance security in any of the prescribed forms under Section 68.4 and 68.5 of the Implementing Rules and Regulations of RA No. 12009 as required by the Procuring Entity.`
+  },
+  {
     code: 'RLA',
     templateType: 'RLA',
     name: 'Request Letter for Advance Payment / 15% Mobilization',

@@ -12,6 +12,7 @@ import { PackagingCoversView } from './components/covers/PackagingCoversView';
 import { TenantSettingsView } from './components/settings/TenantSettingsView';
 import { CompanyProfileView } from './components/profile/CompanyProfileView';
 import { ProjectProfileView } from './components/projects/ProjectProfileView';
+import VaultErrorBoundary from './components/common/VaultErrorBoundary';
 
 const MainApp: React.FC = () => {
   const { currentUser, currentTenant, tenants } = useAuth();
@@ -29,15 +30,17 @@ const MainApp: React.FC = () => {
 
   return (
     <AppShell activeTab={activeTab} setActiveTab={setActiveTab}>
-      {activeTab === 'dashboard' && <DashboardView setActiveTab={setActiveTab} />}
-      {activeTab === 'opportunities' && <OpportunityFinderView setActiveTab={setActiveTab} />}
-      {activeTab === 'project-profile' && <ProjectProfileView setActiveTab={setActiveTab} />}
-      {activeTab === 'vault' && <DocumentVaultView />}
-      {activeTab === 'bids' && <BidPackageBuilderView />}
-      {activeTab === 'covers' && <PackagingCoversView />}
-      {activeTab === 'forms' && <FormsDirectoryView />}
-      {activeTab === 'profile' && <CompanyProfileView />}
-      {activeTab === 'settings' && <TenantSettingsView />}
+      <VaultErrorBoundary key={activeTab} fallbackTitle={`${activeTab.replace('-', ' ').toUpperCase()} Module View`}>
+        {activeTab === 'dashboard' && <DashboardView setActiveTab={setActiveTab} />}
+        {activeTab === 'opportunities' && <OpportunityFinderView setActiveTab={setActiveTab} />}
+        {activeTab === 'project-profile' && <ProjectProfileView setActiveTab={setActiveTab} />}
+        {activeTab === 'vault' && <DocumentVaultView />}
+        {activeTab === 'bids' && <BidPackageBuilderView />}
+        {activeTab === 'covers' && <PackagingCoversView />}
+        {activeTab === 'forms' && <FormsDirectoryView />}
+        {activeTab === 'profile' && <CompanyProfileView />}
+        {activeTab === 'settings' && <TenantSettingsView />}
+      </VaultErrorBoundary>
     </AppShell>
   );
 };

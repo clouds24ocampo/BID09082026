@@ -7,6 +7,7 @@ import { FrameworkAgreementList } from '../vault/templates/FrameworkAgreementLis
 import { OmnibusSwornStatementModal } from '../vault/templates/OmnibusSwornStatementModal';
 import { BidSecuringDeclarationModal } from '../vault/templates/BidSecuringDeclarationModal';
 import PsdModal from '../vault/templates/psd';
+import StatutoryDocumentsGuideModal from '../vault/templates/StatutoryDocumentsGuideModal';
 import { PdfPreviewModal } from '../vault/PdfPreviewModal';
 import VaultErrorBoundary from '../common/VaultErrorBoundary';
 import { savePdfData, loadPdfData as loadPdfDataFromDB } from '../../utils/vaultIndexedDB';
@@ -20,7 +21,8 @@ import {
   Printer,
   Eye,
   Trash2,
-  FileSignature
+  FileSignature,
+  BookOpen
 } from 'lucide-react';
 
 export interface FormItem {
@@ -70,12 +72,12 @@ const OFFICIAL_NOTARIZED_DOCS: FormItem[] = [
   {
     id: 'form-psd',
     formCode: 'GPPB-PSD-2025',
-    title: 'Performance Securing Declaration (Notarized PSD - GPPB Standard)',
+    title: 'Performance Securing Declaration (PSD - RA 12009 Section 76 & Framework Agreement)',
     category: 'NOTARIZED',
-    governingLaw: 'GPPB Res. No. 09-2020 / RA 9184 & RA 12009',
+    governingLaw: 'Section 76, IRR of RA 12009 / GPPB Resolution No. 09-2020',
     format: 'TEMPLATE',
     notaryRequirement: 'Requires Notary Public Jurat & Government-issued ID details',
-    description: 'Official statutory alternative to performance bond guaranteeing faithful compliance within 10 days from Notice of Award (NOA).'
+    description: 'Official statutory undertaking guaranteeing faithful performance within 10 days from Notice of Award (NOA) pursuant to Section 76 of RA 12009.'
   }
 ];
 
@@ -99,6 +101,8 @@ export const FormsDirectoryView: React.FC = () => {
 
   // Active Interactive Template Modal State
   const [activeTemplateModal, setActiveTemplateModal] = useState<'SEC-VI' | 'SEC-VII' | 'FAL-01' | 'GPPB-OSS-2025' | 'GPPB-BSD-2025' | 'GPPB-PSD-2025' | null>(null);
+  const [showGuideModal, setShowGuideModal] = useState(false);
+  const [guideInitialCode, setGuideInitialCode] = useState<string>('PSD');
 
   // Load real saved opportunity projects & saved completed forms from IndexedDB + localStorage
   useEffect(() => {
@@ -268,6 +272,17 @@ export const FormsDirectoryView: React.FC = () => {
               </div>
             </div>
           </div>
+
+          <button
+            onClick={() => {
+              setGuideInitialCode('PSD');
+              setShowGuideModal(true);
+            }}
+            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-950 to-indigo-950 hover:from-blue-900 hover:to-indigo-900 border border-blue-500/40 text-blue-300 hover:text-white text-xs font-bold transition flex items-center gap-2 shadow-lg hover:shadow-blue-500/10 shrink-0"
+          >
+            <BookOpen className="w-4 h-4 text-blue-400" />
+            <span>Statutory Filing & Answering Guide</span>
+          </button>
         </div>
 
         {/* OPPORTUNITY FINDER PROJECT CONNECTION BAR */}
@@ -414,13 +429,29 @@ export const FormsDirectoryView: React.FC = () => {
                       TIN: {currentTenant?.tin || '000-000-000-000'}
                     </span>
 
-                    <button
-                      onClick={() => handleFormAction(form)}
-                      className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg transition flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500"
-                    >
-                      <FileCheck className="w-3.5 h-3.5" />
-                      <span>Fill & Generate Document</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const initialCode = form.formCode.includes('PSD') ? 'PSD' : form.formCode.includes('BSD') ? 'BSD' : 'OSS';
+                          setGuideInitialCode(initialCode);
+                          setShowGuideModal(true);
+                        }}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700 transition flex items-center gap-1.5"
+                        title="View Official Government Answering & Filing Guide"
+                      >
+                        <BookOpen className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Guide</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleFormAction(form)}
+                        className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg transition flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500"
+                      >
+                        <FileCheck className="w-3.5 h-3.5" />
+                        <span>Fill & Generate Document</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -762,6 +793,14 @@ export const FormsDirectoryView: React.FC = () => {
             onClose={() => setPreviewPdfItem(null)}
             pdfDataUrl={previewPdfItem.fileDataUrl}
             hidePrintExport={false}
+          />
+        )}
+
+        {/* STATUTORY FILING & ANSWERING GUIDE MODAL */}
+        {showGuideModal && (
+          <StatutoryDocumentsGuideModal
+            initialCode={guideInitialCode}
+            onClose={() => setShowGuideModal(false)}
           />
         )}
 
