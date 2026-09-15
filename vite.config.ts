@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite';
+/// <reference types="vitest/config" />
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -18,18 +19,41 @@ export default defineConfig({
     }
   ],
   build: {
-    chunkSizeWarningLimit: 1500,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('pdf-lib') || id.includes('html2canvas')) {
+          const normalized = id.replace(/\\/g, '/');
+          if (normalized.includes('node_modules')) {
+            if (normalized.includes('pdf-lib') || normalized.includes('html2canvas') || normalized.includes('jspdf')) {
               return 'pdf-engine-vendor';
             }
-            if (id.includes('lucide-react')) {
+            if (normalized.includes('three') || normalized.includes('@react-three')) {
+              return 'three-3d-vendor';
+            }
+            if (normalized.includes('framer-motion')) {
+              return 'motion-vendor';
+            }
+            if (normalized.includes('lucide-react')) {
               return 'lucide-icons';
             }
+            if (normalized.includes('react/') || normalized.includes('react-dom/')) {
+              return 'react-core-vendor';
+            }
             return 'vendor';
+          }
+          if (normalized.includes('src/components/vault/templates/')) {
+            return 'vault-templates';
+          }
+          if (normalized.includes('src/components/covers/')) {
+            return 'packaging-covers';
+          }
+          if (
+            normalized.includes('src/utils/systemDocumentPdfGenerator') ||
+            normalized.includes('src/utils/vectorPdfGenerator') ||
+            normalized.includes('src/utils/pdfExportEngine')
+          ) {
+            return 'pdf-system-engine';
           }
         }
       }
