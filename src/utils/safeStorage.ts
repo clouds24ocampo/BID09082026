@@ -1,30 +1,43 @@
 /**
  * safeStorage.ts
- * 
+ *
  * Production-Safe Storage Utility for BiDOCS.
- * 
+ *
  * Wraps browser localStorage with automatic QuotaExceededError protection,
  * serialization error handling, and safe fallbacks to prevent runtime crashes
  * in restricted environments (e.g. Private Browsing, disabled cookies, storage full).
  */
+
+function hasStorage(): boolean {
+  return typeof window !== "undefined" && !!window.localStorage;
+}
+
+function isQuotaError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const code = (err as Error & { code?: number }).code;
+  return err.name === "QuotaExceededError" || code === 22 || code === 1014;
+}
 
 /**
  * Safely sets an item in localStorage without throwing QuotaExceededError or security exceptions.
  * Returns true if the item was successfully stored, false otherwise.
  */
 export function safeSetItem(key: string, value: string): boolean {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return false;
-  }
+  if (!hasStorage()) return false;
 
   try {
     localStorage.setItem(key, value);
     return true;
-  } catch (err: any) {
-    if (err && (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014)) {
-      console.warn(`[SafeStorage] localStorage quota exceeded while saving key "${key}". Skipping write.`);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      console.warn(
+        `[SafeStorage] localStorage quota exceeded while saving key "${key}". Skipping write.`,
+      );
     } else {
-      console.warn(`[SafeStorage] Error writing key "${key}" to localStorage:`, err);
+      console.warn(
+        `[SafeStorage] Error writing key "${key}" to localStorage:`,
+        err,
+      );
     }
     return false;
   }
@@ -35,10 +48,12 @@ export function safeSetItem(key: string, value: string): boolean {
  */
 export function safeSetJson<T>(key: string, data: T): boolean {
   try {
-    const serialized = JSON.stringify(data);
-    return safeSetItem(key, serialized);
+    return safeSetItem(key, JSON.stringify(data));
   } catch (err) {
-    console.warn(`[SafeStorage] JSON serialization failed for key "${key}":`, err);
+    console.warn(
+      `[SafeStorage] JSON serialization failed for key "${key}":`,
+      err,
+    );
     return false;
   }
 }
@@ -46,16 +61,20 @@ export function safeSetJson<T>(key: string, data: T): boolean {
 /**
  * Safely retrieves an item from localStorage.
  */
-export function safeGetItem(key: string, fallback: string | null = null): string | null {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return fallback;
-  }
+export function safeGetItem(
+  key: string,
+  fallback: string | null = null,
+): string | null {
+  if (!hasStorage()) return fallback;
 
   try {
-    const val = localStorage.getItem(key);
-    return val !== null ? val : fallback;
+    const value = localStorage.getItem(key);
+    return value !== null ? value : fallback;
   } catch (err) {
-    console.warn(`[SafeStorage] Error reading key "${key}" from localStorage:`, err);
+    console.warn(
+      `[SafeStorage] Error reading key "${key}" from localStorage:`,
+      err,
+    );
     return fallback;
   }
 }
@@ -70,7 +89,10 @@ export function safeGetJson<T>(key: string, defaultValue: T): T {
   try {
     return JSON.parse(raw) as T;
   } catch (err) {
-    console.warn(`[SafeStorage] JSON parse failed for key "${key}", using fallback:`, err);
+    console.warn(
+      `[SafeStorage] JSON parse failed for key "${key}", using fallback:`,
+      err,
+    );
     return defaultValue;
   }
 }
@@ -79,15 +101,16 @@ export function safeGetJson<T>(key: string, defaultValue: T): T {
  * Safely removes an item from localStorage.
  */
 export function safeRemoveItem(key: string): boolean {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return false;
-  }
+  if (!hasStorage()) return false;
 
   try {
     localStorage.removeItem(key);
     return true;
   } catch (err) {
-    console.warn(`[SafeStorage] Error removing key "${key}" from localStorage:`, err);
+    console.warn(
+      `[SafeStorage] Error removing key "${key}" from localStorage:`,
+      err,
+    );
     return false;
   }
 }
