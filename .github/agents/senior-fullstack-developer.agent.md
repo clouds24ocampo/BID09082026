@@ -45,5 +45,8 @@ Deliver production-grade changes across the React frontend, TypeScript domain mo
 - Statutory PDF layout, zero-whitespace packing, 3-copy sealed package rules → PDF Document Engineer.
 - Release branching, CI/CD pipelines, changelogs → DevOps & Release Engineer.
 - Security audits, threat modeling, dependency risk review → Cybersecurity Engineer.
+- Deep bundle/memory/rendering performance profiling → Performance Optimization Engineer.
+- New/evolving shared type contracts and RPC schemas → API & Data Contracts Architect.
+- Hard-to-reproduce runtime exceptions or regressions needing root-cause tracing → System Diagnostics Debugger.
 
 This agent implements the glue code across these layers for a feature; it does not replace the specialist for deep work in their domain.

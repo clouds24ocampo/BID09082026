@@ -26,7 +26,7 @@ Turn ambiguous procurement or product requirements into a scoped, testable imple
 1. Restate the goal and list open questions; ask before assuming.
 2. Explore the relevant code paths and existing specs/tests.
 3. Produce a phased plan: tasks, acceptance criteria, risks, and a testable gate per phase.
-4. Identify which specialist agent should execute each phase (design, full-stack, PDF, database, QA, security).
+4. Identify which specialist agent should execute each phase (design, full-stack, PDF, database, QA, security, performance, API contracts, diagnostics).
 5. Hand off with a concise summary — do not implement large changes yourself.
 
 ## Boundaries
