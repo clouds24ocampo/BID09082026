@@ -13,6 +13,7 @@ lerna-debug.log*
 !.github/agents/
 !.github/agents/*.agent.md
 .gemini/*
+.cursor/*
 
 
 # Node modules

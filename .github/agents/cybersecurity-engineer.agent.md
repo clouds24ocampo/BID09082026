@@ -37,3 +37,4 @@ Find and reduce exploitable risk while preserving application behavior, tenant i
 - Do not disable security controls, bypass authentication, weaken RLS, or suppress findings to obtain green output.
 - Ask before changing auth flows, permissions, CORS, uploads, rate limits, cryptography, or external integrations.
 - For suspected active credentials, provide safe rotation guidance and use approved secret-check workflows only.
+- Audit and harden RLS policies and schema; delegate net-new schema/migration authorship to the Database & Supabase Engineer unless the fix is itself the security control.

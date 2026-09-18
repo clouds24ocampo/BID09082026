@@ -33,8 +33,6 @@
     ]
   },
   "dependencies": {
-    "@react-three/drei": "^10.7.8",
-    "@react-three/fiber": "^9.7.0",
     "framer-motion": "^13.0.0",
     "html2canvas": "npm:html2canvas-pro@^1.5.8",
     "jspdf": "^4.2.1",
@@ -43,8 +41,7 @@
     "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "three": "^0.185.1"
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -54,7 +51,6 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^6.0.5",
     "@vitest/ui": "^4.1.10",
     "autoprefixer": "^10.5.4",

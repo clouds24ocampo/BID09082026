@@ -23,6 +23,9 @@ You can invoke or instruct any specialized agent directly in your prompt, or let
 | `@agent-senior-fullstack` | **Senior Full-Stack Developer** | `senior-fullstack-engineer`, `frontend-ui-engineering`, `api-and-interface-design`, `supabase`, `performance-optimization` | "Architect full-stack feature", "Optimize state, queries & bundle chunks" |
 | `@agent-cybersecurity` | **Enterprise Cybersecurity Guardian** | `cybersecurity-guardian`, `scan-secrets`, `check-hmsl`, `install-hooks`, `security-and-hardening` | "Scan repo for leaked secrets", "Audit input sanitization & RLS policies" |
 | `@agent-document-master` | **Zero-Whitespace Document & PDF Master** | `zero-whitespace-pdf-master`, `bidocs-pdf-system`, `autoFitEngine`, `api-and-interface-design` | "Eliminate whitespace gaps in PDF", "Format statutory Legal procurement layout" |
+| `@agent-performance-engineer` | **Performance & Bundle Engineer** | `performance-optimization-master`, `performance-optimization`, `safe-refactor` | "Optimize chunk splitting", "Profile memory in 3-copy PDF compile" |
+| `@agent-api-architect` | **API & Data Contracts Architect** | `api-data-architect`, `api-and-interface-design`, `supabase` | "Design PhilGEPS sync schema", "Create type-safe contracts" |
+| `@agent-system-debugger` | **Diagnostics & System Debugger** | `system-diagnostics-debugger`, `systematic-debugging`, `debugging-and-error-recovery` | "Diagnose unhandled promise rejection", "Isolate memory leak" |
 
 ---
 

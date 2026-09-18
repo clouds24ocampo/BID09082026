@@ -9,7 +9,7 @@ import { TechnicalExhibitTemplateModal } from './templates/TechnicalExhibitTempl
 import { SectionViScheduleOfRequirements } from './templates/SectionViScheduleOfRequirements';
 import { FrameworkAgreementList } from './templates/FrameworkAgreementList';
 import { TechnicalSpecifications } from './templates/TechnicalSpecifications';
-import { AfterSalesServiceModal } from './templates/AfterSalesServiceModal';
+import { AfterSaleModal as AfterSalesServiceModal } from './templates/aftersale';
 import { NfccModal } from './templates/nfcc';
 import { BidFormForGoodsModal } from './templates/bidform4goods';
 import { BidFormForInfrastructureModal } from './templates/bidform4infrastructure';

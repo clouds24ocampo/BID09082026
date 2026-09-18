@@ -28,9 +28,6 @@ export default defineConfig({
             if (normalized.includes('pdf-lib') || normalized.includes('html2canvas') || normalized.includes('jspdf')) {
               return 'pdf-engine-vendor';
             }
-            if (normalized.includes('three') || normalized.includes('@react-three')) {
-              return 'three-3d-vendor';
-            }
             if (normalized.includes('framer-motion')) {
               return 'motion-vendor';
             }

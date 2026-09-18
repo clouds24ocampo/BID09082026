@@ -125,6 +125,33 @@ You can summon any specialized agent by including its handle or role in your pro
 
 ---
 
+### 14. ⚡ `@agent-performance-engineer` — Performance & Bundle Optimization Specialist
+- **When to use**: Application speed profiling, Vite / Rollup build chunking, memory optimization, IndexedDB binary store throughput, and heavy 3-copy PDF compile efficiency.
+- **Example Prompts**:
+  - *"@agent-performance-engineer: Profile bundle size in `dist/assets` and optimize chunk splitting."*
+  - *"@agent-performance-engineer: Minimize memory usage when compiling 3-copy sealed legal PDF packages."*
+- **Active Skills**: `performance-optimization-master`, `performance-optimization`, `safe-refactor`.
+
+---
+
+### 15. 📐 `@agent-api-architect` — API & Data Contracts Architect
+- **When to use**: Type-safe contract design, schema migrations, PhilGEPS API integrations, Supabase client/server boundaries, and resilient repository interfaces.
+- **Example Prompts**:
+  - *"@agent-api-architect: Design a strict type contract for external PhilGEPS bid notice ingestion."*
+  - *"@agent-api-architect: Define repository interface boundaries between IndexedDB and Supabase cloud sync."*
+- **Active Skills**: `api-data-architect`, `api-and-interface-design`, `supabase`.
+
+---
+
+### 16. 🔍 `@agent-system-debugger` — Diagnostics & System Debugger
+- **When to use**: Systematic root-cause diagnosis, isolating tricky memory leaks or race conditions, fixing unhandled promise rejections, and verifying fix stability.
+- **Example Prompts**:
+  - *"@agent-system-debugger: Find the root cause of the iframe unmount issue during fast tab switching."*
+  - *"@agent-system-debugger: Isolate and fix the promise timeout in the background document validator."*
+- **Active Skills**: `system-diagnostics-debugger`, `systematic-debugging`, `debugging-and-error-recovery`.
+
+---
+
 ## 💡 Pro Tip: Multi-Agent Collaboration
 You can combine agents in a single prompt!
 > *"@agent-architect plan the feature, @agent-designer design the layout, @agent-senior-fullstack implement the full-stack logic, and @agent-document-master guarantee zero whitespace in the final PDF export."*

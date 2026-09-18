@@ -46,3 +46,4 @@ Generate publication-ready, legally formatted Philippine procurement documents w
 - Do not silently remove statutory text, signatures, totals, notices, or attachments to improve spacing.
 - Do not switch to A4/Letter, blob URLs, arbitrary progress values, or broad cover selectors.
 - Ask before changing legal form semantics, copy-stamping policy, document retention, or cryptographic verification behavior.
+- Implements layout/rendering; defer statutory interpretation disputes or new legal-basis decisions to the Procurement Compliance Officer.
