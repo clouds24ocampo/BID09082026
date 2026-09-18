@@ -34,3 +34,4 @@ Keep the app fast under real procurement workloads: large PDF binaries, big docu
 - Do not "optimize" by removing functionality, statutory content, or accessibility features.
 - Do not restructure component ownership/state logic beyond what performance requires; hand off larger refactors to the Senior Full-Stack Developer.
 - Ask before changing build tooling versions or chunking strategy in ways that affect deployment.
+- Measure and vacuum within the existing storage-key design; defer redesigning IndexedDB storage-key architecture or isolation invariants to the Vault & Local-First Storage Architect.

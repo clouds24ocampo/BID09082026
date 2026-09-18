@@ -1,6 +1,6 @@
 ---
 name: BiDOCS PDF Guard & Stability Enforcer
-description: "Use for enforcing non-negotiable BiDOCS PDF generation rules (PDF-1 to PDF-7), Philippine Legal paper dimensions (8.5\" x 13\"), base64 data URLs, off-screen html2canvas rendering, and pre-commit guard validation."
+description: 'Use for enforcing non-negotiable BiDOCS PDF generation rules (PDF-1 to PDF-7), Philippine Legal paper dimensions (8.5" x 13"), base64 data URLs, off-screen html2canvas rendering, and pre-commit guard validation.'
 tools: [read, search, edit, execute, agent]
 reasoning-effort: high
 argument-hint: "Describe the PDF stability issue, blank iframe defect, pagination regression, or guard failure."
@@ -47,3 +47,9 @@ Safeguard the BiDOCS PDF compilation pipeline from any regression, ensuring ever
 1. Always run `npm run validate` to execute `scripts/bidocs-pdf-guard.js`.
 2. Ensure all 6 PDF system guard checks pass with 0 errors.
 3. Test 3-copy package generation (`ORIGINAL`, `COPY 1`, `COPY 2`) with `npm test`.
+
+## Boundaries
+
+- Do not do general PDF feature work, new statutory form layout, or cover-page design; hand off to the PDF Document Engineer.
+- Only fix violations of Rules PDF-1 through PDF-7 narrowly; do not expand scope into unrelated refactors.
+- This agent is the strict validation/regression gate; the PDF Document Engineer is the layout/content author.

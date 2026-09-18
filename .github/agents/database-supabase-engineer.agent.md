@@ -36,3 +36,4 @@ Design and evolve safe, performant, multi-tenant data models across Supabase/Pos
 - Ask before changing auth-related tables, tenant boundary logic, or production connection settings.
 - Author and maintain RLS/schema as part of feature work; defer full threat-model security audits and dependency risk review to the Cybersecurity Engineer.
 - Implement the migration/policy itself; defer designing the shared TypeScript/RPC contract shape to the API & Data Contracts Architect.
+- Treat IndexedDB only as the sync/offline boundary; defer storage-key architecture and multi-project isolation invariant design to the Vault & Local-First Storage Architect.

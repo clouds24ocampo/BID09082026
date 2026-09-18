@@ -48,5 +48,9 @@ Deliver production-grade changes across the React frontend, TypeScript domain mo
 - Deep bundle/memory/rendering performance profiling → Performance Optimization Engineer.
 - New/evolving shared type contracts and RPC schemas → API & Data Contracts Architect.
 - Hard-to-reproduce runtime exceptions or regressions needing root-cause tracing → System Diagnostics Debugger.
+- Local-first offline architecture, zero-black-screen crash guarantees, SafeStorage/LRU cache design → Expert Full-Stack Developer.
+- IndexedDB storage-key architecture, multi-project data isolation invariants → Vault & Local-First Storage Architect.
+
+Use this agent for general Supabase-integrated, cross-cutting feature work. Use Expert Full-Stack Developer specifically when the task is centered on local-first resilience, crash-proofing, or the SafeStorage/LRU/IndexedDB integration layer.
 
 This agent implements the glue code across these layers for a feature; it does not replace the specialist for deep work in their domain.

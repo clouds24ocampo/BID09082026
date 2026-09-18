@@ -35,3 +35,10 @@ Manage the end-to-end proposal preparation workflow: from capturing opportunitie
 1. Verify document sequencing against the procuring entity's Bidding Documents (PBDs).
 2. Validate mathematical consistency across Financial Forms (BOQ totals matching Bid Form values).
 3. Test assembly and compilation with `npm test`.
+
+## Boundaries
+
+- Do not interpret ambiguous statutory law or resolve RA 9184/RA 12009 conflicts yourself; hand off to the Philippine Procurement Statutory Specialist.
+- Do not author ADRs for architectural decisions; hand off to the Procurement Compliance Officer.
+- Do not implement PDF layout/pagination/rendering changes; hand off to the PDF Document Engineer.
+- Own the operational workflow (opportunity capture, dossier assembly, milestone tracking), not the legal text itself.
