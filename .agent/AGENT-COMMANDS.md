@@ -98,8 +98,36 @@ You can summon any specialized agent by including its handle or role in your pro
 
 ---
 
+### 11. 💻 `@agent-senior-fullstack` — Senior Full-Stack Developer
+- **When to use**: End-to-end full-stack development, architectural refactors, React 19, TypeScript strict typing, Tailwind CSS styling, Vite build optimization, Supabase DB & Auth, IndexedDB local persistence.
+- **Example Prompts**:
+  - *"@agent-senior-fullstack: Refactor the opportunity finder and bid package flow with strict type safety and error boundaries."*
+  - *"@agent-senior-fullstack: Optimize frontend rendering performance and bundle chunking."*
+- **Active Skills**: `senior-fullstack-engineer`, `frontend-ui-engineering`, `api-and-interface-design`, `supabase`, `performance-optimization`, `safe-refactor`.
+
+---
+
+### 12. 🛡️ `@agent-cybersecurity` — Enterprise Cybersecurity Guardian
+- **When to use**: Secret leakage scanning, vulnerability audits, input sanitization, OWASP Top 10 hardening, CSP policies, document tamper-evidence, and strict Row Level Security.
+- **Example Prompts**:
+  - *"@agent-cybersecurity: Audit our dependencies and git history for security vulnerabilities and leaked credentials."*
+  - *"@agent-cybersecurity: Review the document QR code generator and verify tamper-proof hash integrity."*
+- **Active Skills**: `cybersecurity-guardian`, `scan-secrets`, `check-hmsl`, `install-hooks`, `scan-machine`, `security-and-hardening`, `triage-incidents`.
+
+---
+
+### 13. 📄 `@agent-document-master` — Zero-Whitespace World-Class Document & PDF Master
+- **When to use**: Professional, publication-ready PDF and document generation with 100% full-page utilization, zero dead whitespace gaps, exact Philippine Legal dimensions (8.5" x 13"), 3-copy sealed package stamping, and statutory RA 9184 / RA 12009 compliance.
+- **Example Prompts**:
+  - *"@agent-document-master: Eliminate awkward empty spaces in the Bill of Quantities PDF using dynamic auto-fit packing."*
+  - *"@agent-document-master: Build an elite statutory bid document template with zero orphan rows and balanced page distribution."*
+- **Active Skills**: `zero-whitespace-pdf-master`, `bidocs-pdf-system`, `autoFitEngine`, `api-and-interface-design`, `context7-mcp`.
+
+---
+
 ## 💡 Pro Tip: Multi-Agent Collaboration
 You can combine agents in a single prompt!
-> *"@agent-architect plan the feature, @agent-designer design the layout, and @agent-pdf-engineer implement the PDF export."*
+> *"@agent-architect plan the feature, @agent-designer design the layout, @agent-senior-fullstack implement the full-stack logic, and @agent-document-master guarantee zero whitespace in the final PDF export."*
 
 The Master Orchestrator will automatically execute the phases in sequence!
+

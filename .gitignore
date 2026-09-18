@@ -9,6 +9,9 @@ lerna-debug.log*
 .agents/*
 .claude/*
 .github/*
+!.github/
+!.github/agents/
+!.github/agents/*.agent.md
 .gemini/*
 
 

@@ -20,6 +20,9 @@ You can invoke or instruct any specialized agent directly in your prompt, or let
 | `@agent-devops` | **DevOps & Release Commander** | `shipping-and-launch`, `ci-cd-and-automation`, `git-workflow-and-versioning` | "Prepare release v2.1.0", "Set up GitHub Actions CI" |
 | `@agent-token-optimizer` | **Caveman Token Optimizer** | `caveman`, `caveman-commit`, `caveman-compress`, `investigate-first`, `surgical-patch` | "/caveman", "Fix this bug with minimal tokens", "Investigate before editing" |
 | `@agent-compliance` | **Procurement Compliance Officer** | `documentation-and-adrs`, `interview-me`, `constraint-driven-development` | "Write ADR for PDF engine", "Audit PhilGEPS BAC requirements" |
+| `@agent-senior-fullstack` | **Senior Full-Stack Developer** | `senior-fullstack-engineer`, `frontend-ui-engineering`, `api-and-interface-design`, `supabase`, `performance-optimization` | "Architect full-stack feature", "Optimize state, queries & bundle chunks" |
+| `@agent-cybersecurity` | **Enterprise Cybersecurity Guardian** | `cybersecurity-guardian`, `scan-secrets`, `check-hmsl`, `install-hooks`, `security-and-hardening` | "Scan repo for leaked secrets", "Audit input sanitization & RLS policies" |
+| `@agent-document-master` | **Zero-Whitespace Document & PDF Master** | `zero-whitespace-pdf-master`, `bidocs-pdf-system`, `autoFitEngine`, `api-and-interface-design` | "Eliminate whitespace gaps in PDF", "Format statutory Legal procurement layout" |
 
 ---
 

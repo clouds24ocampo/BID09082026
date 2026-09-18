@@ -1,4 +1,4 @@
-﻿# BiDOCS — Workspace Rules & Critical System Constraints
+# BiDOCS — Workspace Rules & Critical System Constraints
 
 > These rules are **non-negotiable** and must be followed in every session without exception.
 > Any AI agent working on this project MUST read this file before touching any code.
@@ -99,11 +99,21 @@ This private helper is essential for stable iframe embedding. Do NOT remove or r
 
 ---
 
+### Rule PDF-7: Zero Whitespace & Dynamic Page-Packing Standard
+
+All generated statutory procurement documents and tables must utilize `src/utils/autoFitEngine.ts` to dynamically calculate row heights (`calculateRowHeight`) and balanced page chunks (`autoFitPageChunks`).
+- Documents must achieve **100% full-page utilization** with zero awkward trailing whitespace gaps.
+- Prevent orphan rows on final pages using balanced distribution.
+- Ensure zero collision between table borders and mandatory signatory/QR footer blocks.
+
+---
+
 ## 🟡 IMPORTANT: Architecture Reference
 
 | File | Purpose |
 |------|---------|
 | `src/utils/pdfExportEngine.ts` | Core PDF merge engine |
+| `src/utils/autoFitEngine.ts` | Zero-whitespace dynamic page-packing engine |
 | `src/utils/systemDocumentPdfGenerator.ts` | 27-document-type system generator |
 | `src/components/vault/MergedPackageViewerModal.tsx` | 3-copy merge viewer (ORIGINAL/COPY_1/COPY_2) |
 | `src/components/vault/MergedPdfViewerModal.tsx` | Bundle organizer + PDF export |
@@ -124,8 +134,9 @@ This is required by RA 9184 / RA 12009 (Philippine Gov Procurement Act).
 
 ## 🟢 Before Touching Any PDF File
 
-1. Read `.agents/skills/bidocs-pdf-system/SKILL.md` for full technical context
+1. Read `.agents/skills/bidocs-pdf-system/SKILL.md` and `.agents/skills/zero-whitespace-pdf-master/SKILL.md` for full technical context
 2. Run `npx tsc --noEmit` before AND after changes
 3. Never change exported function signatures in `pdfExportEngine.ts`
 
-*Last updated: September 2026 — BiDOCS PDF System Stabilization*
+*Last updated: September 2026 — BiDOCS PDF System Stabilization & World-Class Standards*
+
