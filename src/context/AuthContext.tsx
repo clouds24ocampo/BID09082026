@@ -2,8 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Tenant, User, UserRole } from '../types';
 import { clearAllVaultData } from '../utils/vaultIndexedDB';
 import { debugLog } from '../utils/debugLog';
-
-
+import { safeGetItem, safeSetItem, safeGetJson, safeSetJson, safeRemoveItem } from '../utils/safeStorage';
 
 const DEFAULT_TENANTS: Tenant[] = [];
 
@@ -13,7 +12,7 @@ const DEFAULT_USERS: User[] = [];
 const purgeLegacyMockData = () => {
   try {
     if (typeof localStorage === 'undefined') return;
-    const isFlushedForLive = localStorage.getItem('bidocs_live_clean_flush_v6');
+    const isFlushedForLive = safeGetItem('bidocs_live_clean_flush_v6');
     if (!isFlushedForLive) {
       localStorage.clear();
       if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
@@ -28,7 +27,7 @@ const purgeLegacyMockData = () => {
           indexedDB.deleteDatabase('bidocs_vault_db');
         }
       } catch (_) {}
-      localStorage.setItem('bidocs_live_clean_flush_v6', 'true');
+      safeSetItem('bidocs_live_clean_flush_v6', 'true');
     }
   } catch (e) {
     console.error('[AuthContext] Error flushing legacy mock data:', e);
@@ -38,32 +37,17 @@ const purgeLegacyMockData = () => {
 purgeLegacyMockData();
 
 const getSavedTenants = (): Tenant[] => {
-  const saved = localStorage.getItem('bidocs_tenants');
-  if (!saved) return DEFAULT_TENANTS;
-  try {
-    const parsed = JSON.parse(saved);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      const valid = parsed.filter((t: any) => t && t.companyName && t.id && t.id !== 'tenant-default-001');
-      return valid;
-    }
-  } catch (e) {
-    console.error(e);
-  }
-  return DEFAULT_TENANTS;
+  const parsed = safeGetJson<any[]>('bidocs_tenants', []);
+  if (!parsed || !Array.isArray(parsed) || parsed.length === 0) return DEFAULT_TENANTS;
+  const valid = parsed.filter((t: any) => t && t.companyName && t.id && t.id !== 'tenant-default-001');
+  return valid.length > 0 ? valid : DEFAULT_TENANTS;
 };
 
 const getSavedUsers = (): User[] => {
-  const saved = localStorage.getItem('bidocs_users');
-  if (!saved) return DEFAULT_USERS;
-  try {
-    const parsed = JSON.parse(saved);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed.filter((u: any) => u && u.id !== 'user-default-001' && u.email !== 'admin@metrobuilders.ph');
-    }
-  } catch (e) {
-    debugLog('AuthContext.tsx:users-init', 'Failed to parse bidocs_users', { error: String(e) }, 'A');
-  }
-  return DEFAULT_USERS;
+  const parsed = safeGetJson<any[]>('bidocs_users', []);
+  if (!parsed || !Array.isArray(parsed) || parsed.length === 0) return DEFAULT_USERS;
+  const valid = parsed.filter((u: any) => u && u.id !== 'user-default-001' && u.email !== 'admin@metrobuilders.ph');
+  return valid.length > 0 ? valid : DEFAULT_USERS;
 };
 
 interface AuthContextType {
@@ -94,16 +78,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const savedTenants = getSavedTenants();
     if (savedTenants.length === 0) return null;
-    const saved = localStorage.getItem('bidocs_current_user');
-    if (saved) {
-      try {
-        const u = JSON.parse(saved);
-        if (u && u.id && savedTenants.some(t => t.id === u.tenantId)) {
-          return u;
-        }
-      } catch (e) {
-        debugLog('AuthContext.tsx:currentUser-init', 'Failed to parse bidocs_current_user', { error: String(e) }, 'A');
-      }
+    const u = safeGetJson<User | null>('bidocs_current_user', null);
+    if (u && u.id && savedTenants.some(t => t.id === u.tenantId)) {
+      return u;
     }
     return null;
   });
@@ -111,17 +88,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentTenant, setCurrentTenant] = useState<Tenant | null>(() => {
     const savedTenants = getSavedTenants();
     if (savedTenants.length === 0) return null;
-    const savedUserStr = localStorage.getItem('bidocs_current_user');
-    if (savedUserStr) {
-      try {
-        const u = JSON.parse(savedUserStr);
-        if (u && u.tenantId) {
-          const matched = savedTenants.find((t: Tenant) => t.id === u.tenantId);
-          if (matched) return matched;
-        }
-      } catch (e) {
-        debugLog('AuthContext.tsx:currentTenant-init', 'Failed to parse bidocs_current_user for tenant lookup', { error: String(e) }, 'A');
-      }
+    const u = safeGetJson<User | null>('bidocs_current_user', null);
+    if (u && u.tenantId) {
+      const matched = savedTenants.find((t: Tenant) => t.id === u.tenantId);
+      if (matched) return matched;
     }
     return savedTenants[0] || null;
   });
@@ -139,18 +109,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Persist tenants and users
   useEffect(() => {
-    localStorage.setItem('bidocs_tenants', JSON.stringify(tenants));
+    safeSetJson('bidocs_tenants', tenants);
   }, [tenants]);
 
   useEffect(() => {
-    localStorage.setItem('bidocs_users', JSON.stringify(users));
+    safeSetJson('bidocs_users', users);
   }, [users]);
 
   useEffect(() => {
     if (currentUser) {
-      localStorage.setItem('bidocs_current_user', JSON.stringify(currentUser));
+      safeSetJson('bidocs_current_user', currentUser);
     } else {
-      localStorage.removeItem('bidocs_current_user');
+      safeRemoveItem('bidocs_current_user');
     }
   }, [currentUser]);
 
@@ -170,19 +140,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Validate password against stored password
-    const storedPw = localStorage.getItem(`bidocs_user_password_${normalizedEmail}`) || foundUser.password;
+    const storedPw = safeGetItem(`bidocs_user_password_${normalizedEmail}`) || foundUser.password;
     if (!storedPw || storedPw !== password) {
       // #region agent log
       debugLog('AuthContext.tsx:login', 'Login rejected: password mismatch', {
         normalizedEmail,
-        hasStoredPwKey: !!localStorage.getItem(`bidocs_user_password_${normalizedEmail}`),
+        hasStoredPwKey: !!safeGetItem(`bidocs_user_password_${normalizedEmail}`),
         hasUserObjectPw: !!foundUser.password
       }, 'D');
       // #endregion
       return false; // Wrong password → reject login
     }
 
-    const storedFlag = localStorage.getItem(`bidocs_must_change_password_${normalizedEmail}`);
+    const storedFlag = safeGetItem(`bidocs_must_change_password_${normalizedEmail}`);
     const isMustChange = storedFlag === 'true' || storedPw === 'BiDOCS#2026' || foundUser.mustChangePassword === true;
 
     // Resolve tenant — must match the user's own tenantId
@@ -239,8 +209,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const userEmail = userData.email.trim().toLowerCase();
-    localStorage.setItem(`bidocs_user_password_${userEmail}`, userPw);
-    localStorage.setItem(`bidocs_must_change_password_${userEmail}`, 'false');
+    safeSetItem(`bidocs_user_password_${userEmail}`, userPw);
+    safeSetItem(`bidocs_must_change_password_${userEmail}`, 'false');
 
     setTenants(prev => [...prev, newTenant]);
     setUsers(prev => [...prev, newUser]);
@@ -292,8 +262,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    localStorage.setItem(`bidocs_user_password_${targetEmail}`, 'BiDOCS#2026');
-    localStorage.setItem(`bidocs_must_change_password_${targetEmail}`, 'true');
+    safeSetItem(`bidocs_user_password_${targetEmail}`, 'BiDOCS#2026');
+    safeSetItem(`bidocs_must_change_password_${targetEmail}`, 'true');
     return true;
   };
 
@@ -301,8 +271,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(prev => prev.map(u => {
       if (u.id === userId || (currentUser && u.email === currentUser.email)) {
         const updated = { ...u, password: newPassword, mustChangePassword: false };
-        localStorage.setItem(`bidocs_user_password_${u.email.toLowerCase()}`, newPassword);
-        localStorage.setItem(`bidocs_must_change_password_${u.email.toLowerCase()}`, 'false');
+        safeSetItem(`bidocs_user_password_${u.email.toLowerCase()}`, newPassword);
+        safeSetItem(`bidocs_must_change_password_${u.email.toLowerCase()}`, 'false');
         return updated;
       }
       return u;
@@ -311,8 +281,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (currentUser) {
       const updatedCurrent = { ...currentUser, password: newPassword, mustChangePassword: false };
       setCurrentUser(updatedCurrent);
-      localStorage.setItem(`bidocs_user_password_${currentUser.email.toLowerCase()}`, newPassword);
-      localStorage.setItem(`bidocs_must_change_password_${currentUser.email.toLowerCase()}`, 'false');
+      safeSetItem(`bidocs_user_password_${currentUser.email.toLowerCase()}`, newPassword);
+      safeSetItem(`bidocs_must_change_password_${currentUser.email.toLowerCase()}`, 'false');
     }
   };
 

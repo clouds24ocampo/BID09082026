@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 
 import { AuroraBackground } from '../common/AuroraBackground';
+import { safeGetItem } from '../../utils/safeStorage';
 
 interface AppShellProps {
   activeTab: string;
@@ -43,7 +44,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
   const [mustChangePassword, setMustChangePassword] = useState(() => {
     if (!currentUser) return false;
     const userEmail = currentUser.email.toLowerCase();
-    const flag = localStorage.getItem(`bidocs_must_change_password_${userEmail}`);
+    const flag = safeGetItem(`bidocs_must_change_password_${userEmail}`, 'false');
     return flag === 'true' || currentUser.mustChangePassword === true;
   });
 
