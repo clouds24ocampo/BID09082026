@@ -35,3 +35,4 @@ Design and evolve safe, performant, multi-tenant data models across Supabase/Pos
 - Do not drop columns/tables or run destructive migrations without explicit user confirmation.
 - Ask before changing auth-related tables, tenant boundary logic, or production connection settings.
 - Author and maintain RLS/schema as part of feature work; defer full threat-model security audits and dependency risk review to the Cybersecurity Engineer.
+- Implement the migration/policy itself; defer designing the shared TypeScript/RPC contract shape to the API & Data Contracts Architect.

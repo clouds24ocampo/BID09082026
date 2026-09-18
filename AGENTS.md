@@ -26,6 +26,11 @@ You can invoke or instruct any specialized agent directly in your prompt, or let
 | `@agent-performance-engineer` | **Performance & Bundle Engineer** | `performance-optimization-master`, `performance-optimization`, `safe-refactor` | "Optimize chunk splitting", "Profile memory in 3-copy PDF compile" |
 | `@agent-api-architect` | **API & Data Contracts Architect** | `api-data-architect`, `api-and-interface-design`, `supabase` | "Design PhilGEPS sync schema", "Create type-safe contracts" |
 | `@agent-system-debugger` | **Diagnostics & System Debugger** | `system-diagnostics-debugger`, `systematic-debugging`, `debugging-and-error-recovery` | "Diagnose unhandled promise rejection", "Isolate memory leak" |
+| `@agent-expert-fullstack` | **Expert Full-Stack Developer** | `expert-fullstack-developer`, `senior-fullstack-engineer`, `frontend-ui-engineering`, `vault-local-storage` | "Engineer resilient full-stack feature", "Zero black-screen crash guarantee" |
+| `@agent-procurement-specialist` | **Philippine Procurement Statutory Specialist** | `philippine-procurement-statutory`, `bid-package-management`, `documentation-and-adrs` | "Audit bid compliance under RA 12009", "Verify SLCC / NFCC calculation" |
+| `@agent-vault-storage` | **Vault & Local-First Storage Architect** | `vault-local-storage`, `supabase-postgres-best-practices`, `performance-optimization` | "Optimize IndexedDB binary offloading", "Enforce zero-leak project isolation" |
+| `@agent-bid-manager` | **Bid Package & Opportunity Manager** | `bid-package-management`, `philippine-procurement-statutory`, `api-data-architect` | "Assemble 3-envelope bid dossier", "Track PhilGEPS opportunity lifecycle" |
+| `@agent-bidocs-pdf-guard` | **BiDOCS PDF Guard & Stability Enforcer** | `bidocs-pdf-guard`, `zero-whitespace-pdf-master`, `bidocs-pdf-system` | "Enforce Rules PDF-1 to PDF-7", "Verify base64 data URLs & legal sizing" |
 
 ---
 

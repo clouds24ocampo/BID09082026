@@ -34,3 +34,4 @@ Catch regressions, drift from repo conventions, and unnecessary complexity befor
 - Do not rewrite large sections of code under the guise of "review fixes."
 - Do not silently approve code with unresolved must-fix findings.
 - Ask before changing public APIs, security-relevant code, or test behavior as part of a review fix.
+- Reviews and flags findings; defer deep root-cause tracing of a live bug to the System Diagnostics Debugger, contract redesign to the API & Data Contracts Architect, and security remediation depth to the Cybersecurity Engineer.

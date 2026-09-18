@@ -152,9 +152,54 @@ You can summon any specialized agent by including its handle or role in your pro
 
 ---
 
+### 17. 🚀 `@agent-expert-fullstack` — Expert Full-Stack Developer
+- **When to use**: Master-level React 19, TypeScript strict mode, Vite build orchestration, Tailwind CSS v4 design system, Local-First SPA architecture, `<VaultErrorBoundary>`, SafeStorage quota protection, LRU memory buffers, and zero black-screen crash guarantee.
+- **Example Prompts**:
+  - *"@agent-expert-fullstack: Architect a fault-tolerant multi-tab bidding dashboard with zero black-screen crash risk."*
+  - *"@agent-expert-fullstack: Build a responsive, high-performance form viewer with optimistic local caching and type-safe validation."*
+- **Active Skills**: `expert-fullstack-developer`, `senior-fullstack-engineer`, `frontend-ui-engineering`, `vault-local-storage`.
+
+---
+
+### 18. 📜 `@agent-procurement-specialist` — Philippine Procurement Statutory Specialist
+- **When to use**: Statutory legal compliance under Republic Act 9184 and Republic Act 12009 (NGPA / GPPB Res. 02-2025), dual-regime transition tracking, Goods/Infra/Consulting eligibility matrices, SLCC, NFCC calculations, and white-labeling multi-company configuration.
+- **Example Prompts**:
+  - *"@agent-procurement-specialist: Audit our proposal checklist for compliance with Republic Act 12009 (NGPA)."*
+  - *"@agent-procurement-specialist: Verify that our NFCC computation properly factors in ongoing project commitments."*
+- **Active Skills**: `philippine-procurement-statutory`, `bid-package-management`, `documentation-and-adrs`.
+
+---
+
+### 19. 💾 `@agent-vault-storage` — Vault & Local-First Storage Architect
+- **When to use**: Client-side IndexedDB `bidocs_vault_db` binary storage (200MB+ PDF blobs), SafeStorage adapter, LRU RAM buffer, multi-project data isolation (`projectRefNo`), unique list primary keys, and zero cross-project data leakage.
+- **Example Prompts**:
+  - *"@agent-vault-storage: Optimize our IndexedDB binary store for multi-megabyte PDF attachment previews."*
+  - *"@agent-vault-storage: Verify that projectRefNo data isolation strictly isolates Project A records from Project B."*
+- **Active Skills**: `vault-local-storage`, `supabase-postgres-best-practices`, `performance-optimization`.
+
+---
+
+### 20. 📋 `@agent-bid-manager` — Bid Package & Opportunity Manager
+- **When to use**: PhilGEPS opportunity notice parsing, 3-envelope bid dossier assembly, 27+ GPPB official template directory workflows, and submission milestone tracking.
+- **Example Prompts**:
+  - *"@agent-bid-manager: Assemble a complete 3-envelope bid dossier for PhilGEPS Reference #1098421."*
+  - *"@agent-bid-manager: Audit the 27 standard government procurement templates for missing statutory fields."*
+- **Active Skills**: `bid-package-management`, `philippine-procurement-statutory`, `api-data-architect`.
+
+---
+
+### 21. 🛡️ `@agent-bidocs-pdf-guard` — BiDOCS PDF Guard & Stability Enforcer
+- **When to use**: Enforcing non-negotiable BiDOCS PDF generation rules (PDF-1 to PDF-7), Philippine Legal dimensions (8.5" x 13"), base64 data URLs via `blobToDataUrl`, `-9999px` off-screen render containers, and zero-whitespace dynamic auto-fit page packing.
+- **Example Prompts**:
+  - *"@agent-bidocs-pdf-guard: Verify that all PDF generator functions return valid base64 data URLs without using URL.createObjectURL."*
+  - *"@agent-bidocs-pdf-guard: Run the BiDOCS PDF Guard to ensure zero regressions across all 27 statutory forms."*
+- **Active Skills**: `bidocs-pdf-guard`, `zero-whitespace-pdf-master`, `bidocs-pdf-system`.
+
+---
+
 ## 💡 Pro Tip: Multi-Agent Collaboration
 You can combine agents in a single prompt!
-> *"@agent-architect plan the feature, @agent-designer design the layout, @agent-senior-fullstack implement the full-stack logic, and @agent-document-master guarantee zero whitespace in the final PDF export."*
+> *"@agent-architect plan the feature, @agent-designer design the layout, @agent-expert-fullstack implement the full-stack logic, and @agent-bidocs-pdf-guard guarantee zero regressions in the final PDF export."*
 
 The Master Orchestrator will automatically execute the phases in sequence!
 

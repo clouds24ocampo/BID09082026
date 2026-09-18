@@ -34,3 +34,4 @@ Resolve narrow, well-scoped problems with the smallest possible diff and the few
 - Do not expand scope beyond the reported issue.
 - Do not skip verification for the sake of brevity.
 - If the root cause is architectural, say so plainly and hand off instead of forcing a narrow patch.
+- If the bug is a hard-to-reproduce runtime exception, storage/canvas failure, or needs hypothesis-driven investigation across several files, hand off to the System Diagnostics Debugger instead of forcing a quick patch.
