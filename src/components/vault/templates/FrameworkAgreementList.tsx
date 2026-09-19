@@ -1,9 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Tenant } from '../../../types';
-import { generateFrameworkAgreementListVectorPdf } from '../../../utils/vectorPdfGenerator';
-import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
-import { autoFitPageChunks, calculateRowHeight, getAutoFitTypographyClass } from '../../../utils/autoFitEngine';
-import { savePdfData } from '../../../utils/vaultIndexedDB';
+import React, { useState, useEffect, useMemo } from "react";
+import { Tenant } from "../../../types";
+import { generateFrameworkAgreementListVectorPdf } from "../../../utils/vectorPdfGenerator";
+import {
+  getOpportunityProjects,
+  OpportunityProjectOption,
+} from "../../../utils/opportunityProjects";
+import {
+  autoFitPageChunks,
+  calculateRowHeight,
+  getAutoFitTypographyClass,
+} from "../../../utils/autoFitEngine";
+import { savePdfData } from "../../../utils/vaultIndexedDB";
 import {
   X,
   Printer,
@@ -15,8 +22,8 @@ import {
   Lock,
   Sparkles,
   ShieldCheck,
-  CheckCircle2
-} from 'lucide-react';
+  CheckCircle2,
+} from "lucide-react";
 
 export interface ScheduleItem {
   id: string;
@@ -33,32 +40,38 @@ export interface FrameworkAgreementListProps {
   activeProjectRefNo?: string;
   activeProjectTitle?: string;
   activeProcuringEntity?: string;
-  onSaveAndComplete?: (fileDataUrl?: string, customName?: string, projectRefNo?: string, projectTitle?: string, projectId?: string) => void;
+  onSaveAndComplete?: (
+    fileDataUrl?: string,
+    customName?: string,
+    projectRefNo?: string,
+    projectTitle?: string,
+    projectId?: string,
+  ) => void;
   onClose?: () => void;
 }
 
 const getNowDateTimeString = () => {
   const now = new Date();
   const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hours = String(now.getHours()).padStart(2, '0');
-  const mins = String(now.getMinutes()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const mins = String(now.getMinutes()).padStart(2, "0");
   return `${year}-${month}-${day}T${hours}:${mins}`;
 };
 
 const formatDateTimeDisplay = (raw: string): string => {
-  if (!raw) return 'N/A';
+  if (!raw) return "N/A";
   try {
     const d = new Date(raw);
     if (isNaN(d.getTime())) return raw;
-    return d.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
+    return d.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
     });
   } catch {
     return raw;
@@ -66,34 +79,40 @@ const formatDateTimeDisplay = (raw: string): string => {
 };
 
 const computeTotalAmount = (unitStr: string, qtyStr: string): string => {
-  if (!unitStr || !qtyStr) return '';
-  const unitNum = parseFloat(unitStr.replace(/[^0-9.]/g, ''));
-  const qtyNum = parseFloat(qtyStr.replace(/[^0-9.]/g, ''));
-  if (isNaN(unitNum) || isNaN(qtyNum)) return '';
+  if (!unitStr || !qtyStr) return "";
+  const unitNum = parseFloat(unitStr.replace(/[^0-9.]/g, ""));
+  const qtyNum = parseFloat(qtyStr.replace(/[^0-9.]/g, ""));
+  if (isNaN(unitNum) || isNaN(qtyNum)) return "";
   const total = unitNum * qtyNum;
-  return `PHP ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `PHP ${total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 /**
  * Strips currency label ('PHP') for paper/PDF view while formatting clean decimals
  */
 export const formatPaperAmount = (val: string | number): string => {
-  if (val === undefined || val === null || val === '') return '';
-  const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[^0-9.]/g, ''));
-  if (isNaN(num)) return '';
-  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (val === undefined || val === null || val === "") return "";
+  const num =
+    typeof val === "number"
+      ? val
+      : parseFloat(String(val).replace(/[^0-9.]/g, ""));
+  if (isNaN(num)) return "";
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 };
 
 export const computeTotalQuantity = (itemList: ScheduleItem[]): string => {
   let totalQty = 0;
   let hasValid = false;
-  let detectedUnit = '';
+  let detectedUnit = "";
 
   (itemList || []).forEach((it) => {
     if (!it.quantity) return;
     const match = it.quantity.trim().match(/^([0-9.,]+)\s*(.*)$/);
     if (match) {
-      const num = parseFloat(match[1].replace(/,/g, ''));
+      const num = parseFloat(match[1].replace(/,/g, ""));
       if (!isNaN(num)) {
         totalQty += num;
         hasValid = true;
@@ -104,8 +123,10 @@ export const computeTotalQuantity = (itemList: ScheduleItem[]): string => {
     }
   });
 
-  if (!hasValid) return '0';
-  return detectedUnit ? `${totalQty.toLocaleString('en-US')} ${detectedUnit}` : `${totalQty.toLocaleString('en-US')}`;
+  if (!hasValid) return "0";
+  return detectedUnit
+    ? `${totalQty.toLocaleString("en-US")} ${detectedUnit}`
+    : `${totalQty.toLocaleString("en-US")}`;
 };
 
 export const computeTotalUnitAmount = (itemList: ScheduleItem[]): string => {
@@ -113,25 +134,27 @@ export const computeTotalUnitAmount = (itemList: ScheduleItem[]): string => {
   let hasValid = false;
   (itemList || []).forEach((it) => {
     if (!it.unitAmount) return;
-    const clean = parseFloat(it.unitAmount.replace(/[^0-9.]/g, ''));
+    const clean = parseFloat(it.unitAmount.replace(/[^0-9.]/g, ""));
     if (!isNaN(clean) && clean > 0) {
       totalUnit += clean;
       hasValid = true;
     }
   });
-  if (!hasValid && totalUnit === 0) return 'PHP 0.00';
-  return `PHP ${totalUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (!hasValid && totalUnit === 0) return "PHP 0.00";
+  return `PHP ${totalUnit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-export const computeGrandTotalMaterials = (itemList: ScheduleItem[]): string => {
+export const computeGrandTotalMaterials = (
+  itemList: ScheduleItem[],
+): string => {
   let grandTotal = 0;
   let hasValid = false;
   (itemList || []).forEach((it) => {
     let amtNum = 0;
     const computedStr = computeTotalAmount(it.unitAmount, it.quantity);
-    const targetStr = computedStr || it.total || '';
+    const targetStr = computedStr || it.total || "";
     if (targetStr) {
-      const clean = parseFloat(targetStr.replace(/[^0-9.]/g, ''));
+      const clean = parseFloat(targetStr.replace(/[^0-9.]/g, ""));
       if (!isNaN(clean) && clean > 0) {
         amtNum = clean;
         hasValid = true;
@@ -139,18 +162,20 @@ export const computeGrandTotalMaterials = (itemList: ScheduleItem[]): string => 
     }
     grandTotal += amtNum;
   });
-  if (!hasValid && grandTotal === 0) return 'PHP 0.00';
-  return `PHP ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (!hasValid && grandTotal === 0) return "PHP 0.00";
+  return `PHP ${grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-export const getNumericGrandTotalMaterials = (itemList: ScheduleItem[]): number => {
+export const getNumericGrandTotalMaterials = (
+  itemList: ScheduleItem[],
+): number => {
   let grandTotal = 0;
   (itemList || []).forEach((it) => {
     let amtNum = 0;
     const computedStr = computeTotalAmount(it.unitAmount, it.quantity);
-    const targetStr = computedStr || it.total || '';
+    const targetStr = computedStr || it.total || "";
     if (targetStr) {
-      const clean = parseFloat(targetStr.replace(/[^0-9.]/g, ''));
+      const clean = parseFloat(targetStr.replace(/[^0-9.]/g, ""));
       if (!isNaN(clean) && clean > 0) {
         amtNum = clean;
       }
@@ -160,11 +185,16 @@ export const getNumericGrandTotalMaterials = (itemList: ScheduleItem[]): number 
   return grandTotal;
 };
 
-export const DEFAULT_SERVICES_DESCRIPTION = 'Logistic, Delivery, Labor, Installation, Cable Pulling, Rough-ins, Cloud Service, Mobile Configuration and User Restriction, Commissioning, CCTV System (35% of Materials Cost) - All kinds of taxes included';
+export const DEFAULT_SERVICES_DESCRIPTION =
+  "Logistic, Delivery, Labor, Installation, Cable Pulling, Rough-ins, Cloud Service, Mobile Configuration and User Restriction, Commissioning, CCTV System (35% of Materials Cost) - All kinds of taxes included";
 
-export const getServicesCostAmount = (itemList: ScheduleItem[], percentage: number = 35, customAmountStr?: string): number => {
+export const getServicesCostAmount = (
+  itemList: ScheduleItem[],
+  percentage: number = 35,
+  customAmountStr?: string,
+): number => {
   if (customAmountStr && customAmountStr.trim()) {
-    const clean = parseFloat(customAmountStr.replace(/[^0-9.]/g, ''));
+    const clean = parseFloat(customAmountStr.replace(/[^0-9.]/g, ""));
     if (!isNaN(clean) && clean >= 0) return clean;
   }
   const materialsCost = getNumericGrandTotalMaterials(itemList);
@@ -172,20 +202,28 @@ export const getServicesCostAmount = (itemList: ScheduleItem[], percentage: numb
 };
 
 export const formatDescriptionText = (text: string): string => {
-  if (!text) return '';
-  return text.replace(/([a-zA-Z0-9])&([a-zA-Z0-9])/g, '$1 & $2');
+  if (!text) return "";
+  return text.replace(/([a-zA-Z0-9])&([a-zA-Z0-9])/g, "$1 & $2");
 };
 
-export const getServicesCostDisplay = (itemList: ScheduleItem[], percentage: number = 35, customAmountStr?: string): string => {
+export const getServicesCostDisplay = (
+  itemList: ScheduleItem[],
+  percentage: number = 35,
+  customAmountStr?: string,
+): string => {
   const amount = getServicesCostAmount(itemList, percentage, customAmountStr);
-  return `PHP ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `PHP ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-export const getGrandTotalWithServicesDisplay = (itemList: ScheduleItem[], percentage: number = 35, customAmountStr?: string): string => {
+export const getGrandTotalWithServicesDisplay = (
+  itemList: ScheduleItem[],
+  percentage: number = 35,
+  customAmountStr?: string,
+): string => {
   const materials = getNumericGrandTotalMaterials(itemList);
   const services = getServicesCostAmount(itemList, percentage, customAmountStr);
   const grandTotal = materials + services;
-  return `PHP ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `PHP ${grandTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 interface PageRow {
@@ -194,65 +232,102 @@ interface PageRow {
 }
 
 export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
-  item = { id: 'fal-01', code: 'FAL-01', name: 'Framework Agreement List' },
+  item = { id: "fal-01", code: "FAL-01", name: "Framework Agreement List" },
   tenant,
-  activeProjectRefNo = '',
-  activeProjectTitle = '',
-  activeProcuringEntity = '',
+  activeProjectRefNo = "",
+  activeProjectTitle = "",
+  activeProcuringEntity = "",
   onSaveAndComplete,
-  onClose
+  onClose,
 }) => {
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date().toISOString().split("T")[0];
 
   // PDF Export rendering mode state
   const [isExporting, setIsExporting] = useState(false);
 
   // Adjustable Table Font Size State ('fine' = 9pt, 'xs' = 10pt, 'sm' = 11pt)
-  const [fontSizeMode, setFontSizeMode] = useState<'fine' | 'xs' | 'sm'>('xs');
+  const [fontSizeMode, setFontSizeMode] = useState<"fine" | "xs" | "sm">("xs");
 
   // Opportunity Finder Project List State
-  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
-  const [selectedOppId, setSelectedOppId] = useState<string>('');
+  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>(
+    [],
+  );
+  const [selectedOppId, setSelectedOppId] = useState<string>("");
 
   // Document & Project Metadata State
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo);
-  const [solicitationNumber, setSolicitationNumber] = useState('SOL-2026-001');
+  const [solicitationNumber, setSolicitationNumber] = useState("SOL-2026-001");
   const [projectTitle, setProjectTitle] = useState(activeProjectTitle);
   const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity);
-  const [dateTimeSubmitted, setDateTimeSubmitted] = useState<string>(getNowDateTimeString());
+  const [dateTimeSubmitted, setDateTimeSubmitted] = useState<string>(
+    getNowDateTimeString(),
+  );
   const projectScopeKey = selectedOppId || projectRefNo || activeProjectRefNo;
 
   // Company Details State
-  const [companyName] = useState(tenant?.companyName || 'Bidding Entity Corporate Name');
-  const [companyAddress] = useState(tenant?.address || 'Metro Manila, Philippines');
-  const [signatoryName] = useState(tenant?.authorizedSignatory?.name || 'Authorized Signatory Name');
-  const [signatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'President / General Manager');
+  const [companyName] = useState(
+    tenant?.companyName || "Bidding Entity Corporate Name",
+  );
+  const [companyAddress] = useState(
+    tenant?.address || "Metro Manila, Philippines",
+  );
+  const [signatoryName] = useState(
+    tenant?.authorizedSignatory?.name || "Authorized Signatory Name",
+  );
+  const [signatoryTitle] = useState(
+    tenant?.authorizedSignatory?.title || "President / General Manager",
+  );
 
   // Items State (Mirrored and Synchronized with Section VI & Bid Documents)
   const [items, setItems] = useState<ScheduleItem[]>([]);
 
   // Services / Logistics Layer State (Mirrored Read-Only from Section VI)
-  const [servicesDescription, setServicesDescription] = useState<string>(DEFAULT_SERVICES_DESCRIPTION);
+  const [servicesDescription, setServicesDescription] = useState<string>(
+    DEFAULT_SERVICES_DESCRIPTION,
+  );
   const [servicesPercentage, setServicesPercentage] = useState<number>(35);
-  const [servicesCustomAmount, setServicesCustomAmount] = useState<string>('');
+  const [servicesCustomAmount, setServicesCustomAmount] = useState<string>("");
 
   // Synchronize items and delivery days across Section VI, Form L Detailed Estimates, and FAL
   const saveItemsToSharedStorage = (updatedItems: ScheduleItem[]) => {
-    const tenantKey = tenant?.id || 'default';
-    const scopeKey = selectedOppId || projectRefNo || activeProjectRefNo || 'default';
+    const tenantKey = tenant?.id || "default";
+    const scopeKey =
+      selectedOppId || projectRefNo || activeProjectRefNo || "default";
 
     // 1. Save FAL
     try {
-      localStorage.setItem(`bidocs_fal_${tenantKey}_${scopeKey}`, JSON.stringify(updatedItems));
-      if (selectedOppId) localStorage.setItem(`bidocs_fal_${tenantKey}_${selectedOppId}`, JSON.stringify(updatedItems));
-      if (projectRefNo) localStorage.setItem(`bidocs_fal_${tenantKey}_${projectRefNo}`, JSON.stringify(updatedItems));
+      localStorage.setItem(
+        `bidocs_fal_${tenantKey}_${scopeKey}`,
+        JSON.stringify(updatedItems),
+      );
+      if (selectedOppId)
+        localStorage.setItem(
+          `bidocs_fal_${tenantKey}_${selectedOppId}`,
+          JSON.stringify(updatedItems),
+        );
+      if (projectRefNo)
+        localStorage.setItem(
+          `bidocs_fal_${tenantKey}_${projectRefNo}`,
+          JSON.stringify(updatedItems),
+        );
     } catch (_) {}
 
     // 2. Sync to Section VI so both documents have 100% IDENTICAL delivery days
     try {
-      localStorage.setItem(`bidocs_sec_vi_${tenantKey}_${scopeKey}`, JSON.stringify(updatedItems));
-      if (selectedOppId) localStorage.setItem(`bidocs_sec_vi_${tenantKey}_${selectedOppId}`, JSON.stringify(updatedItems));
-      if (projectRefNo) localStorage.setItem(`bidocs_sec_vi_${tenantKey}_${projectRefNo}`, JSON.stringify(updatedItems));
+      localStorage.setItem(
+        `bidocs_sec_vi_${tenantKey}_${scopeKey}`,
+        JSON.stringify(updatedItems),
+      );
+      if (selectedOppId)
+        localStorage.setItem(
+          `bidocs_sec_vi_${tenantKey}_${selectedOppId}`,
+          JSON.stringify(updatedItems),
+        );
+      if (projectRefNo)
+        localStorage.setItem(
+          `bidocs_sec_vi_${tenantKey}_${projectRefNo}`,
+          JSON.stringify(updatedItems),
+        );
     } catch (_) {}
 
     // 3. Sync to Detailed Estimates deliverySchedule
@@ -261,8 +336,12 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       try {
         const candidateDetKeys = [
           `bidocs_detailed_estimates_${tenantKey}_${scopeKey}`,
-          selectedOppId ? `bidocs_detailed_estimates_${tenantKey}_${selectedOppId}` : '',
-          projectRefNo ? `bidocs_detailed_estimates_${tenantKey}_${projectRefNo}` : ''
+          selectedOppId
+            ? `bidocs_detailed_estimates_${tenantKey}_${selectedOppId}`
+            : "",
+          projectRefNo
+            ? `bidocs_detailed_estimates_${tenantKey}_${projectRefNo}`
+            : "",
         ].filter(Boolean);
 
         for (const k of candidateDetKeys) {
@@ -277,18 +356,18 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     }
   };
 
-
-
   // Load real saved opportunity projects from Opportunity Finder
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
     setOppProjects(list);
     if (activeProjectRefNo) {
-      const match = list.find((project) => project.refNo === activeProjectRefNo);
+      const match = list.find(
+        (project) => project.refNo === activeProjectRefNo,
+      );
       if (match) {
         setSelectedOppId(match.id);
         setProjectRefNo(match.refNo);
-        setSolicitationNumber(match.solicitationNo || 'SOL-2026-001');
+        setSolicitationNumber(match.solicitationNo || "SOL-2026-001");
         setProjectTitle(match.title);
         setProcuringEntity(match.procuringEntity);
         if (match.dateTimeSubmitted) {
@@ -296,36 +375,43 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
         }
         return;
       }
-      setSelectedOppId('');
+      setSelectedOppId("");
       setProjectRefNo(activeProjectRefNo);
-      setSolicitationNumber('SOL-2026-001');
-      setProjectTitle(activeProjectTitle || 'Target Bidding Project');
-      setProcuringEntity(activeProcuringEntity || '');
+      setSolicitationNumber("SOL-2026-001");
+      setProjectTitle(activeProjectTitle || "Target Bidding Project");
+      setProcuringEntity(activeProcuringEntity || "");
     } else if (list.length > 0) {
       const first = list[0];
       setSelectedOppId(first.id);
       setProjectRefNo(first.refNo);
-      setSolicitationNumber(first.solicitationNo || 'SOL-2026-001');
+      setSolicitationNumber(first.solicitationNo || "SOL-2026-001");
       setProjectTitle(first.title);
       setProcuringEntity(first.procuringEntity);
       if (first.dateTimeSubmitted) {
         setDateTimeSubmitted(first.dateTimeSubmitted);
       }
     } else {
-      setSelectedOppId('');
-      setProjectRefNo('');
-      setSolicitationNumber('');
-      setProjectTitle('');
-      setProcuringEntity('');
+      setSelectedOppId("");
+      setProjectRefNo("");
+      setSolicitationNumber("");
+      setProjectTitle("");
+      setProcuringEntity("");
     }
-  }, [tenant?.id, activeProjectRefNo, activeProjectTitle, activeProcuringEntity]);
+  }, [
+    tenant?.id,
+    activeProjectRefNo,
+    activeProjectTitle,
+    activeProcuringEntity,
+  ]);
 
   const handleSelectProject = (oppIdOrRef: string) => {
-    const found = oppProjects.find((p) => p.id === oppIdOrRef || p.refNo === oppIdOrRef);
+    const found = oppProjects.find(
+      (p) => p.id === oppIdOrRef || p.refNo === oppIdOrRef,
+    );
     if (found) {
       setSelectedOppId(found.id);
       setProjectRefNo(found.refNo);
-      setSolicitationNumber(found.solicitationNo || 'SOL-2026-001');
+      setSolicitationNumber(found.solicitationNo || "SOL-2026-001");
       setProjectTitle(found.title);
       setProcuringEntity(found.procuringEntity);
       if (found.dateTimeSubmitted) {
@@ -340,14 +426,14 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       setItems([]);
       setServicesDescription(DEFAULT_SERVICES_DESCRIPTION);
       setServicesPercentage(35);
-      setServicesCustomAmount('');
+      setServicesCustomAmount("");
       return;
     }
-    const tenantKey = tenant?.id || 'default';
+    const tenantKey = tenant?.id || "default";
     const candidateSecViKeys = [
       `bidocs_sec_vi_${tenantKey}_${projectScopeKey}`,
-      selectedOppId ? `bidocs_sec_vi_${tenantKey}_${selectedOppId}` : '',
-      projectRefNo ? `bidocs_sec_vi_${tenantKey}_${projectRefNo}` : ''
+      selectedOppId ? `bidocs_sec_vi_${tenantKey}_${selectedOppId}` : "",
+      projectRefNo ? `bidocs_sec_vi_${tenantKey}_${projectRefNo}` : "",
     ].filter(Boolean);
 
     let loadedItems: ScheduleItem[] | null = null;
@@ -360,15 +446,17 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             loadedItems = parsed;
             break;
           }
-        } catch (e) { }
+        } catch (e) {}
       }
     }
     setItems(loadedItems !== null ? loadedItems : []);
 
     const candidateServiceKeys = [
       `bidocs_sec_vi_services_${tenantKey}_${projectScopeKey}`,
-      selectedOppId ? `bidocs_sec_vi_services_${tenantKey}_${selectedOppId}` : '',
-      projectRefNo ? `bidocs_sec_vi_services_${tenantKey}_${projectRefNo}` : ''
+      selectedOppId
+        ? `bidocs_sec_vi_services_${tenantKey}_${selectedOppId}`
+        : "",
+      projectRefNo ? `bidocs_sec_vi_services_${tenantKey}_${projectRefNo}` : "",
     ].filter(Boolean);
 
     let loadedServices: any = null;
@@ -386,13 +474,15 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     }
 
     if (loadedServices) {
-      setServicesDescription(loadedServices.description || DEFAULT_SERVICES_DESCRIPTION);
+      setServicesDescription(
+        loadedServices.description || DEFAULT_SERVICES_DESCRIPTION,
+      );
       setServicesPercentage(loadedServices.percentage ?? 35);
-      setServicesCustomAmount(loadedServices.customAmount || '');
+      setServicesCustomAmount(loadedServices.customAmount || "");
     } else {
       setServicesDescription(DEFAULT_SERVICES_DESCRIPTION);
       setServicesPercentage(35);
-      setServicesCustomAmount('');
+      setServicesCustomAmount("");
     }
   }, [projectScopeKey, selectedOppId, projectRefNo, tenant?.id]);
 
@@ -403,7 +493,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
   const handleExportPdf = async () => {
     setIsExporting(true);
     try {
-      const fileName = `${projectRefNo || 'FAL-01'}_Framework_Agreement_List_${todayStr}.pdf`;
+      const fileName = `${projectRefNo || "FAL-01"}_Framework_Agreement_List_${todayStr}.pdf`;
       const pdfDataUrl = await generateFrameworkAgreementListVectorPdf({
         companyName,
         companyAddress,
@@ -415,29 +505,39 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
         signatoryTitle,
         items,
         servicesDescription,
-        servicesCost: getServicesCostAmount(items, servicesPercentage, servicesCustomAmount),
-        grandTotal: getNumericGrandTotalMaterials(items) + getServicesCostAmount(items, servicesPercentage, servicesCustomAmount),
+        servicesCost: getServicesCostAmount(
+          items,
+          servicesPercentage,
+          servicesCustomAmount,
+        ),
+        grandTotal:
+          getNumericGrandTotalMaterials(items) +
+          getServicesCostAmount(
+            items,
+            servicesPercentage,
+            servicesCustomAmount,
+          ),
         totalMaterials: getNumericGrandTotalMaterials(items),
-        totalQuantity: computeTotalQuantity(items)
+        totalQuantity: computeTotalQuantity(items),
       });
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = pdfDataUrl;
-      link.setAttribute('download', fileName);
+      link.setAttribute("download", fileName);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      console.error('PDF export error:', err);
+      console.error("PDF export error:", err);
     } finally {
       setIsExporting(false);
     }
   };
 
   const handleExportExcel = () => {
-    const cleanProj = (projectRefNo || 'PRJ').replace(/[^a-zA-Z0-9]/g, '_');
+    const cleanProj = (projectRefNo || "PRJ").replace(/[^a-zA-Z0-9]/g, "_");
     const fileName = `${cleanProj}_Framework_Agreement_List_${todayStr}.csv`;
 
-    let csvContent = '\uFEFF';
+    let csvContent = "\uFEFF";
     csvContent += `"FRAMEWORK AGREEMENT LIST"\n`;
     csvContent += `"Company Name:","${companyName.replace(/"/g, '""')}"\n`;
     csvContent += `"Company Address:","${companyAddress.replace(/"/g, '""')}"\n`;
@@ -451,27 +551,35 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
 
     items.forEach((it, idx) => {
       const itemNum = `"${idx + 1}"`;
-      const desc = `"${(it.description || '').replace(/"/g, '""')}"`;
-      const qty = `"${(it.quantity || '').replace(/"/g, '""')}"`;
-      const unitAmt = `"${(it.unitAmount || '').replace(/"/g, '""')}"`;
-      const tot = `"${(it.total || computeTotalAmount(it.unitAmount, it.quantity) || '').replace(/"/g, '""')}"`;
+      const desc = `"${(it.description || "").replace(/"/g, '""')}"`;
+      const qty = `"${(it.quantity || "").replace(/"/g, '""')}"`;
+      const unitAmt = `"${(it.unitAmount || "").replace(/"/g, '""')}"`;
+      const tot = `"${(it.total || computeTotalAmount(it.unitAmount, it.quantity) || "").replace(/"/g, '""')}"`;
       csvContent += `${itemNum},${desc},${qty},${unitAmt},${tot}\n`;
     });
 
     const totalQtyStr = computeTotalQuantity(items);
     const grandTotalStr = computeGrandTotalMaterials(items);
-    const servicesCostStr = getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount);
-    const overallGrandTotalStr = getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount);
+    const servicesCostStr = getServicesCostDisplay(
+      items,
+      servicesPercentage,
+      servicesCustomAmount,
+    );
+    const overallGrandTotalStr = getGrandTotalWithServicesDisplay(
+      items,
+      servicesPercentage,
+      servicesCustomAmount,
+    );
 
     csvContent += `"","TOTAL MATERIALS:","${totalQtyStr}","","${grandTotalStr}"\n`;
     csvContent += `"","${servicesDescription.replace(/"/g, '""')}","1 Lot","","${servicesCostStr}"\n`;
     csvContent += `"","GRAND TOTAL REQUIREMENTS (MATERIALS + SERVICES):","","","${overallGrandTotalStr}"\n`;
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
-    link.setAttribute('download', fileName);
+    link.setAttribute("download", fileName);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -491,31 +599,56 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
         signatoryTitle,
         items,
         servicesDescription,
-        servicesCost: getServicesCostAmount(items, servicesPercentage, servicesCustomAmount),
-        grandTotal: getNumericGrandTotalMaterials(items) + getServicesCostAmount(items, servicesPercentage, servicesCustomAmount),
+        servicesCost: getServicesCostAmount(
+          items,
+          servicesPercentage,
+          servicesCustomAmount,
+        ),
+        grandTotal:
+          getNumericGrandTotalMaterials(items) +
+          getServicesCostAmount(
+            items,
+            servicesPercentage,
+            servicesCustomAmount,
+          ),
         totalMaterials: getNumericGrandTotalMaterials(items),
-        totalQuantity: computeTotalQuantity(items)
+        totalQuantity: computeTotalQuantity(items),
       });
 
-      const tenantKey = tenant?.id || 'default';
-      const scopeKey = selectedOppId || projectRefNo || activeProjectRefNo || 'default';
+      const tenantKey = tenant?.id || "default";
+      const scopeKey =
+        selectedOppId || projectRefNo || activeProjectRefNo || "default";
       if (pdfDataUrl) {
         try {
           await savePdfData(`fal_${tenantKey}_${scopeKey}`, pdfDataUrl);
-          if (selectedOppId) await savePdfData(`fal_${tenantKey}_${selectedOppId}`, pdfDataUrl);
-          if (projectRefNo) await savePdfData(`fal_${tenantKey}_${projectRefNo}`, pdfDataUrl);
+          if (selectedOppId)
+            await savePdfData(`fal_${tenantKey}_${selectedOppId}`, pdfDataUrl);
+          if (projectRefNo)
+            await savePdfData(`fal_${tenantKey}_${projectRefNo}`, pdfDataUrl);
         } catch (_) {}
       }
 
       saveItemsToSharedStorage(items);
 
       if (onSaveAndComplete) {
-        onSaveAndComplete(pdfDataUrl, item.name, projectRefNo, projectTitle, selectedOppId);
+        onSaveAndComplete(
+          pdfDataUrl,
+          item.name,
+          projectRefNo,
+          projectTitle,
+          selectedOppId,
+        );
       }
     } catch (error) {
-      console.error('Failed to generate Framework Agreement List PDF:', error);
+      console.error("Failed to generate Framework Agreement List PDF:", error);
       if (onSaveAndComplete) {
-        onSaveAndComplete(undefined, item.name, projectRefNo, projectTitle, selectedOppId);
+        onSaveAndComplete(
+          undefined,
+          item.name,
+          projectRefNo,
+          projectTitle,
+          selectedOppId,
+        );
       }
     } finally {
       setIsExporting(false);
@@ -523,7 +656,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
   };
 
   const totalCharactersInDoc = useMemo(() => {
-    return items.reduce((sum, it) => sum + (it.description || '').length, 0);
+    return items.reduce((sum, it) => sum + (it.description || "").length, 0);
   }, [items]);
 
   const autoTypographyClass = useMemo(() => {
@@ -531,16 +664,19 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
   }, [totalCharactersInDoc, items.length]);
 
   const getTableFontSizeClass = () => {
-    if (fontSizeMode === 'fine') return 'text-[9.5px] leading-tight';
-    if (fontSizeMode === 'xs') return autoTypographyClass;
-    return 'text-xs leading-normal';
+    if (fontSizeMode === "fine") return "text-[9.5px] leading-tight";
+    if (fontSizeMode === "xs") return autoTypographyClass;
+    return "text-xs leading-normal";
   };
 
   const { charsPerLine, lineHeightPx, basePaddingPx } = useMemo(() => {
-    if (fontSizeMode === 'fine' || (fontSizeMode === 'xs' && totalCharactersInDoc > 5000)) {
+    if (
+      fontSizeMode === "fine" ||
+      (fontSizeMode === "xs" && totalCharactersInDoc > 5000)
+    ) {
       return { charsPerLine: 44, lineHeightPx: 15, basePaddingPx: 10 };
     }
-    if (fontSizeMode === 'sm') {
+    if (fontSizeMode === "sm") {
       return { charsPerLine: 36, lineHeightPx: 19, basePaddingPx: 12 };
     }
     return { charsPerLine: 40, lineHeightPx: 16.5, basePaddingPx: 10 };
@@ -549,23 +685,32 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
   // --- DYNAMIC AUTO-FIT PAGE-PACKING ENGINE ---
   // Calibrated for 48% column width (368px @ 96DPI) with zero empty space & safe footer margin
   const pageChunks = useMemo<PageRow[][]>(() => {
-    const indexedItems: PageRow[] = items.map((it, idx) => ({ item: it, index: idx }));
+    const indexedItems: PageRow[] = items.map((it, idx) => ({
+      item: it,
+      index: idx,
+    }));
     return autoFitPageChunks(
       indexedItems,
       (row) => {
-        const formatted = formatDescriptionText(row.item.description || '');
-        return calculateRowHeight(formatted, charsPerLine, lineHeightPx, basePaddingPx, 24);
+        const formatted = formatDescriptionText(row.item.description || "");
+        return calculateRowHeight(
+          formatted,
+          charsPerLine,
+          lineHeightPx,
+          basePaddingPx,
+          24,
+        );
       },
       {
-        orientation: 'portrait',
+        orientation: "portrait",
         columnCharWidth: charsPerLine,
         headerHeightPx: 185,
         footerHeightPx: 350,
         runningFooterPx: 45,
         continuationTheadHeightPx: 32,
         safetyBufferPx: 35,
-        strategy: 'greedy'
-      }
+        strategy: "greedy",
+      },
     );
   }, [items, charsPerLine, lineHeightPx, basePaddingPx]);
 
@@ -574,7 +719,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
   const pagesList = pageChunks.map((chunk, pIdx) => (
     <div
       key={`fal-page-${pIdx}`}
-      id={pIdx === 0 ? 'framework-paper' : `framework-paper-p${pIdx + 1}`}
+      id={pIdx === 0 ? "framework-paper" : `framework-paper-p${pIdx + 1}`}
       className="single-page-paper print-document-sheet portrait bg-white p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] h-auto max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
     >
       <div className="w-full">
@@ -595,19 +740,27 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             <div className="mt-2.5 grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs font-serif text-black">
               <div>
                 <span className="font-bold">Project Name: </span>
-                <span className="font-semibold text-slate-900">{projectTitle || 'N/A'}</span>
+                <span className="font-semibold text-slate-900">
+                  {projectTitle || "N/A"}
+                </span>
               </div>
               <div>
                 <span className="font-bold">Project REF No.: </span>
-                <span className="font-mono font-semibold text-blue-950">{projectRefNo || 'N/A'}</span>
+                <span className="font-mono font-semibold text-blue-950">
+                  {projectRefNo || "N/A"}
+                </span>
               </div>
               <div>
                 <span className="font-bold">Procuring Entity: </span>
-                <span className="text-slate-900">{procuringEntity || 'N/A'}</span>
+                <span className="text-slate-900">
+                  {procuringEntity || "N/A"}
+                </span>
               </div>
               <div>
                 <span className="font-bold">Submission Date & Time: </span>
-                <span className="font-mono font-semibold text-blue-950">{formatDateTimeDisplay(dateTimeSubmitted)}</span>
+                <span className="font-mono font-semibold text-blue-950">
+                  {formatDateTimeDisplay(dateTimeSubmitted)}
+                </span>
               </div>
             </div>
           </div>
@@ -630,69 +783,102 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
           <table className="w-full border-collapse border border-black text-xs font-serif table-fixed">
             <colgroup>
               <col className="w-[5%]" />
-              <col className="w-[67%]" />
+              <col className="w-[70%]" />
               <col className="w-[6%]" />
+              <col className="w-[8%]" />
               <col className="w-[10%]" />
-              <col className="w-[12%]" />
             </colgroup>
             {pIdx === 0 ? (
               <thead>
                 <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[11px]">
-                  <th className="border border-black px-1.5 py-1.5 w-[5%]">Item No.</th>
-                  <th className="border border-black px-2 py-1.5 text-left w-[67%]">Description</th>
-                  <th className="border border-black px-1.5 py-1.5 w-[6%]">Qty</th>
-                  <th className="border border-black px-2 py-1.5 w-[10%]">Unit Cost</th>
-                  <th className="border border-black px-2 py-1.5 w-[12%]">Total Cost</th>
+                  <th className="border border-black px-1.5 py-1.5 w-[5%]">
+                    Item No.
+                  </th>
+                  <th className="border border-black px-2 py-1.5 text-left w-[70%]">
+                    Description
+                  </th>
+                  <th className="border border-black px-1.5 py-1.5 w-[6%]">
+                    Qty
+                  </th>
+                  <th className="border border-black px-2 py-1.5 w-[8%]">
+                    Unit Cost
+                  </th>
+                  <th className="border border-black px-2 py-1.5 w-[10%]">
+                    Total Cost
+                  </th>
                 </tr>
               </thead>
             ) : (
               <thead>
                 <tr className="bg-slate-200 border-b border-black text-black font-bold text-center uppercase tracking-wider text-[10px]">
-                  <th className="border border-black px-1.5 py-1 w-[5%]">Item No.</th>
-                  <th className="border border-black px-2 py-1 text-left w-[67%]">Description (Continuation)</th>
-                  <th className="border border-black px-1.5 py-1 w-[6%]">Qty</th>
-                  <th className="border border-black px-2 py-1 w-[10%]">Unit Cost</th>
-                  <th className="border border-black px-2 py-1 w-[12%]">Total Cost</th>
+                  <th className="border border-black px-1.5 py-1 w-[5%]">
+                    Item No.
+                  </th>
+                  <th className="border border-black px-2 py-1 text-left w-[70%]">
+                    Description (Continuation)
+                  </th>
+                  <th className="border border-black px-1.5 py-1 w-[6%]">
+                    Qty
+                  </th>
+                  <th className="border border-black px-2 py-1 w-[8%]">
+                    Unit Cost
+                  </th>
+                  <th className="border border-black px-2 py-1 w-[10%]">
+                    Total Cost
+                  </th>
                 </tr>
               </thead>
             )}
             <tbody>
               {chunk.map(({ item: rowItem, index: itemIdx }) => (
-                <tr key={rowItem.id} className="border-b border-black hover:bg-amber-50/20 even:bg-slate-50/30 transition-colors">
+                <tr
+                  key={rowItem.id}
+                  className="border-b border-black hover:bg-amber-50/20 even:bg-slate-50/30 transition-colors"
+                >
                   {/* 1. Item # */}
                   <td className="border border-black px-1.5 py-2 text-center font-serif font-bold align-top text-slate-950">
-                    <span className="block pt-0.5 font-bold text-xs">{itemIdx + 1}</span>
+                    <span className="block pt-0.5 font-bold text-xs">
+                      {itemIdx + 1}
+                    </span>
                   </td>
 
                   {/* 2. Description (Read-Only) */}
                   <td className="border border-black px-3.5 py-2 font-serif align-top break-words">
-                    <div className={`font-serif text-slate-950 pt-0.5 whitespace-pre-wrap font-normal break-words leading-normal text-justify ${getTableFontSizeClass()}`}>
+                    <div
+                      className={`font-serif text-slate-950 pt-0.5 whitespace-pre-wrap font-normal break-words leading-normal text-justify ${getTableFontSizeClass()}`}
+                    >
                       {formatDescriptionText(rowItem.description)}
                     </div>
                   </td>
 
                   {/* 3. Quantity (Read-Only) */}
                   <td className="border border-black px-1.5 py-2 font-serif text-center align-top">
-                    <div className={`font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
-                      {rowItem.quantity || ''}
+                    <div
+                      className={`font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}
+                    >
+                      {rowItem.quantity || ""}
                     </div>
                   </td>
 
                   {/* 4. Unit Amount (Read-Only) */}
                   <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
-                    <div className={`font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}>
+                    <div
+                      className={`font-serif text-black text-center pt-0.5 font-normal break-words ${getTableFontSizeClass()}`}
+                    >
                       <span className="print:hidden">
                         {!isExporting
-                          ? (rowItem.unitAmount
-                              ? rowItem.unitAmount.startsWith('PHP')
-                                ? rowItem.unitAmount
-                                : (() => {
-                                    const clean = parseFloat(rowItem.unitAmount.replace(/[^0-9.]/g, ''));
-                                    return !isNaN(clean)
-                                      ? `PHP ${clean.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                      : rowItem.unitAmount;
-                                  })()
-                              : '')
+                          ? rowItem.unitAmount
+                            ? rowItem.unitAmount.startsWith("PHP")
+                              ? rowItem.unitAmount
+                              : (() => {
+                                  const clean = parseFloat(
+                                    rowItem.unitAmount.replace(/[^0-9.]/g, ""),
+                                  );
+                                  return !isNaN(clean)
+                                    ? `PHP ${clean.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                    : rowItem.unitAmount;
+                                })()
+                            : ""
                           : formatPaperAmount(rowItem.unitAmount)}
                       </span>
                       <span className="hidden print:inline">
@@ -703,14 +889,31 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
 
                   {/* 5. Total Amount (Read-Only) */}
                   <td className="border border-black px-2 py-2 font-serif text-center align-top break-words">
-                    <div className={`font-serif text-black text-center pt-0.5 font-semibold break-words ${getTableFontSizeClass()}`}>
+                    <div
+                      className={`font-serif text-black text-center pt-0.5 font-semibold break-words ${getTableFontSizeClass()}`}
+                    >
                       <span className="print:hidden">
                         {!isExporting
-                          ? (computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total || '')
-                          : formatPaperAmount(computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total)}
+                          ? computeTotalAmount(
+                              rowItem.unitAmount,
+                              rowItem.quantity,
+                            ) ||
+                            rowItem.total ||
+                            ""
+                          : formatPaperAmount(
+                              computeTotalAmount(
+                                rowItem.unitAmount,
+                                rowItem.quantity,
+                              ) || rowItem.total,
+                            )}
                       </span>
                       <span className="hidden print:inline">
-                        {formatPaperAmount(computeTotalAmount(rowItem.unitAmount, rowItem.quantity) || rowItem.total)}
+                        {formatPaperAmount(
+                          computeTotalAmount(
+                            rowItem.unitAmount,
+                            rowItem.quantity,
+                          ) || rowItem.total,
+                        )}
                       </span>
                     </div>
                   </td>
@@ -731,7 +934,10 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
               <tfoot className="border-t-2 border-black font-serif font-bold bg-slate-100/90">
                 {/* 1. Subtotal Materials Row */}
                 <tr className="border-b border-black">
-                  <td colSpan={2} className="border border-black px-3 py-1.5 font-serif text-xs text-right">
+                  <td
+                    colSpan={2}
+                    className="border border-black px-3 py-1.5 font-serif text-xs text-right"
+                  >
                     <span className="uppercase tracking-wider text-black font-bold font-serif text-xs">
                       TOTAL MATERIALS:
                     </span>
@@ -744,7 +950,9 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                   </td>
                   <td className="border border-black px-2 py-1.5 text-center font-bold text-black text-xs font-mono break-words bg-amber-50/90">
                     <span className="print:hidden">
-                      {!isExporting ? computeGrandTotalMaterials(items) : formatPaperAmount(computeGrandTotalMaterials(items))}
+                      {!isExporting
+                        ? computeGrandTotalMaterials(items)
+                        : formatPaperAmount(computeGrandTotalMaterials(items))}
                     </span>
                     <span className="hidden print:inline">
                       {formatPaperAmount(computeGrandTotalMaterials(items))}
@@ -760,7 +968,8 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                     </td>
                     <td className="border border-black px-3 py-1 text-left font-serif text-xs text-black align-middle">
                       <div className="font-serif text-black text-xs font-medium">
-                        {servicesDescription || 'Logistics, Installation, Testing & Commissioning Services'}
+                        {servicesDescription ||
+                          "Logistics, Installation, Testing & Commissioning Services"}
                       </div>
                     </td>
                     <td className="border border-black px-1.5 py-1 text-center font-serif text-xs text-black font-bold align-middle">
@@ -773,11 +982,27 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                       <div className="font-mono text-blue-950 text-xs font-bold">
                         <span className="print:hidden">
                           {!isExporting
-                            ? getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount)
-                            : formatPaperAmount(getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount))}
+                            ? getServicesCostDisplay(
+                                items,
+                                servicesPercentage,
+                                servicesCustomAmount,
+                              )
+                            : formatPaperAmount(
+                                getServicesCostDisplay(
+                                  items,
+                                  servicesPercentage,
+                                  servicesCustomAmount,
+                                ),
+                              )}
                         </span>
                         <span className="hidden print:inline">
-                          {formatPaperAmount(getServicesCostDisplay(items, servicesPercentage, servicesCustomAmount))}
+                          {formatPaperAmount(
+                            getServicesCostDisplay(
+                              items,
+                              servicesPercentage,
+                              servicesCustomAmount,
+                            ),
+                          )}
                         </span>
                       </div>
                     </td>
@@ -786,7 +1011,10 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
 
                 {/* 3. Grand Total Requirements Row */}
                 <tr className="border-b-2 border-black bg-amber-100/90 text-black">
-                  <td colSpan={2} className="border border-black px-3 py-2 text-right uppercase tracking-wider text-black font-bold font-serif text-xs">
+                  <td
+                    colSpan={2}
+                    className="border border-black px-3 py-2 text-right uppercase tracking-wider text-black font-bold font-serif text-xs"
+                  >
                     GRAND TOTAL REQUIREMENTS (MATERIALS + SERVICES):
                   </td>
                   <td className="border border-black px-1.5 py-2 text-center text-xs font-serif text-slate-600">
@@ -798,11 +1026,27 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                   <td className="border border-black px-2 py-2 text-center font-extrabold text-black text-sm font-mono break-words bg-amber-200">
                     <span className="print:hidden">
                       {!isExporting
-                        ? getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount)
-                        : formatPaperAmount(getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount))}
+                        ? getGrandTotalWithServicesDisplay(
+                            items,
+                            servicesPercentage,
+                            servicesCustomAmount,
+                          )
+                        : formatPaperAmount(
+                            getGrandTotalWithServicesDisplay(
+                              items,
+                              servicesPercentage,
+                              servicesCustomAmount,
+                            ),
+                          )}
                     </span>
                     <span className="hidden print:inline">
-                      {formatPaperAmount(getGrandTotalWithServicesDisplay(items, servicesPercentage, servicesCustomAmount))}
+                      {formatPaperAmount(
+                        getGrandTotalWithServicesDisplay(
+                          items,
+                          servicesPercentage,
+                          servicesCustomAmount,
+                        ),
+                      )}
                     </span>
                   </td>
                 </tr>
@@ -822,10 +1066,16 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             </p>
             <div className="flex items-end justify-between signatory-block">
               <div>
-                <p className="font-bold text-black uppercase text-[10.5px] tracking-wide">{companyName}</p>
+                <p className="font-bold text-black uppercase text-[10.5px] tracking-wide">
+                  {companyName}
+                </p>
                 <div className="mt-4 border-b border-black w-60"></div>
-                <p className="font-bold text-black mt-1 uppercase text-[11px] tracking-wider">{signatoryName || 'AUTHORIZED REPRESENTATIVE'}</p>
-                <p className="text-slate-700 text-[9.5px] font-medium">{signatoryTitle || 'Designation / Authorized Signatory'}</p>
+                <p className="font-bold text-black mt-1 uppercase text-[11px] tracking-wider">
+                  {signatoryName || "AUTHORIZED REPRESENTATIVE"}
+                </p>
+                <p className="text-slate-700 text-[9.5px] font-medium">
+                  {signatoryTitle || "Designation / Authorized Signatory"}
+                </p>
               </div>
             </div>
           </div>
@@ -895,7 +1145,6 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
       `}</style>
 
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-7xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[96vh] flex flex-col print:border-none print:shadow-none print:max-h-none print:bg-white">
-
         {/* Top Controls Header Bar */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0 print:hidden no-export">
           <div className="flex items-center gap-3">
@@ -910,7 +1159,8 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5 truncate max-w-xl">
-                100% Mirrored with Section VI Schedule of Requirements • Standard Legal Portrait
+                100% Mirrored with Section VI Schedule of Requirements •
+                Standard Legal Portrait
               </p>
             </div>
           </div>
@@ -930,7 +1180,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
               className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 transition shadow flex items-center gap-1.5 cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>{isExporting ? 'Exporting PDF...' : 'Export PDF'}</span>
+              <span>{isExporting ? "Exporting PDF..." : "Export PDF"}</span>
             </button>
             <button
               onClick={handlePrint}
@@ -940,7 +1190,10 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
               <span>Print Pages</span>
             </button>
             {onClose && (
-              <button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer">
+              <button
+                onClick={onClose}
+                className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
                 <X className="w-5 h-5" />
               </button>
             )}
@@ -949,7 +1202,6 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
 
         {/* Scrollable Container */}
         <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-8 print:p-0 print:bg-white">
-
           {/* Interactive Screen Controls */}
           <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 print:hidden no-export">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -972,10 +1224,14 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                   className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer"
                 >
                   {oppProjects.length === 0 ? (
-                    <option value="">-- No Saved Projects in Opportunity Finder --</option>
+                    <option value="">
+                      -- No Saved Projects in Opportunity Finder --
+                    </option>
                   ) : (
                     <>
-                      <option value="">-- Select Active Bidding Opportunity / Project --</option>
+                      <option value="">
+                        -- Select Active Bidding Opportunity / Project --
+                      </option>
                       {oppProjects.map((p) => (
                         <option key={p.id} value={p.id}>
                           [{p.refNo}] {p.title} — {p.procuringEntity} ({p.abc})
@@ -993,25 +1249,34 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
                   </span>
                   <button
                     type="button"
-                    onClick={() => setFontSizeMode('fine')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${fontSizeMode === 'fine' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                      }`}
+                    onClick={() => setFontSizeMode("fine")}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                      fontSizeMode === "fine"
+                        ? "bg-blue-600 text-white"
+                        : "text-slate-400 hover:text-white"
+                    }`}
                   >
                     9pt
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFontSizeMode('xs')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${fontSizeMode === 'xs' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                      }`}
+                    onClick={() => setFontSizeMode("xs")}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                      fontSizeMode === "xs"
+                        ? "bg-blue-600 text-white"
+                        : "text-slate-400 hover:text-white"
+                    }`}
                   >
                     10pt
                   </button>
                   <button
                     type="button"
-                    onClick={() => setFontSizeMode('sm')}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${fontSizeMode === 'sm' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-                      }`}
+                    onClick={() => setFontSizeMode("sm")}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                      fontSizeMode === "sm"
+                        ? "bg-blue-600 text-white"
+                        : "text-slate-400 hover:text-white"
+                    }`}
                   >
                     11pt
                   </button>
@@ -1022,23 +1287,30 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] flex items-center gap-2">
               <Sparkles className="w-4 h-4 shrink-0 text-blue-400" />
               <span>
-                <strong>Synchronized with Section VI & Bid Documents:</strong> All item descriptions, quantities, unit prices, and services are automatically synchronized across all project bid forms.
+                <strong>Synchronized with Section VI & Bid Documents:</strong>{" "}
+                All item descriptions, quantities, unit prices, and services are
+                automatically synchronized across all project bid forms.
               </span>
             </div>
           </div>
 
           {/* MULTI-PAGE RENDER CONTAINER */}
-          <div id="framework-pages-container" className="space-y-8 print:space-y-0">
+          <div
+            id="framework-pages-container"
+            className="space-y-8 print:space-y-0"
+          >
             {pagesList}
           </div>
-
         </div>
 
         {/* Bottom Modal Actions */}
         <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900 shrink-0 print:hidden no-export">
           <div className="text-xs text-slate-400 font-mono flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Class A Legal Package — Framework Agreement List ({totalPages} {totalPages === 1 ? 'Page' : 'Pages'} • Legal Portrait 8.5" × 13")</span>
+            <span>
+              Class A Legal Package — Framework Agreement List ({totalPages}{" "}
+              {totalPages === 1 ? "Page" : "Pages"} • Legal Portrait 8.5" × 13")
+            </span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -1056,11 +1328,12 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
               className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 transition shadow-lg flex items-center gap-2 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>{isExporting ? 'Saving Package...' : 'Save & Complete Package'}</span>
+              <span>
+                {isExporting ? "Saving Package..." : "Save & Complete Package"}
+              </span>
             </button>
           </div>
         </div>
-
       </div>
     </div>
   );

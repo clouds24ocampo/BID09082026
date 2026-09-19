@@ -13,6 +13,7 @@ import { TenantSettingsView } from "./components/settings/TenantSettingsView";
 import { CompanyProfileView } from "./components/profile/CompanyProfileView";
 import { ProjectProfileView } from "./components/projects/ProjectProfileView";
 import PowModal from "./components/vault/templates/POW";
+import TermsOfReferenceView from "./components/vault/templates/TOR";
 import VaultErrorBoundary from "./components/common/VaultErrorBoundary";
 
 const MainApp: React.FC = () => {
@@ -39,10 +40,9 @@ const MainApp: React.FC = () => {
           <DashboardView setActiveTab={setActiveTab} />
         )}
         {activeTab === "tor" && (
-          <PowModal
+          <TermsOfReferenceView
             tenant={currentTenant}
             setActiveTab={setActiveTab}
-            initialTab="tor"
           />
         )}
         {activeTab === "pow" && (

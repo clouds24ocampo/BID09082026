@@ -540,7 +540,14 @@ export const BidPackageBuilderView: React.FC = () => {
         if (isCorporateClassAOrB) {
           // Class A / B Corporate Credentials belong to the company/tenant in Vault
           if (doc.id === 'PHILGEPS_CERTIFICATE' || doc.id === 'PHILGEPS_PLATINUM') {
-            return vCode === 'DOC-1' || vCode.includes('PHILGEPS') || vName.includes('philgeps');
+            const isFinancialOrTech = vCode.includes('SF-INFR') || vCode.includes('CASH') || vCode.includes('BOQ') ||
+              vCode.includes('ESTIMATE') || vCode.includes('PRICE') || vName.includes('cash flow') ||
+              vName.includes('cashflow') || vName.includes('boq') || vName.includes('bill of quantities') ||
+              vName.includes('estimate') || vName.includes('form l') || vName.includes('price schedule') ||
+              (v as any).category === 'FINANCIAL';
+            if (isFinancialOrTech) return false;
+            if (vCode === 'DOC-1' || vCode === 'PHILGEPS_PLATINUM' || vCode === 'PHILGEPS_CERTIFICATE') return true;
+            return (vName.includes('philgeps') && (vName.includes('platinum') || vName.includes('certificate') || vName.includes('registration') || vName.includes('annex a') || vName.includes('membership')));
           }
           if (doc.id === 'SEC_DTI_REG') {
             return (vCode === 'DOC-2' || vCode.includes('DTI') || vName.includes('dti') || vName.includes('incorporation') || vName.includes('securities and exchange') || (vName.includes('sec') && !vName.includes('secretary') && !vName.includes('section'))) && vCode !== 'DOC-13' && !vName.includes('secretary') && !vName.includes('section');
@@ -844,6 +851,21 @@ export const BidPackageBuilderView: React.FC = () => {
         // If it was linked to a corporate vault doc, clear it so the official system document generates cleanly
         return { ...item, vaultDocId: undefined };
       }
+
+      // Corporate PhilGEPS sanitation: purge any accidental links to Cash Flow or financial forms
+      const isPhilgeps = codeOrId.includes('PHILGEPS') || name.includes('philgeps');
+      if (isPhilgeps && item.vaultDocId) {
+        const linked = vaultDocs.find(v => v.id === item.vaultDocId);
+        if (linked) {
+          const lCode = (linked.documentCode || '').toUpperCase();
+          const lName = (linked.documentName || '').toLowerCase();
+          if (lCode.includes('SF-INFR') || lCode.includes('CASH') || lName.includes('cash flow') || lName.includes('cashflow') || linked.category === 'FINANCIAL') {
+            const trueDoc1 = vaultDocs.find(v => (v.documentCode || '').toUpperCase() === 'DOC-1');
+            return { ...item, vaultDocId: trueDoc1?.id };
+          }
+        }
+      }
+
       return item;
     });
 
@@ -1290,6 +1312,18 @@ export const BidPackageBuilderView: React.FC = () => {
       }
     }
 
+    // Corporate PhilGEPS sanitation: clear any targetVaultDocId pointing to Cash Flow
+    const isPhilgepsDoc = codeOrId.includes('PHILGEPS') || docNameLower.includes('philgeps');
+    if (isPhilgepsDoc && targetVaultDocId) {
+      const linked = vaultDocs.find(v => v.id === targetVaultDocId);
+      const vCode = (linked?.documentCode || '').toUpperCase();
+      const vName = (linked?.documentName || '').toLowerCase();
+      if (vCode.includes('SF-INFR') || vCode.includes('CASH') || vName.includes('cash flow') || vName.includes('cashflow') || linked?.category === 'FINANCIAL') {
+        targetVaultDocId = undefined;
+        preloadedDataUrl = undefined;
+      }
+    }
+
     if (!preloadedDataUrl && !isTechnicalOrFinancialDoc) {
       const dName = (doc.documentName || '').toLowerCase();
       const match = vaultDocs.find(v =>
@@ -1297,7 +1331,11 @@ export const BidPackageBuilderView: React.FC = () => {
         (v.id && (v.id === doc.id || v.id === doc.code || v.id === cleanDocId)) ||
         ((v as any).code && doc.code && (v as any).code.toLowerCase() === doc.code.toLowerCase()) ||
         (v.documentName && doc.documentName && v.documentName.trim().toLowerCase() === doc.documentName.trim().toLowerCase()) ||
-        (dName.includes('philgeps') && (v.documentCode === 'DOC-1' || (v.documentName || '').toLowerCase().includes('philgeps'))) ||
+        ((dName.includes('philgeps') || (doc.code && doc.code.includes('PHILGEPS'))) && 
+         !v.documentCode?.toUpperCase().includes('SF-INFR') && !v.documentCode?.toUpperCase().includes('CASH') &&
+         !(v.documentName || '').toLowerCase().includes('cash flow') && !(v.documentName || '').toLowerCase().includes('cashflow') &&
+         (v.category as any) !== 'FINANCIAL' &&
+         (v.documentCode === 'DOC-1' || v.documentCode === 'PHILGEPS_PLATINUM' || (v.documentName || '').toLowerCase().includes('platinum') || ((v.documentName || '').toLowerCase().includes('philgeps') && (v.documentName || '').toLowerCase().includes('certificate')))) ||
         (((dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) && (v.documentCode === 'DOC-2' || ((v.documentName || '').toLowerCase().includes('incorporation') || (v.documentName || '').toLowerCase().includes('securities and exchange') || (v.documentName || '').toLowerCase().includes('dti') || ((v.documentName || '').toLowerCase().includes('sec') && !(v.documentName || '').toLowerCase().includes('secretary') && !(v.documentName || '').toLowerCase().includes('section'))) && !(v.documentName || '').toLowerCase().includes('philgeps') && !(v.documentName || '').toLowerCase().includes('bir') && !(v.documentName || '').toLowerCase().includes('secretary') && v.documentCode !== 'DOC-13')) ||
         ((dName.includes('mayor') || (dName.includes('business permit') && !dName.includes('barangay'))) && (v.documentCode === 'DOC-3' || (v.documentName || '').toLowerCase().includes('permit'))) ||
         (((dName.includes('bir') || dName.includes('2303')) && (dName.includes('registration') || dName.includes('certificate') || dName.includes('cor') || dName.includes('2303')) && !dName.includes('clearance')) && (v.documentCode === 'DOC-6' || (v.documentName || '').toLowerCase().includes('2303') || ((v.documentName || '').toLowerCase().includes('bir') && (v.documentName || '').toLowerCase().includes('registration')))) ||
@@ -2145,7 +2183,10 @@ export const BidPackageBuilderView: React.FC = () => {
                             targetVaultDoc = vaultDocs.find(v => {
                               const vName = (v.documentName || '').toLowerCase();
                               const vCode = (v.documentCode || '').toUpperCase();
-                              if (dName.includes('philgeps') && (vCode === 'DOC-1' || vName.includes('philgeps'))) return true;
+                              if (dName.includes('philgeps')) {
+                                if (vCode.includes('SF-INFR') || vCode.includes('CASH') || vName.includes('cash flow') || vName.includes('cashflow') || (v as any).category === 'FINANCIAL') return false;
+                                return vCode === 'DOC-1' || vCode === 'PHILGEPS_PLATINUM' || (vName.includes('philgeps') && (vName.includes('platinum') || vName.includes('certificate') || vName.includes('registration')));
+                              }
                               if (((dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) && (vCode === 'DOC-2' || ((vName.includes('incorporation') || vName.includes('securities and exchange') || vName.includes('dti') || (vName.includes('sec') && !vName.includes('secretary') && !vName.includes('section'))) && !vName.includes('philgeps') && !vName.includes('bir') && !vName.includes('secretary') && vCode !== 'DOC-13' && vCode !== 'DOC-6'))) return true;
                               if (((dName.includes('bir') || dName.includes('2303')) && (dName.includes('registration') || dName.includes('certificate') || dName.includes('cor') || dName.includes('2303')) && !dName.includes('clearance')) && (vCode === 'DOC-6' || vName.includes('2303') || (vName.includes('bir') && vName.includes('registration')))) return true;
                               if (dName.includes('tax') && (vCode === 'DOC-7' || vName.includes('tax clearance')) && vCode !== 'DOC-4' && vCode !== 'DOC-6' && !vName.includes('2303')) return true;
@@ -3801,8 +3842,13 @@ export const BidPackageBuilderView: React.FC = () => {
       {showOrganizeModal && (
         <MergedPdfViewerModal
           selectedItems={currentFolderItems.map(item => {
-            const linked = vaultDocs.find(v => v.id === item.vaultDocId) ||
-              vaultDocs.find(v => v.documentName.toLowerCase() === item.documentName.toLowerCase());
+            const isPhilgeps = (item.code || item.id || '').toUpperCase().includes('PHILGEPS') || item.documentName.toLowerCase().includes('philgeps');
+            const linked = isPhilgeps
+              ? (vaultDocs.find(v => (v.documentCode || '').toUpperCase() === 'DOC-1') ||
+                 vaultDocs.find(v => v.id === item.vaultDocId && !(v.documentName || '').toLowerCase().includes('cash flow') && (v.documentCode || '').toUpperCase() !== 'SF-INFR-56') ||
+                 vaultDocs.find(v => (v.documentName || '').toLowerCase().includes('philgeps') && !(v.documentName || '').toLowerCase().includes('cash flow')))
+              : (vaultDocs.find(v => v.id === item.vaultDocId) ||
+                 vaultDocs.find(v => v.documentName.toLowerCase() === item.documentName.toLowerCase()));
             return {
               id: item.id,
               tenantId: tenantId,

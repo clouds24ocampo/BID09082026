@@ -58,7 +58,6 @@ import {
   Lock,
   Scale,
 } from "lucide-react";
-import { TermsOfReferenceContent } from "./TOR";
 
 export type PowDocumentMode = "POW" | "QUOTATION";
 export type TaxType = "VATABLE" | "NON_VAT";
@@ -155,7 +154,7 @@ export interface PowItem {
   statementOfCompliance?: string; // e.g. "COMPLY" / "BIDDER COMPLIED"
 }
 
-export type PowTabType = "matrix" | "summary" | "signatories" | "tor" | "dr" | "print";
+export type PowTabType = "matrix" | "summary" | "signatories" | "dr" | "print";
 
 export interface PowModalProps {
   item?: { id: string; code: string; name: string };
@@ -1880,7 +1879,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
     setTorPdfFileSize(sizeFormatted);
     setTorPdfUploadDate(nowStr);
     setAppendTorToPdf(true);
-    setActiveTab("tor");
+    setActiveTab("matrix");
     setShowTorPreviewModal(true);
 
     const tenantId = tenant?.id || "default";
@@ -2666,7 +2665,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
             </div>
             <p className="text-xs text-slate-400">
               {docMode === "POW"
-                ? "Itemized Detailed Cost Estimate, Direct vs Indirect Markups, and Terms of Reference (TOR)"
+                ? "Itemized Detailed Cost Estimate and Direct vs Indirect Markups"
                 : "Official Government Supplier Price Canvass, Brand/Model Specifications, and Delivery Undertaking"}
             </p>
           </div>
@@ -3105,18 +3104,6 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       {/* Navigation Sub-Tabs */}
       <div className="px-6 py-2 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActiveTab("tor")}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 cursor-pointer transition ${
-              activeTab === "tor"
-                ? "bg-blue-600 text-white shadow-sm"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5 text-amber-400" />
-            <span>Terms of Reference (TOR) {torPdfFileName && "✓"}</span>
-          </button>
-
           <button
             onClick={() => setActiveTab("matrix")}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 cursor-pointer transition ${
@@ -4289,189 +4276,6 @@ export const POWModalContent: React.FC<PowModalProps> = ({
         {/* TAB 3: SIGNATORIES & APPROVALS HIERARCHY */}
         {activeTab === "signatories" && (
           <div className="space-y-6">{renderSignatoriesEditor("full-tab")}</div>
-        )}
-
-        {/* TAB 4: TERMS OF REFERENCE (TOR) MANAGER */}
-        {activeTab === "tor" && (
-          <div className="space-y-6">
-            {/* SUB-TAB TOGGLE: GENERATE VS UPLOAD */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 border border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
-                  <Scale className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">
-                    Terms of Reference (TOR) Procurement Hub
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Formulate statutory specifications under RA 9184 / RA 12009
-                    or attach pre-signed procuring entity documents
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setTorMode("GENERATE")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                      torMode === "GENERATE"
-                        ? "bg-amber-500 text-slate-950 shadow-md"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    <Scale className="w-3.5 h-3.5" />
-                    <span>Statutory Generator</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setTorMode("UPLOAD")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                      torMode === "UPLOAD"
-                        ? "bg-blue-600 text-white shadow-md"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Upload PDF</span>
-                  </button>
-                </div>
-
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer ml-2">
-                  <input
-                    type="checkbox"
-                    checked={appendTorToPdf}
-                    onChange={(e) => setAppendTorToPdf(e.target.checked)}
-                    className="rounded border-slate-700 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span>Append to Final Package</span>
-                </label>
-              </div>
-            </div>
-
-            {/* CURRENT ATTACHED / LINKED TOR STATUS CARD */}
-            {torPdfDataUrl && (
-              <div className="p-4 rounded-xl bg-slate-950 border border-emerald-500/40 flex items-center justify-between shadow-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                    <FileCheck className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-bold text-white">
-                        {torPdfFileName}
-                      </p>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        Linked to {docMode === "POW" ? "POW" : "Quotation"}{" "}
-                        Package
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono mt-0.5">
-                      <span>Size: {torPdfFileSize}</span>
-                      <span>•</span>
-                      <span>Date: {torPdfUploadDate}</span>
-                      <span>•</span>
-                      <span className="text-emerald-400 font-semibold">
-                        IndexedDB Stored
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowTorPreviewModal(true)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center gap-1.5 cursor-pointer transition"
-                  >
-                    <Eye className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Preview TOR</span>
-                  </button>
-
-                  <button
-                    onClick={handleTorDelete}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/20 hover:bg-red-500/30 text-red-400 flex items-center gap-1.5 cursor-pointer transition"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Unlink / Delete</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* MODE 1: INTERACTIVE STATUTORY TOR GENERATOR */}
-            {torMode === "GENERATE" && (
-              <TermsOfReferenceContent
-                tenant={tenant}
-                activeProjectRefNo={projectRefNo}
-                activeProjectTitle={projectTitle}
-                activeProcuringEntity={procuringEntity}
-                activeAbcAmount={totals.grandTotal}
-                activeTrackingNumber={trackingNumber}
-                powScopeItems={items}
-                initialPreset={
-                  initialTab === "tor"
-                    ? "LTCISCC_COMMAND_CENTER"
-                    : "LTCISCC_COMMAND_CENTER"
-                }
-                isEmbedded={true}
-                onSaveAndComplete={handleTorGenerated}
-              />
-            )}
-
-            {/* MODE 2: UPLOAD SCANNED TOR PDF */}
-            {torMode === "UPLOAD" && (
-              <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-                <input
-                  type="file"
-                  ref={torInputRef}
-                  accept="application/pdf"
-                  onChange={handleTorUpload}
-                  className="hidden"
-                />
-
-                <div
-                  onClick={() => torInputRef.current?.click()}
-                  className="border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-2xl p-8 text-center cursor-pointer transition bg-slate-950/50 hover:bg-blue-950/10 space-y-3"
-                >
-                  <div className="w-12 h-12 rounded-full bg-blue-600/20 text-blue-400 mx-auto flex items-center justify-center">
-                    <Upload className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-white">
-                      Click to Upload Terms of Reference (TOR) PDF
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Accepts standard government PDF (Scope of Work, Technical
-                      Specifications, TOR)
-                    </p>
-                  </div>
-                  <span className="inline-block px-3 py-1 rounded-full text-[11px] font-mono bg-slate-800 text-slate-300">
-                    Legal &amp; A4 Compatible (Auto-Normalized to Legal
-                    8.5&quot; x 13&quot;)
-                  </span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-blue-950/20 border border-blue-900/30 flex items-start gap-3">
-                  <ShieldCheck className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-                  <div className="text-xs text-slate-300 space-y-1">
-                    <p className="font-bold text-white">
-                      Philippine Procurement Statutory Standard:
-                    </p>
-                    <p className="text-slate-400">
-                      Pursuant to Section 17.7 of RA 9184 and RA 12009 (NGPA),
-                      the Terms of Reference (TOR) define the definitive
-                      statutory scope of project deliverables. Attached TOR
-                      documents maintain 100% resolution with all BAC stamps and
-                      digital signatures preserved.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         )}
 
         {/* TAB: OFFICIAL DELIVERY RECEIPT (DR) */}

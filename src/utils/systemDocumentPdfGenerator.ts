@@ -3856,25 +3856,40 @@ export async function resolveDocumentPdfAttachment(
     docIdUpper.includes('SUMMARY_BID') || docIdUpper.includes('SUMMARY_BID_PRICE') || dName.includes('summary of bid') ||
     docIdUpper.includes('CASH_FLOW') || docIdUpper.includes('CASHFLOW') || dName.includes('cash flow');
 
+  // Identify if this item is a corporate document (Class A / B)
+  const isCorporateDoc = docIdUpper.includes('PHILGEPS') || dName.includes('philgeps') || dCode === 'DOC-1' ||
+    dCode === 'PHILGEPS_PLATINUM' || ['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(dCode);
+
   // 1. DIRECT EMBEDDED ATTACHMENT
   const directUrl = (doc as any).fileDataUrl || (doc as any).pdfDataUrl;
   if (typeof directUrl === 'string' && directUrl.trim().length > 0) {
     return directUrl;
   }
 
-  // 2. DIRECT VAULT DOC ID MATCH (In memory or IndexedDB) - ONLY if not cross-matched with corporate doc
+  // 2. DIRECT VAULT DOC ID MATCH (In memory or IndexedDB) - ONLY if not cross-matched with corporate doc or financial doc
   if (doc.vaultDocId) {
     let isValidVaultLink = true;
+    const linked = Array.isArray(ctx.vaultDocs) ? ctx.vaultDocs.find(v => v && v.id === doc.vaultDocId) : null;
+    const vCode = (linked?.documentCode || '').toUpperCase();
+    const vName = (linked?.documentName || '').toLowerCase();
+
     if (isTechnicalOrFinancialDoc) {
-      const linked = Array.isArray(ctx.vaultDocs) ? ctx.vaultDocs.find(v => v && v.id === doc.vaultDocId) : null;
-      const vCode = (linked?.documentCode || '').toUpperCase();
       if (['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode)) {
         isValidVaultLink = false;
       }
+    } else if (isCorporateDoc) {
+      // Corporate document (e.g. PhilGEPS) must NEVER be linked to a Cash Flow or financial/technical proposal
+      const isMismatchFinancial = vCode.includes('SF-INFR') || vCode.includes('CASH') || vCode.includes('BOQ') ||
+        vCode.includes('ESTIMATE') || vCode.includes('PRICE') || vName.includes('cash flow') ||
+        vName.includes('cashflow') || vName.includes('boq') || vName.includes('estimate') ||
+        vName.includes('price schedule') || linked?.category === 'FINANCIAL';
+      if (isMismatchFinancial) {
+        isValidVaultLink = false;
+      }
     }
+
     if (isValidVaultLink) {
       if (Array.isArray(ctx.vaultDocs)) {
-        const linked = ctx.vaultDocs.find(v => v && v.id === doc.vaultDocId);
         if (linked?.fileDataUrl) return linked.fileDataUrl;
       }
       try {
@@ -3884,16 +3899,22 @@ export async function resolveDocumentPdfAttachment(
     }
   }
 
-  // 3. DIRECT CLEAN ID MATCH IN INDEXEDDB
+  // 3. DIRECT CLEAN ID MATCH IN INDEXEDDB (Guarded against financial cross-link for corporate docs)
   if (cleanDocId && cleanDocId !== doc.vaultDocId) {
-    if (Array.isArray(ctx.vaultDocs)) {
-      const linked = ctx.vaultDocs.find(v => v && (v.id === cleanDocId || v.id === doc.id));
-      if (linked?.fileDataUrl) return linked.fileDataUrl;
+    let isCleanIdValid = true;
+    if (isCorporateDoc && (cleanDocId.includes('cash') || cleanDocId.includes('financial') || cleanDocId.includes('estimate') || cleanDocId.includes('boq'))) {
+      isCleanIdValid = false;
     }
-    try {
-      const data = await loadPdfData(cleanDocId) || await loadPdfData(doc.id);
-      if (data) return data;
-    } catch (_) {}
+    if (isCleanIdValid) {
+      if (Array.isArray(ctx.vaultDocs)) {
+        const linked = ctx.vaultDocs.find(v => v && (v.id === cleanDocId || v.id === doc.id));
+        if (linked?.fileDataUrl) return linked.fileDataUrl;
+      }
+      try {
+        const data = await loadPdfData(cleanDocId) || await loadPdfData(doc.id);
+        if (data) return data;
+      } catch (_) {}
+    }
   }
 
   // 4. ENSURE COMPREHENSIVE VAULT ITEMS POOL (Memory + IndexedDB)
@@ -3916,20 +3937,29 @@ export async function resolveDocumentPdfAttachment(
   const findMatchingVaultDoc = (): DocumentVaultItem | undefined => {
     if (allVaultDocs.length === 0) return undefined;
 
-    // A. Direct vaultDocId (Guarded against corporate cross-matching)
+    // A. Direct vaultDocId (Guarded against corporate & financial cross-matching)
     if (doc.vaultDocId) {
       const found = allVaultDocs.find(v => v && v.id === doc.vaultDocId);
       if (found) {
         const vCode = (found.documentCode || '').toUpperCase();
+        const vName = (found.documentName || '').toLowerCase();
         const isCorporateVaultDoc = ['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode);
-        if (!isCorporateVaultDoc || !isTechnicalOrFinancialDoc) {
+        const isFinancialVaultDoc = vCode.includes('SF-INFR') || vCode.includes('CASH') || vCode.includes('BOQ') ||
+          vCode.includes('ESTIMATE') || vCode.includes('PRICE') || vName.includes('cash flow') ||
+          vName.includes('cashflow') || found.category === 'FINANCIAL';
+
+        if (isTechnicalOrFinancialDoc && isCorporateVaultDoc) {
+          // reject
+        } else if (isCorporateDoc && isFinancialVaultDoc) {
+          // reject
+        } else {
           return found;
         }
       }
     }
 
-    // B. Project-Tagged Completed Form in Vault (Strictly matching project)
-    if (currentRef) {
+    // B. Project-Tagged Completed Form in Vault (Strictly for Technical & Financial docs, NOT corporate credentials)
+    if (currentRef && !isCorporateDoc) {
       const projMatch = allVaultDocs.find(v => {
         if (!v) return false;
         const vRef = (v.philgepsRefNo || '').trim().toLowerCase();
@@ -3957,16 +3987,23 @@ export async function resolveDocumentPdfAttachment(
       if (codeMatch) return codeMatch;
     }
 
-    // D. Specialized Keyword and Subtype Matching (Strict separation between Corporate and Technical)
+    // D. Specialized Keyword and Subtype Matching (Strict separation between Corporate and Technical/Financial)
     return allVaultDocs.find(v => {
       if (!v) return false;
       const vName = (v.documentName || '').toLowerCase();
       const vCode = (v.documentCode || '').toUpperCase();
       const isCorporateVaultDoc = ['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode);
 
-      // Corporate Class A & B Eligibility Documents
+      // Corporate Class A & B Eligibility Documents: PhilGEPS Platinum Certificate (DOC-1)
       if (dName.includes('philgeps') || dCode.includes('PHILGEPS')) {
-        return vCode === 'DOC-1' || vCode.includes('PHILGEPS') || vName.includes('philgeps');
+        const isFinancialOrTech = vCode.includes('SF-INFR') || vCode.includes('CASH') || vCode.includes('BOQ') ||
+          vCode.includes('ESTIMATE') || vCode.includes('PRICE') || vName.includes('cash flow') ||
+          vName.includes('cashflow') || vName.includes('boq') || vName.includes('bill of quantities') ||
+          vName.includes('estimate') || vName.includes('form l') || vName.includes('price schedule') ||
+          (v as any).category === 'FINANCIAL';
+        if (isFinancialOrTech) return false;
+        if (vCode === 'DOC-1' || vCode === 'PHILGEPS_PLATINUM' || vCode === 'PHILGEPS_CERTIFICATE') return true;
+        return (vName.includes('philgeps') && (vName.includes('platinum') || vName.includes('certificate') || vName.includes('registration') || vName.includes('annex a') || vName.includes('membership')));
       }
       if ((dCode === 'SEC_DTI_REG' || dCode === 'DOC-2' || dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) {
         return (vCode === 'DOC-2' || (vCode.includes('SEC') && !vCode.includes('SEC_CERT')) || vCode.includes('DTI') || (vName.includes('sec') && !vName.includes('secretary')) || vName.includes('dti') || vName.includes('incorporation') || (vName.includes('business registration') && !vName.includes('permit') && !vName.includes('mayor'))) && !vName.includes('section') && !vName.includes('secretary') && !vName.includes('philgeps') && !vName.includes('bir') && vCode !== 'DOC-13';

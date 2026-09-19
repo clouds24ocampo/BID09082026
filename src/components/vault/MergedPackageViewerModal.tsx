@@ -283,13 +283,29 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
         }
       }
 
+      // Sanitize: If PhilGEPS doc has a targetVaultDocId pointing to Cash Flow or financial doc, strip it
+      const isPhilgepsDoc = codeOrId.includes('PHILGEPS') || docNameLower.includes('philgeps');
+      if (isPhilgepsDoc && targetVaultDocId && vaultDocs) {
+        const linked = vaultDocs.find(v => v.id === targetVaultDocId);
+        const vCode = (linked?.documentCode || '').toUpperCase();
+        const vName = (linked?.documentName || '').toLowerCase();
+        if (vCode.includes('SF-INFR') || vCode.includes('CASH') || vName.includes('cash flow') || vName.includes('cashflow') || linked?.category === 'FINANCIAL') {
+          targetVaultDocId = undefined;
+          existingDataUrl = undefined;
+        }
+      }
+
       if (!targetVaultDocId && vaultDocs && vaultDocs.length > 0 && !isTechnicalOrFinancialDoc) {
         const dName = (doc.documentName || '').toLowerCase();
         const match = vaultDocs.find(v =>
           (v.id && (v.id === doc.id || v.id === doc.code || v.id === cleanDocId)) ||
           ((v as any).code && doc.code && (v as any).code.toLowerCase() === doc.code.toLowerCase()) ||
           (v.documentName && doc.documentName && v.documentName.trim().toLowerCase() === doc.documentName.trim().toLowerCase()) ||
-          (dName.includes('philgeps') && (v.documentCode === 'DOC-1' || (v.documentName || '').toLowerCase().includes('philgeps'))) ||
+          ((dName.includes('philgeps') || (doc.code && doc.code.includes('PHILGEPS'))) && 
+           !v.documentCode?.toUpperCase().includes('SF-INFR') && !v.documentCode?.toUpperCase().includes('CASH') &&
+           !(v.documentName || '').toLowerCase().includes('cash flow') && !(v.documentName || '').toLowerCase().includes('cashflow') &&
+           (v.category as any) !== 'FINANCIAL' &&
+           (v.documentCode === 'DOC-1' || v.documentCode === 'PHILGEPS_PLATINUM' || (v.documentName || '').toLowerCase().includes('platinum') || ((v.documentName || '').toLowerCase().includes('philgeps') && (v.documentName || '').toLowerCase().includes('certificate')))) ||
           (((dName.includes('sec ') || dName.includes('securities') || dName.includes('dti') || dName.includes('sec registration')) && !dName.includes('section') && !dName.includes('secretary')) && (v.documentCode === 'DOC-2' || ((v.documentName || '').toLowerCase().includes('incorporation') || (v.documentName || '').toLowerCase().includes('securities and exchange') || (v.documentName || '').toLowerCase().includes('dti') || ((v.documentName || '').toLowerCase().includes('sec') && !(v.documentName || '').toLowerCase().includes('secretary') && !(v.documentName || '').toLowerCase().includes('section'))) && !(v.documentName || '').toLowerCase().includes('philgeps') && !(v.documentName || '').toLowerCase().includes('bir') && !(v.documentName || '').toLowerCase().includes('secretary') && v.documentCode !== 'DOC-13')) ||
           ((dName.includes('mayor') || (dName.includes('business permit') && !dName.includes('barangay'))) && (v.documentCode === 'DOC-3' || (v.documentName || '').toLowerCase().includes('permit'))) ||
           (((dName.includes('bir') || dName.includes('2303')) && (dName.includes('registration') || dName.includes('certificate') || dName.includes('cor') || dName.includes('2303')) && !dName.includes('clearance')) && (v.documentCode === 'DOC-6' || (v.documentName || '').toLowerCase().includes('2303') || ((v.documentName || '').toLowerCase().includes('bir') && (v.documentName || '').toLowerCase().includes('registration')))) ||
@@ -1160,10 +1176,23 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
                 const isTechnicalOrFinancial = isFinancial || isTechnical;
 
                 const linkedVaultDoc = !isTechnicalOrFinancial
-                  ? (vaultDocs.find(v => v.id === doc.vaultDocId) ||
+                  ? (vaultDocs.find(v => {
+                      if (v.id !== doc.vaultDocId) return false;
+                      if (docNameLower.includes('philgeps')) {
+                        const lCode = (v.documentCode || '').toUpperCase();
+                        const lName = (v.documentName || '').toLowerCase();
+                        if (lCode.includes('SF-INFR') || lCode.includes('CASH') || lName.includes('cash flow') || lName.includes('cashflow') || v.category === 'FINANCIAL') return false;
+                      }
+                      return true;
+                    }) ||
                      vaultDocs.find(v => {
                        const vName = (v.documentName || '').toLowerCase();
+                       const vCode = (v.documentCode || '').toUpperCase();
                        const dName = doc.documentName.toLowerCase();
+                       if (dName.includes('philgeps')) {
+                         if (vCode.includes('SF-INFR') || vCode.includes('CASH') || vName.includes('cash flow') || vName.includes('cashflow') || (v as any).category === 'FINANCIAL') return false;
+                         return vCode === 'DOC-1' || vCode === 'PHILGEPS_PLATINUM' || (vName.includes('philgeps') && (vName.includes('platinum') || vName.includes('certificate') || vName.includes('registration')));
+                       }
                        return vName === dName || (dName.length > 5 && vName.includes(dName));
                      }))
                   : undefined;
