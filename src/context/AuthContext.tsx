@@ -341,6 +341,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const switchUser = (userId: string): boolean => {
+    if (!isApproverRole(currentUser?.role)) return false;
     const target = users.find((u) => u.id === userId);
     if (!target) return false;
 
@@ -360,12 +361,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const deleteTeamUser = (userId: string): boolean => {
-    if (currentUser?.id === userId) return false;
+    if (!isApproverRole(currentUser?.role) || currentUser?.id === userId)
+      return false;
     setUsers((prev) => prev.filter((u) => u.id !== userId));
     return true;
   };
 
   const switchTenant = (tenantId: string) => {
+    if (!isApproverRole(currentUser?.role)) return;
     const targetTenant = tenants.find((t) => t.id === tenantId);
     if (targetTenant) {
       setCurrentTenant(targetTenant);
@@ -377,7 +380,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const updateTenantSettings = (updatedFields: Partial<Tenant>) => {
-    if (!currentTenant) return;
+    if (!currentTenant || !isApproverRole(currentUser?.role)) return;
     const updated = { ...currentTenant, ...updatedFields };
     setCurrentTenant(updated);
     setTenants((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));

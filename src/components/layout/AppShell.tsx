@@ -371,7 +371,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                           }}
                           className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 rounded-lg flex items-center justify-between transition cursor-pointer"
                         >
-                          <div className="truncate max-w-[120px]">
+                          <div className="truncate max-w-30 shrink-0">
                             <p className="font-semibold text-white truncate text-[11px]">
                               {u.fullName}
                             </p>
@@ -467,7 +467,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                   }}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? "bg-gradient-to-r from-blue-600/20 via-slate-800/80 to-slate-800/40 text-white font-bold border border-blue-500/40 shadow-[0_0_20px_-5px_rgba(59,130,246,0.3)]"
+                      ? "bg-linear-to-r from-blue-600/20 via-slate-800/80 to-slate-800/40 text-white font-bold border border-blue-500/40 shadow-[0_0_20px_-5px_rgba(59,130,246,0.3)] transition-colors"
                       : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
                   }`}
                   style={{
