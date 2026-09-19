@@ -273,13 +273,24 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
       docNameLower.includes('summary of bid') || docNameLower.includes('summary bid') ||
       docNameLower.includes('cash flow');
 
-      // Sanitize: If technical or financial doc has a targetVaultDocId pointing to corporate DOC-1..DOC-15, strip it
+      // Sanitize: If technical or financial doc has a targetVaultDocId pointing to corporate DOC-1..DOC-15 or another project, strip it
       if (isTechnicalOrFinancialDoc && targetVaultDocId && vaultDocs) {
         const linked = vaultDocs.find(v => v.id === targetVaultDocId);
-        const vCode = (linked?.documentCode || '').toUpperCase();
-        if (['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode)) {
-          targetVaultDocId = undefined;
-          existingDataUrl = undefined;
+        if (linked) {
+          const vCode = (linked?.documentCode || '').toUpperCase();
+          const isCorp = ['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode);
+          const vRef = (linked.philgepsRefNo || '').trim().toLowerCase();
+          const vRefDigits = vRef.replace(/[^0-9]/g, '');
+          const curRef = (projectRefNo || '').trim().toLowerCase();
+          const curRefDigits = curRef.replace(/[^0-9]/g, '');
+          const isSameProj = (curRef && vRef && (vRef === curRef || (curRefDigits.length >= 6 && vRefDigits === curRefDigits))) ||
+            (activeProject?.id && linked.projectId === activeProject.id) ||
+            (projectTitle && linked.projectTitle && projectTitle.toLowerCase().trim() === linked.projectTitle.toLowerCase().trim());
+
+          if (isCorp || !isSameProj) {
+            targetVaultDocId = undefined;
+            existingDataUrl = undefined;
+          }
         }
       }
 

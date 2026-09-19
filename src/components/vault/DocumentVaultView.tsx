@@ -888,7 +888,13 @@ export const DocumentVaultView: React.FC = () => {
     name: string;
   } | null>(null);
   const [selectedTechProjectFilter, setSelectedTechProjectFilter] =
-    useState<string>("ALL");
+    useState<string>(() => activeProjectRefNo || "ALL");
+
+  React.useEffect(() => {
+    if (activeProjectRefNo) {
+      setSelectedTechProjectFilter(activeProjectRefNo);
+    }
+  }, [activeProjectRefNo]);
 
   // Financial Documents Templates State
   const [showBidFormGoodsModal, setShowBidFormGoodsModal] = useState(false);
@@ -1565,18 +1571,18 @@ export const DocumentVaultView: React.FC = () => {
     const projectRefToUse = projRefNo || activeProjectRefNo;
     const projectTitleToUse = projTitle || activeProjectTitle;
 
-    if (
-      projectRefToUse &&
-      hasTechnicalDocForActiveProject(fillingTemplateItem.code)
-    ) {
-      notifyFailure(
-        "Duplicate Technical Document Detected",
-        "This project already has a completed document for the selected item. No duplicate document was created.",
-        "Duplicate technical item for active project.",
-      );
-      setFillingTemplateItem(null);
-      return;
-    }
+    // Check if a completed technical document already exists for this project
+    const existingDoc = vaultItems.find(
+      (item) =>
+        item.category === "TECHNICAL" &&
+        ((item.projectId && item.projectId === activeProjectId) ||
+          item.philgepsRefNo === projectRefToUse) &&
+        (item.documentCode === fillingTemplateItem.code ||
+          (fillingTemplateItem.code === "FAL-01" &&
+            (item.documentCode === "FAL-01" ||
+              item.documentCode === "SEC-VI-FAL" ||
+              item.documentName.toLowerCase().includes("framework agreement"))))
+    );
 
     if (!techCompletedIds.includes(itemId)) {
       setTechCompletedIds((prev) => [...prev, itemId]);
@@ -1584,14 +1590,16 @@ export const DocumentVaultView: React.FC = () => {
 
     const docTitle = customName || fillingTemplateItem.name;
     const cleanDocName = docTitle.replace(/[^a-zA-Z0-9]/g, "_");
+    const docIdToUse = existingDoc?.id || `doc-tech-${itemId}-${Date.now()}`;
+    const nextVersion = existingDoc ? existingDoc.versionNumber + 1 : 1;
 
-    // Create DocumentVaultItem for the completed technical exhibit template with Project Tagging
+    // Create or update DocumentVaultItem for the completed technical exhibit template with Project Tagging
     const newVaultDoc: DocumentVaultItem = {
-      id: `doc-tech-${itemId}-${Date.now()}`,
+      id: docIdToUse,
       tenantId: activeTenantId,
       documentCode: fillingTemplateItem.code,
       documentName: docTitle,
-      documentNumber: `EXHIBIT-${fillingTemplateItem.code.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()}-2026`,
+      documentNumber: existingDoc?.documentNumber || `EXHIBIT-${fillingTemplateItem.code.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()}-2026`,
       category: "TECHNICAL",
       procurementApplicability: [
         "Goods & Supply",
@@ -1600,7 +1608,7 @@ export const DocumentVaultView: React.FC = () => {
         "Consulting",
       ],
       legalBasisReference: "RA 12009 NGPA Statutory Compliance Exhibit",
-      versionNumber: 1,
+      versionNumber: nextVersion,
       fileHash: Array.from({ length: 64 }, () =>
         Math.floor(Math.random() * 16).toString(16),
       ).join(""),
@@ -1616,18 +1624,21 @@ export const DocumentVaultView: React.FC = () => {
       projectId: projId || activeProjectId || undefined,
       philgepsRefNo: projectRefToUse || undefined,
       projectTitle: projectTitleToUse || undefined,
-      previousVersions: [],
+      previousVersions: existingDoc?.previousVersions || [],
     };
 
     await storePdfData(newVaultDoc.id, fileDataUrl);
     setVaultItems((prev) => [
       newVaultDoc,
-      ...prev.filter((item) => item.id !== newVaultDoc.id),
+      ...prev.filter((item) => item.id !== docIdToUse),
     ]);
     setFillingTemplateItem(null);
+    if (projectRefToUse) {
+      setSelectedTechProjectFilter(projectRefToUse);
+    }
     setTechSubTab("COMPLETED");
     notifySuccess(
-      `[${docTitle}, v1.0] Template Save Successful!`,
+      `[${docTitle}, v${nextVersion}.0] Template Save Successful!`,
       "Legal template saved into Document Vault as an active technical exhibit under Completed Technical Documents & Forms.",
     );
   };
@@ -2230,18 +2241,14 @@ export const DocumentVaultView: React.FC = () => {
           item.category === "TECHNICAL" &&
           (selectedTechProjectFilter === "ALL" ||
             item.philgepsRefNo === selectedTechProjectFilter ||
-            item.projectId === selectedTechProjectFilter) &&
-          !isDocInBidPackage(item),
+            item.projectId === selectedTechProjectFilter),
       ),
-    [vaultItems, selectedTechProjectFilter, isDocInBidPackage],
+    [vaultItems, selectedTechProjectFilter],
   );
 
   const filteredGridItems = React.useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return vaultItems.filter((item) => {
-      // If document is in active Bid Package and not searching explicitly, remove it from available vault list
-      if (!q && isDocInBidPackage(item)) return false;
-
       const matchesSearch =
         !q ||
         item.documentName.toLowerCase().includes(q) ||
@@ -3199,7 +3206,10 @@ export const DocumentVaultView: React.FC = () => {
                   const displayedCompletedTechItems =
                     completedTechVaultItems.filter((item) => {
                       if (selectedTechProjectFilter === "ALL") return true;
-                      return item.philgepsRefNo === selectedTechProjectFilter;
+                      return (
+                        item.philgepsRefNo === selectedTechProjectFilter ||
+                        item.projectId === selectedTechProjectFilter
+                      );
                     });
 
                   if (completedTechVaultItems.length === 0) {

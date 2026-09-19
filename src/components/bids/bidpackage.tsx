@@ -576,10 +576,9 @@ export const BidPackageBuilderView: React.FC = () => {
           return false;
         }
 
-        // Project-Specific Technical Exhibits & Financial Documents
-        const isStrictlyForThisProject = !vRef || !currentRef || (
-          vRef === currentRef ||
-          (currentRefDigits.length >= 6 && vRefDigits === currentRefDigits) ||
+        // Project-Specific Technical Exhibits & Financial Documents (Strict Project Matching)
+        const isStrictlyForThisProject = (
+          (currentRef && vRef && (vRef === currentRef || (currentRefDigits.length >= 6 && vRefDigits === currentRefDigits))) ||
           (selectedOppId && v.projectId === selectedOppId) ||
           (projectTitle && v.projectTitle && v.projectTitle.toLowerCase().trim() === projectTitle.toLowerCase().trim())
         );
@@ -848,8 +847,22 @@ export const BidPackageBuilderView: React.FC = () => {
       ].some(k => codeOrId.includes(k)) || name.includes('ongoing') || name.includes('slcc') || name.includes('single largest');
 
       if (isTechOrFinancial && item.vaultDocId) {
-        // If it was linked to a corporate vault doc, clear it so the official system document generates cleanly
-        return { ...item, vaultDocId: undefined };
+        const linked = vaultDocs.find(v => v.id === item.vaultDocId);
+        if (linked) {
+          const lCode = (linked.documentCode || '').toUpperCase();
+          const isCorp = ['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(lCode);
+          const vRef = (linked.philgepsRefNo || '').trim().toLowerCase();
+          const vRefDigits = vRef.replace(/[^0-9]/g, '');
+          const curRef = (projectRefNo || '').trim().toLowerCase();
+          const curRefDigits = curRef.replace(/[^0-9]/g, '');
+          const isSameProj = (curRef && vRef && (vRef === curRef || (curRefDigits.length >= 6 && vRefDigits === curRefDigits))) ||
+            (selectedOppId && linked.projectId === selectedOppId) ||
+            (projectTitle && linked.projectTitle && projectTitle.toLowerCase().trim() === linked.projectTitle.toLowerCase().trim());
+
+          if (isCorp || !isSameProj) {
+            return { ...item, vaultDocId: undefined, fileDataUrl: undefined };
+          }
+        }
       }
 
       // Corporate PhilGEPS sanitation: purge any accidental links to Cash Flow or financial forms
@@ -1302,11 +1315,19 @@ export const BidPackageBuilderView: React.FC = () => {
 
     let targetVaultDocId = doc.vaultDocId;
 
-    // Sanitize: If technical or financial doc was mistakenly linked to a corporate vault doc (DOC-1..DOC-15), clear it
+    // Sanitize: If technical or financial doc was mistakenly linked to a corporate vault doc (DOC-1..DOC-15) or another project, clear it
     if (isTechnicalOrFinancialDoc && targetVaultDocId) {
       const linked = vaultDocs.find(v => v.id === targetVaultDocId);
       const vCode = (linked?.documentCode || '').toUpperCase();
-      if (['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode)) {
+      const vRef = (linked?.philgepsRefNo || '').trim().toLowerCase();
+      const vRefDigits = vRef.replace(/[^0-9]/g, '');
+      const curRef = (projectRefNo || '').trim().toLowerCase();
+      const curRefDigits = curRef.replace(/[^0-9]/g, '');
+      const isSameProj = (curRef && vRef && (vRef === curRef || (curRefDigits.length >= 6 && vRefDigits === curRefDigits))) ||
+        (selectedOppId && linked?.projectId === selectedOppId) ||
+        (projectTitle && linked?.projectTitle && projectTitle.toLowerCase().trim() === linked.projectTitle.toLowerCase().trim());
+
+      if (['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode) || !isSameProj) {
         targetVaultDocId = undefined;
         preloadedDataUrl = undefined;
       }
