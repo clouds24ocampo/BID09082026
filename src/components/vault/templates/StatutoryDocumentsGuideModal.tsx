@@ -367,6 +367,45 @@ b. replacement by the winning bidder of the submitted PSD with a performance sec
     officialCopySnippet: `I, [Name of Affiant], of legal age, Filipino, under oath, depose and state that all laborers and workers employed in the project have been fully paid their wages; that all materials, supplies, and equipment utilized have been fully paid; and that no third-party claims or liens exist against the Procuring Entity.`
   },
   {
+    code: 'POW',
+    templateType: 'POW',
+    name: 'Program of Work (POW) & Terms of Reference (TOR)',
+    category: 'PROJECT_CLOSEOUT',
+    legalBasis: 'Section 17.7 of Revised IRR of RA 9184 / RA 12009 (NGPA) / DPWH Department Order No. 19, Series of 2018',
+    submissionTiming: 'Required during bid submission, project inception, and billing validation.',
+    summary: 'Official comprehensive breakdown of itemized work scopes, quantities, direct materials/labor/equipment costs, indirect markups (OCM, Profit, VAT), and integrated Terms of Reference (TOR) specifications.',
+    howToAnswer: [
+      {
+        field: 'Direct & Indirect Cost Computations',
+        description: 'Detailed unit price breakdown for materials, labor rates based on regional wage orders, and equipment rental rates.',
+        recommendedValue: 'Ensure OCM (8%-12%), Profit (8%-10%), and VAT (5%-12%) conform to statutory limits.'
+      },
+      {
+        field: 'Terms of Reference (TOR) PDF Attachment & Generator',
+        description: 'Generate authentic statutory specifications using built-in DPWH, LGU, or Barangay presets, or upload procuring entity Terms of Reference PDF.',
+        recommendedValue: 'Built-in interactive statutory generator (DPWH, LGU, Barangay presets) or direct PDF attachment auto-merged with Legal-sized POW sheet.'
+      }
+    ],
+    attachmentsChecklist: [
+      'Itemized Scope of Work and Cost Matrix',
+      'Detailed Unit Price Analysis (DUPA) supporting sheets',
+      'Procuring Entity Terms of Reference (TOR) / Technical Specifications'
+    ],
+    requiredSignatories: [
+      'Prepared By: Project Engineer / Cost Estimator (PRC & PTR registered)',
+      'Checked / Reviewed By: Chief, Planning & Design Section',
+      'Recommending Approval: BAC Chairperson / Assistant District Engineer',
+      'Approved By: Head of the Procuring Entity (HOPE) / District Engineer',
+      'Concurred By: Contractor Authorized Managing Officer (AMO)'
+    ],
+    coaAuditTraps: [
+      'Indirect cost markups exceeding the maximum statutory caps prescribed under DPWH guidelines.',
+      'Discrepancy between quantities in Program of Work and approved Bill of Quantities (BOQ).',
+      'Unsigned or unsealed cost estimates causing disqualification or COA audit observation.'
+    ],
+    officialCopySnippet: `We hereby submit this Program of Work and Detailed Cost Estimate in strict conformity with government statutory guidelines and approved Terms of Reference.`
+  },
+  {
     code: 'ABP',
     templateType: 'ABP',
     name: 'As-Built Plan (ABP)',

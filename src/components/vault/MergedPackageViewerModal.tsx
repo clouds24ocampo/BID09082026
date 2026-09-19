@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PackageItem, FolderCopyType } from '../bids/bidpackage';
-import { DocumentVaultItem, Tenant } from '../../types';
+import { DocumentVaultItem, Tenant, isApproverRole, isPreparerRole, getRoleDisplayName } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 import { DocumentCoverPage } from './DocumentCoverPage';
 import { 
   buildMergedThreeLayerPdfDataUrl, 
@@ -9,7 +10,13 @@ import {
 } from '../../utils/pdfExportEngine';
 import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
 import { loadPdfData } from '../../utils/vaultIndexedDB';
-import { markProjectBidMergeDone } from '../../utils/opportunityProjects';
+import { 
+  markProjectBidMergeDone, 
+  getDocumentApproval, 
+  saveDocumentApproval, 
+  DocumentApprovalRecord 
+} from '../../utils/opportunityProjects';
+import ApprovalGateModal from '../common/ApprovalGateModal';
 import { PDFDocument } from 'pdf-lib';
 import { 
   X, 
@@ -25,7 +32,11 @@ import {
   Sparkles,
   Layers,
   Eye,
-  Maximize2
+  Maximize2,
+  Lock,
+  Clock,
+  ArrowRight,
+  ShieldCheck
 } from 'lucide-react';
 import DocumentQrCode from '../common/DocumentQrCode';
 
@@ -95,6 +106,67 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
   const tenantId = tenant?.id || '';
   const projectScopeKey = activeProject?.refNo || projectRefNo || 'PRJ-2026';
   const cleanRef = projectScopeKey.replace(/[^a-zA-Z0-9]/g, '_');
+
+  const { currentUser } = useAuth();
+  const [approvalRecord, setApprovalRecord] = useState<DocumentApprovalRecord | null>(null);
+  const [showApprovalGateModal, setShowApprovalGateModal] = useState<boolean>(false);
+
+  // Load project package approval status
+  useEffect(() => {
+    if (!isOpen) return;
+    const rec = getDocumentApproval(tenantId, projectScopeKey);
+    setApprovalRecord(rec);
+  }, [tenantId, projectScopeKey, isOpen]);
+
+  const handleSubmitForApproval = () => {
+    const nowStr = new Date().toLocaleString('en-PH');
+    const subName = currentUser?.fullName || 'Technical Estimator';
+    const subRole = currentUser?.role ? getRoleDisplayName(currentUser.role) : 'Bid Manager';
+    const rec: DocumentApprovalRecord = {
+      recordId: projectScopeKey,
+      docType: 'BIDDING_PACKAGE',
+      status: 'PENDING_APPROVAL',
+      submittedBy: subName,
+      submittedByRole: subRole,
+      submittedAt: nowStr
+    };
+    saveDocumentApproval(tenantId, rec);
+    setApprovalRecord(rec);
+    setStatusMessage('Sealed Bidding Package submitted for Owner review and print authorization.');
+  };
+
+  const handleApprovePackage = (notes?: string) => {
+    const nowStr = new Date().toLocaleString('en-PH');
+    const appName = currentUser?.fullName || tenant?.authorizedSignatory?.name || 'Company Owner';
+    const appRole = currentUser?.role ? getRoleDisplayName(currentUser.role) : 'Company Owner';
+    const rec: DocumentApprovalRecord = {
+      recordId: projectScopeKey,
+      docType: 'BIDDING_PACKAGE',
+      status: 'APPROVED',
+      submittedBy: approvalRecord?.submittedBy || 'Estimator',
+      submittedByRole: approvalRecord?.submittedByRole || 'Bid Manager',
+      submittedAt: approvalRecord?.submittedAt,
+      approvedBy: appName,
+      approvedByRole: appRole,
+      approvedAt: nowStr,
+      notes: notes || approvalRecord?.notes
+    };
+    saveDocumentApproval(tenantId, rec);
+    setApprovalRecord(rec);
+    setStatusMessage(`Sealed Bidding Package officially approved for print & BAC submission by ${appName}!`);
+  };
+
+  const handleRevertToDraft = () => {
+    const rec: DocumentApprovalRecord = {
+      recordId: projectScopeKey,
+      docType: 'BIDDING_PACKAGE',
+      status: 'DRAFT'
+    };
+    saveDocumentApproval(tenantId, rec);
+    setApprovalRecord(rec);
+    setStatusMessage('Package status reverted to DRAFT.');
+  };
+
   const envTag = selectedEnvelope === 'ALL'
     ? 'COMPLETE_BID_PACKAGE'
     : selectedEnvelope === 'ENVELOPE_1'
@@ -432,6 +504,11 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
 
   // Single Download Trigger
   const handleDownloadCopy = async (folderCopy: FolderCopyType) => {
+    if (isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED') {
+      setShowApprovalGateModal(true);
+      return;
+    }
+
     let dataUrl = compiledPdfs[folderCopy];
     if (!dataUrl) {
       dataUrl = await compileFolderPdf(folderCopy);
@@ -449,6 +526,11 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
 
   // Batch Download All 3 Copies
   const handleDownloadAllThreeCopies = async () => {
+    if (isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED') {
+      setShowApprovalGateModal(true);
+      return;
+    }
+
     setIsExportingAll(true);
     const copies: FolderCopyType[] = ['ORIGINAL', 'COPY_1', 'COPY_2'];
     for (let idx = 0; idx < copies.length; idx++) {
@@ -526,30 +608,121 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Approval Status Badge & Executive Controls */}
+            <div className="flex items-center gap-2 mr-1">
+              <span className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold uppercase tracking-wider border flex items-center gap-1.5 ${
+                approvalRecord?.status === 'APPROVED'
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : approvalRecord?.status === 'PENDING_APPROVAL'
+                  ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+              }`}>
+                {approvalRecord?.status === 'APPROVED' ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>APPROVED ({approvalRecord.approvedBy || 'Owner'})</span>
+                  </>
+                ) : approvalRecord?.status === 'PENDING_APPROVAL' ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                    <span>PENDING APPROVAL</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>DRAFT (REQUIRES APPROVAL)</span>
+                  </>
+                )}
+              </span>
+
+              {isApproverRole(currentUser?.role) ? (
+                approvalRecord?.status !== 'APPROVED' ? (
+                  <button
+                    type="button"
+                    onClick={() => handleApprovePackage()}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/30 ring-1 ring-emerald-400/50 flex items-center gap-1.5 cursor-pointer transition"
+                    title="Authorize and officially approve sealed bidding package for printing"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Approve for Official Print ✓</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleRevertToDraft}
+                    className="px-2 py-1 rounded text-[10px] font-semibold text-slate-400 hover:text-slate-200 bg-slate-800 hover:bg-slate-700 transition cursor-pointer"
+                    title="Revert package status to draft"
+                  >
+                    Revert
+                  </button>
+                )
+              ) : (
+                approvalRecord?.status === 'DRAFT' && (
+                  <button
+                    type="button"
+                    onClick={handleSubmitForApproval}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-600/30 flex items-center gap-1.5 cursor-pointer transition"
+                    title="Submit sealed package to Company Owner for approval before printing"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>Submit for Owner Approval ➔</span>
+                  </button>
+                )
+              )}
+            </div>
+
             {/* Download This Copy Button */}
             <button
               onClick={() => handleDownloadCopy(activeFolder)}
               disabled={isCurrentCompiling}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title={`Download ${activeFolder} merged package`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold text-white transition shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
+                  ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40'
+                  : 'bg-blue-600 hover:bg-blue-500'
+              }`}
+              title={
+                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
+                  ? 'Owner / Manager approval required before downloading'
+                  : `Download ${activeFolder} merged package`
+              }
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download {activeFolder} PDF</span>
+              {isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? (
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+              <span>
+                Download {activeFolder} PDF
+                {isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? ' 🔒' : ''}
+              </span>
             </button>
 
             {/* Download All 3 Copies Button */}
             <button
               onClick={handleDownloadAllThreeCopies}
               disabled={isExportingAll || isCurrentCompiling}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition shadow-lg shadow-purple-950/40 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 border border-purple-400/30"
-              title="Download all 3 copies (ORIGINAL, COPY 1, COPY 2)"
+              className={`px-4 py-2 rounded-xl text-xs font-bold text-white transition shadow-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-50 border ${
+                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
+                  ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-amber-500/40'
+                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-950/40 border-purple-400/30'
+              }`}
+              title={
+                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
+                  ? 'Owner / Manager approval required before downloading 3 copies'
+                  : 'Download all 3 copies (ORIGINAL, COPY 1, COPY 2)'
+              }
             >
               {isExportingAll ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-200" />
+              ) : isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? (
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
               ) : (
                 <Copy className="w-3.5 h-3.5 text-purple-200" />
               )}
-              <span>Download All 3 Copies</span>
+              <span>
+                Download All 3 Copies
+                {isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? ' 🔒' : ''}
+              </span>
             </button>
 
             <button
@@ -1049,6 +1222,27 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
         </div>
 
       </div>
+
+      {/* 🔒 OWNER / HIGHER MANAGER APPROVAL GATE MODAL */}
+      <ApprovalGateModal
+        isOpen={showApprovalGateModal}
+        onClose={() => setShowApprovalGateModal(false)}
+        docTitle="3-Copy Sealed Bidding Documents Package (ORIGINAL, COPY 1, COPY 2)"
+        trackingOrRefNo={projectScopeKey}
+        approvalRecord={approvalRecord}
+        onSubmitForApproval={() => {
+          handleSubmitForApproval();
+          setShowApprovalGateModal(false);
+        }}
+        onApprove={(notes) => {
+          handleApprovePackage(notes);
+          setShowApprovalGateModal(false);
+        }}
+        onRevertToDraft={() => {
+          handleRevertToDraft();
+          setShowApprovalGateModal(false);
+        }}
+      />
     </div>
   );
 };

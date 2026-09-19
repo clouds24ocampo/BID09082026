@@ -48,7 +48,7 @@ export const isPhilgepsDocumentUnit = (unit: ExportDocumentUnit, docTitle?: stri
   );
 };
 
-const blobToDataUrl = async (blob: Blob): Promise<string> => {
+export const blobToDataUrl = async (blob: Blob): Promise<string> => {
   if (typeof FileReader !== 'undefined') {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();

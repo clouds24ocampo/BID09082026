@@ -1,4 +1,28 @@
-export type UserRole = 'COMPANY_OWNER' | 'BID_MANAGER' | 'SYSTEM_ADMIN';
+export type UserRole = 
+  | 'COMPANY_OWNER' 
+  | 'HIGHER_MANAGER' 
+  | 'BID_MANAGER' 
+  | 'ESTIMATOR' 
+  | 'SYSTEM_ADMIN';
+
+export const isApproverRole = (role?: UserRole): boolean => {
+  return role === 'COMPANY_OWNER' || role === 'HIGHER_MANAGER' || role === 'SYSTEM_ADMIN';
+};
+
+export const isPreparerRole = (role?: UserRole): boolean => {
+  return role === 'BID_MANAGER' || role === 'ESTIMATOR';
+};
+
+export const getRoleDisplayName = (role?: UserRole): string => {
+  switch (role) {
+    case 'COMPANY_OWNER': return 'Company Owner (Approver)';
+    case 'HIGHER_MANAGER': return 'Higher Manager (Approver)';
+    case 'ESTIMATOR': return 'Technical Estimator (Preparer)';
+    case 'BID_MANAGER': return 'Bid Manager (Preparer)';
+    case 'SYSTEM_ADMIN': return 'System Administrator';
+    default: return 'Authorized User';
+  }
+};
 
 export type ProcurementType = 
   | 'GOODS' 

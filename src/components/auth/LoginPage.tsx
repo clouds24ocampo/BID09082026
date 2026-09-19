@@ -327,11 +327,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                 <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase tracking-wider">
                   Operator Clearance Scope
                 </label>
-                <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-slate-900/90 border border-slate-800">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 rounded-xl bg-slate-900/90 border border-slate-800">
                   <button
                     type="button"
                     onClick={() => setSelectedRole('COMPANY_OWNER')}
-                    className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all relative ${selectedRole === 'COMPANY_OWNER' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all relative ${selectedRole === 'COMPANY_OWNER' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
                       }`}
                   >
                     {selectedRole === 'COMPANY_OWNER' && (
@@ -341,13 +341,45 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                       />
                     )}
-                    <span className="relative z-10">Company Owner</span>
+                    <span className="relative z-10 text-[11px]">Owner</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole('HIGHER_MANAGER')}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all relative ${selectedRole === 'HIGHER_MANAGER' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                  >
+                    {selectedRole === 'HIGHER_MANAGER' && (
+                      <motion.div
+                        layoutId="activeRoleSpaceTravel"
+                        className="absolute inset-0 bg-cyan-600 rounded-lg shadow-[0_0_12px_rgba(8,145,178,0.5)]"
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                      />
+                    )}
+                    <span className="relative z-10 text-[11px]">Manager</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole('ESTIMATOR')}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all relative ${selectedRole === 'ESTIMATOR' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                  >
+                    {selectedRole === 'ESTIMATOR' && (
+                      <motion.div
+                        layoutId="activeRoleSpaceTravel"
+                        className="absolute inset-0 bg-cyan-600 rounded-lg shadow-[0_0_12px_rgba(8,145,178,0.5)]"
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                      />
+                    )}
+                    <span className="relative z-10 text-[11px]">Estimator</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setSelectedRole('BID_MANAGER')}
-                    className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all relative ${selectedRole === 'BID_MANAGER' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
+                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all relative ${selectedRole === 'BID_MANAGER' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
                       }`}
                   >
                     {selectedRole === 'BID_MANAGER' && (
@@ -357,7 +389,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                       />
                     )}
-                    <span className="relative z-10">Bid Manager</span>
+                    <span className="relative z-10 text-[11px]">Bid Manager</span>
                   </button>
                 </div>
               </div>

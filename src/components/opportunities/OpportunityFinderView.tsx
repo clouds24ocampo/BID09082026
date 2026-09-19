@@ -757,6 +757,12 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     {op.projectReferenceNumber}
                   </span>
                   <div className="flex items-center gap-1.5">
+                    {(op.projectReferenceNumber?.startsWith('POW-') || op.projectReferenceNumber?.startsWith('RFQ-') || /^\d{4}-\d{2}-\d{2}-\d{4}-[A-Z0-9]+/i.test(op.projectReferenceNumber || '')) && (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40 flex items-center gap-1 shadow-sm" title="Originated from Program of Work / Quotation. Deliverables synced to Section VI.">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                        POW Synced
+                      </span>
+                    )}
                     <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${getProcurementTypeBadgeStyle(op.procurementType)}`}>
                       {op.procurementType}
                     </span>
@@ -811,10 +817,10 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   <button
                     onClick={() => handleWorkOnProject(op)}
                     className="px-2.5 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-all text-xs font-bold flex items-center gap-1 shadow-md shadow-blue-600/30 hover:shadow-blue-500/50 cursor-pointer"
-                    title="Select project and open Document Vault"
+                    title="Select project and open Document Vault to create 27 statutory bidding documents"
                   >
                     <FileCheck className="w-3.5 h-3.5" />
-                    <span>Work on Project</span>
+                    <span>Create Bid Docs ➔</span>
                   </button>
 
                   <button
@@ -944,6 +950,36 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   </div>
                 </div>
 
+                {/* POW / RFQ LINKED SYNC BANNER */}
+                {(viewingItem.projectReferenceNumber?.startsWith('POW-') || viewingItem.projectReferenceNumber?.startsWith('RFQ-') || /^\d{4}-\d{2}-\d{2}-\d{4}-[A-Z0-9]+/i.test(viewingItem.projectReferenceNumber || '')) && (
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/50 via-slate-900 to-amber-950/30 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg shadow-amber-950/30">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                        <FileCheck className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-amber-300 text-sm">Originating from Program of Work (POW) / Quotation</p>
+                          <span className="text-[10px] font-mono bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded border border-amber-500/30 font-bold">Auto-Synced</span>
+                        </div>
+                        <p className="text-slate-300 text-xs mt-0.5">
+                          All deliverable item descriptions, units, and quantities are synced to <strong className="text-amber-300">Section VI (Schedule of Requirements)</strong> and ready for 27 statutory bidding documents.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        handleWorkOnProject(viewingItem);
+                        setViewingItem(null);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold text-xs shrink-0 transition shadow-lg shadow-amber-600/30 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <FileCheck className="w-4 h-4" />
+                      <span>Open in Document Vault ➔</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* OFFICIAL PHILGEPS PDF NOTICE DOCUMENT BANNER */}
                 <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/80 to-slate-900 border border-blue-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
@@ -1063,17 +1099,30 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
               </div>
 
               <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900/95 sticky bottom-0 z-10 shrink-0">
-                <button
-                  onClick={() => handleOpenEditModal(viewingItem)}
-                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-xs font-semibold text-white transition flex items-center gap-1.5"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Edit Opportunity</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleOpenEditModal(viewingItem)}
+                    className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-xs font-semibold text-white transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit Opportunity</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleWorkOnProject(viewingItem);
+                      setViewingItem(null);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white transition flex items-center gap-1.5 shadow-lg shadow-blue-500/25 cursor-pointer"
+                  >
+                    <FileCheck className="w-3.5 h-3.5" />
+                    <span>Create / Open Bid Docs ➔</span>
+                  </button>
+                </div>
 
                 <button
                   onClick={() => setViewingItem(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition"
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white transition cursor-pointer"
                 >
                   Close Details
                 </button>

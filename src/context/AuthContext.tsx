@@ -45,9 +45,13 @@ interface AuthContextType {
   currentUser: User | null;
   currentTenant: Tenant | null;
   tenants: Tenant[];
+  users: User[];
   login: (email: string, password: string, role?: UserRole, tenantId?: string) => boolean;
   logout: () => void;
   registerTenantAndUser: (tenantData: Omit<Tenant, 'id' | 'createdAt'>, userData: Omit<User, 'id' | 'tenantId'>) => boolean;
+  createTeamUser: (userData: { fullName: string; email: string; role: UserRole; password?: string }) => { success: boolean; error?: string };
+  switchUser: (userId: string) => boolean;
+  deleteTeamUser: (userId: string) => boolean;
   switchTenant: (tenantId: string) => void;
   updateTenantSettings: (updatedTenant: Partial<Tenant>) => void;
   resetUserPassword: (email: string) => boolean;
@@ -212,6 +216,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return true;
   };
 
+  const createTeamUser = (userData: {
+    fullName: string;
+    email: string;
+    role: UserRole;
+    password?: string;
+  }): { success: boolean; error?: string } => {
+    if (!currentTenant) return { success: false, error: 'No active company profile.' };
+    const normalizedEmail = userData.email.trim().toLowerCase();
+    if (!normalizedEmail || !userData.fullName.trim()) {
+      return { success: false, error: 'Full name and valid email are required.' };
+    }
+
+    if (users.some(u => u.email.toLowerCase() === normalizedEmail)) {
+      return { success: false, error: 'An account with this email address already exists.' };
+    }
+
+    const userPw = userData.password?.trim() || 'BiDOCS#2026';
+    const newUser: User = {
+      id: `user-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      tenantId: currentTenant.id,
+      email: normalizedEmail,
+      fullName: userData.fullName.trim(),
+      role: userData.role,
+      password: userPw,
+      mustChangePassword: false,
+      lastLoginAt: new Date().toISOString()
+    };
+
+    safeSetItem(`bidocs_user_password_${normalizedEmail}`, userPw);
+    safeSetItem(`bidocs_must_change_password_${normalizedEmail}`, 'false');
+
+    setUsers(prev => [...prev, newUser]);
+    return { success: true };
+  };
+
+  const switchUser = (userId: string): boolean => {
+    const target = users.find(u => u.id === userId);
+    if (!target) return false;
+
+    const matchedTenant = tenants.find(t => t.id === target.tenantId) || currentTenant;
+    if (matchedTenant && matchedTenant.id !== currentTenant?.id) {
+      setCurrentTenant(matchedTenant);
+    }
+
+    const userToSet: User = {
+      ...target,
+      lastLoginAt: new Date().toISOString()
+    };
+    setCurrentUser(userToSet);
+    safeSetJson('bidocs_current_user', userToSet);
+    return true;
+  };
+
+  const deleteTeamUser = (userId: string): boolean => {
+    if (currentUser?.id === userId) return false;
+    setUsers(prev => prev.filter(u => u.id !== userId));
+    return true;
+  };
+
   const switchTenant = (tenantId: string) => {
     const targetTenant = tenants.find(t => t.id === tenantId);
     if (targetTenant) {
@@ -294,9 +357,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         currentTenant,
         tenants,
+        users,
         login,
         logout,
         registerTenantAndUser,
+        createTeamUser,
+        switchUser,
+        deleteTeamUser,
         switchTenant,
         updateTenantSettings,
         resetUserPassword,

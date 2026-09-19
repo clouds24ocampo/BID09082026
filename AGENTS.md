@@ -4,9 +4,12 @@ Welcome to the **BiDOCS Agent Swarm**, powered by Google Antigravity and 79 spec
 
 ---
 
-## 🎯 How to Invoke Specialized Agents
+## 🎯 Autonomous Specialist Routing (Zero `@agent` Required)
 
-You can invoke or instruct any specialized agent directly in your prompt, or let the Master Orchestrator route it automatically:
+> **Core Operating Directive**: The user **never needs to explicitly call `@agent` or tag any agent handle**.
+> The Antigravity Master Orchestrator **automatically analyzes what the user is saying**, assumes the appropriate specialist role, and directly executes and responds with complete domain expertise.
+
+Explicit handles remain available for reference:
 
 | Agent Handle | Specialization | Core Skills | Typical Commands |
 |:---|:---|:---|:---|

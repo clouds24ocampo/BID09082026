@@ -18,7 +18,8 @@ import {
   Lock,
   FileSignature,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Link2
 } from 'lucide-react';
 
 export interface ScheduleItem {
@@ -333,6 +334,12 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
   const [servicesPercentage, setServicesPercentage] = useState<number>(35);
   const [servicesCustomAmount, setServicesCustomAmount] = useState<string>('');
 
+  // Approved POW / Quotation Auto-Input Link State
+  const [linkedPowIdentifier, setLinkedPowIdentifier] = useState<string>('');
+  const [linkedPowApprovedAt, setLinkedPowApprovedAt] = useState<string>('');
+  const [linkedPowDocMode, setLinkedPowDocMode] = useState<string>('');
+  const [syncBannerMessage, setSyncBannerMessage] = useState<string>('');
+
   // Load real saved opportunity projects from Opportunity Finder
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
@@ -448,7 +455,129 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
       setServicesPercentage(35);
       setServicesCustomAmount('');
     }
+
+    // Check Approved POW/Quotation Registry for this Project Scope
+    const regKey = `bidocs_approved_pow_rfq_registry_${tenantKey}`;
+    try {
+      const rawReg = localStorage.getItem(regKey);
+      if (rawReg) {
+        const list = JSON.parse(rawReg);
+        if (Array.isArray(list)) {
+          const match = list.slice().reverse().find((entry: any) =>
+            entry.approvalStatus === 'APPROVED' && (
+              (entry.selectedOppId && entry.selectedOppId === selectedOppId) ||
+              (entry.projectRefNo && (entry.projectRefNo === projectRefNo || entry.projectRefNo === activeProjectRefNo)) ||
+              (entry.projectScopeKey && entry.projectScopeKey === projectScopeKey)
+            )
+          );
+          if (match) {
+            setLinkedPowIdentifier(match.trackingNumber || match.id);
+            setLinkedPowApprovedAt(match.approvedAt || '');
+            setLinkedPowDocMode(match.docMode || 'POW');
+          } else {
+            setLinkedPowIdentifier('');
+            setLinkedPowApprovedAt('');
+            setLinkedPowDocMode('');
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[Section VI] Registry check error:', e);
+    }
+  }, [projectScopeKey, selectedOppId, projectRefNo, tenant?.id, activeProjectRefNo]);
+
+  // Live Sync Listener from POW / RFQ Auto-Input
+  useEffect(() => {
+    const handleSyncEvent = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const detail = customEvent?.detail;
+      if (!detail) return;
+
+      const tenantKey = tenant?.id || 'default';
+      const candidateKeys = [
+        projectScopeKey ? `bidocs_sec_vi_${tenantKey}_${projectScopeKey}` : '',
+        selectedOppId ? `bidocs_sec_vi_${tenantKey}_${selectedOppId}` : '',
+        projectRefNo ? `bidocs_sec_vi_${tenantKey}_${projectRefNo}` : ''
+      ].filter(Boolean);
+
+      for (const key of candidateKeys) {
+        const saved = localStorage.getItem(key);
+        if (saved !== null) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setItems(parsed);
+              break;
+            }
+          } catch (err) {}
+        }
+      }
+
+      const candidateServiceKeys = [
+        projectScopeKey ? `bidocs_sec_vi_services_${tenantKey}_${projectScopeKey}` : '',
+        selectedOppId ? `bidocs_sec_vi_services_${tenantKey}_${selectedOppId}` : '',
+        projectRefNo ? `bidocs_sec_vi_services_${tenantKey}_${projectRefNo}` : ''
+      ].filter(Boolean);
+
+      for (const sKey of candidateServiceKeys) {
+        const savedServices = localStorage.getItem(sKey);
+        if (savedServices !== null) {
+          try {
+            const parsedSvc = JSON.parse(savedServices);
+            if (parsedSvc) {
+              setServicesDescription(parsedSvc.description || DEFAULT_SERVICES_DESCRIPTION);
+              setServicesPercentage(parsedSvc.percentage ?? 35);
+              setServicesCustomAmount(parsedSvc.customAmount || '');
+              break;
+            }
+          } catch (err) {}
+        }
+      }
+
+      if (detail.trackingNumber) {
+        setLinkedPowIdentifier(detail.trackingNumber);
+        setLinkedPowDocMode(detail.docMode || 'POW');
+        setSyncBannerMessage(
+          `✨ Auto-Input Successful! Synchronized ${detail.itemCount || 'all'} item(s) from Approved ${detail.docMode === 'QUOTATION' ? 'Quotation' : 'Program of Work'} [${detail.trackingNumber}].`
+        );
+      }
+    };
+
+    window.addEventListener('bidocs:section_vi_synced', handleSyncEvent);
+    return () => {
+      window.removeEventListener('bidocs:section_vi_synced', handleSyncEvent);
+    };
   }, [projectScopeKey, selectedOppId, projectRefNo, tenant?.id]);
+
+  const handleManualResyncFromPow = () => {
+    const tenantKey = tenant?.id || 'default';
+    const candidateKeys = [
+      projectScopeKey ? `bidocs_sec_vi_${tenantKey}_${projectScopeKey}` : '',
+      selectedOppId ? `bidocs_sec_vi_${tenantKey}_${selectedOppId}` : '',
+      projectRefNo ? `bidocs_sec_vi_${tenantKey}_${projectRefNo}` : ''
+    ].filter(Boolean);
+
+    let foundItems: ScheduleItem[] | null = null;
+    for (const key of candidateKeys) {
+      const saved = localStorage.getItem(key);
+      if (saved !== null) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            foundItems = parsed;
+            break;
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (foundItems && foundItems.length > 0) {
+      setItems(foundItems);
+      setSyncBannerMessage(
+        `✅ Successfully refreshed ${foundItems.length} deliverable items from approved ${linkedPowDocMode === 'QUOTATION' ? 'Quotation' : 'Program of Work'} [${linkedPowIdentifier}].`
+      );
+    }
+  };
 
   const saveServicesData = (desc: string, pct: number, customAmt: string) => {
     setServicesDescription(desc);
@@ -761,6 +890,11 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
               <div>
                 <span className="font-bold">Project REF No.: </span>
                 <span className="font-mono font-semibold text-blue-950">{projectRefNo || 'N/A'}</span>
+                {linkedPowIdentifier && (
+                  <span className="text-[10px] text-slate-600 font-mono ml-1.5 font-normal">
+                    ({linkedPowDocMode === 'QUOTATION' ? 'RFQ' : 'POW'} Ref: {linkedPowIdentifier})
+                  </span>
+                )}
               </div>
               <div>
                 <span className="font-bold">Procuring Entity: </span>
@@ -1265,12 +1399,20 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                     <Building2 className="w-4 h-4 text-blue-400" />
                     <span>Target Bidding Project:</span>
                   </label>
-                  {projectRefNo && (
-                    <span className="text-[10px] text-emerald-400 font-bold font-mono flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
-                      <Lock className="w-3 h-3 text-emerald-400" />
-                      <span>Strict Isolation Active ({projectRefNo})</span>
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {linkedPowIdentifier && (
+                      <span className="text-[10px] text-blue-300 font-bold font-mono flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/30">
+                        <Link2 className="w-3 h-3 text-blue-400" />
+                        <span>{linkedPowDocMode === 'QUOTATION' ? 'Quotation' : 'POW'}: {linkedPowIdentifier}</span>
+                      </span>
+                    )}
+                    {projectRefNo && (
+                      <span className="text-[10px] text-emerald-400 font-bold font-mono flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                        <Lock className="w-3 h-3 text-emerald-400" />
+                        <span>Strict Isolation Active ({projectRefNo})</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <select
                   value={selectedOppId || projectRefNo}
@@ -1346,6 +1488,48 @@ export const SectionViScheduleOfRequirements: React.FC<SectionViScheduleOfRequir
                 <strong>100% Identical & Mirrored Sync:</strong> Entering Quantity and Unit Amount automatically calculates Total cost. Automatically synced with Page 1 of Framework Agreement List.
               </span>
             </div>
+
+            {/* Auto-Input / Sync Notification Banner */}
+            {syncBannerMessage && (
+              <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center justify-between shadow">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="font-semibold">{syncBannerMessage}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSyncBannerMessage('')}
+                  className="p-1 text-emerald-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* Linked Approved POW / RFQ Card */}
+            {linkedPowIdentifier && !syncBannerMessage && (
+              <div className="p-3 rounded-xl bg-blue-950/40 border border-blue-500/30 text-blue-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow">
+                <div className="flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-blue-400 shrink-0" />
+                  <span>
+                    <strong>Auto-Inputted from Approved {linkedPowDocMode === 'QUOTATION' ? 'Quotation (RFQ)' : 'Program of Work (POW)'}:</strong>{' '}
+                    <span className="font-mono font-bold text-blue-300">[{linkedPowIdentifier}]</span>
+                    {linkedPowApprovedAt && (
+                      <span className="text-slate-400 ml-1.5 font-mono text-[11px]">({linkedPowApprovedAt})</span>
+                    )}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleManualResyncFromPow}
+                  className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer transition shadow shrink-0 self-start sm:self-auto"
+                  title="Re-synchronize items from approved POW or Quotation"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Re-sync Deliverables</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* OFFICIAL PRINTABLE PAPER DOCUMENT SHEETS */}

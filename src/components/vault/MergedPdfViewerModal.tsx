@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { DocumentVaultItem, Tenant } from '../../types';
+import { DocumentVaultItem, Tenant, isApproverRole, isPreparerRole, getRoleDisplayName } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 import { DocumentCoverPage } from './DocumentCoverPage';
 import { exportMergedThreeLayerPdf, ExportDocumentUnit } from '../../utils/pdfExportEngine';
 import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
 import { loadPdfData } from '../../utils/vaultIndexedDB';
-import { markProjectBidMergeDone } from '../../utils/opportunityProjects';
+import { 
+  markProjectBidMergeDone, 
+  getDocumentApproval, 
+  saveDocumentApproval, 
+  DocumentApprovalRecord 
+} from '../../utils/opportunityProjects';
+import ApprovalGateModal from '../common/ApprovalGateModal';
 import { 
   X, 
   CheckCircle2, 
@@ -16,7 +23,10 @@ import {
   Printer,
   FolderPlus,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Lock,
+  Clock,
+  ArrowRight
 } from 'lucide-react';
 
 interface MergedPdfViewerModalProps {
@@ -53,6 +63,63 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
   const [isResolving, setIsResolving] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [statusText, setStatusText] = useState<string>('');
+
+  const { currentUser } = useAuth();
+  const [approvalRecord, setApprovalRecord] = useState<DocumentApprovalRecord | null>(null);
+  const [showApprovalGateModal, setShowApprovalGateModal] = useState<boolean>(false);
+
+  const activeRef = (selectedItems[0]?.philgepsRefNo || projectRefNo || 'PACKAGE').replace(/[^a-zA-Z0-9]/g, '_');
+
+  useEffect(() => {
+    const rec = getDocumentApproval(tenant?.id || '', activeRef);
+    setApprovalRecord(rec);
+  }, [tenant?.id, activeRef]);
+
+  const handleSubmitForApproval = () => {
+    const nowStr = new Date().toLocaleString('en-PH');
+    const subName = currentUser?.fullName || 'Technical Estimator';
+    const subRole = currentUser?.role ? getRoleDisplayName(currentUser.role) : 'Bid Manager';
+    const rec: DocumentApprovalRecord = {
+      recordId: activeRef,
+      docType: 'BIDDING_PACKAGE',
+      status: 'PENDING_APPROVAL',
+      submittedBy: subName,
+      submittedByRole: subRole,
+      submittedAt: nowStr
+    };
+    saveDocumentApproval(tenant?.id || '', rec);
+    setApprovalRecord(rec);
+  };
+
+  const handleApprovePackage = (notes?: string) => {
+    const nowStr = new Date().toLocaleString('en-PH');
+    const appName = currentUser?.fullName || tenant?.authorizedSignatory?.name || 'Company Owner';
+    const appRole = currentUser?.role ? getRoleDisplayName(currentUser.role) : 'Company Owner';
+    const rec: DocumentApprovalRecord = {
+      recordId: activeRef,
+      docType: 'BIDDING_PACKAGE',
+      status: 'APPROVED',
+      submittedBy: approvalRecord?.submittedBy || 'Estimator',
+      submittedByRole: approvalRecord?.submittedByRole || 'Bid Manager',
+      submittedAt: approvalRecord?.submittedAt,
+      approvedBy: appName,
+      approvedByRole: appRole,
+      approvedAt: nowStr,
+      notes: notes || approvalRecord?.notes
+    };
+    saveDocumentApproval(tenant?.id || '', rec);
+    setApprovalRecord(rec);
+  };
+
+  const handleRevertToDraft = () => {
+    const rec: DocumentApprovalRecord = {
+      recordId: activeRef,
+      docType: 'BIDDING_PACKAGE',
+      status: 'DRAFT'
+    };
+    saveDocumentApproval(tenant?.id || '', rec);
+    setApprovalRecord(rec);
+  };
 
   // Auto-resolve all document streams for all selected items
   useEffect(() => {
@@ -140,10 +207,18 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
   };
 
   const handlePrintBundle = () => {
+    if (isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED') {
+      setShowApprovalGateModal(true);
+      return;
+    }
     window.print();
   };
 
   const handleExportBundle = async () => {
+    if (isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED') {
+      setShowApprovalGateModal(true);
+      return;
+    }
     const items = bundles[activeBundle] || [];
     if (items.length === 0) return;
 
@@ -259,21 +334,118 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
               </button>
             </div>
 
+            {/* Approval Status Badge & Executive Controls */}
+            <div className="flex items-center gap-2 mr-1">
+              <span className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold uppercase tracking-wider border flex items-center gap-1.5 ${
+                approvalRecord?.status === 'APPROVED'
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : approvalRecord?.status === 'PENDING_APPROVAL'
+                  ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+              }`}>
+                {approvalRecord?.status === 'APPROVED' ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>APPROVED ({approvalRecord.approvedBy || 'Owner'})</span>
+                  </>
+                ) : approvalRecord?.status === 'PENDING_APPROVAL' ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                    <span>PENDING APPROVAL</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>DRAFT</span>
+                  </>
+                )}
+              </span>
+
+              {isApproverRole(currentUser?.role) ? (
+                approvalRecord?.status !== 'APPROVED' ? (
+                  <button
+                    type="button"
+                    onClick={() => handleApprovePackage()}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/30 ring-1 ring-emerald-400/50 flex items-center gap-1.5 cursor-pointer transition"
+                    title="Authorize and officially approve package for printing"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Approve for Print ✓</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleRevertToDraft}
+                    className="px-2 py-1 rounded text-[10px] font-semibold text-slate-400 hover:text-slate-200 bg-slate-800 hover:bg-slate-700 transition cursor-pointer"
+                    title="Revert package status to draft"
+                  >
+                    Revert
+                  </button>
+                )
+              ) : (
+                approvalRecord?.status === 'DRAFT' && (
+                  <button
+                    type="button"
+                    onClick={handleSubmitForApproval}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-600/30 flex items-center gap-1.5 cursor-pointer transition"
+                    title="Submit package to Company Owner for approval before printing"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>Submit for Approval ➔</span>
+                  </button>
+                )
+              )}
+            </div>
+
             <button
               onClick={handleExportBundle}
               disabled={isExporting}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold text-white transition shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
+                  ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40'
+                  : 'bg-emerald-600 hover:bg-emerald-500'
+              }`}
+              title={
+                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
+                  ? 'Owner approval required before exporting'
+                  : `Export ${activeBundle} to PDF`
+              }
             >
-              {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              <span>{isExporting ? 'Compiling...' : `Export ${activeBundle} to PDF`}</span>
+              {isExporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? (
+                <Lock className="w-4 h-4 text-amber-400" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              <span>
+                {isExporting ? 'Compiling...' : `Export ${activeBundle} to PDF`}
+                {isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? ' 🔒' : ''}
+              </span>
             </button>
 
             <button
               onClick={handlePrintBundle}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 transition shadow flex items-center gap-1.5 cursor-pointer"
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold text-white transition shadow flex items-center gap-1.5 cursor-pointer ${
+                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
+                  ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40'
+                  : 'bg-blue-600 hover:bg-blue-500'
+              }`}
+              title={
+                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
+                  ? 'Owner approval required before printing'
+                  : `Print ${activeBundle}`
+              }
             >
-              <Printer className="w-4 h-4" />
-              <span>Print {activeBundle}</span>
+              {isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? (
+                <Lock className="w-4 h-4 text-amber-400" />
+              ) : (
+                <Printer className="w-4 h-4" />
+              )}
+              <span>
+                Print {activeBundle}
+                {isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? ' 🔒' : ''}
+              </span>
             </button>
 
             <button onClick={onClose} className="p-2 text-slate-400 hover:text-white cursor-pointer">
@@ -498,10 +670,17 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
             <button
               onClick={handleExportBundle}
               disabled={isExporting || currentBundleItems.length === 0}
-              className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className={`px-4 py-1.5 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
+                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
+                  ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40'
+                  : 'bg-blue-600 hover:bg-blue-500'
+              }`}
             >
               {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-              <span>Compile & Download {activeBundle}</span>
+              <span>
+                Compile & Download {activeBundle}
+                {isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? ' 🔒' : ''}
+              </span>
             </button>
             <button
               onClick={onClose}
@@ -526,6 +705,27 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
         </div>
 
       </div>
+
+      {/* 🔒 OWNER / HIGHER MANAGER APPROVAL GATE MODAL */}
+      <ApprovalGateModal
+        isOpen={showApprovalGateModal}
+        onClose={() => setShowApprovalGateModal(false)}
+        docTitle={`Document Bundle (${activeBundle})`}
+        trackingOrRefNo={activeRef}
+        approvalRecord={approvalRecord}
+        onSubmitForApproval={() => {
+          handleSubmitForApproval();
+          setShowApprovalGateModal(false);
+        }}
+        onApprove={(notes) => {
+          handleApprovePackage(notes);
+          setShowApprovalGateModal(false);
+        }}
+        onRevertToDraft={() => {
+          handleRevertToDraft();
+          setShowApprovalGateModal(false);
+        }}
+      />
     </div>
   );
 };

@@ -74,6 +74,7 @@ import MtsModal from '../vault/templates/MTS';
 import CaModal from '../vault/templates/CA';
 import AbpModal from '../vault/templates/ABP';
 import WsModal from '../vault/templates/WS';
+import PowModal from '../vault/templates/POW';
 import BsModal from '../vault/templates/Bs';
 import CmsModal from '../vault/templates/CMS';
 import EupModal from '../vault/templates/EUP';
@@ -168,12 +169,19 @@ export interface StatutoryTemplateSlot {
   key: string;
   name: string;
   code: string;
-  templateType: 'RLA' | 'SWA' | 'PROGRESS_PHOTO' | 'MTS' | 'CA' | 'ABP' | 'WS' | 'BS' | 'CMS' | 'EUP' | 'FPL' | 'MPDS' | 'PERT' | 'SOTE' | 'TOA';
+  templateType: 'RLA' | 'SWA' | 'PROGRESS_PHOTO' | 'MTS' | 'CA' | 'ABP' | 'WS' | 'BS' | 'CMS' | 'EUP' | 'FPL' | 'MPDS' | 'PERT' | 'SOTE' | 'TOA' | 'POW';
   isUploadOnly?: boolean;
   description: string;
 }
 
 export const STATUTORY_DOCUMENT_SLOTS: StatutoryTemplateSlot[] = [
+  {
+    key: 'pow',
+    name: 'Program of Work (POW) & Terms of Reference (TOR)',
+    code: 'POW',
+    templateType: 'POW',
+    description: 'Itemized detailed cost estimate, direct/indirect markups, and integrated Terms of Reference PDF attachment.'
+  },
   {
     key: 'rla',
     name: 'Request Letter for Advance Payment / Mobilization',
@@ -4446,6 +4454,27 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({ setActiv
           projectLocation={selectedProject?.areaOfDelivery || ''}
           onSaveAndComplete={(dataUrl, name, refNo, title) => {
             handleSaveStatutoryDoc('ca', dataUrl, name, refNo, title);
+            setActiveStatutoryModal(null);
+          }}
+          onClose={() => setActiveStatutoryModal(null)}
+        />
+      )}
+
+      {activeStatutoryModal === 'POW' && (
+        <PowModal
+          tenant={currentTenant}
+          activeProjectRefNo={selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || ''}
+          activeProjectTitle={selectedProject?.title || ''}
+          activeProcuringEntity={selectedProject?.procuringEntity || 'Bids and Awards Committee'}
+          procuringEntityAddress={selectedProject?.procuringEntityAddress || ''}
+          procuringEntityContactPerson={selectedProject?.procuringEntityContactPerson || ''}
+          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ''}
+          headOfProcuringEntityPosition={selectedProject?.headOfProcuringEntityPosition || ''}
+          solicitationNumber={selectedProject?.solicitationNumber || ''}
+          contractAmount={selectedProject?.approvedBudget || 0}
+          projectLocation={selectedProject?.areaOfDelivery || ''}
+          onSaveAndComplete={(dataUrl, name, refNo, title) => {
+            handleSaveStatutoryDoc('pow', dataUrl, name, refNo, title);
             setActiveStatutoryModal(null);
           }}
           onClose={() => setActiveStatutoryModal(null)}

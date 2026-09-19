@@ -21,11 +21,15 @@ import {
   CheckCircle2, 
   Trash2,
   Box,
-  Briefcase 
+  Briefcase,
+  FileSpreadsheet,
+  Users,
+  ArrowRightLeft
 } from 'lucide-react';
 
 import { AuroraBackground } from '../common/AuroraBackground';
 import { safeGetItem } from '../../utils/safeStorage';
+import { getRoleDisplayName, isApproverRole } from '../../types';
 
 interface AppShellProps {
   activeTab: string;
@@ -34,7 +38,7 @@ interface AppShellProps {
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, children }) => {
-  const { currentUser, currentTenant, tenants, switchTenant, logout, updateUserPassword, resetAllData } = useAuth();
+  const { currentUser, currentTenant, tenants, users, switchUser, switchTenant, logout, updateUserPassword, resetAllData } = useAuth();
   const [showTenantDropdown, setShowTenantDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -85,6 +89,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'pow', label: 'Program of Work (POW)', icon: FileSpreadsheet, badge: 'Scope' },
     { id: 'opportunities', label: 'Opportunity Finder', icon: Search, badge: 'Philgeps' },
     { id: 'project-profile', label: 'Project Status', icon: Briefcase, badge: 'Status' },
     { id: 'vault', label: 'Document Vault', icon: FileCheck, badge: 'Secure' },
@@ -235,10 +240,54 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
                 <div className="px-3 py-2 border-b border-slate-800">
                   <p className="text-xs font-semibold text-white truncate">{currentUser?.fullName}</p>
                   <p className="text-[10px] text-slate-400 truncate">{currentUser?.email}</p>
-                  <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-semibold font-mono">
-                    {currentUser?.role === 'COMPANY_OWNER' ? 'Company Owner' : 'Bid Manager'}
+                  <span className={`inline-block mt-1 text-[10px] px-2 py-0.5 rounded font-bold font-mono border ${
+                    isApproverRole(currentUser?.role)
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  }`}>
+                    {getRoleDisplayName(currentUser?.role)}
                   </span>
                 </div>
+
+                {/* Quick Account Switcher */}
+                {users.filter(u => u.tenantId === currentTenant?.id && u.id !== currentUser?.id).length > 0 && (
+                  <div className="py-1 border-b border-slate-800/80">
+                    <p className="px-3 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                      Switch Active Account
+                    </p>
+                    {users
+                      .filter(u => u.tenantId === currentTenant?.id && u.id !== currentUser?.id)
+                      .map((u) => (
+                        <button
+                          key={u.id}
+                          onClick={() => {
+                            switchUser(u.id);
+                            setShowUserMenu(false);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 rounded-lg flex items-center justify-between transition cursor-pointer"
+                        >
+                          <div className="truncate max-w-[120px]">
+                            <p className="font-semibold text-white truncate text-[11px]">{u.fullName}</p>
+                            <p className="text-[9px] text-slate-400 truncate font-mono">{u.email}</p>
+                          </div>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
+                            {isApproverRole(u.role) ? 'Approver' : 'Preparer'}
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    setActiveTab('settings');
+                    setShowUserMenu(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-2 cursor-pointer"
+                >
+                  <Users className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Team Accounts &amp; Roles</span>
+                </button>
 
                 <button
                   onClick={() => {
@@ -248,7 +297,7 @@ export const AppShell: React.FC<AppShellProps> = ({ activeTab, setActiveTab, chi
                   className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-2 cursor-pointer"
                 >
                   <Settings className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Tenant & Branding Settings</span>
+                  <span>Tenant &amp; Branding Settings</span>
                 </button>
 
                 <button

@@ -132,6 +132,13 @@ This is required by RA 9184 / RA 12009 (Philippine Gov Procurement Act).
 
 ---
 
+## 🤖 Rule AGENT-AUTO: Automatic Specialist Routing (No `@agent` Required)
+
+The user is **never required to type `@agent` or specify agent handles**.
+The Antigravity Orchestrator **automatically detects user intent** from natural language instructions and immediately assumes the corresponding specialist role (Architecture, UI/UX, PDF Engineering, Philippine Procurement Statutory Compliance, Database, Security, etc.) to execute and respond directly.
+
+---
+
 ## 🟢 Before Touching Any PDF File
 
 1. Read `.agents/skills/bidocs-pdf-system/SKILL.md` and `.agents/skills/zero-whitespace-pdf-master/SKILL.md` for full technical context
@@ -139,4 +146,5 @@ This is required by RA 9184 / RA 12009 (Philippine Gov Procurement Act).
 3. Never change exported function signatures in `pdfExportEngine.ts`
 
 *Last updated: September 2026 — BiDOCS PDF System Stabilization & World-Class Standards*
+
 

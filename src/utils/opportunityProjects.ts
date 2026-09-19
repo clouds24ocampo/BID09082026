@@ -295,3 +295,60 @@ export const isProjectBidMergeDone = (
 
   return false;
 };
+
+export interface DocumentApprovalRecord {
+  recordId: string;
+  docType: 'POW' | 'QUOTATION' | 'BIDDING_PACKAGE';
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED';
+  submittedBy?: string;
+  submittedByRole?: string;
+  submittedAt?: string;
+  approvedBy?: string;
+  approvedByRole?: string;
+  approvedAt?: string;
+  notes?: string;
+}
+
+/**
+ * Retrieves approval status for a POW, Quotation, or Bidding Package
+ */
+export const getDocumentApproval = (
+  tenantId: string,
+  recordId: string
+): DocumentApprovalRecord | null => {
+  if (!recordId) return null;
+  const cleanKey = recordId.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+  const tKey = tenantId || 'default';
+  try {
+    const raw = localStorage.getItem(`bidocs_approval_${tKey}_${cleanKey}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.error('[DocumentApproval] Error reading approval record:', e);
+  }
+  return null;
+};
+
+/**
+ * Persists approval status and broadcasts live update event across app components
+ */
+export const saveDocumentApproval = (
+  tenantId: string,
+  record: DocumentApprovalRecord
+): void => {
+  if (!record.recordId) return;
+  const cleanKey = record.recordId.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+  const tKey = tenantId || 'default';
+  try {
+    localStorage.setItem(`bidocs_approval_${tKey}_${cleanKey}`, JSON.stringify(record));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('bidocs:approval_updated', {
+          detail: { tenantId: tKey, record }
+        })
+      );
+    }
+  } catch (e) {
+    console.error('[DocumentApproval] Error saving approval record:', e);
+  }
+};
+

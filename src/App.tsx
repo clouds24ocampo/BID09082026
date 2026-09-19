@@ -12,6 +12,7 @@ import { PackagingCoversView } from './components/covers/PackagingCoversView';
 import { TenantSettingsView } from './components/settings/TenantSettingsView';
 import { CompanyProfileView } from './components/profile/CompanyProfileView';
 import { ProjectProfileView } from './components/projects/ProjectProfileView';
+import PowModal from './components/vault/templates/POW';
 import VaultErrorBoundary from './components/common/VaultErrorBoundary';
 
 const MainApp: React.FC = () => {
@@ -32,6 +33,7 @@ const MainApp: React.FC = () => {
     <AppShell activeTab={activeTab} setActiveTab={setActiveTab}>
       <VaultErrorBoundary key={activeTab} fallbackTitle={`${activeTab.replace('-', ' ').toUpperCase()} Module View`}>
         {activeTab === 'dashboard' && <DashboardView setActiveTab={setActiveTab} />}
+        {activeTab === 'pow' && <PowModal tenant={currentTenant} setActiveTab={setActiveTab} />}
         {activeTab === 'opportunities' && <OpportunityFinderView setActiveTab={setActiveTab} />}
         {activeTab === 'project-profile' && <ProjectProfileView setActiveTab={setActiveTab} />}
         {activeTab === 'vault' && <DocumentVaultView />}

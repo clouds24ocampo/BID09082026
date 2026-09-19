@@ -82,6 +82,8 @@ export default defineConfig({
               normalized.includes('CMS') ||
               normalized.includes('ABP') ||
               normalized.includes('WS') ||
+              normalized.includes('POW') ||
+              normalized.includes('programofwork') ||
               normalized.includes('Progressphoto')
             ) {
               return 'statutory-templates';
