@@ -1,25 +1,25 @@
-import React, { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { DocumentVaultItem, DocCategory, DocumentVersion } from '../../types';
-import { PdfPreviewModal } from './PdfPreviewModal';
-import { MergedPdfViewerModal } from './MergedPdfViewerModal';
-import { StatementOngoingContractsModal } from './templates/StatementOngoingContractsModal';
-import { StatementSlccModal } from './templates/StatementSlccModal';
-import { TechnicalExhibitTemplateModal } from './templates/TechnicalExhibitTemplateModal';
-import { SectionViScheduleOfRequirements } from './templates/SectionViScheduleOfRequirements';
-import { FrameworkAgreementList } from './templates/FrameworkAgreementList';
-import { TechnicalSpecifications } from './templates/TechnicalSpecifications';
-import { AfterSaleModal as AfterSalesServiceModal } from './templates/aftersale';
-import { NfccModal } from './templates/nfcc';
-import { BidFormForGoodsModal } from './templates/bidform4goods';
-import { BidFormForInfrastructureModal } from './templates/bidform4infrastructure';
-import { BillOfQuantitiesModal } from './templates/billofquantities';
-import { CashFlowByQuarterModal } from './templates/cashflowbyquarter';
-import { PriceSchedule4GoodsModal } from './templates/priceschedule4goods';
-import { SummaryOfBidPriceModal } from './templates/summaryofbidprice';
-import { DetailedEstimatesModal } from './templates/detailedestimates';
-import { PackageItem } from '../bids/bidpackage';
-import VaultErrorBoundary from '../common/VaultErrorBoundary';
+import React, { useState } from "react";
+import { useAuth } from "../../context/AuthContext";
+import { DocumentVaultItem, DocCategory, DocumentVersion } from "../../types";
+import { PdfPreviewModal } from "./PdfPreviewModal";
+import { MergedPdfViewerModal } from "./MergedPdfViewerModal";
+import { StatementOngoingContractsModal } from "./templates/StatementOngoingContractsModal";
+import { StatementSlccModal } from "./templates/StatementSlccModal";
+import { TechnicalExhibitTemplateModal } from "./templates/TechnicalExhibitTemplateModal";
+import { SectionViScheduleOfRequirements } from "./templates/SectionViScheduleOfRequirements";
+import { FrameworkAgreementList } from "./templates/FrameworkAgreementList";
+import { TechnicalSpecifications } from "./templates/TechnicalSpecifications";
+import { AfterSaleModal as AfterSalesServiceModal } from "./templates/aftersale";
+import { NfccModal } from "./templates/nfcc";
+import { BidFormForGoodsModal } from "./templates/bidform4goods";
+import { BidFormForInfrastructureModal } from "./templates/bidform4infrastructure";
+import { BillOfQuantitiesModal } from "./templates/billofquantities";
+import { CashFlowByQuarterModal } from "./templates/cashflowbyquarter";
+import { PriceSchedule4GoodsModal } from "./templates/priceschedule4goods";
+import { SummaryOfBidPriceModal } from "./templates/summaryofbidprice";
+import { DetailedEstimatesModal } from "./templates/detailedestimates";
+import { PackageItem } from "../bids/bidpackage";
+import VaultErrorBoundary from "../common/VaultErrorBoundary";
 import {
   saveVaultItems,
   upsertVaultItem,
@@ -29,10 +29,13 @@ import {
   loadPdfData as loadPdfDataFromDB,
   deletePdfData,
   clearVaultDataForTenant,
-  migrateFromLocalStorage
-} from '../../utils/vaultIndexedDB';
-import { getOpportunityProjects, OpportunityProjectOption } from '../../utils/opportunityProjects';
-import { debugLog } from '../../utils/debugLog';
+  migrateFromLocalStorage,
+} from "../../utils/vaultIndexedDB";
+import {
+  getOpportunityProjects,
+  OpportunityProjectOption,
+} from "../../utils/opportunityProjects";
+import { debugLog } from "../../utils/debugLog";
 import {
   FileCheck,
   Upload,
@@ -58,12 +61,12 @@ import {
   Unlock,
   Trash2,
   Edit3,
-  Filter
-} from 'lucide-react';
-import { SpotlightCard } from '../common/SpotlightCard';
-import { BorderBeam } from '../common/BorderBeam';
-import { ShinyText } from '../common/ShinyText';
-import { CyberBadge } from '../common/CyberBadge';
+  Filter,
+} from "lucide-react";
+import { SpotlightCard } from "../common/SpotlightCard";
+import { BorderBeam } from "../common/BorderBeam";
+import { ShinyText } from "../common/ShinyText";
+import { CyberBadge } from "../common/CyberBadge";
 
 interface ClassAMasterItemDef {
   code: string;
@@ -72,25 +75,132 @@ interface ClassAMasterItemDef {
   requiresExpiryDate: boolean;
   isOptional: boolean;
   conditionalRuleNote: string;
-  subType?: 'DTI' | 'SEC';
+  subType?: "DTI" | "SEC";
 }
 
 const CLASS_A_MASTER_LIST: ClassAMasterItemDef[] = [
-  { code: 'DOC-1', name: 'PhilGEPS Certificate', requiresIssueDate: true, requiresExpiryDate: true, isOptional: false, conditionalRuleNote: 'Requires valid Issue Date and Expiration Date.' },
-  { code: 'DOC-2', name: 'DTI or SEC Certificate', requiresIssueDate: true, requiresExpiryDate: true, isOptional: false, conditionalRuleNote: 'DTI requires Issue Date + Expiration Date. SEC requires no dates.' },
-  { code: 'DOC-3', name: 'Business Permit', requiresIssueDate: true, requiresExpiryDate: true, isOptional: false, conditionalRuleNote: 'Requires valid Issue Date and Expiration Date.' },
-  { code: 'DOC-4', name: 'Barangay Business Permit', requiresIssueDate: true, requiresExpiryDate: true, isOptional: false, conditionalRuleNote: 'Requires valid Issue Date and Expiration Date.' },
-  { code: 'DOC-5', name: 'Business Plate', requiresIssueDate: false, requiresExpiryDate: false, isOptional: false, conditionalRuleNote: 'No dates required.' },
-  { code: 'DOC-6', name: 'BIR Certificate of Registration', requiresIssueDate: false, requiresExpiryDate: false, isOptional: false, conditionalRuleNote: 'No dates required.' },
-  { code: 'DOC-7', name: 'BIR Tax Clearance for Bidding', requiresIssueDate: true, requiresExpiryDate: true, isOptional: false, conditionalRuleNote: 'Requires valid Issue Date and Expiration Date.' },
-  { code: 'DOC-8', name: 'PCAB License', requiresIssueDate: true, requiresExpiryDate: true, isOptional: false, conditionalRuleNote: 'Requires valid Issue Date and Expiration Date.' },
-  { code: 'DOC-9', name: 'DOLE COSH or BOSH', requiresIssueDate: false, requiresExpiryDate: false, isOptional: false, conditionalRuleNote: 'No dates required.' },
-  { code: 'DOC-10', name: 'Occupancy Permit', requiresIssueDate: true, requiresExpiryDate: true, isOptional: true, conditionalRuleNote: 'Optional document. Requires dates if uploaded.' },
-  { code: 'DOC-11', name: 'Sanitary Permit', requiresIssueDate: true, requiresExpiryDate: true, isOptional: true, conditionalRuleNote: 'Optional document. Requires dates if uploaded.' },
-  { code: 'DOC-12', name: 'Fire Permit', requiresIssueDate: true, requiresExpiryDate: true, isOptional: true, conditionalRuleNote: 'Optional document. Requires dates if uploaded.' },
-  { code: 'DOC-13', name: 'Secretary Certificate — Authority Signatory', requiresIssueDate: false, requiresExpiryDate: false, isOptional: false, conditionalRuleNote: 'No dates required.' },
-  { code: 'DOC-14', name: 'Joint Venture Agreement (JVA)', requiresIssueDate: false, requiresExpiryDate: false, isOptional: true, conditionalRuleNote: 'Optional if applicable. No dates required.' },
-  { code: 'DOC-15', name: 'Annual Financial Statement (AFS)', requiresIssueDate: false, requiresExpiryDate: false, isOptional: false, conditionalRuleNote: 'No issue date and expiration date required. Supports uploading large PDF files.' },
+  {
+    code: "DOC-1",
+    name: "PhilGEPS Certificate",
+    requiresIssueDate: true,
+    requiresExpiryDate: true,
+    isOptional: false,
+    conditionalRuleNote: "Requires valid Issue Date and Expiration Date.",
+  },
+  {
+    code: "DOC-2",
+    name: "DTI or SEC Certificate",
+    requiresIssueDate: true,
+    requiresExpiryDate: true,
+    isOptional: false,
+    conditionalRuleNote:
+      "DTI requires Issue Date + Expiration Date. SEC requires no dates.",
+  },
+  {
+    code: "DOC-3",
+    name: "Business Permit",
+    requiresIssueDate: true,
+    requiresExpiryDate: true,
+    isOptional: false,
+    conditionalRuleNote: "Requires valid Issue Date and Expiration Date.",
+  },
+  {
+    code: "DOC-4",
+    name: "Barangay Business Permit",
+    requiresIssueDate: true,
+    requiresExpiryDate: true,
+    isOptional: false,
+    conditionalRuleNote: "Requires valid Issue Date and Expiration Date.",
+  },
+  {
+    code: "DOC-5",
+    name: "Business Plate",
+    requiresIssueDate: false,
+    requiresExpiryDate: false,
+    isOptional: false,
+    conditionalRuleNote: "No dates required.",
+  },
+  {
+    code: "DOC-6",
+    name: "BIR Certificate of Registration",
+    requiresIssueDate: false,
+    requiresExpiryDate: false,
+    isOptional: false,
+    conditionalRuleNote: "No dates required.",
+  },
+  {
+    code: "DOC-7",
+    name: "BIR Tax Clearance for Bidding",
+    requiresIssueDate: true,
+    requiresExpiryDate: true,
+    isOptional: false,
+    conditionalRuleNote: "Requires valid Issue Date and Expiration Date.",
+  },
+  {
+    code: "DOC-8",
+    name: "PCAB License",
+    requiresIssueDate: true,
+    requiresExpiryDate: true,
+    isOptional: false,
+    conditionalRuleNote: "Requires valid Issue Date and Expiration Date.",
+  },
+  {
+    code: "DOC-9",
+    name: "DOLE COSH or BOSH",
+    requiresIssueDate: false,
+    requiresExpiryDate: false,
+    isOptional: false,
+    conditionalRuleNote: "No dates required.",
+  },
+  {
+    code: "DOC-10",
+    name: "Occupancy Permit",
+    requiresIssueDate: true,
+    requiresExpiryDate: true,
+    isOptional: true,
+    conditionalRuleNote: "Optional document. Requires dates if uploaded.",
+  },
+  {
+    code: "DOC-11",
+    name: "Sanitary Permit",
+    requiresIssueDate: true,
+    requiresExpiryDate: true,
+    isOptional: true,
+    conditionalRuleNote: "Optional document. Requires dates if uploaded.",
+  },
+  {
+    code: "DOC-12",
+    name: "Fire Permit",
+    requiresIssueDate: true,
+    requiresExpiryDate: true,
+    isOptional: true,
+    conditionalRuleNote: "Optional document. Requires dates if uploaded.",
+  },
+  {
+    code: "DOC-13",
+    name: "Secretary Certificate — Authority Signatory",
+    requiresIssueDate: false,
+    requiresExpiryDate: false,
+    isOptional: false,
+    conditionalRuleNote: "No dates required.",
+  },
+  {
+    code: "DOC-14",
+    name: "Joint Venture Agreement (JVA)",
+    requiresIssueDate: false,
+    requiresExpiryDate: false,
+    isOptional: true,
+    conditionalRuleNote: "Optional if applicable. No dates required.",
+  },
+  {
+    code: "DOC-15",
+    name: "Annual Financial Statement (AFS)",
+    requiresIssueDate: false,
+    requiresExpiryDate: false,
+    isOptional: false,
+    conditionalRuleNote:
+      "No issue date and expiration date required. Supports uploading large PDF files.",
+  },
 ];
 
 export interface TechnicalChecklistItem {
@@ -105,93 +215,93 @@ export interface TechnicalChecklistItem {
 
 const TECHNICAL_CHECKLIST_MASTER: TechnicalChecklistItem[] = [
   {
-    id: 'tech-b',
-    code: '(b)',
-    name: 'Statement of all ongoing government and private contracts (including awarded but not yet started), whether similar or not to the contract to be bid',
-    notes: 'Legal template to follow',
-    templateCode: 'STATEMENT_ONGOING_CONTRACTS'
+    id: "tech-b",
+    code: "(b)",
+    name: "Statement of all ongoing government and private contracts (including awarded but not yet started), whether similar or not to the contract to be bid",
+    notes: "Legal template to follow",
+    templateCode: "STATEMENT_ONGOING_CONTRACTS",
   },
   {
-    id: 'tech-c',
-    code: '(c)',
-    name: 'Statement of Bidder\'s Single Largest Completed Contract (SLCC) similar to the contract to be bid',
-    notes: 'Legal template to follow',
-    templateCode: 'STATEMENT_SLCC'
+    id: "tech-c",
+    code: "(c)",
+    name: "Statement of Bidder's Single Largest Completed Contract (SLCC) similar to the contract to be bid",
+    notes: "Legal template to follow",
+    templateCode: "STATEMENT_SLCC",
   },
   {
-    id: 'tech-sec-vi',
-    code: 'SEC-VI',
-    name: 'Section VI. Schedule of Requirements',
-    notes: 'Legal template to follow',
-    templateCode: 'SCHEDULE_OF_REQUIREMENTS'
+    id: "tech-sec-vi",
+    code: "SEC-VI",
+    name: "Section VI. Schedule of Requirements",
+    notes: "Legal template to follow",
+    templateCode: "SCHEDULE_OF_REQUIREMENTS",
   },
   {
-    id: 'tech-sec-vii',
-    code: 'SEC-VII',
-    name: 'Section VII. Technical Specifications',
-    notes: 'Legal template to follow',
-    templateCode: 'TECHNICAL_SPECIFICATIONS'
+    id: "tech-sec-vii",
+    code: "SEC-VII",
+    name: "Section VII. Technical Specifications",
+    notes: "Legal template to follow",
+    templateCode: "TECHNICAL_SPECIFICATIONS",
   },
   {
-    id: 'tech-fal',
-    code: 'FAL-01',
-    name: 'Framework Agreement List',
-    notes: 'Legal template to follow',
-    templateCode: 'FRAMEWORK_AGREEMENT_LIST'
+    id: "tech-fal",
+    code: "FAL-01",
+    name: "Framework Agreement List",
+    notes: "Legal template to follow",
+    templateCode: "FRAMEWORK_AGREEMENT_LIST",
   },
   {
-    id: 'tech-d',
-    code: '(d)',
-    name: 'Special PCAB License (for Joint Ventures) and registration for type/cost of contract to be bid',
-    notes: 'Legal template to follow',
-    templateCode: 'SPECIAL_PCAB_LICENSE'
+    id: "tech-d",
+    code: "(d)",
+    name: "Special PCAB License (for Joint Ventures) and registration for type/cost of contract to be bid",
+    notes: "Legal template to follow",
+    templateCode: "SPECIAL_PCAB_LICENSE",
   },
   {
-    id: 'tech-f',
-    code: '(f)',
-    name: 'Project Requirements — Key Personnel, Equipment & Organizational Chart',
-    notes: 'Legal template to follow',
-    templateCode: 'PROJECT_REQUIREMENTS',
+    id: "tech-f",
+    code: "(f)",
+    name: "Project Requirements — Key Personnel, Equipment & Organizational Chart",
+    notes: "Legal template to follow",
+    templateCode: "PROJECT_REQUIREMENTS",
     isExpandable: true,
     subItems: [
       {
-        id: 'tech-fa',
-        code: '(f.a)',
-        name: 'Organizational chart for the contract to be bid',
-        notes: 'Legal template to follow'
+        id: "tech-fa",
+        code: "(f.a)",
+        name: "Organizational chart for the contract to be bid",
+        notes: "Legal template to follow",
       },
       {
-        id: 'tech-fb',
-        code: '(f.b)',
-        name: 'List of contractor\'s key personnel (e.g., Project Manager, Project Engineers, Materials Engineers, and Foremen)',
-        notes: 'Legal template to follow'
+        id: "tech-fb",
+        code: "(f.b)",
+        name: "List of contractor's key personnel (e.g., Project Manager, Project Engineers, Materials Engineers, and Foremen)",
+        notes: "Legal template to follow",
       },
       {
-        id: 'tech-fc',
-        code: '(f.c)',
-        name: 'List of contractor\'s major equipment (owned/leased/under purchase) with proof of ownership or lessor/vendor availability certification',
-        notes: 'Legal template to follow'
-      }
-    ]
+        id: "tech-fc",
+        code: "(f.c)",
+        name: "List of contractor's major equipment (owned/leased/under purchase) with proof of ownership or lessor/vendor availability certification",
+        notes: "Legal template to follow",
+      },
+    ],
   },
   {
-    id: 'tech-h',
-    code: '(h)',
-    name: 'After Sales Services & Warranty Undertaking Guaranty Statement',
-    notes: 'Legal template to follow',
-    templateCode: 'AFTER_SALES_SERVICES'
+    id: "tech-h",
+    code: "(h)",
+    name: "After Sales Services & Warranty Undertaking Guaranty Statement",
+    notes: "Legal template to follow",
+    templateCode: "AFTER_SALES_SERVICES",
   },
   {
-    id: 'tech-nfcc',
-    code: 'NFCC',
-    name: 'Net Financial Contracting Capacity (NFCC) — Financial Documents for Eligibility Check',
-    notes: 'Legal template to follow',
-    templateCode: 'NFCC'
-  }
+    id: "tech-nfcc",
+    code: "NFCC",
+    name: "Net Financial Contracting Capacity (NFCC) — Financial Documents for Eligibility Check",
+    notes: "Legal template to follow",
+    templateCode: "NFCC",
+  },
 ];
 
 export interface VaultNotification {
-  type: 'SUCCESS' | 'FAILURE';
+  type: "SUCCESS" | "FAILURE";
   title: string;
   message: string;
   reason?: string;
@@ -210,7 +320,7 @@ export const DocumentVaultView: React.FC = () => {
     try {
       await savePdfData(itemId, dataUrl);
     } catch (e) {
-      console.error('[VaultDB] Failed to persist PDF data:', e);
+      console.error("[VaultDB] Failed to persist PDF data:", e);
     }
   };
 
@@ -218,66 +328,78 @@ export const DocumentVaultView: React.FC = () => {
     return pdfDataCache.current[itemId];
   };
 
-  const activeTenantId = currentTenant?.id || '';
+  const activeTenantId = currentTenant?.id || "";
   const [vaultItems, setVaultItems] = useState<DocumentVaultItem[]>([]);
 
   // Helper to determine Project Type and styling colors for any saved vault document
   const getProjectInfoForDoc = (item: DocumentVaultItem) => {
     // 1. Match from opportunity projects
     const matchedProject = oppProjects.find(
-      p => (item.philgepsRefNo && p.refNo && p.refNo.toLowerCase() === item.philgepsRefNo.toLowerCase()) ||
-           (item.projectId && p.id === item.projectId)
+      (p) =>
+        (item.philgepsRefNo &&
+          p.refNo &&
+          p.refNo.toLowerCase() === item.philgepsRefNo.toLowerCase()) ||
+        (item.projectId && p.id === item.projectId),
     );
 
-    let type: 'Goods' | 'Infrastructure' | 'Consulting Services' = 'Goods';
+    let type: "Goods" | "Infrastructure" | "Consulting Services" = "Goods";
 
     if (matchedProject?.category) {
       const catUpper = matchedProject.category.toUpperCase();
-      if (catUpper.includes('INFRA')) type = 'Infrastructure';
-      else if (catUpper.includes('CONSULT')) type = 'Consulting Services';
-      else type = 'Goods';
+      if (catUpper.includes("INFRA")) type = "Infrastructure";
+      else if (catUpper.includes("CONSULT")) type = "Consulting Services";
+      else type = "Goods";
     } else {
       // 2. Infer from document name, legalBasisReference, projectTitle, or procurementApplicability
-      const combined = `${item.documentName} ${item.documentCode} ${item.projectTitle || ''} ${(item.procurementApplicability || []).join(' ')} ${item.legalBasisReference || ''}`.toUpperCase();
-      if (combined.includes('CONSULT')) {
-        type = 'Consulting Services';
-      } else if (combined.includes('INFRA') || combined.includes('INFRASTRUCTURE') || combined.includes('CONSTRUCT') || combined.includes('CIVIL')) {
-        type = 'Infrastructure';
+      const combined =
+        `${item.documentName} ${item.documentCode} ${item.projectTitle || ""} ${(item.procurementApplicability || []).join(" ")} ${item.legalBasisReference || ""}`.toUpperCase();
+      if (combined.includes("CONSULT")) {
+        type = "Consulting Services";
+      } else if (
+        combined.includes("INFRA") ||
+        combined.includes("INFRASTRUCTURE") ||
+        combined.includes("CONSTRUCT") ||
+        combined.includes("CIVIL")
+      ) {
+        type = "Infrastructure";
       } else {
-        type = 'Goods';
+        type = "Goods";
       }
     }
 
-    if (type === 'Infrastructure') {
+    if (type === "Infrastructure") {
       return {
-        type: 'Infrastructure',
-        badgeClass: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
-        pillClass: 'bg-yellow-500/15 text-yellow-300 border border-yellow-500/30 font-bold',
-        accentBorder: 'border-yellow-500/40 hover:border-yellow-400/80',
-        accentCardBorder: 'border-yellow-500/40 hover:border-yellow-400/80',
-        textAccent: 'text-yellow-300',
-        dotColor: 'bg-yellow-400'
+        type: "Infrastructure",
+        badgeClass: "bg-yellow-500/20 text-yellow-300 border-yellow-500/40",
+        pillClass:
+          "bg-yellow-500/15 text-yellow-300 border border-yellow-500/30 font-bold",
+        accentBorder: "border-yellow-500/40 hover:border-yellow-400/80",
+        accentCardBorder: "border-yellow-500/40 hover:border-yellow-400/80",
+        textAccent: "text-yellow-300",
+        dotColor: "bg-yellow-400",
       };
     }
-    if (type === 'Consulting Services') {
+    if (type === "Consulting Services") {
       return {
-        type: 'Consulting Services',
-        badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-        pillClass: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold',
-        accentBorder: 'border-emerald-500/40 hover:border-emerald-400/80',
-        accentCardBorder: 'border-emerald-500/40 hover:border-emerald-400/80',
-        textAccent: 'text-emerald-300',
-        dotColor: 'bg-emerald-400'
+        type: "Consulting Services",
+        badgeClass: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+        pillClass:
+          "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold",
+        accentBorder: "border-emerald-500/40 hover:border-emerald-400/80",
+        accentCardBorder: "border-emerald-500/40 hover:border-emerald-400/80",
+        textAccent: "text-emerald-300",
+        dotColor: "bg-emerald-400",
       };
     }
     return {
-      type: 'Goods',
-      badgeClass: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
-      pillClass: 'bg-blue-500/15 text-blue-300 border border-blue-500/30 font-bold',
-      accentBorder: 'border-blue-500/40 hover:border-blue-400/80',
-      accentCardBorder: 'border-blue-500/40 hover:border-blue-400/80',
-      textAccent: 'text-blue-300',
-      dotColor: 'bg-blue-400'
+      type: "Goods",
+      badgeClass: "bg-blue-500/20 text-blue-300 border-blue-500/40",
+      pillClass:
+        "bg-blue-500/15 text-blue-300 border border-blue-500/30 font-bold",
+      accentBorder: "border-blue-500/40 hover:border-blue-400/80",
+      accentCardBorder: "border-blue-500/40 hover:border-blue-400/80",
+      textAccent: "text-blue-300",
+      dotColor: "bg-blue-400",
     };
   };
 
@@ -304,30 +426,51 @@ export const DocumentVaultView: React.FC = () => {
           setVaultItems(items);
 
           // #region agent log
-          debugLog('DocumentVaultView.tsx:loadFromDB', 'Vault load complete', {
-            activeTenantId,
-            itemCount: items.length,
-            migratedCount: migrated.length,
-            dbReady: true
-          }, 'B');
+          debugLog(
+            "DocumentVaultView.tsx:loadFromDB",
+            "Vault load complete",
+            {
+              activeTenantId,
+              itemCount: items.length,
+              migratedCount: migrated.length,
+              dbReady: true,
+            },
+            "B",
+          );
           // #endregion
 
           setDbReady(true);
         }
       } catch (e) {
-        console.error('[VaultDB] Failed to load from IndexedDB, falling back to localStorage:', e);
+        console.error(
+          "[VaultDB] Failed to load from IndexedDB, falling back to localStorage:",
+          e,
+        );
         // #region agent log
-        debugLog('DocumentVaultView.tsx:loadFromDB', 'Vault load failed, using localStorage fallback', {
-          activeTenantId,
-          error: String(e)
-        }, 'B');
+        debugLog(
+          "DocumentVaultView.tsx:loadFromDB",
+          "Vault load failed, using localStorage fallback",
+          {
+            activeTenantId,
+            error: String(e),
+          },
+          "B",
+        );
         // #endregion
         if (!cancelled) {
           try {
-            const saved = localStorage.getItem(`bidocs_vault_items_${activeTenantId}`);
+            const saved = localStorage.getItem(
+              `bidocs_vault_items_${activeTenantId}`,
+            );
             if (saved) {
               const parsed = JSON.parse(saved);
-              setVaultItems(Array.isArray(parsed) ? parsed.filter((item: any) => item.tenantId === activeTenantId) : []);
+              setVaultItems(
+                Array.isArray(parsed)
+                  ? parsed.filter(
+                      (item: any) => item.tenantId === activeTenantId,
+                    )
+                  : [],
+              );
             } else {
               setVaultItems([]);
             }
@@ -343,7 +486,9 @@ export const DocumentVaultView: React.FC = () => {
     loadFromDB();
 
     // Sync tech completed IDs for active tenant (clean slate [] for new tenants)
-    const savedTech = localStorage.getItem(`bidocs_tech_completed_ids_${activeTenantId}`);
+    const savedTech = localStorage.getItem(
+      `bidocs_tech_completed_ids_${activeTenantId}`,
+    );
     if (savedTech) {
       try {
         setTechCompletedIds(JSON.parse(savedTech));
@@ -354,62 +499,84 @@ export const DocumentVaultView: React.FC = () => {
       setTechCompletedIds([]);
     }
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [activeTenantId]);
 
   // ─── Persist vault item metadata to IndexedDB on every change (scoped by activeTenantId) ───
   React.useEffect(() => {
     if (!dbReady) return; // Don't write until initial load completes
     // #region agent log
-    debugLog('DocumentVaultView.tsx:persist', 'Persisting vault items to IndexedDB', {
-      activeTenantId,
-      itemCount: vaultItems.length,
-      dbReady
-    }, 'B');
+    debugLog(
+      "DocumentVaultView.tsx:persist",
+      "Persisting vault items to IndexedDB",
+      {
+        activeTenantId,
+        itemCount: vaultItems.length,
+        dbReady,
+      },
+      "B",
+    );
     // #endregion
-    saveVaultItems(vaultItems, activeTenantId).catch(e =>
-      console.error('[VaultDB] Failed to persist vault items:', e)
+    saveVaultItems(vaultItems, activeTenantId).catch((e) =>
+      console.error("[VaultDB] Failed to persist vault items:", e),
     );
   }, [vaultItems, dbReady, activeTenantId]);
 
-  const [selectedCategory, setSelectedCategory] = useState<string>('ELIGIBILITY_CLASS_A');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    "ELIGIBILITY_CLASS_A",
+  );
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Selection & Merging state
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [showMergeModal, setShowMergeModal] = useState(false);
 
   // Active Bidding Project Scoping State (Strict Project Isolation - 1 Project at a Time)
-  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
+  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>(
+    [],
+  );
   const [activeProjectRefNo, setActiveProjectRefNo] = useState<string>(() => {
     try {
-      return localStorage.getItem(`bidocs_active_vault_project_${activeTenantId}`) || '';
+      return (
+        localStorage.getItem(`bidocs_active_vault_project_${activeTenantId}`) ||
+        ""
+      );
     } catch (_) {
-      return '';
+      return "";
     }
   });
-  const [activeProjectTitle, setActiveProjectTitle] = useState<string>('');
-  const [activeProcuringEntity, setActiveProcuringEntity] = useState<string>('');
-  const activeProjectId = oppProjects.find((project) => project.refNo === activeProjectRefNo)?.id || '';
+  const [activeProjectTitle, setActiveProjectTitle] = useState<string>("");
+  const [activeProcuringEntity, setActiveProcuringEntity] =
+    useState<string>("");
+  const activeProjectId =
+    oppProjects.find((project) => project.refNo === activeProjectRefNo)?.id ||
+    "";
 
   const handleSelectActiveProject = (selectedRef: string) => {
     setActiveProjectRefNo(selectedRef);
-    const match = oppProjects.find(p => p.refNo === selectedRef);
-    setActiveProjectTitle(match?.title || '');
-    setActiveProcuringEntity(match?.procuringEntity || '');
+    const match = oppProjects.find((p) => p.refNo === selectedRef);
+    setActiveProjectTitle(match?.title || "");
+    setActiveProcuringEntity(match?.procuringEntity || "");
     try {
       if (selectedRef) {
-        localStorage.setItem(`bidocs_active_vault_project_${activeTenantId}`, selectedRef);
+        localStorage.setItem(
+          `bidocs_active_vault_project_${activeTenantId}`,
+          selectedRef,
+        );
       } else {
-        localStorage.removeItem(`bidocs_active_vault_project_${activeTenantId}`);
+        localStorage.removeItem(
+          `bidocs_active_vault_project_${activeTenantId}`,
+        );
       }
     } catch (_) {}
   };
 
   const handleUnlockOrChangeProject = () => {
-    setActiveProjectRefNo('');
-    setActiveProjectTitle('');
-    setActiveProcuringEntity('');
+    setActiveProjectRefNo("");
+    setActiveProjectTitle("");
+    setActiveProcuringEntity("");
     try {
       localStorage.removeItem(`bidocs_active_vault_project_${activeTenantId}`);
     } catch (_) {}
@@ -419,9 +586,11 @@ export const DocumentVaultView: React.FC = () => {
     const list = getOpportunityProjects(activeTenantId);
     setOppProjects(list);
     try {
-      const savedRef = localStorage.getItem(`bidocs_active_vault_project_${activeTenantId}`);
+      const savedRef = localStorage.getItem(
+        `bidocs_active_vault_project_${activeTenantId}`,
+      );
       if (savedRef) {
-        const match = list.find(p => p.refNo === savedRef);
+        const match = list.find((p) => p.refNo === savedRef);
         if (match) {
           setActiveProjectRefNo(match.refNo);
           setActiveProjectTitle(match.title);
@@ -432,7 +601,9 @@ export const DocumentVaultView: React.FC = () => {
   }, [activeTenantId]);
 
   // Active Bid Package Items tracking across projects for the tenant
-  const [activePackageItems, setActivePackageItems] = useState<PackageItem[]>([]);
+  const [activePackageItems, setActivePackageItems] = useState<PackageItem[]>(
+    [],
+  );
 
   const loadActivePackageItems = React.useCallback(() => {
     if (!activeTenantId) {
@@ -444,10 +615,16 @@ export const DocumentVaultView: React.FC = () => {
     const seen = new Set<string>();
 
     const candidateKeys = [
-      activeProjectRefNo ? `bidocs_package_items_${activeTenantId}_${activeProjectRefNo}` : '',
-      activeProjectRefNo ? `bidocs_package_items_${activeTenantId}_${activeProjectRefNo.replace(/[^a-zA-Z0-9]/g, '_')}` : '',
-      activeProjectId ? `bidocs_package_items_${activeTenantId}_${activeProjectId}` : '',
-      `bidocs_package_items_${activeTenantId}_default`
+      activeProjectRefNo
+        ? `bidocs_package_items_${activeTenantId}_${activeProjectRefNo}`
+        : "",
+      activeProjectRefNo
+        ? `bidocs_package_items_${activeTenantId}_${activeProjectRefNo.replace(/[^a-zA-Z0-9]/g, "_")}`
+        : "",
+      activeProjectId
+        ? `bidocs_package_items_${activeTenantId}_${activeProjectId}`
+        : "",
+      `bidocs_package_items_${activeTenantId}_default`,
     ].filter(Boolean);
 
     // Scan all package keys for this tenant to ensure complete cross-project awareness
@@ -485,15 +662,15 @@ export const DocumentVaultView: React.FC = () => {
 
   React.useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key && e.key.includes('bidocs_package_items_')) {
+      if (e.key && e.key.includes("bidocs_package_items_")) {
         loadActivePackageItems();
       }
     };
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('focus', loadActivePackageItems);
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("focus", loadActivePackageItems);
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('focus', loadActivePackageItems);
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("focus", loadActivePackageItems);
     };
   }, [loadActivePackageItems]);
 
@@ -503,99 +680,216 @@ export const DocumentVaultView: React.FC = () => {
     const docNumbers = new Set<string>();
     const pkgNames: string[] = [];
 
-    activePackageItems.forEach(pkg => {
+    activePackageItems.forEach((pkg) => {
       if (pkg.vaultDocId) directIds.add(pkg.vaultDocId);
       if (pkg.id) directIds.add(pkg.id);
-      if (pkg.documentNumber) docNumbers.add(pkg.documentNumber.toLowerCase().trim());
-      if (pkg.documentName) pkgNames.push(pkg.documentName.toLowerCase().trim());
+      if (pkg.documentNumber)
+        docNumbers.add(pkg.documentNumber.toLowerCase().trim());
+      if (pkg.documentName)
+        pkgNames.push(pkg.documentName.toLowerCase().trim());
     });
 
     return { directIds, docNumbers, pkgNames };
   }, [activePackageItems]);
 
   // Master helper: Determines whether a document is currently merged/added inside the Bid Package
-  const isDocInBidPackage = React.useCallback((docItem?: DocumentVaultItem | null): boolean => {
-    if (!docItem || activePackageItems.length === 0) return false;
+  const isDocInBidPackage = React.useCallback(
+    (docItem?: DocumentVaultItem | null): boolean => {
+      if (!docItem || activePackageItems.length === 0) return false;
 
-    const docId = docItem.id;
-    if (packageLookup.directIds.has(docId)) return true;
+      const docId = docItem.id;
+      if (packageLookup.directIds.has(docId)) return true;
 
-    const docName = (docItem.documentName || '').toLowerCase().trim();
-    const docCode = (docItem.documentCode || '').toUpperCase().trim();
+      const docName = (docItem.documentName || "").toLowerCase().trim();
+      const docCode = (docItem.documentCode || "").toUpperCase().trim();
 
-    for (let i = 0; i < packageLookup.pkgNames.length; i++) {
-      const pkgName = packageLookup.pkgNames[i];
+      for (let i = 0; i < packageLookup.pkgNames.length; i++) {
+        const pkgName = packageLookup.pkgNames[i];
 
-      // 1. Exact or substring name match
-      if (pkgName === docName || (docName && pkgName.includes(docName)) || (pkgName && docName.includes(pkgName))) {
-        return true;
+        // 1. Exact or substring name match
+        if (
+          pkgName === docName ||
+          (docName && pkgName.includes(docName)) ||
+          (pkgName && docName.includes(pkgName))
+        ) {
+          return true;
+        }
+
+        // 2. Technical code mappings
+        if (
+          docCode === "B" ||
+          docCode === "ONGOING_CONTRACTS" ||
+          docCode.includes("ONGOING")
+        ) {
+          if (pkgName.includes("ongoing")) return true;
+        }
+        if (
+          docCode === "C" ||
+          docCode === "SLCC_STATEMENT" ||
+          docCode.includes("SLCC")
+        ) {
+          if (pkgName.includes("slcc") || pkgName.includes("single largest"))
+            return true;
+        }
+        if (
+          docCode === "E" ||
+          docCode === "BSD" ||
+          docCode.includes("BID_SECURING")
+        ) {
+          if (
+            pkgName.includes("bid secur") ||
+            pkgName.includes("bsd") ||
+            pkgName.includes("surety bond")
+          )
+            return true;
+        }
+        if (
+          docCode === "F" ||
+          docCode === "FA" ||
+          docCode.includes("(F.A)") ||
+          docCode.includes("ORG")
+        ) {
+          if (
+            pkgName.includes("organizational chart") ||
+            pkgName.includes("org chart")
+          )
+            return true;
+        }
+        if (
+          docCode === "FB" ||
+          docCode.includes("(F.B)") ||
+          docCode.includes("PERSONNEL")
+        ) {
+          if (
+            pkgName.includes("key personnel") ||
+            pkgName.includes("manpower") ||
+            pkgName.includes("bio-data")
+          )
+            return true;
+        }
+        if (
+          docCode === "FC" ||
+          docCode.includes("(F.C)") ||
+          docCode.includes("EQUIPMENT")
+        ) {
+          if (
+            pkgName.includes("major equipment") ||
+            pkgName.includes("equipment utilization") ||
+            pkgName.includes("equipment")
+          )
+            return true;
+        }
+        if (
+          docCode === "FD" ||
+          docCode.includes("(F.D)") ||
+          docCode.includes("SEC-VI")
+        ) {
+          if (
+            pkgName.includes("section vi") ||
+            pkgName.includes("schedule of requirements")
+          )
+            return true;
+        }
+        if (docCode === "G" || docCode.includes("SEC-VII")) {
+          if (
+            pkgName.includes("section vii") ||
+            pkgName.includes("technical specification")
+          )
+            return true;
+        }
+        if (docCode === "H" || docCode.includes("AFTER")) {
+          if (
+            pkgName.includes("after-sales") ||
+            pkgName.includes("aftersales") ||
+            pkgName.includes("warranty")
+          )
+            return true;
+        }
+        if (
+          docCode === "I" ||
+          docCode === "OSS" ||
+          docCode.includes("OMNIBUS")
+        ) {
+          if (pkgName.includes("omnibus") || pkgName.includes("oss"))
+            return true;
+        }
+        if (docCode === "K" || docCode === "NFCC") {
+          if (
+            pkgName.includes("nfcc") ||
+            pkgName.includes("contracting capacity")
+          )
+            return true;
+        }
+
+        // 3. Financial code mappings
+        if (
+          docCode.includes("DETAILED-ESTIMATES") ||
+          docCode.includes("FORM-L") ||
+          docCode.includes("DETAILED_ESTIMATES")
+        ) {
+          if (
+            pkgName.includes("detailed estimate") ||
+            pkgName.includes("form l") ||
+            pkgName.includes("form (l)")
+          )
+            return true;
+        }
+        if (
+          docCode.includes("PRICESCHED") ||
+          docCode.includes("PRICE_SCHEDULE")
+        ) {
+          if (pkgName.includes("price schedule")) return true;
+        }
+        if (docCode === "BOQ" || docCode.includes("BILL_OF_QUANTITIES")) {
+          if (pkgName.includes("bill of quantities") || pkgName.includes("boq"))
+            return true;
+        }
+        if (
+          docCode.includes("BIDFORM") ||
+          docCode.includes("FINANCIAL_BID_FORM")
+        ) {
+          if (pkgName.includes("bid form")) return true;
+        }
+        if (
+          docCode.includes("SUMMARY-BIDPRICE") ||
+          docCode.includes("SUMMARY_BID_PRICES")
+        ) {
+          if (
+            pkgName.includes("summary of bid price") ||
+            pkgName.includes("summary bid")
+          )
+            return true;
+        }
+        if (
+          docCode.includes("SF-INFR-56") ||
+          docCode.includes("CASHFLOW") ||
+          docCode.includes("CASH_FLOW")
+        ) {
+          if (pkgName.includes("cash flow") || pkgName.includes("sf-infr-56"))
+            return true;
+        }
       }
 
-      // 2. Technical code mappings
-      if (docCode === 'B' || docCode === 'ONGOING_CONTRACTS' || docCode.includes('ONGOING')) {
-        if (pkgName.includes('ongoing')) return true;
-      }
-      if (docCode === 'C' || docCode === 'SLCC_STATEMENT' || docCode.includes('SLCC')) {
-        if (pkgName.includes('slcc') || pkgName.includes('single largest')) return true;
-      }
-      if (docCode === 'E' || docCode === 'BSD' || docCode.includes('BID_SECURING')) {
-        if (pkgName.includes('bid secur') || pkgName.includes('bsd') || pkgName.includes('surety bond')) return true;
-      }
-      if (docCode === 'F' || docCode === 'FA' || docCode.includes('(F.A)') || docCode.includes('ORG')) {
-        if (pkgName.includes('organizational chart') || pkgName.includes('org chart')) return true;
-      }
-      if (docCode === 'FB' || docCode.includes('(F.B)') || docCode.includes('PERSONNEL')) {
-        if (pkgName.includes('key personnel') || pkgName.includes('manpower') || pkgName.includes('bio-data')) return true;
-      }
-      if (docCode === 'FC' || docCode.includes('(F.C)') || docCode.includes('EQUIPMENT')) {
-        if (pkgName.includes('major equipment') || pkgName.includes('equipment utilization') || pkgName.includes('equipment')) return true;
-      }
-      if (docCode === 'FD' || docCode.includes('(F.D)') || docCode.includes('SEC-VI')) {
-        if (pkgName.includes('section vi') || pkgName.includes('schedule of requirements')) return true;
-      }
-      if (docCode === 'G' || docCode.includes('SEC-VII')) {
-        if (pkgName.includes('section vii') || pkgName.includes('technical specification')) return true;
-      }
-      if (docCode === 'H' || docCode.includes('AFTER')) {
-        if (pkgName.includes('after-sales') || pkgName.includes('aftersales') || pkgName.includes('warranty')) return true;
-      }
-      if (docCode === 'I' || docCode === 'OSS' || docCode.includes('OMNIBUS')) {
-        if (pkgName.includes('omnibus') || pkgName.includes('oss')) return true;
-      }
-      if (docCode === 'K' || docCode === 'NFCC') {
-        if (pkgName.includes('nfcc') || pkgName.includes('contracting capacity')) return true;
-      }
-
-      // 3. Financial code mappings
-      if (docCode.includes('DETAILED-ESTIMATES') || docCode.includes('FORM-L') || docCode.includes('DETAILED_ESTIMATES')) {
-        if (pkgName.includes('detailed estimate') || pkgName.includes('form l') || pkgName.includes('form (l)')) return true;
-      }
-      if (docCode.includes('PRICESCHED') || docCode.includes('PRICE_SCHEDULE')) {
-        if (pkgName.includes('price schedule')) return true;
-      }
-      if (docCode === 'BOQ' || docCode.includes('BILL_OF_QUANTITIES')) {
-        if (pkgName.includes('bill of quantities') || pkgName.includes('boq')) return true;
-      }
-      if (docCode.includes('BIDFORM') || docCode.includes('FINANCIAL_BID_FORM')) {
-        if (pkgName.includes('bid form')) return true;
-      }
-      if (docCode.includes('SUMMARY-BIDPRICE') || docCode.includes('SUMMARY_BID_PRICES')) {
-        if (pkgName.includes('summary of bid price') || pkgName.includes('summary bid')) return true;
-      }
-      if (docCode.includes('SF-INFR-56') || docCode.includes('CASHFLOW') || docCode.includes('CASH_FLOW')) {
-        if (pkgName.includes('cash flow') || pkgName.includes('sf-infr-56')) return true;
-      }
-    }
-
-    return false;
-  }, [activePackageItems, packageLookup]);
+      return false;
+    },
+    [activePackageItems, packageLookup],
+  );
 
   // Technical Documents Sub-Tab State
-  const [techSubTab, setTechSubTab] = useState<'CHECKLIST' | 'COMPLETED'>('CHECKLIST');
-  const [expandedTechItems, setExpandedTechItems] = useState<string[]>(['tech-f']);
+  const [techSubTab, setTechSubTab] = useState<"CHECKLIST" | "COMPLETED">(
+    "CHECKLIST",
+  );
+  const [expandedTechItems, setExpandedTechItems] = useState<string[]>([
+    "tech-f",
+  ]);
   const [techCompletedIds, setTechCompletedIds] = useState<string[]>([]);
-  const [fillingTemplateItem, setFillingTemplateItem] = useState<{ id: string; code: string; name: string } | null>(null);
-  const [selectedTechProjectFilter, setSelectedTechProjectFilter] = useState<string>('ALL');
+  const [fillingTemplateItem, setFillingTemplateItem] = useState<{
+    id: string;
+    code: string;
+    name: string;
+  } | null>(null);
+  const [selectedTechProjectFilter, setSelectedTechProjectFilter] =
+    useState<string>("ALL");
 
   // Financial Documents Templates State
   const [showBidFormGoodsModal, setShowBidFormGoodsModal] = useState(false);
@@ -603,26 +897,45 @@ export const DocumentVaultView: React.FC = () => {
   const [showBoqModal, setShowBoqModal] = useState(false);
   const [showNfccModal, setShowNfccModal] = useState(false);
 
-  const handleSaveCompletedBidFormGoods = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
-    const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
-    const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+  const handleSaveCompletedBidFormGoods = (
+    fileDataUrl?: string,
+    customName?: string,
+    projRefNo?: string,
+    projTitle?: string,
+  ) => {
+    const refNo =
+      projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
+    const title =
+      projTitle || activeProjectTitle || oppProjects[0]?.title || "";
 
-    const isInfra = customName?.includes('Infrastructure') || (title && (title.toLowerCase().includes('infra') || title.toLowerCase().includes('construction') || title.toLowerCase().includes('building') || title.toLowerCase().includes('concreting') || title.toLowerCase().includes('rehabilitation')));
-    const isConsulting = customName?.includes('Consulting') || (title && (title.toLowerCase().includes('consult') || title.toLowerCase().includes('study') || title.toLowerCase().includes('design service')));
+    const isInfra =
+      customName?.includes("Infrastructure") ||
+      (title &&
+        (title.toLowerCase().includes("infra") ||
+          title.toLowerCase().includes("construction") ||
+          title.toLowerCase().includes("building") ||
+          title.toLowerCase().includes("concreting") ||
+          title.toLowerCase().includes("rehabilitation")));
+    const isConsulting =
+      customName?.includes("Consulting") ||
+      (title &&
+        (title.toLowerCase().includes("consult") ||
+          title.toLowerCase().includes("study") ||
+          title.toLowerCase().includes("design service")));
 
     const docTypeLabel = isInfra
-      ? 'Bid Form for the Procurement of Infrastructure Projects'
+      ? "Bid Form for the Procurement of Infrastructure Projects"
       : isConsulting
-        ? 'Bid Form for Consulting Services'
-        : 'Bid Form for the Procurement of Goods';
+        ? "Bid Form for Consulting Services"
+        : "Bid Form for the Procurement of Goods";
 
     const docCode = isInfra
-      ? 'GPPB-BIDFORM-INFRASTRUCTURE'
+      ? "GPPB-BIDFORM-INFRASTRUCTURE"
       : isConsulting
-        ? 'GPPB-BIDFORM-CONSULTING'
-        : 'GPPB-BIDFORM-GOODS';
+        ? "GPPB-BIDFORM-CONSULTING"
+        : "GPPB-BIDFORM-GOODS";
 
-    const newId = `fin-bidform-${isInfra ? 'infra' : isConsulting ? 'consult' : 'goods'}-${Date.now()}`;
+    const newId = `fin-bidform-${isInfra ? "infra" : isConsulting ? "consult" : "goods"}-${Date.now()}`;
     const cleanPdfName = isInfra
       ? `${refNo}_Financial_Envelope_Bid_Form_for_Infrastructure.pdf`
       : isConsulting
@@ -634,241 +947,343 @@ export const DocumentVaultView: React.FC = () => {
       tenantId: activeTenantId,
       documentCode: docCode,
       documentName: customName || `${docTypeLabel} - [${refNo}]`,
-      category: 'FINANCIAL',
-      procurementApplicability: isInfra ? ['INFRASTRUCTURE'] : isConsulting ? ['CONSULTING_SERVICES'] : ['GOODS'],
+      category: "FINANCIAL",
+      procurementApplicability: isInfra
+        ? ["INFRASTRUCTURE"]
+        : isConsulting
+          ? ["CONSULTING_SERVICES"]
+          : ["GOODS"],
       legalBasisReference: isInfra
-        ? 'GPPB Resolution No. 09-2020 / Section 30.1 of RA 12009 (Financial Bid Form)'
-        : 'Section 30.1 of RA 12009 / Section 32.2.1 of RA 9184 (Financial Bid Form)',
+        ? "GPPB Resolution No. 09-2020 / Section 30.1 of RA 12009 (Financial Bid Form)"
+        : "Section 30.1 of RA 12009 / Section 32.2.1 of RA 9184 (Financial Bid Form)",
       versionNumber: 1,
-      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16),
+      ).join(""),
       fileSizeBytes: 245000,
       fileName: cleanPdfName,
       fileDataUrl: fileDataUrl,
-      status: 'ACTIVE',
-      uploadedByName: currentUser?.fullName || 'Authorized Financial Manager',
+      status: "ACTIVE",
+      uploadedByName: currentUser?.fullName || "Authorized Financial Manager",
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
       projectId: activeProjectId || undefined,
       philgepsRefNo: refNo,
-      projectTitle: title
+      projectTitle: title,
     };
 
     storePdfData(newId, fileDataUrl);
-    setVaultItems(prev => [newItem, ...prev.filter(item => !(item.category === 'FINANCIAL' && (item.documentCode === 'GPPB-BIDFORM-GOODS' || item.documentCode === 'GPPB-BIDFORM-INFRASTRUCTURE' || item.documentCode === 'GPPB-BIDFORM-CONSULTING') && (item.philgepsRefNo === refNo || item.projectId === activeProjectId)))]);
+    setVaultItems((prev) => [
+      newItem,
+      ...prev.filter(
+        (item) =>
+          !(
+            item.category === "FINANCIAL" &&
+            (item.documentCode === "GPPB-BIDFORM-GOODS" ||
+              item.documentCode === "GPPB-BIDFORM-INFRASTRUCTURE" ||
+              item.documentCode === "GPPB-BIDFORM-CONSULTING") &&
+            (item.philgepsRefNo === refNo || item.projectId === activeProjectId)
+          ),
+      ),
+    ]);
     setShowBidFormGoodsModal(false);
     setShowBidFormInfraModal(false);
     notifySuccess(
       `${docTypeLabel} Saved!`,
-      `Duly completed statutory ${docTypeLabel} saved to vault under project [${refNo}] ${title}.`
+      `Duly completed statutory ${docTypeLabel} saved to vault under project [${refNo}] ${title}.`,
     );
   };
 
-  const handleSaveCompletedBidFormInfra = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
-    handleSaveCompletedBidFormGoods(fileDataUrl, customName || 'Bid Form for the Procurement of Infrastructure Projects', projRefNo, projTitle);
+  const handleSaveCompletedBidFormInfra = (
+    fileDataUrl?: string,
+    customName?: string,
+    projRefNo?: string,
+    projTitle?: string,
+  ) => {
+    handleSaveCompletedBidFormGoods(
+      fileDataUrl,
+      customName || "Bid Form for the Procurement of Infrastructure Projects",
+      projRefNo,
+      projTitle,
+    );
   };
 
-  const handleSaveCompletedBoq = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
+  const handleSaveCompletedBoq = (
+    fileDataUrl?: string,
+    customName?: string,
+    projRefNo?: string,
+    projTitle?: string,
+  ) => {
     const newId = `fin-boq-${Date.now()}`;
-    const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
-    const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+    const refNo =
+      projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
+    const title =
+      projTitle || activeProjectTitle || oppProjects[0]?.title || "";
 
     const newItem: DocumentVaultItem = {
       id: newId,
       tenantId: activeTenantId,
-      documentCode: 'BOQ',
+      documentCode: "BOQ",
       documentName: customName || `Bill of Quantities Schedule - [${refNo}]`,
-      category: 'FINANCIAL',
-      procurementApplicability: ['GOODS', 'INFRASTRUCTURE'],
-      legalBasisReference: 'Section 32.2.1 of RA 9184 / RA 12009 (Bill of Quantities / Detailed Estimates)',
+      category: "FINANCIAL",
+      procurementApplicability: ["GOODS", "INFRASTRUCTURE"],
+      legalBasisReference:
+        "Section 32.2.1 of RA 9184 / RA 12009 (Bill of Quantities / Detailed Estimates)",
       versionNumber: 1,
-      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16),
+      ).join(""),
       fileSizeBytes: 210000,
-      fileName: customName || `${refNo}_Financial_Envelope_Bill_of_Quantities.pdf`,
+      fileName:
+        customName || `${refNo}_Financial_Envelope_Bill_of_Quantities.pdf`,
       fileDataUrl: fileDataUrl,
-      status: 'ACTIVE',
-      uploadedByName: currentUser?.fullName || 'Authorized Financial Manager',
+      status: "ACTIVE",
+      uploadedByName: currentUser?.fullName || "Authorized Financial Manager",
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
       projectId: activeProjectId || undefined,
       philgepsRefNo: refNo,
-      projectTitle: title
+      projectTitle: title,
     };
 
     storePdfData(newId, fileDataUrl);
-    setVaultItems(prev => [newItem, ...prev]);
+    setVaultItems((prev) => [newItem, ...prev]);
     setShowBoqModal(false);
     notifySuccess(
-      'Bill of Quantities Saved!',
-      `Bill of Quantities schedule saved to Financial Documents vault under project [${refNo}] ${title}.`
+      "Bill of Quantities Saved!",
+      `Bill of Quantities schedule saved to Financial Documents vault under project [${refNo}] ${title}.`,
     );
   };
 
   const [showCashFlowModal, setShowCashFlowModal] = useState(false);
 
-  const handleSaveCompletedCashFlow = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
+  const handleSaveCompletedCashFlow = (
+    fileDataUrl?: string,
+    customName?: string,
+    projRefNo?: string,
+    projTitle?: string,
+  ) => {
     const newId = `fin-cashflow-${Date.now()}`;
-    const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
-    const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+    const refNo =
+      projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
+    const title =
+      projTitle || activeProjectTitle || oppProjects[0]?.title || "";
 
     const newItem: DocumentVaultItem = {
       id: newId,
       tenantId: activeTenantId,
-      documentCode: 'SF-INFR-56',
-      documentName: customName || `Cash Flow by Quarter (SF-INFR-56) - [${refNo}]`,
-      category: 'FINANCIAL',
-      procurementApplicability: ['INFRASTRUCTURE', 'GOODS'],
-      legalBasisReference: 'Standard Form SF-INFR-56 / Section 32.2.1 of RA 9184 / RA 12009 (Cash Flow by Quarter)',
+      documentCode: "SF-INFR-56",
+      documentName:
+        customName || `Cash Flow by Quarter (SF-INFR-56) - [${refNo}]`,
+      category: "FINANCIAL",
+      procurementApplicability: ["INFRASTRUCTURE", "GOODS"],
+      legalBasisReference:
+        "Standard Form SF-INFR-56 / Section 32.2.1 of RA 9184 / RA 12009 (Cash Flow by Quarter)",
       versionNumber: 1,
-      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16),
+      ).join(""),
       fileSizeBytes: 220000,
-      fileName: customName || `${refNo}_Financial_Envelope_Cash_Flow_By_Quarter.pdf`,
+      fileName:
+        customName || `${refNo}_Financial_Envelope_Cash_Flow_By_Quarter.pdf`,
       fileDataUrl: fileDataUrl,
-      status: 'ACTIVE',
-      uploadedByName: currentUser?.fullName || 'Authorized Financial Manager',
+      status: "ACTIVE",
+      uploadedByName: currentUser?.fullName || "Authorized Financial Manager",
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
       projectId: activeProjectId || undefined,
       philgepsRefNo: refNo,
-      projectTitle: title
+      projectTitle: title,
     };
 
     storePdfData(newId, fileDataUrl);
-    setVaultItems(prev => [newItem, ...prev]);
+    setVaultItems((prev) => [newItem, ...prev]);
     setShowCashFlowModal(false);
     notifySuccess(
-      'Cash Flow Schedule Saved!',
-      `Cash Flow by Quarter and Payment Schedule (SF-INFR-56) saved to Financial Documents vault under project [${refNo}] ${title}.`
+      "Cash Flow Schedule Saved!",
+      `Cash Flow by Quarter and Payment Schedule (SF-INFR-56) saved to Financial Documents vault under project [${refNo}] ${title}.`,
     );
   };
 
-  const [showPriceScheduleGoodsModal, setShowPriceScheduleGoodsModal] = useState(false);
+  const [showPriceScheduleGoodsModal, setShowPriceScheduleGoodsModal] =
+    useState(false);
 
-  const handleSaveCompletedPriceScheduleGoods = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
+  const handleSaveCompletedPriceScheduleGoods = (
+    fileDataUrl?: string,
+    customName?: string,
+    projRefNo?: string,
+    projTitle?: string,
+  ) => {
     const newId = `fin-pricesched-goods-${Date.now()}`;
-    const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
-    const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+    const refNo =
+      projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
+    const title =
+      projTitle || activeProjectTitle || oppProjects[0]?.title || "";
 
     const newItem: DocumentVaultItem = {
       id: newId,
       tenantId: activeTenantId,
-      documentCode: 'GPPB-PRICESCHED-GOODS',
-      documentName: customName || `Price Schedule for Goods (Cols 1-10) - [${refNo}]`,
-      category: 'FINANCIAL',
-      procurementApplicability: ['GOODS'],
-      legalBasisReference: 'PBDs Section VIII / Section 32.2.1 of RA 9184 / RA 12009 (Price Schedule for Goods)',
+      documentCode: "GPPB-PRICESCHED-GOODS",
+      documentName:
+        customName || `Price Schedule for Goods (Cols 1-10) - [${refNo}]`,
+      category: "FINANCIAL",
+      procurementApplicability: ["GOODS"],
+      legalBasisReference:
+        "PBDs Section VIII / Section 32.2.1 of RA 9184 / RA 12009 (Price Schedule for Goods)",
       versionNumber: 1,
-      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16),
+      ).join(""),
       fileSizeBytes: 230000,
-      fileName: customName || `${refNo}_Financial_Envelope_Price_Schedule_For_Goods.pdf`,
+      fileName:
+        customName ||
+        `${refNo}_Financial_Envelope_Price_Schedule_For_Goods.pdf`,
       fileDataUrl: fileDataUrl,
-      status: 'ACTIVE',
-      uploadedByName: currentUser?.fullName || 'Authorized Financial Manager',
+      status: "ACTIVE",
+      uploadedByName: currentUser?.fullName || "Authorized Financial Manager",
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
       projectId: activeProjectId || undefined,
       philgepsRefNo: refNo,
-      projectTitle: title
+      projectTitle: title,
     };
 
     storePdfData(newId, fileDataUrl);
-    setVaultItems(prev => [newItem, ...prev]);
+    setVaultItems((prev) => [newItem, ...prev]);
     setShowPriceScheduleGoodsModal(false);
     notifySuccess(
-      'Price Schedule for Goods Saved!',
-      `Price Schedule for Goods (Columns 1-10) saved to Financial Documents vault under project [${refNo}] ${title}.`
+      "Price Schedule for Goods Saved!",
+      `Price Schedule for Goods (Columns 1-10) saved to Financial Documents vault under project [${refNo}] ${title}.`,
     );
   };
 
-  const [showSummaryBidPriceModal, setShowSummaryBidPriceModal] = useState(false);
+  const [showSummaryBidPriceModal, setShowSummaryBidPriceModal] =
+    useState(false);
 
-  const handleSaveCompletedSummaryBidPrice = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
+  const handleSaveCompletedSummaryBidPrice = (
+    fileDataUrl?: string,
+    customName?: string,
+    projRefNo?: string,
+    projTitle?: string,
+  ) => {
     const newId = `fin-summarybid-${Date.now()}`;
-    const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
-    const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+    const refNo =
+      projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
+    const title =
+      projTitle || activeProjectTitle || oppProjects[0]?.title || "";
 
     const newItem: DocumentVaultItem = {
       id: newId,
       tenantId: activeTenantId,
-      documentCode: 'PBD-SUMMARY-BIDPRICE',
+      documentCode: "PBD-SUMMARY-BIDPRICE",
       documentName: customName || `Summary of Bid Prices - [${refNo}]`,
-      category: 'FINANCIAL',
-      procurementApplicability: ['GOODS', 'INFRASTRUCTURE', 'CONSULTING_SERVICES'],
-      legalBasisReference: 'Section 32.2.1 of RA 9184 / RA 12009 (Summary of Bid Prices)',
+      category: "FINANCIAL",
+      procurementApplicability: [
+        "GOODS",
+        "INFRASTRUCTURE",
+        "CONSULTING_SERVICES",
+      ],
+      legalBasisReference:
+        "Section 32.2.1 of RA 9184 / RA 12009 (Summary of Bid Prices)",
       versionNumber: 1,
-      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16),
+      ).join(""),
       fileSizeBytes: 215000,
-      fileName: customName || `${refNo}_Financial_Envelope_Summary_Of_Bid_Prices.pdf`,
+      fileName:
+        customName || `${refNo}_Financial_Envelope_Summary_Of_Bid_Prices.pdf`,
       fileDataUrl: fileDataUrl,
-      status: 'ACTIVE',
-      uploadedByName: currentUser?.fullName || 'Authorized Financial Manager',
+      status: "ACTIVE",
+      uploadedByName: currentUser?.fullName || "Authorized Financial Manager",
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
       projectId: activeProjectId || undefined,
       philgepsRefNo: refNo,
-      projectTitle: title
+      projectTitle: title,
     };
 
     storePdfData(newId, fileDataUrl);
-    setVaultItems(prev => [newItem, ...prev]);
+    setVaultItems((prev) => [newItem, ...prev]);
     setShowSummaryBidPriceModal(false);
     notifySuccess(
-      'Summary of Bid Prices Saved!',
-      `Summary of Bid Prices schedule saved to Financial Documents vault under project [${refNo}] ${title}.`
+      "Summary of Bid Prices Saved!",
+      `Summary of Bid Prices schedule saved to Financial Documents vault under project [${refNo}] ${title}.`,
     );
   };
 
-  const [showDetailedEstimatesModal, setShowDetailedEstimatesModal] = useState(false);
+  const [showDetailedEstimatesModal, setShowDetailedEstimatesModal] =
+    useState(false);
 
-  const handleSaveCompletedDetailedEstimates = (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string) => {
+  const handleSaveCompletedDetailedEstimates = (
+    fileDataUrl?: string,
+    customName?: string,
+    projRefNo?: string,
+    projTitle?: string,
+  ) => {
     const newId = `fin-detest-${Date.now()}`;
-    const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
-    const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+    const refNo =
+      projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
+    const title =
+      projTitle || activeProjectTitle || oppProjects[0]?.title || "";
 
     const newItem: DocumentVaultItem = {
       id: newId,
       tenantId: activeTenantId,
-      documentCode: 'PBD-DETAILED-ESTIMATES',
+      documentCode: "PBD-DETAILED-ESTIMATES",
       documentName: customName || `(L) Detailed Estimates Form - [${refNo}]`,
-      category: 'FINANCIAL',
-      procurementApplicability: ['INFRASTRUCTURE', 'GOODS', 'CONSULTING_SERVICES'],
-      legalBasisReference: 'Form (L) / Section 32.2.1 of RA 9184 / RA 12009 (Detailed Estimates Form)',
+      category: "FINANCIAL",
+      procurementApplicability: [
+        "INFRASTRUCTURE",
+        "GOODS",
+        "CONSULTING_SERVICES",
+      ],
+      legalBasisReference:
+        "Form (L) / Section 32.2.1 of RA 9184 / RA 12009 (Detailed Estimates Form)",
       versionNumber: 1,
-      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16),
+      ).join(""),
       fileSizeBytes: 240000,
-      fileName: customName || `${refNo}_Financial_Envelope_Detailed_Estimates.pdf`,
+      fileName:
+        customName || `${refNo}_Financial_Envelope_Detailed_Estimates.pdf`,
       fileDataUrl: fileDataUrl,
-      status: 'ACTIVE',
-      uploadedByName: currentUser?.fullName || 'Authorized Financial Manager',
+      status: "ACTIVE",
+      uploadedByName: currentUser?.fullName || "Authorized Financial Manager",
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
       projectId: activeProjectId || undefined,
       philgepsRefNo: refNo,
-      projectTitle: title
+      projectTitle: title,
     };
 
     storePdfData(newId, fileDataUrl);
-    setVaultItems(prev => [newItem, ...prev]);
+    setVaultItems((prev) => [newItem, ...prev]);
     setShowDetailedEstimatesModal(false);
     notifySuccess(
-      'Detailed Estimates Saved!',
-      `(L) Duly accomplished Detailed Estimates Form saved to Financial Documents vault under project [${refNo}] ${title}.`
+      "Detailed Estimates Saved!",
+      `(L) Duly accomplished Detailed Estimates Form saved to Financial Documents vault under project [${refNo}] ${title}.`,
     );
   };
 
   // Modals state
-  const [uploadTargetDef, setUploadTargetDef] = useState<ClassAMasterItemDef | null>(null);
+  const [uploadTargetDef, setUploadTargetDef] =
+    useState<ClassAMasterItemDef | null>(null);
   const [showCustomUploadModal, setShowCustomUploadModal] = useState(false);
-  const [customUploadCategory, setCustomUploadCategory] = useState<DocCategory>('ELIGIBILITY_CLASS_B');
-  const [customDocName, setCustomDocName] = useState('');
+  const [customUploadCategory, setCustomUploadCategory] = useState<DocCategory>(
+    "ELIGIBILITY_CLASS_B",
+  );
+  const [customDocName, setCustomDocName] = useState("");
 
-  const [replaceTargetItem, setReplaceTargetItem] = useState<DocumentVaultItem | null>(null);
-  const [previewPdfItem, setPreviewPdfItem] = useState<DocumentVaultItem | null>(null);
+  const [replaceTargetItem, setReplaceTargetItem] =
+    useState<DocumentVaultItem | null>(null);
+  const [previewPdfItem, setPreviewPdfItem] =
+    useState<DocumentVaultItem | null>(null);
 
   const openPreviewItem = async (item: DocumentVaultItem) => {
     const cachedData = getPdfData(item.id) || item.fileDataUrl;
@@ -884,30 +1299,42 @@ export const DocumentVaultView: React.FC = () => {
       const loaded = await loadPdfDataFromDB(item.id);
       if (loaded) {
         pdfDataCache.current[item.id] = loaded;
-        setPreviewPdfItem(prev => prev && prev.id === item.id ? { ...prev, fileDataUrl: loaded } : prev);
+        setPreviewPdfItem((prev) =>
+          prev && prev.id === item.id ? { ...prev, fileDataUrl: loaded } : prev,
+        );
       }
     } catch (err) {
-      console.error('[VaultDB] Failed to load PDF data for preview:', err);
+      console.error("[VaultDB] Failed to load PDF data for preview:", err);
     }
   };
 
   // Edit Metadata State
-  const [editTargetItem, setEditTargetItem] = useState<DocumentVaultItem | null>(null);
-  const [editDocName, setEditDocName] = useState('');
-  const [editDocNumber, setEditDocNumber] = useState('');
-  const [editIssuedDate, setEditIssuedDate] = useState('');
-  const [editExpiryDate, setEditExpiryDate] = useState('');
+  const [editTargetItem, setEditTargetItem] =
+    useState<DocumentVaultItem | null>(null);
+  const [editDocName, setEditDocName] = useState("");
+  const [editDocNumber, setEditDocNumber] = useState("");
+  const [editIssuedDate, setEditIssuedDate] = useState("");
+  const [editExpiryDate, setEditExpiryDate] = useState("");
 
   // Re-Tag Bidding Project State (Zero-Mistake Project Isolation)
-  const [retagTargetItem, setRetagTargetItem] = useState<DocumentVaultItem | null>(null);
-  const [retagProjectRefNo, setRetagProjectRefNo] = useState<string>('');
-  const [retagProjectTitle, setRetagProjectTitle] = useState<string>('');
+  const [retagTargetItem, setRetagTargetItem] =
+    useState<DocumentVaultItem | null>(null);
+  const [retagProjectRefNo, setRetagProjectRefNo] = useState<string>("");
+  const [retagProjectTitle, setRetagProjectTitle] = useState<string>("");
 
   const openRetagModal = (item: DocumentVaultItem) => {
     setRetagTargetItem(item);
-    const matchedOpp = item.projectId ? oppProjects.find(p => p.id === item.projectId) : undefined;
-    const initialRef = matchedOpp?.refNo || item.philgepsRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
-    const initialTitle = item.projectTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+    const matchedOpp = item.projectId
+      ? oppProjects.find((p) => p.id === item.projectId)
+      : undefined;
+    const initialRef =
+      matchedOpp?.refNo ||
+      item.philgepsRefNo ||
+      activeProjectRefNo ||
+      oppProjects[0]?.refNo ||
+      "";
+    const initialTitle =
+      item.projectTitle || activeProjectTitle || oppProjects[0]?.title || "";
     setRetagProjectRefNo(initialRef);
     setRetagProjectTitle(initialTitle);
   };
@@ -916,33 +1343,40 @@ export const DocumentVaultView: React.FC = () => {
     e.preventDefault();
     if (!retagTargetItem) return;
 
-    const matchedOpp = oppProjects.find(p => p.refNo === retagProjectRefNo);
+    const matchedOpp = oppProjects.find((p) => p.refNo === retagProjectRefNo);
     const updatedRefNo = retagProjectRefNo.trim();
     const updatedTitle = (matchedOpp?.title || retagProjectTitle).trim();
 
-    setVaultItems(prev => prev.map(item => {
-      if (item.id === retagTargetItem.id) {
-        const matchedProject = oppProjects.find(p => p.refNo === updatedRefNo);
-        return {
-          ...item,
-          projectId: matchedProject?.id || undefined,
-          philgepsRefNo: updatedRefNo || undefined,
-          projectTitle: updatedTitle || undefined
-        };
-      }
-      return item;
-    }));
+    setVaultItems((prev) =>
+      prev.map((item) => {
+        if (item.id === retagTargetItem.id) {
+          const matchedProject = oppProjects.find(
+            (p) => p.refNo === updatedRefNo,
+          );
+          return {
+            ...item,
+            projectId: matchedProject?.id || undefined,
+            philgepsRefNo: updatedRefNo || undefined,
+            projectTitle: updatedTitle || undefined,
+          };
+        }
+        return item;
+      }),
+    );
 
     setRetagTargetItem(null);
-    notifySuccess('Bidding Project Tag Updated', `"${retagTargetItem.documentName}" is now successfully tagged to project [${updatedRefNo || 'N/A'}] ${updatedTitle}.`);
+    notifySuccess(
+      "Bidding Project Tag Updated",
+      `"${retagTargetItem.documentName}" is now successfully tagged to project [${updatedRefNo || "N/A"}] ${updatedTitle}.`,
+    );
   };
 
   const openEditModal = (item: DocumentVaultItem) => {
     setEditTargetItem(item);
     setEditDocName(item.documentName);
-    setEditDocNumber(item.documentNumber || '');
-    setEditIssuedDate(item.issuedDate || '');
-    setEditExpiryDate(item.expiryDate || '');
+    setEditDocNumber(item.documentNumber || "");
+    setEditIssuedDate(item.issuedDate || "");
+    setEditExpiryDate(item.expiryDate || "");
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
@@ -955,28 +1389,38 @@ export const DocumentVaultView: React.FC = () => {
       documentNumber: editDocNumber.trim(),
       issuedDate: editIssuedDate || undefined,
       expiryDate: editExpiryDate || undefined,
-      status: editExpiryDate && new Date(editExpiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        ? 'EXPIRING_SOON'
-        : (editExpiryDate && new Date(editExpiryDate) < new Date() ? 'EXPIRED' : 'ACTIVE')
+      status:
+        editExpiryDate &&
+        new Date(editExpiryDate) <
+          new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          ? "EXPIRING_SOON"
+          : editExpiryDate && new Date(editExpiryDate) < new Date()
+            ? "EXPIRED"
+            : "ACTIVE",
     };
 
-    setVaultItems(prev => prev.map(item => item.id === editTargetItem.id ? updatedItem : item));
+    setVaultItems((prev) =>
+      prev.map((item) => (item.id === editTargetItem.id ? updatedItem : item)),
+    );
     setEditTargetItem(null);
     notifySuccess(
       `[${updatedItem.documentName}] Details Updated!`,
-      'Document serial number, name, and validity dates updated in Document Vault.'
+      "Document serial number, name, and validity dates updated in Document Vault.",
     );
   };
 
   // Upload & Form Inputs
-  const [docNumber, setDocNumber] = useState('');
-  const [dtiSecType, setDtiSecType] = useState<'DTI' | 'SEC'>('DTI');
-  const [issuedDate, setIssuedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [expiryDate, setExpiryDate] = useState('');
+  const [docNumber, setDocNumber] = useState("");
+  const [dtiSecType, setDtiSecType] = useState<"DTI" | "SEC">("DTI");
+  const [issuedDate, setIssuedDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [expiryDate, setExpiryDate] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string>('');
-  const [uploadError, setUploadError] = useState('');
-  const [vaultNotification, setVaultNotification] = useState<VaultNotification | null>(null);
+  const [selectedFileDataUrl, setSelectedFileDataUrl] = useState<string>("");
+  const [uploadError, setUploadError] = useState("");
+  const [vaultNotification, setVaultNotification] =
+    useState<VaultNotification | null>(null);
 
   const readFileAsDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -989,54 +1433,60 @@ export const DocumentVaultView: React.FC = () => {
 
   const notifySuccess = (title: string, message: string) => {
     setVaultNotification({
-      type: 'SUCCESS',
+      type: "SUCCESS",
       title,
-      message
+      message,
     });
   };
 
   const notifyFailure = (title: string, message: string, reason: string) => {
     setVaultNotification({
-      type: 'FAILURE',
+      type: "FAILURE",
       title,
       message,
-      reason
+      reason,
     });
   };
 
   // Sync states to localStorage — strip fileDataUrl to avoid QuotaExceededError
   React.useEffect(() => {
     try {
-      const itemsForStorage = vaultItems.map(item => {
+      const itemsForStorage = vaultItems.map((item) => {
         const { fileDataUrl, previousVersions, ...rest } = item;
         // Strip fileDataUrl from previous versions too
-        const cleanVersions = (previousVersions || []).map(v => {
+        const cleanVersions = (previousVersions || []).map((v) => {
           const { fileDataUrl: _fd, ...vRest } = v;
           return vRest;
         });
         return { ...rest, previousVersions: cleanVersions };
       });
-      localStorage.setItem(`bidocs_vault_items_${activeTenantId}`, JSON.stringify(itemsForStorage));
+      localStorage.setItem(
+        `bidocs_vault_items_${activeTenantId}`,
+        JSON.stringify(itemsForStorage),
+      );
     } catch (e) {
-      console.error('Failed to persist vault items to localStorage:', e);
+      console.error("Failed to persist vault items to localStorage:", e);
     }
   }, [vaultItems, activeTenantId]);
 
   React.useEffect(() => {
     if (activeTenantId) {
-      localStorage.setItem(`bidocs_tech_completed_ids_${activeTenantId}`, JSON.stringify(techCompletedIds));
+      localStorage.setItem(
+        `bidocs_tech_completed_ids_${activeTenantId}`,
+        JSON.stringify(techCompletedIds),
+      );
     }
   }, [techCompletedIds, activeTenantId]);
 
   const resetFormState = () => {
-    setDocNumber('');
-    setDtiSecType('DTI');
-    setIssuedDate(new Date().toISOString().split('T')[0]);
-    setExpiryDate('');
+    setDocNumber("");
+    setDtiSecType("DTI");
+    setIssuedDate(new Date().toISOString().split("T")[0]);
+    setExpiryDate("");
     setSelectedFile(null);
-    setSelectedFileDataUrl('');
-    setUploadError('');
-    setCustomDocName('');
+    setSelectedFileDataUrl("");
+    setUploadError("");
+    setCustomDocName("");
   };
 
   const calculateDaysRemaining = (expiryDateStr?: string) => {
@@ -1050,65 +1500,91 @@ export const DocumentVaultView: React.FC = () => {
   };
 
   const handleResetClassAVault = () => {
-    if (confirm('Are you sure you want to remove all uploaded Class A Eligibility documents and start fresh from scratch? PhilGEPS and all document slots will be reset to v1.0.')) {
+    if (
+      confirm(
+        "Are you sure you want to remove all uploaded Class A Eligibility documents and start fresh from scratch? PhilGEPS and all document slots will be reset to v1.0.",
+      )
+    ) {
       setVaultItems([]);
       setSelectedItemIds([]);
       // Clear only this tenant's vault data from IndexedDB
       if (activeTenantId) {
-        clearVaultDataForTenant(activeTenantId).catch(e => console.error('[VaultDB] Failed to clear tenant vault:', e));
+        clearVaultDataForTenant(activeTenantId).catch((e) =>
+          console.error("[VaultDB] Failed to clear tenant vault:", e),
+        );
       }
-      alert('Class A Eligibility documents have been completely reset! All document slots are ready for re-uploading from scratch.');
+      alert(
+        "Class A Eligibility documents have been completely reset! All document slots are ready for re-uploading from scratch.",
+      );
     }
   };
 
   const handleClearAllClassAUploads = () => {
-    if (confirm('Are you sure you want to remove ALL uploaded documents? All uploaded files in Class A Legal Eligibility and All Vault Documents will be removed so you can re-upload everything from scratch.')) {
+    if (
+      confirm(
+        "Are you sure you want to remove ALL uploaded documents? All uploaded files in Class A Legal Eligibility and All Vault Documents will be removed so you can re-upload everything from scratch.",
+      )
+    ) {
       setVaultItems([]);
       setSelectedItemIds([]);
       // Clear only this tenant's vault data from IndexedDB (preserves other tenants)
       if (activeTenantId) {
-        clearVaultDataForTenant(activeTenantId).catch(e => console.error('[VaultDB] Failed to clear tenant vault:', e));
+        clearVaultDataForTenant(activeTenantId).catch((e) =>
+          console.error("[VaultDB] Failed to clear tenant vault:", e),
+        );
       }
       pdfDataCache.current = {};
-      notifySuccess('All Documents Removed', 'All uploaded documents and PDF files have been completely removed. All slots are clean and ready for re-uploading.');
+      notifySuccess(
+        "All Documents Removed",
+        "All uploaded documents and PDF files have been completely removed. All slots are clean and ready for re-uploading.",
+      );
     }
   };
 
   const toggleTechExpand = (id: string) => {
-    setExpandedTechItems(prev =>
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    setExpandedTechItems((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
   };
 
   const toggleTechCheckbox = (id: string) => {
-    setTechCompletedIds(prev =>
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    setTechCompletedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
   };
 
-  const handleCompleteTemplate = async (fileDataUrl?: string, customName?: string, projRefNo?: string, projTitle?: string, projId?: string) => {
+  const handleCompleteTemplate = async (
+    fileDataUrl?: string,
+    customName?: string,
+    projRefNo?: string,
+    projTitle?: string,
+    projId?: string,
+  ) => {
     if (!fillingTemplateItem) return;
 
     const itemId = fillingTemplateItem.id;
     const projectRefToUse = projRefNo || activeProjectRefNo;
     const projectTitleToUse = projTitle || activeProjectTitle;
 
-    if (projectRefToUse && hasTechnicalDocForActiveProject(fillingTemplateItem.code)) {
+    if (
+      projectRefToUse &&
+      hasTechnicalDocForActiveProject(fillingTemplateItem.code)
+    ) {
       notifyFailure(
-        'Duplicate Technical Document Detected',
-        'This project already has a completed document for the selected item. No duplicate document was created.',
-        'Duplicate technical item for active project.'
+        "Duplicate Technical Document Detected",
+        "This project already has a completed document for the selected item. No duplicate document was created.",
+        "Duplicate technical item for active project.",
       );
       setFillingTemplateItem(null);
       return;
     }
 
     if (!techCompletedIds.includes(itemId)) {
-      setTechCompletedIds(prev => [...prev, itemId]);
+      setTechCompletedIds((prev) => [...prev, itemId]);
     }
 
     const docTitle = customName || fillingTemplateItem.name;
-    const cleanDocName = docTitle.replace(/[^a-zA-Z0-9]/g, '_');
+    const cleanDocName = docTitle.replace(/[^a-zA-Z0-9]/g, "_");
 
     // Create DocumentVaultItem for the completed technical exhibit template with Project Tagging
     const newVaultDoc: DocumentVaultItem = {
@@ -1116,154 +1592,255 @@ export const DocumentVaultView: React.FC = () => {
       tenantId: activeTenantId,
       documentCode: fillingTemplateItem.code,
       documentName: docTitle,
-      documentNumber: `EXHIBIT-${fillingTemplateItem.code.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}-2026`,
-      category: 'TECHNICAL',
-      procurementApplicability: ['Goods & Supply', 'Goods & Supply with Installation', 'Infrastructure', 'Consulting'],
-      legalBasisReference: 'RA 12009 NGPA Statutory Compliance Exhibit',
+      documentNumber: `EXHIBIT-${fillingTemplateItem.code.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()}-2026`,
+      category: "TECHNICAL",
+      procurementApplicability: [
+        "Goods & Supply",
+        "Goods & Supply with Installation",
+        "Infrastructure",
+        "Consulting",
+      ],
+      legalBasisReference: "RA 12009 NGPA Statutory Compliance Exhibit",
       versionNumber: 1,
-      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16),
+      ).join(""),
       fileSizeBytes: 150000,
       fileName: `${cleanDocName}.pdf`,
       fileDataUrl: fileDataUrl,
-      status: 'ACTIVE',
-      uploadedByName: currentUser?.fullName || 'Authorized Administrator',
+      status: "ACTIVE",
+      uploadedByName: currentUser?.fullName || "Authorized Administrator",
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
-      conditionalRuleNote: 'Completed GPPB Statutory Legal Template',
+      conditionalRuleNote: "Completed GPPB Statutory Legal Template",
       projectId: projId || activeProjectId || undefined,
       philgepsRefNo: projectRefToUse || undefined,
       projectTitle: projectTitleToUse || undefined,
-      previousVersions: []
+      previousVersions: [],
     };
 
     await storePdfData(newVaultDoc.id, fileDataUrl);
-    setVaultItems(prev => [newVaultDoc, ...prev.filter(item => item.id !== newVaultDoc.id)]);
+    setVaultItems((prev) => [
+      newVaultDoc,
+      ...prev.filter((item) => item.id !== newVaultDoc.id),
+    ]);
     setFillingTemplateItem(null);
-    setTechSubTab('COMPLETED');
-    notifySuccess(`[${docTitle}, v1.0] Template Save Successful!`, 'Legal template saved into Document Vault as an active technical exhibit under Completed Technical Documents & Forms.');
+    setTechSubTab("COMPLETED");
+    notifySuccess(
+      `[${docTitle}, v1.0] Template Save Successful!`,
+      "Legal template saved into Document Vault as an active technical exhibit under Completed Technical Documents & Forms.",
+    );
   };
 
-  const handleDeleteCompletedTechDoc = async (docId: string, docName: string) => {
-    if (confirm(`Are you sure you want to delete "${docName}" from Completed Technical Documents? This will remove the completed form and reset its item status.`)) {
-      setVaultItems(prev => prev.filter(item => item.id !== docId));
-      await deleteVaultItem(docId, activeTenantId).catch(e => console.error('[VaultDB] Failed to delete doc:', e));
+  const handleDeleteCompletedTechDoc = async (
+    docId: string,
+    docName: string,
+  ) => {
+    if (
+      confirm(
+        `Are you sure you want to delete "${docName}" from Completed Technical Documents? This will remove the completed form and reset its item status.`,
+      )
+    ) {
+      setVaultItems((prev) => prev.filter((item) => item.id !== docId));
+      await deleteVaultItem(docId, activeTenantId).catch((e) =>
+        console.error("[VaultDB] Failed to delete doc:", e),
+      );
       await deletePdfData(docId).catch(() => {});
 
       // Clean up project-scoped storage keys if this was a template document
       if (activeProjectRefNo) {
         const ref = activeProjectRefNo;
-        const tenantKey = activeTenantId || 'default';
-        const dLower = (docName || '').toLowerCase();
+        const tenantKey = activeTenantId || "default";
+        const dLower = (docName || "").toLowerCase();
         const keysToPurge = [
-          dLower.includes('technical specifications') || dLower.includes('section vii') ? `bidocs_tech_specs_${tenantKey}_${ref}` : '',
-          dLower.includes('schedule of requirements') || dLower.includes('section vi') ? `bidocs_sec_vi_${tenantKey}_${ref}` : '',
-          dLower.includes('schedule of requirements') || dLower.includes('section vi') ? `bidocs_sec_vi_services_${tenantKey}_${ref}` : '',
-          dLower.includes('framework agreement') ? `bidocs_fal_${tenantKey}_${ref}` : '',
-          dLower.includes('organizational chart') ? `bidocs_org_chart_${tenantKey}_${ref}` : '',
-          dLower.includes('key personnel') ? `bidocs_key_personnel_${tenantKey}_${ref}` : '',
-          dLower.includes('major equipment') ? `bidocs_major_equipment_${tenantKey}_${ref}` : '',
-          dLower.includes('after-sales') || dLower.includes('warranty') ? `bidocs_aftersale_${tenantKey}_${ref}` : ''
+          dLower.includes("technical specifications") ||
+          dLower.includes("section vii")
+            ? `bidocs_tech_specs_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("schedule of requirements") ||
+          dLower.includes("section vi")
+            ? `bidocs_sec_vi_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("schedule of requirements") ||
+          dLower.includes("section vi")
+            ? `bidocs_sec_vi_services_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("framework agreement")
+            ? `bidocs_fal_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("organizational chart")
+            ? `bidocs_org_chart_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("key personnel")
+            ? `bidocs_key_personnel_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("major equipment")
+            ? `bidocs_major_equipment_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("after-sales") || dLower.includes("warranty")
+            ? `bidocs_aftersale_${tenantKey}_${ref}`
+            : "",
         ].filter(Boolean);
 
-        keysToPurge.forEach(k => {
-          try { localStorage.removeItem(k); } catch (_) {}
+        keysToPurge.forEach((k) => {
+          try {
+            localStorage.removeItem(k);
+          } catch (_) {}
         });
 
-        if (dLower.includes('technical specifications') || dLower.includes('section vii')) {
+        if (
+          dLower.includes("technical specifications") ||
+          dLower.includes("section vii")
+        ) {
           deletePdfData(`tech_specs_${tenantKey}_${ref}`).catch(() => {});
-          deletePdfData(`tech_specs_brochure_${tenantKey}_${ref}`).catch(() => {});
-          deletePdfData(`tech_specs_drawing_${tenantKey}_${ref}`).catch(() => {});
+          deletePdfData(`tech_specs_brochure_${tenantKey}_${ref}`).catch(
+            () => {},
+          );
+          deletePdfData(`tech_specs_drawing_${tenantKey}_${ref}`).catch(
+            () => {},
+          );
         }
-        if (dLower.includes('framework agreement')) {
+        if (dLower.includes("framework agreement")) {
           deletePdfData(`fal_${tenantKey}_${ref}`).catch(() => {});
         }
       }
 
-      notifySuccess('Completed Form Deleted', `"${docName}" has been successfully removed from Technical Eligibility.`);
+      notifySuccess(
+        "Completed Form Deleted",
+        `"${docName}" has been successfully removed from Technical Eligibility.`,
+      );
     }
   };
 
   const handleDeleteFinancialDoc = async (docId: string, docName: string) => {
-    if (confirm(`Are you sure you want to delete "${docName}" from Financial Documents? This will remove the document from the vault.`)) {
-      setVaultItems(prev => prev.filter(item => item.id !== docId));
-      await deleteVaultItem(docId, activeTenantId).catch(e => console.error('[VaultDB] Failed to delete doc:', e));
+    if (
+      confirm(
+        `Are you sure you want to delete "${docName}" from Financial Documents? This will remove the document from the vault.`,
+      )
+    ) {
+      setVaultItems((prev) => prev.filter((item) => item.id !== docId));
+      await deleteVaultItem(docId, activeTenantId).catch((e) =>
+        console.error("[VaultDB] Failed to delete doc:", e),
+      );
       await deletePdfData(docId).catch(() => {});
 
       // Clean up project-scoped storage keys if this was a template document
       if (activeProjectRefNo) {
         const ref = activeProjectRefNo;
-        const tenantKey = activeTenantId || 'default';
-        const dLower = (docName || '').toLowerCase();
+        const tenantKey = activeTenantId || "default";
+        const dLower = (docName || "").toLowerCase();
         const keysToPurge = [
-          dLower.includes('detailed estimate') ? `bidocs_detailed_estimates_${tenantKey}_${ref}` : '',
-          dLower.includes('bill of quantities') || dLower.includes('boq') ? `bidocs_boq_${tenantKey}_${ref}` : '',
-          dLower.includes('price schedule') ? `bidocs_pricesched_${tenantKey}_${ref}` : '',
-          dLower.includes('summary of bid price') ? `bidocs_summary_bid_price_${tenantKey}_${ref}` : '',
-          dLower.includes('cash flow') ? `bidocs_cash_flow_${tenantKey}_${ref}` : '',
-          dLower.includes('bid form') ? `bidocs_bidform_goods_${tenantKey}_${ref}` : '',
-          dLower.includes('bid form') ? `bidocs_bidform_infra_${tenantKey}_${ref}` : '',
-          dLower.includes('bid form') ? `bidocs_bidform_consulting_${tenantKey}_${ref}` : '',
-          dLower.includes('nfcc') ? `bidocs_nfcc_${tenantKey}_${ref}` : ''
+          dLower.includes("detailed estimate")
+            ? `bidocs_detailed_estimates_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("bill of quantities") || dLower.includes("boq")
+            ? `bidocs_boq_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("price schedule")
+            ? `bidocs_pricesched_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("summary of bid price")
+            ? `bidocs_summary_bid_price_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("cash flow")
+            ? `bidocs_cash_flow_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("bid form")
+            ? `bidocs_bidform_goods_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("bid form")
+            ? `bidocs_bidform_infra_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("bid form")
+            ? `bidocs_bidform_consulting_${tenantKey}_${ref}`
+            : "",
+          dLower.includes("nfcc") ? `bidocs_nfcc_${tenantKey}_${ref}` : "",
         ].filter(Boolean);
 
-        keysToPurge.forEach(k => {
-          try { localStorage.removeItem(k); } catch (_) {}
+        keysToPurge.forEach((k) => {
+          try {
+            localStorage.removeItem(k);
+          } catch (_) {}
         });
 
-        if (dLower.includes('boq')) {
+        if (dLower.includes("boq")) {
           deletePdfData(`boq_${tenantKey}_${ref}`).catch(() => {});
         }
-        if (dLower.includes('price schedule')) {
+        if (dLower.includes("price schedule")) {
           deletePdfData(`priceschedule_${tenantKey}_${ref}`).catch(() => {});
           deletePdfData(`pricesched_${tenantKey}_${ref}`).catch(() => {});
         }
-        if (dLower.includes('bid form')) {
+        if (dLower.includes("bid form")) {
           deletePdfData(`bidform_infra_${tenantKey}_${ref}`).catch(() => {});
           deletePdfData(`bidform_${tenantKey}_${ref}`).catch(() => {});
         }
       }
 
-      notifySuccess('Financial Document Deleted', `"${docName}" has been successfully removed from Financial Documents.`);
+      notifySuccess(
+        "Financial Document Deleted",
+        `"${docName}" has been successfully removed from Financial Documents.`,
+      );
     }
   };
 
   const handleDeleteClassADoc = async (item: DocumentVaultItem) => {
-    if (confirm(`Are you sure you want to delete the uploaded file for "${item.documentName}"? This will clear this document slot so you can upload a fresh file.`)) {
-      setVaultItems(prev => prev.filter(i => i.id !== item.id));
-      await deleteVaultItem(item.id, activeTenantId).catch(e => console.error('[VaultDB] Failed to delete doc:', e));
+    if (
+      confirm(
+        `Are you sure you want to delete the uploaded file for "${item.documentName}"? This will clear this document slot so you can upload a fresh file.`,
+      )
+    ) {
+      setVaultItems((prev) => prev.filter((i) => i.id !== item.id));
+      await deleteVaultItem(item.id, activeTenantId).catch((e) =>
+        console.error("[VaultDB] Failed to delete doc:", e),
+      );
       await deletePdfData(item.id).catch(() => {});
-      notifySuccess('Document Deleted', `"${item.documentName}" has been removed and the slot is now ready for re-upload.`);
+      notifySuccess(
+        "Document Deleted",
+        `"${item.documentName}" has been removed and the slot is now ready for re-upload.`,
+      );
     }
   };
 
   const handleFileSelection = (file: File | undefined) => {
     if (!file) {
       setSelectedFile(null);
-      setSelectedFileDataUrl('');
+      setSelectedFileDataUrl("");
       return;
     }
 
-    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-      const errReason = 'Invalid File Format: Strictly PDF (.pdf) documents are accepted by GPPB bidding standards.';
+    if (
+      !file.name.toLowerCase().endsWith(".pdf") &&
+      file.type !== "application/pdf"
+    ) {
+      const errReason =
+        "Invalid File Format: Strictly PDF (.pdf) documents are accepted by GPPB bidding standards.";
       setUploadError(errReason);
-      notifyFailure('Upload Validation Failed', 'Selected document file cannot be accepted.', errReason);
+      notifyFailure(
+        "Upload Validation Failed",
+        "Selected document file cannot be accepted.",
+        errReason,
+      );
       setSelectedFile(null);
-      setSelectedFileDataUrl('');
+      setSelectedFileDataUrl("");
       return;
     }
 
     if (file.size > 250 * 1024 * 1024) {
       const errReason = `File Size Exceeded: Selected file size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds maximum 250 MB limit.`;
       setUploadError(errReason);
-      notifyFailure('Upload Validation Failed', 'Selected document file is too large.', errReason);
+      notifyFailure(
+        "Upload Validation Failed",
+        "Selected document file is too large.",
+        errReason,
+      );
       setSelectedFile(null);
-      setSelectedFileDataUrl('');
+      setSelectedFileDataUrl("");
       return;
     }
 
     setSelectedFile(file);
-    setUploadError('');
+    setUploadError("");
 
     // Read PDF file into Base64 Data URL for rendering directly in PDF viewer
     const reader = new FileReader();
@@ -1277,20 +1854,28 @@ export const DocumentVaultView: React.FC = () => {
     e.preventDefault();
     if (!uploadTargetDef) return;
 
-    const docName = uploadTargetDef.code === 'DOC-2' ? `${dtiSecType} Certificate` : uploadTargetDef.name;
+    const docName =
+      uploadTargetDef.code === "DOC-2"
+        ? `${dtiSecType} Certificate`
+        : uploadTargetDef.name;
 
     if (!selectedFile) {
-      const errReason = 'No File Selected: Please select a PDF document file from your computer.';
+      const errReason =
+        "No File Selected: Please select a PDF document file from your computer.";
       setUploadError(errReason);
-      notifyFailure(`Upload Failed for ${docName}`, 'Submission could not be completed.', errReason);
+      notifyFailure(
+        `Upload Failed for ${docName}`,
+        "Submission could not be completed.",
+        errReason,
+      );
       return;
     }
 
     let reqIssue = uploadTargetDef.requiresIssueDate;
     let reqExp = uploadTargetDef.requiresExpiryDate;
 
-    if (uploadTargetDef.code === 'DOC-2') {
-      if (dtiSecType === 'SEC') {
+    if (uploadTargetDef.code === "DOC-2") {
+      if (dtiSecType === "SEC") {
         reqIssue = false;
         reqExp = false;
       } else {
@@ -1302,14 +1887,22 @@ export const DocumentVaultView: React.FC = () => {
     if (reqIssue && !issuedDate) {
       const errReason = `Missing Required Field: Issue Date is mandatory for ${docName}.`;
       setUploadError(errReason);
-      notifyFailure(`Upload Failed for ${docName}`, 'Submission could not be completed.', errReason);
+      notifyFailure(
+        `Upload Failed for ${docName}`,
+        "Submission could not be completed.",
+        errReason,
+      );
       return;
     }
 
     if (reqExp && !expiryDate) {
       const errReason = `Missing Required Field: Expiration Date is mandatory for ${docName}.`;
       setUploadError(errReason);
-      notifyFailure(`Upload Failed for ${docName}`, 'Submission could not be completed.', errReason);
+      notifyFailure(
+        `Upload Failed for ${docName}`,
+        "Submission could not be completed.",
+        errReason,
+      );
       return;
     }
 
@@ -1318,9 +1911,14 @@ export const DocumentVaultView: React.FC = () => {
       try {
         fileDataUrl = await readFileAsDataUrl(selectedFile);
       } catch (err) {
-        const errReason = 'File Processing Error: Failed to read PDF document data.';
+        const errReason =
+          "File Processing Error: Failed to read PDF document data.";
         setUploadError(errReason);
-        notifyFailure(`Upload Failed for ${docName}`, 'File conversion failed.', errReason);
+        notifyFailure(
+          `Upload Failed for ${docName}`,
+          "File conversion failed.",
+          errReason,
+        );
         return;
       }
     }
@@ -1330,46 +1928,78 @@ export const DocumentVaultView: React.FC = () => {
       tenantId: activeTenantId,
       documentCode: uploadTargetDef.code,
       documentName: docName,
-      documentNumber: docNumber.trim() || `REF-${Math.floor(Math.random() * 899999 + 100000)}`,
-      category: uploadTargetDef.code === 'DOC-14' ? 'ELIGIBILITY_CLASS_B' : 'ELIGIBILITY_CLASS_A',
-      procurementApplicability: ['Goods & Supply', 'Goods & Supply with Installation', 'Infrastructure', 'Consulting'],
+      documentNumber:
+        docNumber.trim() ||
+        `REF-${Math.floor(Math.random() * 899999 + 100000)}`,
+      category:
+        uploadTargetDef.code === "DOC-14"
+          ? "ELIGIBILITY_CLASS_B"
+          : "ELIGIBILITY_CLASS_A",
+      procurementApplicability: [
+        "Goods & Supply",
+        "Goods & Supply with Installation",
+        "Infrastructure",
+        "Consulting",
+      ],
       legalBasisReference: uploadTargetDef.conditionalRuleNote,
       versionNumber: 1,
-      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16),
+      ).join(""),
       fileSizeBytes: selectedFile.size,
       fileName: selectedFile.name,
       fileDataUrl: fileDataUrl,
       issuedDate: reqIssue ? issuedDate : undefined,
       expiryDate: reqExp ? expiryDate : undefined,
-      status: reqExp && expiryDate && new Date(expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'EXPIRING_SOON' : 'ACTIVE',
-      uploadedByName: currentUser?.fullName || 'Authorized Administrator',
+      status:
+        reqExp &&
+        expiryDate &&
+        new Date(expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          ? "EXPIRING_SOON"
+          : "ACTIVE",
+      uploadedByName: currentUser?.fullName || "Authorized Administrator",
       isOptional: uploadTargetDef.isOptional,
       requiresIssueDate: reqIssue,
       requiresExpiryDate: reqExp,
       conditionalRuleNote: uploadTargetDef.conditionalRuleNote,
-      previousVersions: []
+      previousVersions: [],
     };
 
     await storePdfData(newItem.id, fileDataUrl);
-    setVaultItems(prev => [newItem, ...prev.filter(item => item.id !== newItem.id)]);
+    setVaultItems((prev) => [
+      newItem,
+      ...prev.filter((item) => item.id !== newItem.id),
+    ]);
     setUploadTargetDef(null);
     resetFormState();
-    notifySuccess(`[${docName}, v1.0] Upload Successful!`, 'Your document has been verified and encrypted into Document Vault. Click "View PDF" to inspect your document.');
+    notifySuccess(
+      `[${docName}, v1.0] Upload Successful!`,
+      'Your document has been verified and encrypted into Document Vault. Click "View PDF" to inspect your document.',
+    );
   };
 
   const handleCustomUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customDocName.trim()) {
-      const errReason = 'Missing Required Field: Document Name is required.';
+      const errReason = "Missing Required Field: Document Name is required.";
       setUploadError(errReason);
-      notifyFailure('Custom Upload Failed', 'Submission could not be completed.', errReason);
+      notifyFailure(
+        "Custom Upload Failed",
+        "Submission could not be completed.",
+        errReason,
+      );
       return;
     }
 
     if (!selectedFile) {
-      const errReason = 'No File Selected: Please select a PDF document to upload.';
+      const errReason =
+        "No File Selected: Please select a PDF document to upload.";
       setUploadError(errReason);
-      notifyFailure(`Custom Upload Failed for ${customDocName}`, 'Submission could not be completed.', errReason);
+      notifyFailure(
+        `Custom Upload Failed for ${customDocName}`,
+        "Submission could not be completed.",
+        errReason,
+      );
       return;
     }
 
@@ -1378,9 +2008,14 @@ export const DocumentVaultView: React.FC = () => {
       try {
         fileDataUrl = await readFileAsDataUrl(selectedFile);
       } catch (err) {
-        const errReason = 'File Processing Error: Failed to read PDF document data.';
+        const errReason =
+          "File Processing Error: Failed to read PDF document data.";
         setUploadError(errReason);
-        notifyFailure(`Custom Upload Failed for ${customDocName}`, 'File conversion failed.', errReason);
+        notifyFailure(
+          `Custom Upload Failed for ${customDocName}`,
+          "File conversion failed.",
+          errReason,
+        );
         return;
       }
     }
@@ -1389,31 +2024,47 @@ export const DocumentVaultView: React.FC = () => {
       id: `doc-custom-${Date.now()}`,
       tenantId: activeTenantId,
       documentName: customDocName.trim(),
-      documentNumber: docNumber.trim() || `REF-${Math.floor(Math.random() * 899999 + 100000)}`,
+      documentNumber:
+        docNumber.trim() ||
+        `REF-${Math.floor(Math.random() * 899999 + 100000)}`,
       category: customUploadCategory,
-      procurementApplicability: ['Goods & Supply', 'Goods & Supply with Installation', 'Infrastructure', 'Consulting'],
-      legalBasisReference: 'RA 12009 NGPA Statutory Compliance Exhibit',
+      procurementApplicability: [
+        "Goods & Supply",
+        "Goods & Supply with Installation",
+        "Infrastructure",
+        "Consulting",
+      ],
+      legalBasisReference: "RA 12009 NGPA Statutory Compliance Exhibit",
       versionNumber: 1,
-      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16),
+      ).join(""),
       fileSizeBytes: selectedFile.size,
       fileName: selectedFile.name,
       fileDataUrl: fileDataUrl,
       issuedDate: issuedDate || undefined,
       expiryDate: expiryDate || undefined,
-      status: expiryDate && new Date(expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'EXPIRING_SOON' : 'ACTIVE',
-      uploadedByName: currentUser?.fullName || 'Authorized Administrator',
+      status:
+        expiryDate &&
+        new Date(expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          ? "EXPIRING_SOON"
+          : "ACTIVE",
+      uploadedByName: currentUser?.fullName || "Authorized Administrator",
       isOptional: true,
       requiresIssueDate: !!issuedDate,
       requiresExpiryDate: !!expiryDate,
-      conditionalRuleNote: 'Custom Uploaded Statutory Exhibit',
-      previousVersions: []
+      conditionalRuleNote: "Custom Uploaded Statutory Exhibit",
+      previousVersions: [],
     };
 
     await storePdfData(newItem.id, fileDataUrl);
-    setVaultItems(prev => [newItem, ...prev]);
+    setVaultItems((prev) => [newItem, ...prev]);
     setShowCustomUploadModal(false);
     resetFormState();
-    notifySuccess(`[${newItem.documentName}, v1.0] Upload Successful!`, 'Custom statutory document added to Document Vault.');
+    notifySuccess(
+      `[${newItem.documentName}, v1.0] Upload Successful!`,
+      "Custom statutory document added to Document Vault.",
+    );
   };
 
   const handleReplaceSubmit = async (e: React.FormEvent) => {
@@ -1421,9 +2072,14 @@ export const DocumentVaultView: React.FC = () => {
     if (!replaceTargetItem) return;
 
     if (!selectedFile) {
-      const errReason = 'No File Selected: Please select a replacement PDF file to upload.';
+      const errReason =
+        "No File Selected: Please select a replacement PDF file to upload.";
       setUploadError(errReason);
-      notifyFailure(`Replacement Failed for ${replaceTargetItem.documentName}`, 'Submission could not be completed.', errReason);
+      notifyFailure(
+        `Replacement Failed for ${replaceTargetItem.documentName}`,
+        "Submission could not be completed.",
+        errReason,
+      );
       return;
     }
 
@@ -1432,9 +2088,14 @@ export const DocumentVaultView: React.FC = () => {
       try {
         fileDataUrl = await readFileAsDataUrl(selectedFile);
       } catch (err) {
-        const errReason = 'File Processing Error: Failed to read replacement PDF document data.';
+        const errReason =
+          "File Processing Error: Failed to read replacement PDF document data.";
         setUploadError(errReason);
-        notifyFailure(`Replacement Failed for ${replaceTargetItem.documentName}`, 'File conversion failed.', errReason);
+        notifyFailure(
+          `Replacement Failed for ${replaceTargetItem.documentName}`,
+          "File conversion failed.",
+          errReason,
+        );
         return;
       }
     }
@@ -1445,9 +2106,9 @@ export const DocumentVaultView: React.FC = () => {
       fileHash: replaceTargetItem.fileHash,
       uploadedAt: new Date().toLocaleString(),
       uploadedByName: replaceTargetItem.uploadedByName,
-      fileName: replaceTargetItem.fileName || 'previous_document.pdf',
+      fileName: replaceTargetItem.fileName || "previous_document.pdf",
       fileSizeBytes: replaceTargetItem.fileSizeBytes,
-      fileDataUrl: replaceTargetItem.fileDataUrl
+      fileDataUrl: replaceTargetItem.fileDataUrl,
     };
 
     const newVersionNum = replaceTargetItem.versionNumber + 1;
@@ -1456,27 +2117,51 @@ export const DocumentVaultView: React.FC = () => {
       ...replaceTargetItem,
       versionNumber: newVersionNum,
       documentNumber: docNumber.trim() || replaceTargetItem.documentNumber,
-      fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+      fileHash: Array.from({ length: 64 }, () =>
+        Math.floor(Math.random() * 16).toString(16),
+      ).join(""),
       fileSizeBytes: selectedFile.size,
       fileName: selectedFile.name,
       fileDataUrl: fileDataUrl || replaceTargetItem.fileDataUrl,
-      issuedDate: replaceTargetItem.requiresIssueDate ? (issuedDate || replaceTargetItem.issuedDate) : undefined,
-      expiryDate: replaceTargetItem.requiresExpiryDate ? (expiryDate || replaceTargetItem.expiryDate) : undefined,
-      status: replaceTargetItem.requiresExpiryDate && expiryDate && new Date(expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) ? 'EXPIRING_SOON' : 'ACTIVE',
-      uploadedByName: currentUser?.fullName || 'Authorized Administrator',
-      previousVersions: [archivedVersion, ...(replaceTargetItem.previousVersions || [])]
+      issuedDate: replaceTargetItem.requiresIssueDate
+        ? issuedDate || replaceTargetItem.issuedDate
+        : undefined,
+      expiryDate: replaceTargetItem.requiresExpiryDate
+        ? expiryDate || replaceTargetItem.expiryDate
+        : undefined,
+      status:
+        replaceTargetItem.requiresExpiryDate &&
+        expiryDate &&
+        new Date(expiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          ? "EXPIRING_SOON"
+          : "ACTIVE",
+      uploadedByName: currentUser?.fullName || "Authorized Administrator",
+      previousVersions: [
+        archivedVersion,
+        ...(replaceTargetItem.previousVersions || []),
+      ],
     };
 
-    await storePdfData(updatedItem.id, fileDataUrl || replaceTargetItem.fileDataUrl);
-    setVaultItems(prev => prev.map(item => item.id === replaceTargetItem.id ? updatedItem : item));
+    await storePdfData(
+      updatedItem.id,
+      fileDataUrl || replaceTargetItem.fileDataUrl,
+    );
+    setVaultItems((prev) =>
+      prev.map((item) =>
+        item.id === replaceTargetItem.id ? updatedItem : item,
+      ),
+    );
     setReplaceTargetItem(null);
     resetFormState();
-    notifySuccess(`[${updatedItem.documentName}, v${newVersionNum}.0] Replacement Successful!`, 'Replacement file uploaded and set as active document version.');
+    notifySuccess(
+      `[${updatedItem.documentName}, v${newVersionNum}.0] Replacement Successful!`,
+      "Replacement file uploaded and set as active document version.",
+    );
   };
 
   const toggleSelectDoc = (id: string) => {
-    setSelectedItemIds(prev =>
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    setSelectedItemIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
   };
 
@@ -1484,63 +2169,88 @@ export const DocumentVaultView: React.FC = () => {
     if (selectedItemIds.length === itemsToSelect.length) {
       setSelectedItemIds([]);
     } else {
-      setSelectedItemIds(itemsToSelect.map(i => i.id));
+      setSelectedItemIds(itemsToSelect.map((i) => i.id));
     }
   };
 
-  const mandatoryDefs = CLASS_A_MASTER_LIST.filter(d => !d.isOptional);
-  const uploadedCodes = vaultItems.map(i => i.documentCode);
-  const completedMandatoryCount = mandatoryDefs.filter(d => uploadedCodes.includes(d.code)).length;
-  const isClassAFullyCompliant = completedMandatoryCount === mandatoryDefs.length;
+  const mandatoryDefs = CLASS_A_MASTER_LIST.filter((d) => !d.isOptional);
+  const uploadedCodes = vaultItems.map((i) => i.documentCode);
+  const completedMandatoryCount = mandatoryDefs.filter((d) =>
+    uploadedCodes.includes(d.code),
+  ).length;
+  const isClassAFullyCompliant =
+    completedMandatoryCount === mandatoryDefs.length;
 
-  const customClassAItems = vaultItems.filter(item =>
-    item.category === 'ELIGIBILITY_CLASS_A' &&
-    !CLASS_A_MASTER_LIST.some(d => d.code === item.documentCode)
+  const customClassAItems = vaultItems.filter(
+    (item) =>
+      item.category === "ELIGIBILITY_CLASS_A" &&
+      !CLASS_A_MASTER_LIST.some((d) => d.code === item.documentCode),
   );
 
-
-
   const hasTechnicalDocForActiveProject = (docCode: string) =>
-    !!activeProjectRefNo && vaultItems.some(item =>
-      item.category === 'TECHNICAL' &&
-      ((item.projectId && item.projectId === activeProjectId) || item.philgepsRefNo === activeProjectRefNo) &&
-      (item.documentCode === docCode || (docCode === 'FAL-01' && (item.documentCode === 'FAL-01' || item.documentCode === 'SEC-VI-FAL' || item.documentName.toLowerCase().includes('framework agreement'))))
+    !!activeProjectRefNo &&
+    vaultItems.some(
+      (item) =>
+        item.category === "TECHNICAL" &&
+        ((item.projectId && item.projectId === activeProjectId) ||
+          item.philgepsRefNo === activeProjectRefNo) &&
+        (item.documentCode === docCode ||
+          (docCode === "FAL-01" &&
+            (item.documentCode === "FAL-01" ||
+              item.documentCode === "SEC-VI-FAL" ||
+              item.documentName
+                .toLowerCase()
+                .includes("framework agreement")))),
     );
 
   const hasFinancialDocForActiveProject = (docCode: string) =>
-    !!activeProjectRefNo && vaultItems.some(item =>
-      item.category === 'FINANCIAL' &&
-      ((item.projectId && item.projectId === activeProjectId) || item.philgepsRefNo === activeProjectRefNo) &&
-      item.documentCode === docCode
+    !!activeProjectRefNo &&
+    vaultItems.some(
+      (item) =>
+        item.category === "FINANCIAL" &&
+        ((item.projectId && item.projectId === activeProjectId) ||
+          item.philgepsRefNo === activeProjectRefNo) &&
+        item.documentCode === docCode,
     );
 
   const getCompletedFinancialDocForActiveProject = (docCode: string) =>
     activeProjectRefNo
-      ? vaultItems.find(item =>
-          item.category === 'FINANCIAL' &&
-          ((item.projectId && item.projectId === activeProjectId) || item.philgepsRefNo === activeProjectRefNo) &&
-          item.documentCode === docCode
+      ? vaultItems.find(
+          (item) =>
+            item.category === "FINANCIAL" &&
+            ((item.projectId && item.projectId === activeProjectId) ||
+              item.philgepsRefNo === activeProjectRefNo) &&
+            item.documentCode === docCode,
         )
       : undefined;
 
-  const completedTechVaultItems = React.useMemo(() => vaultItems.filter(item =>
-    item.category === 'TECHNICAL' &&
-    (selectedTechProjectFilter === 'ALL' || item.philgepsRefNo === selectedTechProjectFilter || item.projectId === selectedTechProjectFilter) &&
-    !isDocInBidPackage(item)
-  ), [vaultItems, selectedTechProjectFilter, isDocInBidPackage]);
+  const completedTechVaultItems = React.useMemo(
+    () =>
+      vaultItems.filter(
+        (item) =>
+          item.category === "TECHNICAL" &&
+          (selectedTechProjectFilter === "ALL" ||
+            item.philgepsRefNo === selectedTechProjectFilter ||
+            item.projectId === selectedTechProjectFilter) &&
+          !isDocInBidPackage(item),
+      ),
+    [vaultItems, selectedTechProjectFilter, isDocInBidPackage],
+  );
 
   const filteredGridItems = React.useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return vaultItems.filter(item => {
+    return vaultItems.filter((item) => {
       // If document is in active Bid Package and not searching explicitly, remove it from available vault list
       if (!q && isDocInBidPackage(item)) return false;
 
-      const matchesSearch = !q ||
+      const matchesSearch =
+        !q ||
         item.documentName.toLowerCase().includes(q) ||
-        (item.documentNumber || '').toLowerCase().includes(q) ||
-        (item.legalBasisReference || '').toLowerCase().includes(q) ||
-        (item.philgepsRefNo || '').toLowerCase().includes(q);
-      const matchesCat = selectedCategory === 'ALL' || item.category === selectedCategory;
+        (item.documentNumber || "").toLowerCase().includes(q) ||
+        (item.legalBasisReference || "").toLowerCase().includes(q) ||
+        (item.philgepsRefNo || "").toLowerCase().includes(q);
+      const matchesCat =
+        selectedCategory === "ALL" || item.category === selectedCategory;
       return matchesSearch && matchesCat;
     });
   }, [vaultItems, searchQuery, selectedCategory, isDocInBidPackage]);
@@ -1548,2527 +2258,3260 @@ export const DocumentVaultView: React.FC = () => {
   const selectedVaultObjects = React.useMemo(() => {
     if (selectedItemIds.length === 0) return [];
     const idSet = new Set(selectedItemIds);
-    return vaultItems.filter(item => idSet.has(item.id));
+    return vaultItems.filter((item) => idSet.has(item.id));
   }, [vaultItems, selectedItemIds]);
 
   return (
     <VaultErrorBoundary fallbackTitle="Document Vault Render Protected">
       <div className="space-y-6 animate-fadeIn">
+        {/* Header Banner — 3D Glass with BorderBeam & Telemetry */}
+        <div className="relative rounded-2xl p-5 md:p-6 bg-linear-to-r from-slate-900/90 via-[#0a1128]/85 to-slate-900/90 border border-slate-800/90 shadow-2xl backdrop-blur-xl overflow-hidden">
+          <BorderBeam
+            size={200}
+            duration={14}
+            colorFrom="#3b82f6"
+            colorTo="#8b5cf6"
+          />
 
-      {/* Header Banner — 3D Glass with BorderBeam & Telemetry */}
-      <div className="relative rounded-2xl p-5 md:p-6 bg-gradient-to-r from-slate-900/90 via-[#0a1128]/85 to-slate-900/90 border border-slate-800/90 shadow-2xl backdrop-blur-xl overflow-hidden">
-        <BorderBeam size={200} duration={14} colorFrom="#3b82f6" colorTo="#8b5cf6" />
-
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <span
-                className="w-3.5 h-3.5 rounded-full ring-4 ring-blue-500/20"
-                style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
-              />
-              <h1 className="text-2xl font-black text-white tracking-tight">
-                <ShinyText text="Document Vault" speed={6} />
-                <span className="text-slate-400 font-medium text-lg ml-2 font-sans">& Statutory Registry</span>
-              </h1>
-            </div>
-            <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-2">
-              <span>Encrypted compliance repository for</span>
-              <span className="text-slate-200 font-bold bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700/60 font-mono">
-                {currentTenant?.companyName || 'Your Enterprise'}
-              </span>
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            <CyberBadge 
-              label="Vault Encrypted" 
-              variant="emerald" 
-              telemetry={`${vaultItems.length} Docs`}
-              pulse={true}
-            />
-
-            <button
-              onClick={handleResetClassAVault}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all flex items-center gap-2 shrink-0 cursor-pointer"
-              title="Remove all uploaded PDFs and reset PhilGEPS and Class A slots to v1.0 for re-uploading from scratch"
-            >
-              <RefreshCw className="w-4 h-4 text-amber-400" />
-              <span>Reset & Refresh Vault</span>
-            </button>
-
-            {selectedItemIds.length > 0 && (
-              <button
-                onClick={() => setShowMergeModal(true)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <Layers className="w-4 h-4" />
-                <span>Merge Selected ({selectedItemIds.length})</span>
-              </button>
-            )}
-
-            <button
-              onClick={() => {
-                resetFormState();
-                setCustomUploadCategory('ELIGIBILITY_CLASS_A');
-                setShowCustomUploadModal(true);
-              }}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg shadow-blue-600/25 transition-all flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
-              style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
-              title="Add custom or project-specific legal document to vault"
-            >
-              <Plus className="w-4 h-4 text-blue-200" />
-              <span>+ Add Legal Document</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* UNIFIED VAULT SUCCESS / FAILURE NOTIFICATION BANNER */}
-      {vaultNotification && (
-        <div className={`p-4 rounded-2xl border-2 flex items-start justify-between gap-4 shadow-xl animate-fadeIn ${vaultNotification.type === 'SUCCESS'
-          ? 'bg-emerald-500/15 border-emerald-500/40 text-white'
-          : 'bg-red-500/15 border-red-500/40 text-white'
-          }`}>
-          <div className="flex items-start gap-3">
-            <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${vaultNotification.type === 'SUCCESS' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
-              }`}>
-              {vaultNotification.type === 'SUCCESS' ? (
-                <CheckCircle2 className="w-6 h-6 text-emerald-400" />
-              ) : (
-                <AlertTriangle className="w-6 h-6 text-red-400" />
-              )}
-            </div>
-            <div className="space-y-1">
-              <h4 className={`text-sm font-bold font-mono ${vaultNotification.type === 'SUCCESS' ? 'text-emerald-300' : 'text-red-300'
-                }`}>
-                {vaultNotification.title}
-              </h4>
-              <p className="text-xs text-slate-300 leading-relaxed">{vaultNotification.message}</p>
-              {vaultNotification.reason && (
-                <div className="p-2.5 rounded-xl bg-red-950/90 border border-red-800/80 text-red-200 text-xs font-mono mt-2 shadow-inner">
-                  <strong className="text-red-400 font-bold block mb-0.5">Reason for Failure:</strong>
-                  <span>{vaultNotification.reason}</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={() => setVaultNotification(null)}
-            className="text-slate-400 hover:text-white transition p-1 shrink-0"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      )}
-
-      {/* ALL CATEGORY TABS AT TOP */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
-          {[
-            { id: 'ALL', label: 'All Vault Documents' },
-            { id: 'ELIGIBILITY_CLASS_A', label: 'Class A Eligibility' },
-            { id: 'TECHNICAL', label: 'Technical Eligibility' },
-            { id: 'FINANCIAL', label: 'Financial Documents' },
-            { id: 'CORPORATE_LEGAL', label: 'Corporate Legal' },
-            { id: 'ELIGIBILITY_CLASS_B', label: 'Class B Joint Venture' },
-          ].map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${selectedCategory === cat.id
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
-            >
-              <span>{cat.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {selectedCategory !== 'ELIGIBILITY_CLASS_A' && selectedCategory !== 'TECHNICAL' && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => toggleSelectAll(filteredGridItems)}
-              className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-xs font-semibold hover:text-white transition flex items-center gap-1.5"
-            >
-              {selectedItemIds.length === filteredGridItems.length && filteredGridItems.length > 0 ? (
-                <CheckSquare className="w-4 h-4 text-blue-400" />
-              ) : (
-                <Square className="w-4 h-4 text-slate-500" />
-              )}
-              <span>Select All</span>
-            </button>
-
-            <div className="relative min-w-55">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search documents or serial no..."
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-              />
-              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* TAB 1: CLASS A ELIGIBILITY MATRIX */}
-      {selectedCategory === 'ELIGIBILITY_CLASS_A' && (
-        <div className="space-y-6">
-          <div className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${isClassAFullyCompliant
-            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-            : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-            }`}>
-            <div className="flex items-center gap-3">
-              <Award className="w-6 h-6 shrink-0" />
-              <div>
-                <h3 className="text-sm font-bold">
-                  Class A Eligibility Matrix Status: {completedMandatoryCount} / {mandatoryDefs.length} Mandatory Uploaded
-                </h3>
-                <p className="text-xs text-slate-400 font-mono mt-0.5">
-                  {isClassAFullyCompliant
-                    ? '100% Mandatory Class A documents uploaded & verified. Ready for automated bid envelope assembly.'
-                    : 'Upload the remaining mandatory Class A documents in the table below to pass GPPB eligibility audit.'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={handleClearAllClassAUploads}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition flex items-center gap-1.5 shadow-sm"
-                title="Remove all uploaded Class A documents to re-upload from scratch"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                <span>Remove All Uploaded Documents</span>
-              </button>
-              <span className="text-xs font-mono font-bold bg-slate-900 text-white px-3 py-1.5 rounded-xl border border-slate-800">
-                10 Mandatory • 3 Optional
-              </span>
-            </div>
-          </div>
-
-          <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl space-y-0">
-            <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <FileCheck className="w-4 h-4 text-blue-400" />
-                Statutory Fixed Master Document List & Custom Exhibits (Class A)
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    resetFormState();
-                    setCustomUploadCategory('ELIGIBILITY_CLASS_A');
-                    setShowCustomUploadModal(true);
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <span
+                  className="w-3.5 h-3.5 rounded-full ring-4 ring-blue-500/20"
+                  style={{
+                    backgroundColor: currentTenant?.brandColor || "#1e40af",
                   }}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center gap-1.5"
-                  title="Add custom or project-specific legal document to Class A Eligibility"
-                >
-                  <Plus className="w-4 h-4 text-blue-200" />
-                  <span>+ Add Additional Legal Document</span>
-                </button>
-                <button
-                  onClick={handleClearAllClassAUploads}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition flex items-center gap-1.5"
-                  title="Clear all Class A documents and start fresh"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                  <span>Remove All Uploads</span>
-                </button>
+                />
+                <h1 className="text-2xl font-black text-white tracking-tight">
+                  <ShinyText text="Document Vault" speed={6} />
+                  <span className="text-slate-400 font-medium text-lg ml-2 font-sans">
+                    & Statutory Registry
+                  </span>
+                </h1>
               </div>
+              <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-2">
+                <span>Encrypted compliance repository for</span>
+                <span className="text-slate-200 font-bold bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700/60 font-mono">
+                  {currentTenant?.companyName || "Your Enterprise"}
+                </span>
+              </p>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 uppercase font-mono text-[10px] tracking-wider">
-                    <th className="py-3 px-4 w-12 text-center">#</th>
-                    <th className="py-3 px-4">Document Name</th>
-                    <th className="py-3 px-4 text-center">Issue Date</th>
-                    <th className="py-3 px-4 text-center">Expiration Date</th>
-                    <th className="py-3 px-4 text-center">Optional</th>
-                    <th className="py-3 px-4">Conditional Rules & Status</th>
-                    <th className="py-3 px-4 text-right">Global Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 font-sans">
-                  {CLASS_A_MASTER_LIST.map((def, idx) => {
-                    const uploadedItem = vaultItems.find(item => item.documentCode === def.code);
-                    const isUploaded = !!uploadedItem;
-                    const daysRem = isUploaded ? calculateDaysRemaining(uploadedItem?.expiryDate) : null;
-                    const isSoonExpiring = daysRem !== null && daysRem <= 30 && daysRem >= 0;
-                    const isExp = daysRem !== null && daysRem < 0;
+            <div className="flex items-center gap-3 flex-wrap">
+              <CyberBadge
+                label="Vault Encrypted"
+                variant="emerald"
+                telemetry={`${vaultItems.length} Docs`}
+                pulse={true}
+              />
 
-                    return (
-                      <tr
-                        key={def.code}
-                        className={`hover:bg-slate-800/40 transition ${!isUploaded && !def.isOptional ? 'bg-red-500/5' : ''
-                          }`}
-                      >
-                        <td className="py-3.5 px-4 font-mono font-bold text-slate-500 text-center">
-                          {idx + 1}
-                        </td>
-                        <td className="py-3.5 px-4 font-medium text-white">
-                          <div className="flex items-center gap-2">
-                            <FileText className={`w-4 h-4 shrink-0 ${isUploaded ? 'text-blue-400' : 'text-slate-500'}`} />
-                            <div>
-                              <span className="font-bold text-slate-100">{def.name}</span>
-                              {uploadedItem?.documentNumber && (
-                                <span className="text-[10px] text-slate-400 block font-mono">
-                                  No: {uploadedItem.documentNumber}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          {def.code === 'DOC-2' ? (
-                            <span className="text-amber-400 text-sm">⚠️</span>
-                          ) : def.requiresIssueDate ? (
-                            <span className="text-emerald-400 text-sm">✅</span>
-                          ) : (
-                            <span className="text-slate-600 text-sm">❌</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          {def.code === 'DOC-2' ? (
-                            <span className="text-amber-400 text-sm">⚠️</span>
-                          ) : def.requiresExpiryDate ? (
-                            <span className="text-emerald-400 text-sm">✅</span>
-                          ) : (
-                            <span className="text-slate-600 text-sm">❌</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 text-center font-mono">
-                          {def.isOptional ? (
-                            <span className="text-amber-400 text-sm">✅</span>
-                          ) : (
-                            <span className="text-slate-600 text-sm">❌</span>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          {isUploaded ? (
-                            <div className="space-y-1">
-                              {isSoonExpiring || uploadedItem.status === 'EXPIRING_SOON' ? (
-                                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 animate-pulse">
-                                  <AlertTriangle className="w-3 h-3 text-amber-400" /> Expiring in {daysRem ?? 30} Days (30-Day Notice)
-                                </span>
-                              ) : isExp || uploadedItem.status === 'EXPIRED' ? (
-                                <span className="bg-red-500/20 text-red-300 border border-red-500/40 text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 animate-pulse">
-                                  <AlertTriangle className="w-3 h-3 text-red-400" /> EXPIRED ({daysRem ? Math.abs(daysRem) : 0} Days Ago) — Action Required
-                                </span>
-                              ) : (
-                                <span className="badge-success text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Uploaded (v{uploadedItem.versionNumber}.0)
-                                </span>
-                              )}
-                              {uploadedItem.expiryDate && (
-                                <span className="text-[10px] text-slate-400 block font-mono">
-                                  Expires: {uploadedItem.expiryDate}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="space-y-0.5">
-                              <span className={`text-[10px] font-semibold block ${def.isOptional ? 'text-slate-400' : 'text-red-400 font-bold'
-                                }`}>
-                                {def.isOptional ? 'Optional — Pending Upload' : 'Required — Missing'}
-                              </span>
-                              <span className="text-[10px] text-slate-500 block leading-tight">{def.conditionalRuleNote}</span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {isUploaded ? (
-                              <>
-                                <button
-                                  onClick={() => openPreviewItem(uploadedItem)}
-                                  className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-blue-500/30"
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                  <span>View PDF</span>
-                                </button>
-                                <button
-                                  onClick={() => openEditModal(uploadedItem)}
-                                  className="px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-amber-500/30"
-                                  title="Edit Document Number, Title, or Validity Dates"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setReplaceTargetItem(uploadedItem);
-                                    resetFormState();
-                                  }}
-                                  className={`px-3 py-1.5 rounded-lg transition font-bold text-[11px] flex items-center gap-1.5 border shadow cursor-pointer ${isSoonExpiring || isExp || uploadedItem.status === 'EXPIRING_SOON' || uploadedItem.status === 'EXPIRED'
-                                    ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-400 animate-pulse'
-                                    : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border-emerald-500/30'
-                                    }`}
-                                  title="Click to replace document at any time or update expiring document"
-                                >
-                                  <RefreshCw className="w-3.5 h-3.5" />
-                                  <span>{isSoonExpiring || isExp ? 'Upload Replacement (30-Day Notice)' : 'Replace PDF'}</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteClassADoc(uploadedItem)}
-                                  className="px-2.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-red-500/30 cursor-pointer"
-                                  title="Delete uploaded document and clear this slot"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Delete</span>
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  setUploadTargetDef(def);
-                                  resetFormState();
-                                }}
-                                className="px-3 py-1.5 rounded-lg text-white font-semibold text-[11px] shadow transition flex items-center gap-1.5 hover:opacity-90 cursor-pointer"
-                                style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
-                              >
-                                <Upload className="w-3.5 h-3.5" />
-                                <span>Upload Document</span>
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+              <button
+                onClick={handleResetClassAVault}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+                title="Remove all uploaded PDFs and reset PhilGEPS and Class A slots to v1.0 for re-uploading from scratch"
+              >
+                <RefreshCw className="w-4 h-4 text-amber-400" />
+                <span>Reset & Refresh Vault</span>
+              </button>
 
-                  {/* CUSTOM / ADDITIONAL PROJECT-SPECIFIC LEGAL DOCUMENTS */}
-                  {customClassAItems.map((item, idx) => {
-                    const daysRem = calculateDaysRemaining(item.expiryDate);
-                    const isSoonExpiring = daysRem !== null && daysRem <= 30 && daysRem >= 0;
-                    const isExp = daysRem !== null && daysRem < 0;
+              {selectedItemIds.length > 0 && (
+                <button
+                  onClick={() => setShowMergeModal(true)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <Layers className="w-4 h-4" />
+                  <span>Merge Selected ({selectedItemIds.length})</span>
+                </button>
+              )}
 
-                    return (
-                      <tr
-                        key={item.id}
-                        className="hover:bg-slate-800/40 transition bg-blue-500/5 border-l-2 border-l-blue-500"
-                      >
-                        <td className="py-3.5 px-4 font-mono font-bold text-blue-400 text-center">
-                          {CLASS_A_MASTER_LIST.length + idx + 1}
-                        </td>
-                        <td className="py-3.5 px-4 font-medium text-white">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-blue-400 shrink-0" />
-                            <div>
-                              <span className="font-bold text-slate-100">{item.documentName}</span>
-                              <span className="text-[10px] text-blue-400 font-mono block">Additional Legal Exhibit</span>
-                              {item.documentNumber && (
-                                <span className="text-[10px] text-slate-400 block font-mono">
-                                  No: {item.documentNumber}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 text-center font-mono text-xs text-slate-300">
-                          {item.issuedDate || '—'}
-                        </td>
-                        <td className="py-3.5 px-4 text-center font-mono text-xs text-slate-300">
-                          {item.expiryDate || '—'}
-                        </td>
-                        <td className="py-3.5 px-4 text-center font-mono">
-                          <span className="text-amber-400 text-sm">✅</span>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="space-y-1">
-                            {isSoonExpiring || item.status === 'EXPIRING_SOON' ? (
-                              <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 animate-pulse">
-                                <AlertTriangle className="w-3 h-3 text-amber-400" /> Expiring in {daysRem ?? 30} Days
-                              </span>
-                            ) : isExp || item.status === 'EXPIRED' ? (
-                              <span className="bg-red-500/20 text-red-300 border border-red-500/40 text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 animate-pulse">
-                                <AlertTriangle className="w-3 h-3 text-red-400" /> EXPIRED — Action Required
-                              </span>
-                            ) : (
-                              <span className="badge-success text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Uploaded (v{item.versionNumber}.0)
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => openPreviewItem(item)}
-                              className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-blue-500/30 cursor-pointer"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>View PDF</span>
-                            </button>
-                            <button
-                              onClick={() => openEditModal(item)}
-                              className="px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-amber-500/30 cursor-pointer"
-                              title="Edit Document Number, Title, or Validity Dates"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                setReplaceTargetItem(item);
-                                resetFormState();
-                              }}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition font-bold text-[11px] flex items-center gap-1.5 border border-emerald-500/30 shadow cursor-pointer"
-                              title="Replace PDF file"
-                            >
-                              <RefreshCw className="w-3.5 h-3.5" />
-                              <span>Replace PDF</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteClassADoc(item)}
-                              className="px-2.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-red-500/30 cursor-pointer"
-                              title="Delete this custom document"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Delete</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <button
+                onClick={() => {
+                  resetFormState();
+                  setCustomUploadCategory("ELIGIBILITY_CLASS_A");
+                  setShowCustomUploadModal(true);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg shadow-blue-600/25 transition-all flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
+                style={{
+                  backgroundColor: currentTenant?.brandColor || "#1e40af",
+                }}
+                title="Add custom or project-specific legal document to vault"
+              >
+                <Plus className="w-4 h-4 text-blue-200" />
+                <span>+ Add Legal Document</span>
+              </button>
             </div>
           </div>
         </div>
-      )}
 
-      {/* TECHNICAL EXHIBITS — TECHNICAL DOCUMENTS SUB-TAB */}
-      {selectedCategory === 'TECHNICAL' && (
-        <div className="space-y-6">
-
-          {/* Sub-Tab Navigation Bar */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setTechSubTab('CHECKLIST')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${techSubTab === 'CHECKLIST'
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                  }`}
+        {/* UNIFIED VAULT SUCCESS / FAILURE NOTIFICATION BANNER */}
+        {vaultNotification && (
+          <div
+            className={`p-4 rounded-2xl border-2 flex items-start justify-between gap-4 shadow-xl animate-fadeIn ${
+              vaultNotification.type === "SUCCESS"
+                ? "bg-emerald-500/15 border-emerald-500/40 text-white"
+                : "bg-red-500/15 border-red-500/40 text-white"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`p-2 rounded-xl shrink-0 mt-0.5 ${
+                  vaultNotification.type === "SUCCESS"
+                    ? "bg-emerald-500/20 text-emerald-400"
+                    : "bg-red-500/20 text-red-400"
+                }`}
               >
-                <FileSignature className="w-4 h-4" />
-                <span>Technical Requirements Checklist</span>
-                <span className="text-[10px] font-mono bg-blue-950 px-2 py-0.5 rounded-full border border-blue-400">
-                  {techCompletedIds.length} / 8 Completed
-                </span>
-              </button>
-
-              <button
-                onClick={() => setTechSubTab('COMPLETED')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${techSubTab === 'COMPLETED'
-                  ? 'bg-emerald-600 text-white shadow-lg'
-                  : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
-                  }`}
-              >
-                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                <span>Completed Technical Documents & Forms</span>
-                <span className="text-[10px] font-mono bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500 font-bold">
-                  {completedTechVaultItems.length} Saved
-                </span>
-              </button>
-            </div>
-
-            <span className="text-xs text-slate-400 font-mono">
-              RA 12009 NGPA Statutory Technical Compliance Engine
-            </span>
-          </div>
-
-          {oppProjects.length > 0 && (
-            <div className="p-4 rounded-2xl border border-slate-800 bg-slate-950/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-0.5">
-                  <p className="text-[11px] text-slate-400 font-mono">Active Bidding Project Scope</p>
-                  {activeProjectRefNo && (
-                    <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                      <Lock className="w-3 h-3 text-amber-400" />
-                      <span>Project Locked (1 Project at a Time)</span>
-                    </span>
-                  )}
-                </div>
-                <h4 className="text-sm font-bold text-white">
-                  {activeProjectRefNo ? `[${activeProjectRefNo}] ${activeProjectTitle}` : 'No Project Selected'}
-                </h4>
-                <p className="text-[11px] text-slate-500">
-                  {activeProjectRefNo ? activeProcuringEntity : 'Please select a bidding project to scope technical and financial components'}
-                </p>
+                {vaultNotification.type === "SUCCESS" ? (
+                  <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                ) : (
+                  <AlertTriangle className="w-6 h-6 text-red-400" />
+                )}
               </div>
-              <div className="min-w-65 flex items-center gap-2">
-                <div className="flex-1">
-                  <label className="block text-slate-300 text-[11px] font-medium mb-1">Target Bidding Project (Locked)</label>
-                  <select
-                    value={activeProjectRefNo}
-                    disabled={Boolean(activeProjectRefNo)}
-                    onChange={(e) => handleSelectActiveProject(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500 disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-950/80"
-                  >
-                    <option value="">-- Choose / Select a Bidding Project --</option>
-                    {oppProjects.map((project) => (
-                      <option key={project.id} value={project.refNo}>
-                        [{project.refNo}] {project.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {activeProjectRefNo && (
-                  <button
-                    type="button"
-                    onClick={handleUnlockOrChangeProject}
-                    className="mt-5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700 shrink-0 cursor-pointer shadow"
-                    title="Unlock to switch or select a different project"
-                  >
-                    <Unlock className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Unlock Project</span>
-                  </button>
+              <div className="space-y-1">
+                <h4
+                  className={`text-sm font-bold font-mono ${
+                    vaultNotification.type === "SUCCESS"
+                      ? "text-emerald-300"
+                      : "text-red-300"
+                  }`}
+                >
+                  {vaultNotification.title}
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  {vaultNotification.message}
+                </p>
+                {vaultNotification.reason && (
+                  <div className="p-2.5 rounded-xl bg-red-950/90 border border-red-800/80 text-red-200 text-xs font-mono mt-2 shadow-inner">
+                    <strong className="text-red-400 font-bold block mb-0.5">
+                      Reason for Failure:
+                    </strong>
+                    <span>{vaultNotification.reason}</span>
+                  </div>
                 )}
               </div>
             </div>
-          )}
+            <button
+              onClick={() => setVaultNotification(null)}
+              className="text-slate-400 hover:text-white transition p-1 shrink-0"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        )}
 
-          {/* SUB-TAB 1: TECHNICAL DOCUMENTS CHECKLIST */}
-          {techSubTab === 'CHECKLIST' && (
+        {/* ALL CATEGORY TABS AT TOP */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
+            {[
+              { id: "ALL", label: "All Vault Documents" },
+              { id: "ELIGIBILITY_CLASS_A", label: "Class A Eligibility" },
+              { id: "TECHNICAL", label: "Technical Eligibility" },
+              { id: "FINANCIAL", label: "Financial Documents" },
+              { id: "CORPORATE_LEGAL", label: "Corporate Legal" },
+              { id: "ELIGIBILITY_CLASS_B", label: "Class B Joint Venture" },
+            ].map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
+                  selectedCategory === cat.id
+                    ? "bg-blue-600 text-white shadow-lg"
+                    : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                }`}
+              >
+                <span>{cat.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {selectedCategory !== "ELIGIBILITY_CLASS_A" &&
+            selectedCategory !== "TECHNICAL" && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => toggleSelectAll(filteredGridItems)}
+                  className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-xs font-semibold hover:text-white transition flex items-center gap-1.5"
+                >
+                  {selectedItemIds.length === filteredGridItems.length &&
+                  filteredGridItems.length > 0 ? (
+                    <CheckSquare className="w-4 h-4 text-blue-400" />
+                  ) : (
+                    <Square className="w-4 h-4 text-slate-500" />
+                  )}
+                  <span>Select All</span>
+                </button>
+
+                <div className="relative min-w-55">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search documents or serial no..."
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                </div>
+              </div>
+            )}
+        </div>
+
+        {/* TAB 1: CLASS A ELIGIBILITY MATRIX */}
+        {selectedCategory === "ELIGIBILITY_CLASS_A" && (
+          <div className="space-y-6">
+            <div
+              className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${
+                isClassAFullyCompliant
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                  : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Award className="w-6 h-6 shrink-0" />
+                <div>
+                  <h3 className="text-sm font-bold">
+                    Class A Eligibility Matrix Status: {completedMandatoryCount}{" "}
+                    / {mandatoryDefs.length} Mandatory Uploaded
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono mt-0.5">
+                    {isClassAFullyCompliant
+                      ? "100% Mandatory Class A documents uploaded & verified. Ready for automated bid envelope assembly."
+                      : "Upload the remaining mandatory Class A documents in the table below to pass GPPB eligibility audit."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleClearAllClassAUploads}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition flex items-center gap-1.5 shadow-sm"
+                  title="Remove all uploaded Class A documents to re-upload from scratch"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  <span>Remove All Uploaded Documents</span>
+                </button>
+                <span className="text-xs font-mono font-bold bg-slate-900 text-white px-3 py-1.5 rounded-xl border border-slate-800">
+                  10 Mandatory • 3 Optional
+                </span>
+              </div>
+            </div>
+
             <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl space-y-0">
-              <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+              <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  Technical Documents Requirement Checklist (Items b through g)
+                  <FileCheck className="w-4 h-4 text-blue-400" />
+                  Statutory Fixed Master Document List & Custom Exhibits (Class
+                  A)
                 </h3>
-                <span className="text-xs font-mono text-slate-400">Legal Templates Provided</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      resetFormState();
+                      setCustomUploadCategory("ELIGIBILITY_CLASS_A");
+                      setShowCustomUploadModal(true);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center gap-1.5"
+                    title="Add custom or project-specific legal document to Class A Eligibility"
+                  >
+                    <Plus className="w-4 h-4 text-blue-200" />
+                    <span>+ Add Additional Legal Document</span>
+                  </button>
+                  <button
+                    onClick={handleClearAllClassAUploads}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition flex items-center gap-1.5"
+                    title="Clear all Class A documents and start fresh"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    <span>Remove All Uploads</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="divide-y divide-slate-800/80">
-                {TECHNICAL_CHECKLIST_MASTER.map((item) => {
-                  const isCompleted = techCompletedIds.includes(item.id);
-                  const isExpanded = expandedTechItems.includes(item.id);
-                  const isProjectScoped = !!activeProjectRefNo;
-                  const projectDocExists = isProjectScoped && hasTechnicalDocForActiveProject(item.code);
-                  const canCreateForm = isProjectScoped && !projectDocExists;
-                  const createTooltip = !activeProjectRefNo
-                    ? 'Select or tag a bidding project before generating a technical exhibit.'
-                    : projectDocExists
-                      ? 'A completed technical document for this project already exists.'
-                      : 'Create and save the completed legal template for this item.';
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 uppercase font-mono text-[10px] tracking-wider">
+                      <th className="py-3 px-4 w-12 text-center">#</th>
+                      <th className="py-3 px-4">Document Name</th>
+                      <th className="py-3 px-4 text-center">Issue Date</th>
+                      <th className="py-3 px-4 text-center">Expiration Date</th>
+                      <th className="py-3 px-4 text-center">Optional</th>
+                      <th className="py-3 px-4">Conditional Rules & Status</th>
+                      <th className="py-3 px-4 text-right">Global Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-sans">
+                    {CLASS_A_MASTER_LIST.map((def, idx) => {
+                      const uploadedItem = vaultItems.find(
+                        (item) => item.documentCode === def.code,
+                      );
+                      const isUploaded = !!uploadedItem;
+                      const daysRem = isUploaded
+                        ? calculateDaysRemaining(uploadedItem?.expiryDate)
+                        : null;
+                      const isSoonExpiring =
+                        daysRem !== null && daysRem <= 30 && daysRem >= 0;
+                      const isExp = daysRem !== null && daysRem < 0;
 
-                  return (
-                    <div key={item.id} className="bg-slate-950/60 hover:bg-slate-900/50 transition">
-
-                      {/* Main Row */}
-                      <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-
-                        <div className="flex items-start gap-3 min-w-0">
-                          {/* Checkbox */}
-                          <button
-                            onClick={() => toggleTechCheckbox(item.id)}
-                            className="mt-0.5 text-slate-400 hover:text-white transition shrink-0"
-                          >
-                            {isCompleted ? (
-                              <CheckSquare className="w-5 h-5 text-emerald-400" />
-                            ) : (
-                              <Square className="w-5 h-5 text-slate-600" />
-                            )}
-                          </button>
-
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono font-bold text-xs text-blue-400 bg-blue-950 px-2 py-0.5 rounded border border-blue-800">
-                                Item {item.code}
+                      return (
+                        <tr
+                          key={def.code}
+                          className={`hover:bg-slate-800/40 transition ${
+                            !isUploaded && !def.isOptional ? "bg-red-500/5" : ""
+                          }`}
+                        >
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-500 text-center">
+                            {idx + 1}
+                          </td>
+                          <td className="py-3.5 px-4 font-medium text-white">
+                            <div className="flex items-center gap-2">
+                              <FileText
+                                className={`w-4 h-4 shrink-0 ${isUploaded ? "text-blue-400" : "text-slate-500"}`}
+                              />
+                              <div>
+                                <span className="font-bold text-slate-100">
+                                  {def.name}
+                                </span>
+                                {uploadedItem?.documentNumber && (
+                                  <span className="text-[10px] text-slate-400 block font-mono">
+                                    No: {uploadedItem.documentNumber}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            {def.code === "DOC-2" ? (
+                              <span className="text-amber-400 text-sm">⚠️</span>
+                            ) : def.requiresIssueDate ? (
+                              <span className="text-emerald-400 text-sm">
+                                ✅
                               </span>
-                              <span className="font-bold text-white text-xs leading-snug">{item.name}</span>
-                              {item.isExpandable && (
-                                <button
-                                  onClick={() => toggleTechExpand(item.id)}
-                                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition flex items-center gap-1"
+                            ) : (
+                              <span className="text-slate-600 text-sm">❌</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            {def.code === "DOC-2" ? (
+                              <span className="text-amber-400 text-sm">⚠️</span>
+                            ) : def.requiresExpiryDate ? (
+                              <span className="text-emerald-400 text-sm">
+                                ✅
+                              </span>
+                            ) : (
+                              <span className="text-slate-600 text-sm">❌</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-center font-mono">
+                            {def.isOptional ? (
+                              <span className="text-amber-400 text-sm">✅</span>
+                            ) : (
+                              <span className="text-slate-600 text-sm">❌</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            {isUploaded ? (
+                              <div className="space-y-1">
+                                {isSoonExpiring ||
+                                uploadedItem.status === "EXPIRING_SOON" ? (
+                                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 animate-pulse">
+                                    <AlertTriangle className="w-3 h-3 text-amber-400" />{" "}
+                                    Expiring in {daysRem ?? 30} Days (30-Day
+                                    Notice)
+                                  </span>
+                                ) : isExp ||
+                                  uploadedItem.status === "EXPIRED" ? (
+                                  <span className="bg-red-500/20 text-red-300 border border-red-500/40 text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 animate-pulse">
+                                    <AlertTriangle className="w-3 h-3 text-red-400" />{" "}
+                                    EXPIRED ({daysRem ? Math.abs(daysRem) : 0}{" "}
+                                    Days Ago) — Action Required
+                                  </span>
+                                ) : (
+                                  <span className="badge-success text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />{" "}
+                                    Uploaded (v{uploadedItem.versionNumber}.0)
+                                  </span>
+                                )}
+                                {uploadedItem.expiryDate && (
+                                  <span className="text-[10px] text-slate-400 block font-mono">
+                                    Expires: {uploadedItem.expiryDate}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-0.5">
+                                <span
+                                  className={`text-[10px] font-semibold block ${
+                                    def.isOptional
+                                      ? "text-slate-400"
+                                      : "text-red-400 font-bold"
+                                  }`}
                                 >
-                                  {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                                  <span>{item.subItems?.length || 2} Sub-Items</span>
+                                  {def.isOptional
+                                    ? "Optional — Pending Upload"
+                                    : "Required — Missing"}
+                                </span>
+                                <span className="text-[10px] text-slate-500 block leading-tight">
+                                  {def.conditionalRuleNote}
+                                </span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {isUploaded ? (
+                                <>
+                                  <button
+                                    onClick={() =>
+                                      openPreviewItem(uploadedItem)
+                                    }
+                                    className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-blue-500/30"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>View PDF</span>
+                                  </button>
+                                  <button
+                                    onClick={() => openEditModal(uploadedItem)}
+                                    className="px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-amber-500/30"
+                                    title="Edit Document Number, Title, or Validity Dates"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                    <span>Edit</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setReplaceTargetItem(uploadedItem);
+                                      resetFormState();
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg transition font-bold text-[11px] flex items-center gap-1.5 border shadow cursor-pointer ${
+                                      isSoonExpiring ||
+                                      isExp ||
+                                      uploadedItem.status === "EXPIRING_SOON" ||
+                                      uploadedItem.status === "EXPIRED"
+                                        ? "bg-amber-600 hover:bg-amber-500 text-white border-amber-400 animate-pulse"
+                                        : "bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border-emerald-500/30"
+                                    }`}
+                                    title="Click to replace document at any time or update expiring document"
+                                  >
+                                    <RefreshCw className="w-3.5 h-3.5" />
+                                    <span>
+                                      {isSoonExpiring || isExp
+                                        ? "Upload Replacement (30-Day Notice)"
+                                        : "Replace PDF"}
+                                    </span>
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      handleDeleteClassADoc(uploadedItem)
+                                    }
+                                    className="px-2.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-red-500/30 cursor-pointer"
+                                    title="Delete uploaded document and clear this slot"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Delete</span>
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setUploadTargetDef(def);
+                                    resetFormState();
+                                  }}
+                                  className="px-3 py-1.5 rounded-lg text-white font-semibold text-[11px] shadow transition flex items-center gap-1.5 hover:opacity-90 cursor-pointer"
+                                  style={{
+                                    backgroundColor:
+                                      currentTenant?.brandColor || "#1e40af",
+                                  }}
+                                >
+                                  <Upload className="w-3.5 h-3.5" />
+                                  <span>Upload Document</span>
                                 </button>
                               )}
                             </div>
-                            <p className="text-[11px] text-slate-400 font-mono italic">{item.notes}</p>
-                          </div>
-                        </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
 
-                        {/* Actions */}
-                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                          {!item.isExpandable && (
-                            <button
-                              type="button"
-                              onClick={() => setFillingTemplateItem({ id: item.id, code: item.code, name: item.name })}
-                              disabled={!canCreateForm}
-                              title={createTooltip}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 border transition ${canCreateForm
-                                ? 'bg-blue-600/20 text-blue-400 border-blue-500/30 hover:bg-blue-600 hover:text-white'
-                                : 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
-                              }`}
-                            >
-                              <FileSignature className="w-3.5 h-3.5" />
-                              <span>{projectDocExists ? 'Already Created' : 'Create Form'}</span>
-                            </button>
-                          )}
-                        </div>
-                        </div>
+                    {/* CUSTOM / ADDITIONAL PROJECT-SPECIFIC LEGAL DOCUMENTS */}
+                    {customClassAItems.map((item, idx) => {
+                      const daysRem = calculateDaysRemaining(item.expiryDate);
+                      const isSoonExpiring =
+                        daysRem !== null && daysRem <= 30 && daysRem >= 0;
+                      const isExp = daysRem !== null && daysRem < 0;
 
-                      {/* Expandable Sub-Items Section for Item (f) */}
-                      {item.isExpandable && isExpanded && item.subItems && (
-                        <div className="bg-slate-900/80 p-4 border-t border-slate-800 pl-10 space-y-3">
-                          <h5 className="text-[11px] font-bold text-slate-300 uppercase font-mono tracking-wider">
-                            Item (f) Expandable Sub-Checklist Requirements:
-                          </h5>
-                          <div className="space-y-2">
-                            {item.subItems.map((sub) => {
-                              const isSubCompleted = techCompletedIds.includes(sub.id);
-
-                              return (
-                                <div
-                                  key={sub.id}
-                                  className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 text-xs"
-                                >
-                                  <div className="flex items-start gap-2.5">
-                                    <button
-                                      onClick={() => toggleTechCheckbox(sub.id)}
-                                      className="mt-0.5 text-slate-400 hover:text-white transition shrink-0"
-                                    >
-                                      {isSubCompleted ? (
-                                        <CheckSquare className="w-4 h-4 text-emerald-400" />
-                                      ) : (
-                                        <Square className="w-4 h-4 text-slate-600" />
-                                      )}
-                                    </button>
-                                    <div>
-                                      <span className="font-mono font-bold text-blue-300 mr-2">{sub.code}</span>
-                                      <span className="text-slate-200 font-medium">{sub.name}</span>
-                                    </div>
-                                  </div>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => setFillingTemplateItem({ id: sub.id, code: sub.code, name: sub.name })}
-                                    disabled={!activeProjectRefNo || hasTechnicalDocForActiveProject(sub.code)}
-                                    title={!activeProjectRefNo
-                                      ? 'Select a bidding project before generating this form.'
-                                      : hasTechnicalDocForActiveProject(sub.code)
-                                        ? 'A completed technical document for this project already exists.'
-                                        : 'Create and save the completed legal template for this item.'
-                                    }
-                                    className={`px-2.5 py-1 rounded text-[11px] font-semibold flex items-center gap-1 border transition ${activeProjectRefNo && !hasTechnicalDocForActiveProject(sub.code)
-                                      ? 'bg-blue-600/20 text-blue-400 border-blue-500/30 hover:bg-blue-600 hover:text-white'
-                                      : 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
-                                    } shrink-0`}
-                                  >
-                                    <FileSignature className="w-3 h-3" />
-                                    <span>{hasTechnicalDocForActiveProject(sub.code) ? 'Already Created' : 'Create Form'}</span>
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* SUB-TAB 2: COMPLETED TECHNICAL DOCUMENTS & FORMS */}
-          {techSubTab === 'COMPLETED' && (
-            <div className="space-y-4">
-              {/* Bidding Project Filter Bar & Document Management */}
-              {(() => {
-                // Build complete option list combining Opportunity Finder projects and existing form project tags
-                const allAvailableProjects = (() => {
-                  const seenRefs = new Set<string>();
-                  const list: { refNo: string; title: string; docCount: number }[] = [];
-
-                  oppProjects.forEach(p => {
-                    if (p.refNo && !seenRefs.has(p.refNo)) {
-                      seenRefs.add(p.refNo);
-                      const count = completedTechVaultItems.filter(i => i.philgepsRefNo === p.refNo).length;
-                      list.push({ refNo: p.refNo, title: p.title, docCount: count });
-                    }
-                  });
-
-                  completedTechVaultItems.forEach(i => {
-                    if (i.philgepsRefNo && !seenRefs.has(i.philgepsRefNo)) {
-                      seenRefs.add(i.philgepsRefNo);
-                      list.push({
-                        refNo: i.philgepsRefNo,
-                        title: i.projectTitle || 'Bidding Opportunity',
-                        docCount: completedTechVaultItems.filter(doc => doc.philgepsRefNo === i.philgepsRefNo).length
-                      });
-                    }
-                  });
-
-                  return list;
-                })();
-
-                const selectedProjectOption = allAvailableProjects.find(p => p.refNo === selectedTechProjectFilter);
-
-                const displayedCompletedTechItems = completedTechVaultItems.filter(item => {
-                  if (selectedTechProjectFilter === 'ALL') return true;
-                  return item.philgepsRefNo === selectedTechProjectFilter;
-                });
-
-                if (completedTechVaultItems.length === 0) {
-                  return (
-                    <div className="glass-panel p-12 text-center rounded-2xl border border-slate-800 space-y-4">
-                      <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto">
-                        <CheckCircle2 className="w-6 h-6" />
-                      </div>
-                      <div className="max-w-md mx-auto space-y-2">
-                        <h3 className="text-base font-bold text-white">No Completed Technical Documents Saved Yet</h3>
-                        <p className="text-xs text-slate-400 leading-relaxed">
-                          Go to <span className="text-blue-400 font-bold">Technical Requirements Checklist</span> sub-tab above and click <span className="text-white font-bold">"Fill Legal Template"</span> on Item (b) Statement of Ongoing Contracts or Item (c) SLCC to generate and save your completed technical forms.
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setTechSubTab('CHECKLIST')}
-                        className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow transition inline-flex items-center gap-2"
-                      >
-                        <FileSignature className="w-4 h-4" />
-                        <span>Go to Technical Checklist & Fill Templates</span>
-                      </button>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="space-y-4">
-                    {/* Filter Bar */}
-                    <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 font-mono">
-                      <div className="flex items-center gap-2 text-xs font-bold text-blue-400">
-                        <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
-                        <span>Filter Completed Technical Forms by Bidding Project:</span>
-                      </div>
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <select
-                          value={selectedTechProjectFilter}
-                          onChange={(e) => setSelectedTechProjectFilter(e.target.value)}
-                          className="w-full sm:w-auto bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-1.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer"
+                      return (
+                        <tr
+                          key={item.id}
+                          className="hover:bg-slate-800/40 transition bg-blue-500/5 border-l-2 border-l-blue-500"
                         >
-                          <option value="ALL">All Bidding Projects ({completedTechVaultItems.length} Total Forms)</option>
-                          {allAvailableProjects.map(p => (
-                            <option key={p.refNo} value={p.refNo}>
-                              [{p.refNo}] {p.title} ({p.docCount} saved)
-                            </option>
-                          ))}
-                        </select>
-                        {selectedTechProjectFilter !== 'ALL' && (
-                          <button
-                            onClick={() => setSelectedTechProjectFilter('ALL')}
-                            className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-950 border border-slate-800 hover:text-white transition shrink-0"
-                            title="Clear project filter to show all"
-                          >
-                            Clear Filter
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Filter Active Summary Banner */}
-                    {selectedTechProjectFilter !== 'ALL' && (
-                      <div className="p-3 rounded-xl bg-blue-950/60 border border-blue-500/40 flex items-center justify-between flex-wrap gap-2 text-xs font-mono">
-                        <div className="flex items-center gap-2">
-                          <Filter className="w-4 h-4 text-blue-400 shrink-0" />
-                          <span className="text-slate-300 font-medium">Active Project Filter:</span>
-                          <span className="text-white font-bold">[{selectedTechProjectFilter}] {selectedProjectOption?.title || 'Selected Opportunity'}</span>
-                        </div>
-                        <span className="text-blue-300 font-bold bg-blue-900/80 px-2.5 py-0.5 rounded-full border border-blue-400 text-[11px]">
-                          {displayedCompletedTechItems.length} Completed Form{displayedCompletedTechItems.length !== 1 ? 's' : ''} Found
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Empty State for specific project filter */}
-                    {displayedCompletedTechItems.length === 0 ? (
-                      <div className="glass-panel p-8 text-center rounded-2xl border border-slate-800 space-y-4">
-                        <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto">
-                          <Building2 className="w-6 h-6" />
-                        </div>
-                        <div className="max-w-md mx-auto space-y-1">
-                          <h3 className="text-sm font-bold text-white">No Completed Technical Forms Found for Filtered Project</h3>
-                          <p className="text-xs text-blue-400 font-mono font-bold truncate">
-                            [{selectedTechProjectFilter}] {selectedProjectOption?.title || 'Selected Bidding Project'}
-                          </p>
-                          <p className="text-xs text-slate-400 leading-relaxed pt-1">
-                            No completed technical forms have been generated and saved for this project reference yet. Switch to the Checklist tab to generate forms for this project.
-                          </p>
-                        </div>
-                        <div className="flex items-center justify-center gap-3 pt-2">
-                          <button
-                            onClick={() => setSelectedTechProjectFilter('ALL')}
-                            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-900 border border-slate-800 hover:text-white transition"
-                          >
-                            Show All Projects ({completedTechVaultItems.length} Total)
-                          </button>
-                          <button
-                            onClick={() => setTechSubTab('CHECKLIST')}
-                            className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center gap-1.5"
-                          >
-                            <FileSignature className="w-4 h-4" />
-                            <span>Go to Technical Checklist & Fill Form</span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {displayedCompletedTechItems.map((item) => (
-                          <SpotlightCard
-                            key={item.id}
-                            spotlightColor="rgba(16, 185, 129, 0.2)"
-                            enableTilt={true}
-                            className="p-5 rounded-2xl border border-slate-800/90 hover:border-emerald-500/50 transition-all duration-300 space-y-4 flex flex-col justify-between shadow-xl"
-                          >
-                            <div className="space-y-3">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                  <CheckCircle2 className="w-3 h-3" /> Technical Completed Form
-                                </span>
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800/80 text-slate-300 font-semibold border border-slate-700/60">
-                                  v{item.versionNumber}.0
-                                </span>
-                              </div>
-
+                          <td className="py-3.5 px-4 font-mono font-bold text-blue-400 text-center">
+                            {CLASS_A_MASTER_LIST.length + idx + 1}
+                          </td>
+                          <td className="py-3.5 px-4 font-medium text-white">
+                            <div className="flex items-center gap-2">
+                              <FileText className="w-4 h-4 text-blue-400 shrink-0" />
                               <div>
-                                <h3 className="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors leading-snug">{item.documentName}</h3>
-                                <p className="text-xs text-slate-400 mt-1 font-mono">Ref: {item.documentNumber || 'N/A'}</p>
-                              </div>
-
-                              <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2 text-[11px] font-mono text-slate-400 backdrop-blur-sm">
-                                {item.philgepsRefNo ? (
-                                  <div className="p-2.5 rounded-lg bg-blue-950/80 border border-blue-500/40 text-[11px] font-mono space-y-1">
-                                    <div className="flex items-center justify-between gap-1">
-                                      <span className="text-blue-300 font-bold flex items-center gap-1">
-                                        <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" /> Tagged Bidding Project:
-                                      </span>
-                                      <button
-                                        onClick={() => openRetagModal(item)}
-                                        className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline flex items-center gap-1 transition cursor-pointer"
-                                        title="Change or update associated Bidding Project tag"
-                                      >
-                                        Retag
-                                      </button>
-                                    </div>
-                                    <p className="text-white font-bold truncate">
-                                      [{item.philgepsRefNo}] {item.projectTitle || 'Selected Opportunity'}
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/80 border border-slate-800">
-                                    <span className="text-slate-500 italic text-[10px]">No specific project tagged</span>
-                                    <button
-                                      onClick={() => openRetagModal(item)}
-                                      className="text-[10px] text-blue-400 hover:text-blue-300 font-bold underline cursor-pointer"
-                                    >
-                                      + Tag to Project
-                                    </button>
-                                  </div>
+                                <span className="font-bold text-slate-100">
+                                  {item.documentName}
+                                </span>
+                                <span className="text-[10px] text-blue-400 font-mono block">
+                                  Additional Legal Exhibit
+                                </span>
+                                {item.documentNumber && (
+                                  <span className="text-[10px] text-slate-400 block font-mono">
+                                    No: {item.documentNumber}
+                                  </span>
                                 )}
-                                <p className="text-slate-300 font-semibold">{item.legalBasisReference}</p>
-                                <p className="truncate">File: {item.fileName}</p>
-                                <p className="text-[10px] text-slate-500">Saved by: {item.uploadedByName}</p>
                               </div>
                             </div>
-
-                            <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                          </td>
+                          <td className="py-3.5 px-4 text-center font-mono text-xs text-slate-300">
+                            {item.issuedDate || "—"}
+                          </td>
+                          <td className="py-3.5 px-4 text-center font-mono text-xs text-slate-300">
+                            {item.expiryDate || "—"}
+                          </td>
+                          <td className="py-3.5 px-4 text-center font-mono">
+                            <span className="text-amber-400 text-sm">✅</span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="space-y-1">
+                              {isSoonExpiring ||
+                              item.status === "EXPIRING_SOON" ? (
+                                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 animate-pulse">
+                                  <AlertTriangle className="w-3 h-3 text-amber-400" />{" "}
+                                  Expiring in {daysRem ?? 30} Days
+                                </span>
+                              ) : isExp || item.status === "EXPIRED" ? (
+                                <span className="bg-red-500/20 text-red-300 border border-red-500/40 text-[10px] px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1 animate-pulse">
+                                  <AlertTriangle className="w-3 h-3 text-red-400" />{" "}
+                                  EXPIRED — Action Required
+                                </span>
+                              ) : (
+                                <span className="badge-success text-[10px] px-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />{" "}
+                                  Uploaded (v{item.versionNumber}.0)
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
                               <button
                                 onClick={() => openPreviewItem(item)}
-                                className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30 cursor-pointer"
-                                title="View completed PDF document"
+                                className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-blue-500/30 cursor-pointer"
                               >
                                 <Eye className="w-3.5 h-3.5" />
                                 <span>View PDF</span>
                               </button>
-
                               <button
-                                onClick={() => {
-                                  setFillingTemplateItem({
-                                    id: item.documentCode?.toLowerCase() || 'tech-b',
-                                    code: item.documentCode || 'b',
-                                    name: item.documentName
-                                  });
-                                }}
-                                className="px-3 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-amber-500/30 cursor-pointer"
-                                title="Edit form entries in legal template"
+                                onClick={() => openEditModal(item)}
+                                className="px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-amber-500/30 cursor-pointer"
+                                title="Edit Document Number, Title, or Validity Dates"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
-                                <span>Edit Form</span>
+                                <span>Edit</span>
                               </button>
-
                               <button
                                 onClick={() => {
                                   setReplaceTargetItem(item);
                                   resetFormState();
                                 }}
-                                className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30 cursor-pointer"
+                                className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition font-bold text-[11px] flex items-center gap-1.5 border border-emerald-500/30 shadow cursor-pointer"
                                 title="Replace PDF file"
                               >
                                 <RefreshCw className="w-3.5 h-3.5" />
-                                <span>Replace</span>
+                                <span>Replace PDF</span>
                               </button>
-
                               <button
-                                onClick={() => handleDeleteCompletedTechDoc(item.id, item.documentName)}
-                                className="px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30 cursor-pointer"
-                                title="Delete completed technical document"
+                                onClick={() => handleDeleteClassADoc(item)}
+                                className="px-2.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition font-semibold text-[11px] flex items-center gap-1 border border-red-500/30 cursor-pointer"
+                                title="Delete this custom document"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 <span>Delete</span>
                               </button>
                             </div>
-                          </SpotlightCard>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-
-        </div>
-      )}
-
-      {/* OTHER CATEGORY TABS (ALL, CLASS B, FINANCIAL, CORPORATE LEGAL) GRID */}
-      {selectedCategory !== 'ELIGIBILITY_CLASS_A' && selectedCategory !== 'TECHNICAL' && (
-        <div className="space-y-6">
-
-          {/* SECTION SEPARATOR BANNER FOR ORGANIZED VIEW */}
-          {selectedCategory === 'ALL' && (
-            <div className="p-4 rounded-2xl bg-linear-to-r from-slate-900 via-blue-950/40 to-slate-900 border border-blue-500/30 flex items-center justify-between flex-wrap gap-3 shadow-lg">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                  <Layers className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                    <span>Organized Document Vault — Statutory Component Registry</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase">
-                      Class A • Technical • Financial
-                    </span>
-                  </h3>
-                  <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                    Categorized into Class A Legal Eligibility, Technical Exhibits (Envelope 1), and Financial Component (Envelope 2).
-                  </p>
-                </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
+            </div>
+          </div>
+        )}
 
+        {/* TECHNICAL EXHIBITS — TECHNICAL DOCUMENTS SUB-TAB */}
+        {selectedCategory === "TECHNICAL" && (
+          <div className="space-y-6">
+            {/* Sub-Tab Navigation Bar */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-slate-300 font-bold bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-                  {filteredGridItems.length} Saved Documents
-                </span>
-              </div>
-            </div>
-          )}
+                <button
+                  onClick={() => setTechSubTab("CHECKLIST")}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                    techSubTab === "CHECKLIST"
+                      ? "bg-blue-600 text-white shadow-lg"
+                      : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
+                  }`}
+                >
+                  <FileSignature className="w-4 h-4" />
+                  <span>Technical Requirements Checklist</span>
+                  <span className="text-[10px] font-mono bg-blue-950 px-2 py-0.5 rounded-full border border-blue-400">
+                    {techCompletedIds.length} / 8 Completed
+                  </span>
+                </button>
 
-          {/* INDIVIDUAL CATEGORY HEADER BANNER */}
-          {selectedCategory !== 'ALL' && (
-            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <FileText className="w-5 h-5" />
-                </div>
+                <button
+                  onClick={() => setTechSubTab("COMPLETED")}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 ${
+                    techSubTab === "COMPLETED"
+                      ? "bg-emerald-600 text-white shadow-lg"
+                      : "bg-slate-950 text-slate-400 hover:text-white border border-slate-800"
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                  <span>Completed Technical Documents & Forms</span>
+                  <span className="text-[10px] font-mono bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500 font-bold">
+                    {completedTechVaultItems.length} Saved
+                  </span>
+                </button>
+              </div>
+
+              <span className="text-xs text-slate-400 font-mono">
+                RA 12009 NGPA Statutory Technical Compliance Engine
+              </span>
+            </div>
+
+            {oppProjects.length > 0 && (
+              <div className="p-4 rounded-2xl border border-slate-800 bg-slate-950/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                    {selectedCategory === 'FINANCIAL' ? '3. Financial Component Documents (Envelope 2)' : selectedCategory === 'CORPORATE_LEGAL' ? '4. Corporate Legal Documents' : '5. Class B Joint Venture Documents'}
-                  </h3>
-                  <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                    {selectedCategory === 'FINANCIAL' ? 'Financial Bid Form, Bill of Quantities (BOQ), Detailed Estimates, Unit Price Schedules & Cash Flow Statements' : 'Corporate resolutions, secretary certificates, power of attorney, and joint venture agreements.'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* FINANCIAL DOCUMENTS STATUTORY FORMS GENERATOR CARDS */}
-          {selectedCategory === 'FINANCIAL' && (
-            <div className="space-y-4">
-
-              {/* Active Project Scope Bar for Financial Documents */}
-              {oppProjects.length > 0 && (
-                <div className="p-4 rounded-2xl border border-slate-800 bg-slate-950/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-[11px] text-slate-400 font-mono">Active Bidding Project Scope</p>
-                      {activeProjectRefNo && (
-                        <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                          <Lock className="w-3 h-3 text-amber-400" />
-                          <span>Project Locked (1 Project at a Time)</span>
-                        </span>
-                      )}
-                    </div>
-                    <h4 className="text-sm font-bold text-white">
-                      {activeProjectRefNo ? `[${activeProjectRefNo}] ${activeProjectTitle}` : 'No Project Selected'}
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      {activeProjectRefNo ? activeProcuringEntity : 'Please select a bidding project to generate or view financial component documents'}
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-[11px] text-slate-400 font-mono">
+                      Active Bidding Project Scope
                     </p>
-                  </div>
-                  <div className="min-w-65 flex items-center gap-2">
-                    <div className="flex-1">
-                      <label className="block text-slate-300 text-[11px] font-medium mb-1">Target Bidding Project (Locked)</label>
-                      <select
-                        value={activeProjectRefNo}
-                        disabled={Boolean(activeProjectRefNo)}
-                        onChange={(e) => handleSelectActiveProject(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500 disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-950/80"
-                      >
-                        <option value="">-- Choose / Select a Bidding Project --</option>
-                        {oppProjects.map((project) => (
-                          <option key={project.id} value={project.refNo}>
-                            [{project.refNo}] {project.title}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
                     {activeProjectRefNo && (
-                      <button
-                        type="button"
-                        onClick={handleUnlockOrChangeProject}
-                        className="mt-5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700 shrink-0 cursor-pointer shadow"
-                        title="Unlock to switch or select a different project"
-                      >
-                        <Unlock className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Unlock Project</span>
-                      </button>
+                      <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                        <Lock className="w-3 h-3 text-amber-400" />
+                        <span>Project Locked (1 Project at a Time)</span>
+                      </span>
                     )}
                   </div>
+                  <h4 className="text-sm font-bold text-white">
+                    {activeProjectRefNo
+                      ? `[${activeProjectRefNo}] ${activeProjectTitle}`
+                      : "No Project Selected"}
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    {activeProjectRefNo
+                      ? activeProcuringEntity
+                      : "Please select a bidding project to scope technical and financial components"}
+                  </p>
                 </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                
-                {/* CARD 1 (FIRST IN LINE): (L) Detailed Estimates Form */}
-                {(() => {
-                  const isDone = hasFinancialDocForActiveProject('PBD-DETAILED-ESTIMATES');
-                  const existingDoc = getCompletedFinancialDocForActiveProject('PBD-DETAILED-ESTIMATES');
-                  const isInBidPackage = existingDoc ? isDocInBidPackage(existingDoc) : false;
-
-                  return (
-                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? 'border-blue-500/60 bg-blue-950/20' : isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-purple-500/50'}`}>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between flex-wrap gap-1">
-                          {isInBidPackage ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
-                              <Layers className="w-3 h-3 text-blue-400" /> In Bid Package
-                            </span>
-                          ) : isDone ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-amber-400" /> Pending
-                            </span>
-                          )}
-                          <span className="text-[9px] font-mono text-purple-400 font-bold">Form (L) • 1st</span>
-                        </div>
-
-                        <div>
-                          <h3 className="text-sm font-bold text-white leading-snug">(L) Detailed Estimates</h3>
-                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                            Statutory Form (L) Detailed Estimates Form with unit prices of materials, labor rates, rentals, and tax breakdown.
-                          </p>
-                        </div>
-
-                        <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
-                          <p className="text-slate-300 font-bold">Ref: Statutory Form (L)</p>
-                          <p className="text-purple-400">Legal 13" × 8.5"</p>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
-                        {isDone && existingDoc ? (
-                          <>
-                            <button
-                              onClick={() => openPreviewItem(existingDoc)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
-                              title="View saved PDF"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>PDF</span>
-                            </button>
-                            {isInBidPackage ? (
-                              <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
-                                In Bid Package
-                              </span>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => setShowDetailedEstimatesModal(true)}
-                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
-                                  title="Re-edit or update"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
-                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
-                                  title="Delete from project"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Del</span>
-                                </button>
-                              </>
-                            )}
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => setShowDetailedEstimatesModal(true)}
-                            className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow transition flex items-center justify-center gap-1"
-                          >
-                            <FileSignature className="w-3.5 h-3.5" />
-                            <span>Create Form</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* CARD 2: Unified Financial Bid Form (Auto-Classified: Goods, Infra, Consulting) */}
-                {(() => {
-                  const isDoneGoods = hasFinancialDocForActiveProject('GPPB-BIDFORM-GOODS');
-                  const isDoneInfra = hasFinancialDocForActiveProject('GPPB-BIDFORM-INFRASTRUCTURE');
-                  const isDone = isDoneGoods || isDoneInfra;
-                  const existingDoc = getCompletedFinancialDocForActiveProject('GPPB-BIDFORM-GOODS') || getCompletedFinancialDocForActiveProject('GPPB-BIDFORM-INFRASTRUCTURE');
-                  const isInBidPackage = existingDoc ? isDocInBidPackage(existingDoc) : false;
-
-                  const matchedProject = oppProjects.find(p => p.refNo === activeProjectRefNo || p.id === activeProjectRefNo);
-                  const isInfraProject = (() => {
-                    // 1. Primary Authority: Project's explicit category
-                    if (matchedProject?.category) {
-                      const cat = matchedProject.category.toUpperCase();
-                      if (cat.includes('INFRA') || cat.includes('CIVIL')) return true;
-                      if (cat.includes('GOOD')) return false;
-                      if (cat.includes('CONSULT')) return false;
-                    }
-                    // 2. Fallback: Check project title and ref if category is not explicitly set
-                    const combined = `${activeProjectRefNo || ''} ${activeProjectTitle || matchedProject?.title || ''}`.toUpperCase();
-                    return combined.includes('CONSTRUCT') || combined.includes('CIVIL WORKS') || combined.includes('ROAD OPENING') || combined.includes('DRAINAGE SYSTEM') || combined.includes('INFRASTRUCTURE') || combined.includes('BUILDING');
-                  })();
-
-                  const handleOpenBidForm = () => {
-                    if (isInfraProject) {
-                      setShowBidFormInfraModal(true);
-                    } else {
-                      setShowBidFormGoodsModal(true);
-                    }
-                  };
-
-                  return (
-                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? 'border-blue-500/60 bg-blue-950/20' : isDone ? 'border-emerald-500/60 bg-emerald-950/10' : (isInfraProject ? 'border-slate-800 hover:border-amber-500/50' : 'border-slate-800 hover:border-blue-500/50')}`}>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between flex-wrap gap-1">
-                          {isInBidPackage ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
-                              <Layers className="w-3 h-3 text-blue-400" /> In Bid Package
-                            </span>
-                          ) : isDone ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-amber-400" /> Pending
-                            </span>
-                          )}
-                          <span className={`text-[9px] font-mono font-bold ${isInfraProject ? 'text-amber-400' : 'text-blue-400'}`}>
-                            {isInfraProject ? 'Infra Template' : 'Goods & Services'}
-                          </span>
-                        </div>
-
-                        <div>
-                          <h3 className="text-sm font-bold text-white leading-snug">
-                            {isInfraProject ? 'Infrastructure Bid Form' : 'Financial Bid Form'}
-                          </h3>
-                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                            {isInfraProject
-                              ? 'Statutory Bid Form for Infrastructure Projects (GPPB Resolution 09-2020).'
-                              : 'Statutory Financial Bid Form for Goods, Services, and Consulting Projects.'}
-                          </p>
-                        </div>
-
-                        <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
-                          <p className="text-slate-300 font-bold">
-                            {isInfraProject ? 'Ref: GPPB Res. 09-2020' : 'Ref: GPPB 6th Ed. PBDs'}
-                          </p>
-                          <p className={isInfraProject ? 'text-amber-400' : 'text-blue-400'}>
-                            {isInfraProject ? 'Infrastructure (Auto-Selected)' : 'Goods & Services (Auto-Selected)'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
-                        {isDone && existingDoc ? (
-                          <>
-                            <button
-                              onClick={() => openPreviewItem(existingDoc)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
-                              title="View saved PDF"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>PDF</span>
-                            </button>
-                            {isInBidPackage ? (
-                              <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
-                                In Bid Package
-                              </span>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => {
-                                    if (existingDoc.documentCode === 'GPPB-BIDFORM-INFRASTRUCTURE') {
-                                      setShowBidFormInfraModal(true);
-                                    } else {
-                                      setShowBidFormGoodsModal(true);
-                                    }
-                                  }}
-                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
-                                  title="Re-edit or update"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
-                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
-                                  title="Delete from project"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Del</span>
-                                </button>
-                              </>
-                            )}
-                          </>
-                        ) : (
-                          <button
-                            onClick={handleOpenBidForm}
-                            className={`w-full px-3 py-1.5 rounded-xl text-xs font-bold shadow transition flex items-center justify-center gap-1.5 ${
-                              isInfraProject
-                                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
-                                : 'bg-blue-600 hover:bg-blue-500 text-white'
-                            }`}
-                          >
-                            <FileSignature className="w-3.5 h-3.5" />
-                            <span>Create Bid Form</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* CARD 3: Bill of Quantities (BOQ) */}
-                {(() => {
-                  const isDone = hasFinancialDocForActiveProject('BOQ');
-                  const existingDoc = getCompletedFinancialDocForActiveProject('BOQ');
-                  const isInBidPackage = existingDoc ? isDocInBidPackage(existingDoc) : false;
-
-                  return (
-                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? 'border-blue-500/60 bg-blue-950/20' : isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-blue-500/50'}`}>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between flex-wrap gap-1">
-                          {isInBidPackage ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
-                              <Layers className="w-3 h-3 text-blue-400" /> In Bid Package
-                            </span>
-                          ) : isDone ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-amber-400" /> Pending
-                            </span>
-                          )}
-                          <span className="text-[9px] font-mono text-slate-400">Cols 1 to 6</span>
-                        </div>
-
-                        <div>
-                          <h3 className="text-sm font-bold text-white leading-snug">Bill of Quantities (BOQ)</h3>
-                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                            Statutory Bill of Quantities schedule tracing columns 1-6 with unit prices, quantity & auto-totals.
-                          </p>
-                        </div>
-
-                        <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
-                          <p className="text-slate-300 font-bold">Ref: Sec. 32.2.1</p>
-                          <p className="text-blue-400">Legal 13" × 8.5"</p>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
-                        {isDone && existingDoc ? (
-                          <>
-                            <button
-                              onClick={() => openPreviewItem(existingDoc)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
-                              title="View saved PDF"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>PDF</span>
-                            </button>
-                            {isInBidPackage ? (
-                              <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
-                                In Bid Package
-                              </span>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => setShowBoqModal(true)}
-                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
-                                  title="Re-edit or update"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
-                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
-                                  title="Delete from project"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Del</span>
-                                </button>
-                              </>
-                            )}
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => setShowBoqModal(true)}
-                            className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center justify-center gap-1"
-                          >
-                            <FileSignature className="w-3.5 h-3.5" />
-                            <span>Create Form</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* CARD 4: Price Schedule for Goods */}
-                {(() => {
-                  const isDone = hasFinancialDocForActiveProject('GPPB-PRICESCHED-GOODS');
-                  const existingDoc = getCompletedFinancialDocForActiveProject('GPPB-PRICESCHED-GOODS');
-                  const isInBidPackage = existingDoc ? isDocInBidPackage(existingDoc) : false;
-
-                  return (
-                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? 'border-blue-500/60 bg-blue-950/20' : isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-emerald-500/50'}`}>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between flex-wrap gap-1">
-                          {isInBidPackage ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
-                              <Layers className="w-3 h-3 text-blue-400" /> In Bid Package
-                            </span>
-                          ) : isDone ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-amber-400" /> Pending
-                            </span>
-                          )}
-                          <span className="text-[9px] font-mono text-slate-400">Cols 1 to 10</span>
-                        </div>
-
-                        <div>
-                          <h3 className="text-sm font-bold text-white leading-snug">Price Schedule</h3>
-                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                            Statutory Price Schedule tracing columns 1-10 with EXW unit price, taxes, and auto-computed total cost.
-                          </p>
-                        </div>
-
-                        <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
-                          <p className="text-slate-300 font-bold">Ref: Section 32.2.1</p>
-                          <p className="text-emerald-400">Legal 13" × 8.5"</p>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
-                        {isDone && existingDoc ? (
-                          <>
-                            <button
-                              onClick={() => openPreviewItem(existingDoc)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
-                              title="View saved PDF"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>PDF</span>
-                            </button>
-                            {isInBidPackage ? (
-                              <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
-                                In Bid Package
-                              </span>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => setShowPriceScheduleGoodsModal(true)}
-                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
-                                  title="Re-edit or update"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
-                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
-                                  title="Delete from project"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Del</span>
-                                </button>
-                              </>
-                            )}
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => setShowPriceScheduleGoodsModal(true)}
-                            className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow transition flex items-center justify-center gap-1"
-                          >
-                            <FileSignature className="w-3.5 h-3.5" />
-                            <span>Create Form</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* CARD 5: Summary of Bid Prices */}
-                {(() => {
-                  const isDone = hasFinancialDocForActiveProject('PBD-SUMMARY-BIDPRICE');
-                  const existingDoc = getCompletedFinancialDocForActiveProject('PBD-SUMMARY-BIDPRICE');
-                  const isInBidPackage = existingDoc ? isDocInBidPackage(existingDoc) : false;
-
-                  return (
-                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? 'border-blue-500/60 bg-blue-950/20' : isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-blue-500/50'}`}>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between flex-wrap gap-1">
-                          {isInBidPackage ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
-                              <Layers className="w-3 h-3 text-blue-400" /> In Bid Package
-                            </span>
-                          ) : isDone ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-amber-400" /> Pending
-                            </span>
-                          )}
-                          <span className="text-[9px] font-mono text-slate-400">Cols 1 to 4</span>
-                        </div>
-
-                        <div>
-                          <h3 className="text-sm font-bold text-white leading-snug">Summary of Bid Prices</h3>
-                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                            Statutory Summary of Bid Prices table with Item No, Item, Particulars/Description, and Total Amount.
-                          </p>
-                        </div>
-
-                        <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
-                          <p className="text-slate-300 font-bold">Ref: Section 32.2.1</p>
-                          <p className="text-blue-400">Legal 13" × 8.5"</p>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
-                        {isDone && existingDoc ? (
-                          <>
-                            <button
-                              onClick={() => openPreviewItem(existingDoc)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
-                              title="View saved PDF"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>PDF</span>
-                            </button>
-                            {isInBidPackage ? (
-                              <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
-                                In Bid Package
-                              </span>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => setShowSummaryBidPriceModal(true)}
-                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
-                                  title="Re-edit or update"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
-                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
-                                  title="Delete from project"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Del</span>
-                                </button>
-                              </>
-                            )}
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => setShowSummaryBidPriceModal(true)}
-                            className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center justify-center gap-1"
-                          >
-                            <FileSignature className="w-3.5 h-3.5" />
-                            <span>Create Form</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* CARD 6: Cash Flow by Quarter (SF-INFR-56) */}
-                {(() => {
-                  const isDone = hasFinancialDocForActiveProject('SF-INFR-56');
-                  const existingDoc = getCompletedFinancialDocForActiveProject('SF-INFR-56');
-                  const isInBidPackage = existingDoc ? isDocInBidPackage(existingDoc) : false;
-
-                  return (
-                    <div className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? 'border-blue-500/60 bg-blue-950/20' : isDone ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-slate-800 hover:border-purple-500/50'}`}>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between flex-wrap gap-1">
-                          {isInBidPackage ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
-                              <Layers className="w-3 h-3 text-blue-400" /> In Bid Package
-                            </span>
-                          ) : isDone ? (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Completed
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-amber-400" /> Pending
-                            </span>
-                          )}
-                          <span className="text-[9px] font-mono text-slate-400">SF-INFR-56</span>
-                        </div>
-
-                        <div>
-                          <h3 className="text-sm font-bold text-white leading-snug">Cash Flow by Quarter</h3>
-                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                            Statutory Cash Flow and Payment Schedule form (SF-INFR-56) with quarterly accomplishments & cumulative amounts.
-                          </p>
-                        </div>
-
-                        <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
-                          <p className="text-slate-300 font-bold">Ref: SF-INFR-56</p>
-                          <p className="text-purple-400">Legal 13" × 8.5"</p>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
-                        {isDone && existingDoc ? (
-                          <>
-                            <button
-                              onClick={() => openPreviewItem(existingDoc)}
-                              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
-                              title="View saved PDF"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>PDF</span>
-                            </button>
-                            {isInBidPackage ? (
-                              <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
-                                In Bid Package
-                              </span>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => setShowCashFlowModal(true)}
-                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
-                                  title="Re-edit or update"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteFinancialDoc(existingDoc.id, existingDoc.documentName)}
-                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
-                                  title="Delete from project"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Del</span>
-                                </button>
-                              </>
-                            )}
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => setShowCashFlowModal(true)}
-                            className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow transition flex items-center justify-center gap-1"
-                          >
-                            <FileSignature className="w-3.5 h-3.5" />
-                            <span>Create Form</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-
+                <div className="min-w-65 flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className="block text-slate-300 text-[11px] font-medium mb-1">
+                      Target Bidding Project (Locked)
+                    </label>
+                    <select
+                      value={activeProjectRefNo}
+                      disabled={Boolean(activeProjectRefNo)}
+                      onChange={(e) =>
+                        handleSelectActiveProject(e.target.value)
+                      }
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500 disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-950/80"
+                    >
+                      <option value="">
+                        -- Choose / Select a Bidding Project --
+                      </option>
+                      {oppProjects.map((project) => (
+                        <option key={project.id} value={project.refNo}>
+                          [{project.refNo}] {project.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {activeProjectRefNo && (
+                    <button
+                      type="button"
+                      onClick={handleUnlockOrChangeProject}
+                      className="mt-5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700 shrink-0 cursor-pointer shadow"
+                      title="Unlock to switch or select a different project"
+                    >
+                      <Unlock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Unlock Project</span>
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {filteredGridItems.length === 0 && selectedCategory !== 'FINANCIAL' ? (
-            <div className="glass-panel p-12 text-center rounded-2xl border border-slate-800 space-y-4">
-              <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto">
-                <FileCheck className="w-6 h-6" />
-              </div>
-              <div className="max-w-md mx-auto space-y-2">
-                <h3 className="text-base font-bold text-white">No Documents in Selected Category</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  No uploaded vault items match category <span className="text-white font-mono font-bold">{selectedCategory.replace('_', ' ')}</span>. Click "Upload Vault Document" above to add new permits or exhibits.
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  resetFormState();
-                  setCustomUploadCategory(selectedCategory === 'ALL' ? 'ELIGIBILITY_CLASS_B' : selectedCategory as DocCategory);
-                  setShowCustomUploadModal(true);
-                }}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white shadow transition inline-flex items-center gap-2"
-                style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
-              >
-                <Upload className="w-4 h-4" />
-                <span>Upload Vault Document</span>
-              </button>
-            </div>
-          ) : filteredGridItems.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredGridItems.map((item) => {
-                const isSelected = selectedItemIds.includes(item.id);
-                const projInfo = getProjectInfoForDoc(item);
+            {/* SUB-TAB 1: TECHNICAL DOCUMENTS CHECKLIST */}
+            {techSubTab === "CHECKLIST" && (
+              <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl space-y-0">
+                <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    Technical Documents Requirement Checklist (Items b through
+                    g)
+                  </h3>
+                  <span className="text-xs font-mono text-slate-400">
+                    Legal Templates Provided
+                  </span>
+                </div>
 
-                return (
-                  <SpotlightCard
-                    key={item.id}
-                    spotlightColor="rgba(59, 130, 246, 0.22)"
-                    enableTilt={true}
-                    className={`p-5 rounded-2xl border transition-all duration-300 space-y-4 flex flex-col justify-between group cursor-pointer shadow-xl ${isSelected
-                      ? 'border-blue-500 bg-blue-950/20 shadow-blue-500/10'
-                      : `${projInfo.accentCardBorder} hover:border-slate-700`
-                      }`}
-                    onClick={() => toggleSelectDoc(item.id)}
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-600/20 text-blue-400 font-bold border border-blue-500/30">
-                            {item.category.replace('_', ' ')}
-                          </span>
-                          <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border flex items-center gap-1 ${projInfo.badgeClass}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${projInfo.dotColor}`} />
-                            {projInfo.type.toUpperCase()}
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20 shrink-0">
-                          v{item.versionNumber}.0
-                        </span>
-                      </div>
+                <div className="divide-y divide-slate-800/80">
+                  {TECHNICAL_CHECKLIST_MASTER.map((item) => {
+                    const isCompleted = techCompletedIds.includes(item.id);
+                    const isExpanded = expandedTechItems.includes(item.id);
+                    const isProjectScoped = !!activeProjectRefNo;
+                    const projectDocExists =
+                      isProjectScoped &&
+                      hasTechnicalDocForActiveProject(item.code);
+                    const canCreateForm = isProjectScoped && !projectDocExists;
+                    const createTooltip = !activeProjectRefNo
+                      ? "Select or tag a bidding project before generating a technical exhibit."
+                      : projectDocExists
+                        ? "A completed technical document for this project already exists."
+                        : "Create and save the completed legal template for this item.";
 
-                      <div>
-                        <h3 className="text-sm font-bold text-white group-hover:text-blue-300 transition-colors leading-snug">{item.documentName}</h3>
-                        <p className="text-xs text-slate-400 mt-1 font-mono">Serial No: {item.documentNumber || 'N/A'}</p>
-                      </div>
+                    return (
+                      <div
+                        key={item.id}
+                        className="bg-slate-950/60 hover:bg-slate-900/50 transition"
+                      >
+                        {/* Main Row */}
+                        <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex items-start gap-3 min-w-0">
+                            {/* Checkbox */}
+                            <button
+                              onClick={() => toggleTechCheckbox(item.id)}
+                              className="mt-0.5 text-slate-400 hover:text-white transition shrink-0"
+                            >
+                              {isCompleted ? (
+                                <CheckSquare className="w-5 h-5 text-emerald-400" />
+                              ) : (
+                                <Square className="w-5 h-5 text-slate-600" />
+                              )}
+                            </button>
 
-                      <div className={`p-3 rounded-xl bg-slate-950/70 border ${projInfo.accentBorder} space-y-1.5 text-[11px] font-mono text-slate-400 backdrop-blur-sm`}>
-                        {item.philgepsRefNo && (
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-slate-800 text-slate-300">Project</span>
-                              <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${projInfo.pillClass}`}>
-                                {projInfo.type}
-                              </span>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono font-bold text-xs text-blue-400 bg-blue-950 px-2 py-0.5 rounded border border-blue-800">
+                                  Item {item.code}
+                                </span>
+                                <span className="font-bold text-white text-xs leading-snug">
+                                  {item.name}
+                                </span>
+                                {item.isExpandable && (
+                                  <button
+                                    onClick={() => toggleTechExpand(item.id)}
+                                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition flex items-center gap-1"
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronDown className="w-3.5 h-3.5" />
+                                    ) : (
+                                      <ChevronRight className="w-3.5 h-3.5" />
+                                    )}
+                                    <span>
+                                      {item.subItems?.length || 2} Sub-Items
+                                    </span>
+                                  </button>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-400 font-mono italic">
+                                {item.notes}
+                              </p>
                             </div>
-                            <p className={`${projInfo.textAccent} font-bold truncate text-[11px] pt-0.5`}>
-                              [{item.philgepsRefNo}] {item.projectTitle || ''}
-                            </p>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            {!item.isExpandable && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setFillingTemplateItem({
+                                    id: item.id,
+                                    code: item.code,
+                                    name: item.name,
+                                  })
+                                }
+                                disabled={!canCreateForm}
+                                title={createTooltip}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 border transition ${
+                                  canCreateForm
+                                    ? "bg-blue-600/20 text-blue-400 border-blue-500/30 hover:bg-blue-600 hover:text-white"
+                                    : "bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed"
+                                }`}
+                              >
+                                <FileSignature className="w-3.5 h-3.5" />
+                                <span>
+                                  {projectDocExists
+                                    ? "Already Created"
+                                    : "Create Form"}
+                                </span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Expandable Sub-Items Section for Item (f) */}
+                        {item.isExpandable && isExpanded && item.subItems && (
+                          <div className="bg-slate-900/80 p-4 border-t border-slate-800 pl-10 space-y-3">
+                            <h5 className="text-[11px] font-bold text-slate-300 uppercase font-mono tracking-wider">
+                              Item (f) Expandable Sub-Checklist Requirements:
+                            </h5>
+                            <div className="space-y-2">
+                              {item.subItems.map((sub) => {
+                                const isSubCompleted =
+                                  techCompletedIds.includes(sub.id);
+
+                                return (
+                                  <div
+                                    key={sub.id}
+                                    className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                                  >
+                                    <div className="flex items-start gap-2.5">
+                                      <button
+                                        onClick={() =>
+                                          toggleTechCheckbox(sub.id)
+                                        }
+                                        className="mt-0.5 text-slate-400 hover:text-white transition shrink-0"
+                                      >
+                                        {isSubCompleted ? (
+                                          <CheckSquare className="w-4 h-4 text-emerald-400" />
+                                        ) : (
+                                          <Square className="w-4 h-4 text-slate-600" />
+                                        )}
+                                      </button>
+                                      <div>
+                                        <span className="font-mono font-bold text-blue-300 mr-2">
+                                          {sub.code}
+                                        </span>
+                                        <span className="text-slate-200 font-medium">
+                                          {sub.name}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setFillingTemplateItem({
+                                          id: sub.id,
+                                          code: sub.code,
+                                          name: sub.name,
+                                        })
+                                      }
+                                      disabled={
+                                        !activeProjectRefNo ||
+                                        hasTechnicalDocForActiveProject(
+                                          sub.code,
+                                        )
+                                      }
+                                      title={
+                                        !activeProjectRefNo
+                                          ? "Select a bidding project before generating this form."
+                                          : hasTechnicalDocForActiveProject(
+                                                sub.code,
+                                              )
+                                            ? "A completed technical document for this project already exists."
+                                            : "Create and save the completed legal template for this item."
+                                      }
+                                      className={`px-2.5 py-1 rounded text-[11px] font-semibold flex items-center gap-1 border transition ${
+                                        activeProjectRefNo &&
+                                        !hasTechnicalDocForActiveProject(
+                                          sub.code,
+                                        )
+                                          ? "bg-blue-600/20 text-blue-400 border-blue-500/30 hover:bg-blue-600 hover:text-white"
+                                          : "bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed"
+                                      } shrink-0`}
+                                    >
+                                      <FileSignature className="w-3 h-3" />
+                                      <span>
+                                        {hasTechnicalDocForActiveProject(
+                                          sub.code,
+                                        )
+                                          ? "Already Created"
+                                          : "Create Form"}
+                                      </span>
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
-                        {item.issuedDate && <p>Issued: <span className="text-slate-200">{item.issuedDate}</span></p>}
-                        {item.expiryDate && <p>Expires: <span className="text-emerald-400 font-semibold">{item.expiryDate}</span></p>}
-                        <p className="truncate">File: {item.fileName}</p>
                       </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* SUB-TAB 2: COMPLETED TECHNICAL DOCUMENTS & FORMS */}
+            {techSubTab === "COMPLETED" && (
+              <div className="space-y-4">
+                {/* Bidding Project Filter Bar & Document Management */}
+                {(() => {
+                  // Build complete option list combining Opportunity Finder projects and existing form project tags
+                  const allAvailableProjects = (() => {
+                    const seenRefs = new Set<string>();
+                    const list: {
+                      refNo: string;
+                      title: string;
+                      docCount: number;
+                    }[] = [];
+
+                    oppProjects.forEach((p) => {
+                      if (p.refNo && !seenRefs.has(p.refNo)) {
+                        seenRefs.add(p.refNo);
+                        const count = completedTechVaultItems.filter(
+                          (i) => i.philgepsRefNo === p.refNo,
+                        ).length;
+                        list.push({
+                          refNo: p.refNo,
+                          title: p.title,
+                          docCount: count,
+                        });
+                      }
+                    });
+
+                    completedTechVaultItems.forEach((i) => {
+                      if (i.philgepsRefNo && !seenRefs.has(i.philgepsRefNo)) {
+                        seenRefs.add(i.philgepsRefNo);
+                        list.push({
+                          refNo: i.philgepsRefNo,
+                          title: i.projectTitle || "Bidding Opportunity",
+                          docCount: completedTechVaultItems.filter(
+                            (doc) => doc.philgepsRefNo === i.philgepsRefNo,
+                          ).length,
+                        });
+                      }
+                    });
+
+                    return list;
+                  })();
+
+                  const selectedProjectOption = allAvailableProjects.find(
+                    (p) => p.refNo === selectedTechProjectFilter,
+                  );
+
+                  const displayedCompletedTechItems =
+                    completedTechVaultItems.filter((item) => {
+                      if (selectedTechProjectFilter === "ALL") return true;
+                      return item.philgepsRefNo === selectedTechProjectFilter;
+                    });
+
+                  if (completedTechVaultItems.length === 0) {
+                    return (
+                      <div className="glass-panel p-12 text-center rounded-2xl border border-slate-800 space-y-4">
+                        <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto">
+                          <CheckCircle2 className="w-6 h-6" />
+                        </div>
+                        <div className="max-w-md mx-auto space-y-2">
+                          <h3 className="text-base font-bold text-white">
+                            No Completed Technical Documents Saved Yet
+                          </h3>
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            Go to{" "}
+                            <span className="text-blue-400 font-bold">
+                              Technical Requirements Checklist
+                            </span>{" "}
+                            sub-tab above and click{" "}
+                            <span className="text-white font-bold">
+                              "Fill Legal Template"
+                            </span>{" "}
+                            on Item (b) Statement of Ongoing Contracts or Item
+                            (c) SLCC to generate and save your completed
+                            technical forms.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setTechSubTab("CHECKLIST")}
+                          className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow transition inline-flex items-center gap-2"
+                        >
+                          <FileSignature className="w-4 h-4" />
+                          <span>
+                            Go to Technical Checklist & Fill Templates
+                          </span>
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      {/* Filter Bar */}
+                      <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 font-mono">
+                        <div className="flex items-center gap-2 text-xs font-bold text-blue-400">
+                          <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
+                          <span>
+                            Filter Completed Technical Forms by Bidding Project:
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <select
+                            value={selectedTechProjectFilter}
+                            onChange={(e) =>
+                              setSelectedTechProjectFilter(e.target.value)
+                            }
+                            className="w-full sm:w-auto bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-1.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer"
+                          >
+                            <option value="ALL">
+                              All Bidding Projects (
+                              {completedTechVaultItems.length} Total Forms)
+                            </option>
+                            {allAvailableProjects.map((p) => (
+                              <option key={p.refNo} value={p.refNo}>
+                                [{p.refNo}] {p.title} ({p.docCount} saved)
+                              </option>
+                            ))}
+                          </select>
+                          {selectedTechProjectFilter !== "ALL" && (
+                            <button
+                              onClick={() =>
+                                setSelectedTechProjectFilter("ALL")
+                              }
+                              className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-950 border border-slate-800 hover:text-white transition shrink-0"
+                              title="Clear project filter to show all"
+                            >
+                              Clear Filter
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Filter Active Summary Banner */}
+                      {selectedTechProjectFilter !== "ALL" && (
+                        <div className="p-3 rounded-xl bg-blue-950/60 border border-blue-500/40 flex items-center justify-between flex-wrap gap-2 text-xs font-mono">
+                          <div className="flex items-center gap-2">
+                            <Filter className="w-4 h-4 text-blue-400 shrink-0" />
+                            <span className="text-slate-300 font-medium">
+                              Active Project Filter:
+                            </span>
+                            <span className="text-white font-bold">
+                              [{selectedTechProjectFilter}]{" "}
+                              {selectedProjectOption?.title ||
+                                "Selected Opportunity"}
+                            </span>
+                          </div>
+                          <span className="text-blue-300 font-bold bg-blue-900/80 px-2.5 py-0.5 rounded-full border border-blue-400 text-[11px]">
+                            {displayedCompletedTechItems.length} Completed Form
+                            {displayedCompletedTechItems.length !== 1
+                              ? "s"
+                              : ""}{" "}
+                            Found
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Empty State for specific project filter */}
+                      {displayedCompletedTechItems.length === 0 ? (
+                        <div className="glass-panel p-8 text-center rounded-2xl border border-slate-800 space-y-4">
+                          <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto">
+                            <Building2 className="w-6 h-6" />
+                          </div>
+                          <div className="max-w-md mx-auto space-y-1">
+                            <h3 className="text-sm font-bold text-white">
+                              No Completed Technical Forms Found for Filtered
+                              Project
+                            </h3>
+                            <p className="text-xs text-blue-400 font-mono font-bold truncate">
+                              [{selectedTechProjectFilter}]{" "}
+                              {selectedProjectOption?.title ||
+                                "Selected Bidding Project"}
+                            </p>
+                            <p className="text-xs text-slate-400 leading-relaxed pt-1">
+                              No completed technical forms have been generated
+                              and saved for this project reference yet. Switch
+                              to the Checklist tab to generate forms for this
+                              project.
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-center gap-3 pt-2">
+                            <button
+                              onClick={() =>
+                                setSelectedTechProjectFilter("ALL")
+                              }
+                              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-900 border border-slate-800 hover:text-white transition"
+                            >
+                              Show All Projects (
+                              {completedTechVaultItems.length} Total)
+                            </button>
+                            <button
+                              onClick={() => setTechSubTab("CHECKLIST")}
+                              className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center gap-1.5"
+                            >
+                              <FileSignature className="w-4 h-4" />
+                              <span>Go to Technical Checklist & Fill Form</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {displayedCompletedTechItems.map((item) => (
+                            <SpotlightCard
+                              key={item.id}
+                              spotlightColor="rgba(16, 185, 129, 0.2)"
+                              enableTilt={true}
+                              className="p-5 rounded-2xl border border-slate-800/90 hover:border-emerald-500/50 transition-all duration-300 space-y-4 flex flex-col justify-between shadow-xl"
+                            >
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                    <CheckCircle2 className="w-3 h-3" />{" "}
+                                    Technical Completed Form
+                                  </span>
+                                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800/80 text-slate-300 font-semibold border border-slate-700/60">
+                                    v{item.versionNumber}.0
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <h3 className="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors leading-snug">
+                                    {item.documentName}
+                                  </h3>
+                                  <p className="text-xs text-slate-400 mt-1 font-mono">
+                                    Ref: {item.documentNumber || "N/A"}
+                                  </p>
+                                </div>
+
+                                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2 text-[11px] font-mono text-slate-400 backdrop-blur-sm">
+                                  {item.philgepsRefNo ? (
+                                    <div className="p-2.5 rounded-lg bg-blue-950/80 border border-blue-500/40 text-[11px] font-mono space-y-1">
+                                      <div className="flex items-center justify-between gap-1">
+                                        <span className="text-blue-300 font-bold flex items-center gap-1">
+                                          <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />{" "}
+                                          Tagged Bidding Project:
+                                        </span>
+                                        <button
+                                          onClick={() => openRetagModal(item)}
+                                          className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline flex items-center gap-1 transition cursor-pointer"
+                                          title="Change or update associated Bidding Project tag"
+                                        >
+                                          Retag
+                                        </button>
+                                      </div>
+                                      <p className="text-white font-bold truncate">
+                                        [{item.philgepsRefNo}]{" "}
+                                        {item.projectTitle ||
+                                          "Selected Opportunity"}
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/80 border border-slate-800">
+                                      <span className="text-slate-500 italic text-[10px]">
+                                        No specific project tagged
+                                      </span>
+                                      <button
+                                        onClick={() => openRetagModal(item)}
+                                        className="text-[10px] text-blue-400 hover:text-blue-300 font-bold underline cursor-pointer"
+                                      >
+                                        + Tag to Project
+                                      </button>
+                                    </div>
+                                  )}
+                                  <p className="text-slate-300 font-semibold">
+                                    {item.legalBasisReference}
+                                  </p>
+                                  <p className="truncate">
+                                    File: {item.fileName}
+                                  </p>
+                                  <p className="text-[10px] text-slate-500">
+                                    Saved by: {item.uploadedByName}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                                <button
+                                  onClick={() => openPreviewItem(item)}
+                                  className="px-3 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30 cursor-pointer"
+                                  title="View completed PDF document"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>View PDF</span>
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    setFillingTemplateItem({
+                                      id:
+                                        item.documentCode?.toLowerCase() ||
+                                        "tech-b",
+                                      code: item.documentCode || "b",
+                                      name: item.documentName,
+                                    });
+                                  }}
+                                  className="px-3 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-amber-500/30 cursor-pointer"
+                                  title="Edit form entries in legal template"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <span>Edit Form</span>
+                                </button>
+
+                                <button
+                                  onClick={() => {
+                                    setReplaceTargetItem(item);
+                                    resetFormState();
+                                  }}
+                                  className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30 cursor-pointer"
+                                  title="Replace PDF file"
+                                >
+                                  <RefreshCw className="w-3.5 h-3.5" />
+                                  <span>Replace</span>
+                                </button>
+
+                                <button
+                                  onClick={() =>
+                                    handleDeleteCompletedTechDoc(
+                                      item.id,
+                                      item.documentName,
+                                    )
+                                  }
+                                  className="px-3 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30 cursor-pointer"
+                                  title="Delete completed technical document"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Delete</span>
+                                </button>
+                              </div>
+                            </SpotlightCard>
+                          ))}
+                        </div>
+                      )}
                     </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        )}
 
-                    <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-1" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => openPreviewItem(item)}
-                        className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30 cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>View PDF</span>
-                      </button>
-
-                      <button
-                        onClick={() => openEditModal(item)}
-                        className="px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-amber-500/30 cursor-pointer"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        <span>Edit</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setReplaceTargetItem(item);
-                          resetFormState();
-                        }}
-                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30 cursor-pointer"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Replace</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleDeleteFinancialDoc(item.id, item.documentName)}
-                        className="px-2.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30 cursor-pointer"
-                        title="Delete document from vault"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Delete</span>
-                      </button>
+        {/* OTHER CATEGORY TABS (ALL, CLASS B, FINANCIAL, CORPORATE LEGAL) GRID */}
+        {selectedCategory !== "ELIGIBILITY_CLASS_A" &&
+          selectedCategory !== "TECHNICAL" && (
+            <div className="space-y-6">
+              {/* SECTION SEPARATOR BANNER FOR ORGANIZED VIEW */}
+              {selectedCategory === "ALL" && (
+                <div className="p-4 rounded-2xl bg-linear-to-r from-slate-900 via-blue-950/40 to-slate-900 border border-blue-500/30 flex items-center justify-between flex-wrap gap-3 shadow-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <Layers className="w-5 h-5" />
                     </div>
-                  </SpotlightCard>
-                );
-              })}
-            </div>
-          ) : null}
-        </div>
-      )}
+                    <div>
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>
+                          Organized Document Vault — Statutory Component
+                          Registry
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase">
+                          Class A • Technical • Financial
+                        </span>
+                      </h3>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                        Categorized into Class A Legal Eligibility, Technical
+                        Exhibits (Envelope 1), and Financial Component (Envelope
+                        2).
+                      </p>
+                    </div>
+                  </div>
 
-      {/* LEGAL TEMPLATE FILLER MODALS */}
-      {fillingTemplateItem && fillingTemplateItem.code === '(b)' && (
-        <StatementOngoingContractsModal
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
-            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
-          }}
-          onClose={() => setFillingTemplateItem(null)}
-        />
-      )}
-
-      {fillingTemplateItem && fillingTemplateItem.code === '(c)' && (
-        <StatementSlccModal
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
-            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
-          }}
-          onClose={() => setFillingTemplateItem(null)}
-        />
-      )}
-
-      {fillingTemplateItem && (fillingTemplateItem.code === 'SEC-VI' || fillingTemplateItem.code === '(f.d)' || fillingTemplateItem.name.toLowerCase().includes('schedule of requirements') || fillingTemplateItem.name.toLowerCase().includes('section vi')) && (
-        <SectionViScheduleOfRequirements
-          item={fillingTemplateItem}
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
-            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
-          }}
-          onClose={() => setFillingTemplateItem(null)}
-        />
-      )}
-
-      {fillingTemplateItem && (fillingTemplateItem.code === 'SEC-VII' || fillingTemplateItem.name.toLowerCase().includes('technical specifications') || fillingTemplateItem.name.toLowerCase().includes('section vii')) && (
-        <TechnicalSpecifications
-          item={fillingTemplateItem}
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
-            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
-          }}
-          onClose={() => setFillingTemplateItem(null)}
-        />
-      )}
-
-
-
-      {/* FRAMEWORK AGREEMENT LIST TEMPLATE */}
-      {fillingTemplateItem && (fillingTemplateItem.code === 'FAL-01' || fillingTemplateItem.code === 'SEC-VI-FAL' || fillingTemplateItem.name.toLowerCase().includes('framework agreement') || fillingTemplateItem.name.toLowerCase().includes('framework agreement list')) && (
-        <FrameworkAgreementList
-          item={fillingTemplateItem}
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
-            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
-          }}
-          onClose={() => setFillingTemplateItem(null)}
-        />
-      )}
-
-      {fillingTemplateItem && (fillingTemplateItem.code === '(h)' || fillingTemplateItem.code === 'AFTER-SALES' || fillingTemplateItem.name.toLowerCase().includes('after sales')) && (
-        <AfterSalesServiceModal
-          item={fillingTemplateItem}
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
-            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
-          }}
-          onClose={() => setFillingTemplateItem(null)}
-        />
-      )}
-
-      {fillingTemplateItem && (fillingTemplateItem.code === 'NFCC' || fillingTemplateItem.name.toLowerCase().includes('nfcc') || fillingTemplateItem.name.toLowerCase().includes('net financial contracting')) && (
-        <NfccModal
-          item={fillingTemplateItem}
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
-            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
-          }}
-          onClose={() => setFillingTemplateItem(null)}
-        />
-      )}
-
-      {fillingTemplateItem && fillingTemplateItem.code !== '(b)' && fillingTemplateItem.code !== '(c)' && fillingTemplateItem.code !== 'SEC-VI' && fillingTemplateItem.code !== 'SEC-VII' && fillingTemplateItem.code !== '(f.d)' && fillingTemplateItem.code !== 'FAL-01' && fillingTemplateItem.code !== '(h)' && fillingTemplateItem.code !== 'NFCC' && !fillingTemplateItem.name.toLowerCase().includes('schedule of requirements') && !fillingTemplateItem.name.toLowerCase().includes('section vi') && !fillingTemplateItem.name.toLowerCase().includes('technical specifications') && !fillingTemplateItem.name.toLowerCase().includes('section vii') && !fillingTemplateItem.name.toLowerCase().includes('framework agreement') && !fillingTemplateItem.name.toLowerCase().includes('after sales') && !fillingTemplateItem.name.toLowerCase().includes('nfcc') && !fillingTemplateItem.name.toLowerCase().includes('net financial contracting') && (
-        <TechnicalExhibitTemplateModal
-          item={fillingTemplateItem}
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
-            handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
-          }}
-          onClose={() => setFillingTemplateItem(null)}
-        />
-      )}
-
-      {/* CLASS A MASTER UPLOAD MODAL */}
-      {uploadTargetDef && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleIn my-auto">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Upload className="w-4 h-4 text-blue-400" />
-                <span>Upload Statutory Document — {uploadTargetDef.name}</span>
-              </h3>
-              <button onClick={() => setUploadTargetDef(null)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleUploadSubmit} className="p-6 space-y-4 text-xs">
-              {uploadTargetDef.code === 'DOC-2' && (
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Registration Entity Sub-Type</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setDtiSecType('DTI')}
-                      className={`py-2 rounded-lg font-bold border transition ${dtiSecType === 'DTI' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-950 text-slate-400 border-slate-800'}`}
-                    >
-                      DTI Registration
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDtiSecType('SEC')}
-                      className={`py-2 rounded-lg font-bold border transition ${dtiSecType === 'SEC' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-950 text-slate-400 border-slate-800'}`}
-                    >
-                      SEC Certificate
-                    </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-slate-300 font-bold bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+                      {filteredGridItems.length} Saved Documents
+                    </span>
                   </div>
                 </div>
               )}
 
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Document Serial / Permit Number</label>
-                <input
-                  type="text"
-                  value={docNumber}
-                  onChange={(e) => setDocNumber(e.target.value)}
-                  placeholder="e.g. PERMIT-2026-9012"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {uploadTargetDef.requiresIssueDate && (
-                  <div>
-                    <label className="block text-slate-300 font-medium mb-1">Issue Date <span className="text-red-400">*</span></label>
-                    <input
-                      type="date"
-                      value={issuedDate}
-                      onChange={(e) => setIssuedDate(e.target.value)}
-                      required
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                    />
+              {/* INDIVIDUAL CATEGORY HEADER BANNER */}
+              {selectedCategory !== "ALL" && (
+                <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                        {selectedCategory === "FINANCIAL"
+                          ? "3. Financial Component Documents (Envelope 2)"
+                          : selectedCategory === "CORPORATE_LEGAL"
+                            ? "4. Corporate Legal Documents"
+                            : "5. Class B Joint Venture Documents"}
+                      </h3>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                        {selectedCategory === "FINANCIAL"
+                          ? "Financial Bid Form, Bill of Quantities (BOQ), Detailed Estimates, Unit Price Schedules & Cash Flow Statements"
+                          : "Corporate resolutions, secretary certificates, power of attorney, and joint venture agreements."}
+                      </p>
+                    </div>
                   </div>
-                )}
-                {uploadTargetDef.requiresExpiryDate && (
-                  <div>
-                    <label className="block text-slate-300 font-medium mb-1">Expiration Date <span className="text-red-400">*</span></label>
-                    <input
-                      type="date"
-                      value={expiryDate}
-                      onChange={(e) => setExpiryDate(e.target.value)}
-                      required
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Upload PDF File (Large PDF Supported up to 250 MB) <span className="text-red-400">*</span></label>
-                <div className="border-2 border-dashed border-slate-800 rounded-xl p-4 text-center hover:border-blue-500 transition cursor-pointer bg-slate-950">
-                  <label className="cursor-pointer block space-y-1">
-                    <FileText className="w-6 h-6 text-blue-400 mx-auto" />
-                    <p className="text-xs text-slate-300 font-semibold">{selectedFile?.name || 'Click to select PDF document'}</p>
-                    <input type="file" accept=".pdf" onChange={(e) => handleFileSelection(e.target.files?.[0])} className="hidden" />
-                  </label>
                 </div>
-                {uploadError && <p className="text-xs text-red-400 mt-1">{uploadError}</p>}
-              </div>
+              )}
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
-                <button type="button" onClick={() => setUploadTargetDef(null)} className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">
-                  Cancel
-                </button>
-                <button type="submit" className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-xl transition">
-                  Upload & Save Document
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+              {/* FINANCIAL DOCUMENTS STATUTORY FORMS GENERATOR CARDS */}
+              {selectedCategory === "FINANCIAL" && (
+                <div className="space-y-4">
+                  {/* Active Project Scope Bar for Financial Documents */}
+                  {oppProjects.length > 0 && (
+                    <div className="p-4 rounded-2xl border border-slate-800 bg-slate-950/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="text-[11px] text-slate-400 font-mono">
+                            Active Bidding Project Scope
+                          </p>
+                          {activeProjectRefNo && (
+                            <span className="text-[10px] text-amber-400 font-bold font-mono flex items-center gap-1 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                              <Lock className="w-3 h-3 text-amber-400" />
+                              <span>Project Locked (1 Project at a Time)</span>
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-sm font-bold text-white">
+                          {activeProjectRefNo
+                            ? `[${activeProjectRefNo}] ${activeProjectTitle}`
+                            : "No Project Selected"}
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          {activeProjectRefNo
+                            ? activeProcuringEntity
+                            : "Please select a bidding project to generate or view financial component documents"}
+                        </p>
+                      </div>
+                      <div className="min-w-65 flex items-center gap-2">
+                        <div className="flex-1">
+                          <label className="block text-slate-300 text-[11px] font-medium mb-1">
+                            Target Bidding Project (Locked)
+                          </label>
+                          <select
+                            value={activeProjectRefNo}
+                            disabled={Boolean(activeProjectRefNo)}
+                            onChange={(e) =>
+                              handleSelectActiveProject(e.target.value)
+                            }
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500 disabled:opacity-85 disabled:cursor-not-allowed disabled:bg-slate-950/80"
+                          >
+                            <option value="">
+                              -- Choose / Select a Bidding Project --
+                            </option>
+                            {oppProjects.map((project) => (
+                              <option key={project.id} value={project.refNo}>
+                                [{project.refNo}] {project.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {activeProjectRefNo && (
+                          <button
+                            type="button"
+                            onClick={handleUnlockOrChangeProject}
+                            className="mt-5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700 shrink-0 cursor-pointer shadow"
+                            title="Unlock to switch or select a different project"
+                          >
+                            <Unlock className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Unlock Project</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-      {/* DOCUMENT REPLACEMENT MODAL */}
-      {replaceTargetItem && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleIn my-auto">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 text-emerald-400" />
-                <span>Upload Replacement Document — {replaceTargetItem.documentName}</span>
-              </h3>
-              <button onClick={() => setReplaceTargetItem(null)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {/* CARD 1 (FIRST IN LINE): (L) Detailed Estimates Form */}
+                    {(() => {
+                      const isDone = hasFinancialDocForActiveProject(
+                        "PBD-DETAILED-ESTIMATES",
+                      );
+                      const existingDoc =
+                        getCompletedFinancialDocForActiveProject(
+                          "PBD-DETAILED-ESTIMATES",
+                        );
+                      const isInBidPackage = existingDoc
+                        ? isDocInBidPackage(existingDoc)
+                        : false;
 
-            <form onSubmit={handleReplaceSubmit} className="p-6 space-y-4 text-xs">
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 font-mono">
-                Uploading replacement will archive version <strong>v{replaceTargetItem.versionNumber}.0</strong> and increment version to <strong>v{replaceTargetItem.versionNumber + 1}.0</strong>.
-              </div>
+                      return (
+                        <div
+                          className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? "border-blue-500/60 bg-blue-950/20" : isDone ? "border-emerald-500/60 bg-emerald-950/10" : "border-slate-800 hover:border-purple-500/50"}`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between flex-wrap gap-1">
+                              {isInBidPackage ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
+                                  <Layers className="w-3 h-3 text-blue-400" />{" "}
+                                  In Bid Package
+                                </span>
+                              ) : isDone ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />{" "}
+                                  Completed
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-amber-400" />{" "}
+                                  Pending
+                                </span>
+                              )}
+                              <span className="text-[9px] font-mono text-purple-400 font-bold">
+                                Form (L) • 1st
+                              </span>
+                            </div>
 
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">New Serial / Permit Number</label>
-                <input
-                  type="text"
-                  value={docNumber}
-                  onChange={(e) => setDocNumber(e.target.value)}
-                  placeholder={replaceTargetItem.documentNumber || 'New Document Serial Number'}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-emerald-500"
-                />
-              </div>
+                            <div>
+                              <h3 className="text-sm font-bold text-white leading-snug">
+                                (L) Detailed Estimates
+                              </h3>
+                              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                                Statutory Form (L) Detailed Estimates Form with
+                                unit prices of materials, labor rates, rentals,
+                                and tax breakdown.
+                              </p>
+                            </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                {replaceTargetItem.requiresIssueDate && (
-                  <div>
-                    <label className="block text-slate-300 font-medium mb-1">New Issue Date</label>
-                    <input
-                      type="date"
-                      value={issuedDate}
-                      onChange={(e) => setIssuedDate(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
-                    />
+                            <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
+                              <p className="text-slate-300 font-bold">
+                                Ref: Statutory Form (L)
+                              </p>
+                              <p className="text-purple-400">
+                                Legal 13" × 8.5"
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
+                            {isDone && existingDoc ? (
+                              <>
+                                <button
+                                  onClick={() => openPreviewItem(existingDoc)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
+                                  title="View saved PDF"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>PDF</span>
+                                </button>
+                                {isInBidPackage ? (
+                                  <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
+                                    In Bid Package
+                                  </span>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() =>
+                                        setShowDetailedEstimatesModal(true)
+                                      }
+                                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
+                                      title="Re-edit or update"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                      <span>Edit</span>
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteFinancialDoc(
+                                          existingDoc.id,
+                                          existingDoc.documentName,
+                                        )
+                                      }
+                                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
+                                      title="Delete from project"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <span>Del</span>
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  setShowDetailedEstimatesModal(true)
+                                }
+                                className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow transition flex items-center justify-center gap-1"
+                              >
+                                <FileSignature className="w-3.5 h-3.5" />
+                                <span>Create Form</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* CARD 2: Unified Financial Bid Form (Auto-Classified: Goods, Infra, Consulting) */}
+                    {(() => {
+                      const isDoneGoods =
+                        hasFinancialDocForActiveProject("GPPB-BIDFORM-GOODS");
+                      const isDoneInfra = hasFinancialDocForActiveProject(
+                        "GPPB-BIDFORM-INFRASTRUCTURE",
+                      );
+                      const isDone = isDoneGoods || isDoneInfra;
+                      const existingDoc =
+                        getCompletedFinancialDocForActiveProject(
+                          "GPPB-BIDFORM-GOODS",
+                        ) ||
+                        getCompletedFinancialDocForActiveProject(
+                          "GPPB-BIDFORM-INFRASTRUCTURE",
+                        );
+                      const isInBidPackage = existingDoc
+                        ? isDocInBidPackage(existingDoc)
+                        : false;
+
+                      const matchedProject = oppProjects.find(
+                        (p) =>
+                          p.refNo === activeProjectRefNo ||
+                          p.id === activeProjectRefNo,
+                      );
+                      const isInfraProject = (() => {
+                        // 1. Primary Authority: Project's explicit category
+                        if (matchedProject?.category) {
+                          const cat = matchedProject.category.toUpperCase();
+                          if (cat.includes("INFRA") || cat.includes("CIVIL"))
+                            return true;
+                          if (cat.includes("GOOD")) return false;
+                          if (cat.includes("CONSULT")) return false;
+                        }
+                        // 2. Fallback: Check project title and ref if category is not explicitly set
+                        const combined =
+                          `${activeProjectRefNo || ""} ${activeProjectTitle || matchedProject?.title || ""}`.toUpperCase();
+                        return (
+                          combined.includes("CONSTRUCT") ||
+                          combined.includes("CIVIL WORKS") ||
+                          combined.includes("ROAD OPENING") ||
+                          combined.includes("DRAINAGE SYSTEM") ||
+                          combined.includes("INFRASTRUCTURE") ||
+                          combined.includes("BUILDING")
+                        );
+                      })();
+
+                      const handleOpenBidForm = () => {
+                        if (isInfraProject) {
+                          setShowBidFormInfraModal(true);
+                        } else {
+                          setShowBidFormGoodsModal(true);
+                        }
+                      };
+
+                      return (
+                        <div
+                          className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? "border-blue-500/60 bg-blue-950/20" : isDone ? "border-emerald-500/60 bg-emerald-950/10" : isInfraProject ? "border-slate-800 hover:border-amber-500/50" : "border-slate-800 hover:border-blue-500/50"}`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between flex-wrap gap-1">
+                              {isInBidPackage ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
+                                  <Layers className="w-3 h-3 text-blue-400" />{" "}
+                                  In Bid Package
+                                </span>
+                              ) : isDone ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />{" "}
+                                  Completed
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-amber-400" />{" "}
+                                  Pending
+                                </span>
+                              )}
+                              <span
+                                className={`text-[9px] font-mono font-bold ${isInfraProject ? "text-amber-400" : "text-blue-400"}`}
+                              >
+                                {isInfraProject
+                                  ? "Infra Template"
+                                  : "Goods & Services"}
+                              </span>
+                            </div>
+
+                            <div>
+                              <h3 className="text-sm font-bold text-white leading-snug">
+                                {isInfraProject
+                                  ? "Infrastructure Bid Form"
+                                  : "Financial Bid Form"}
+                              </h3>
+                              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                                {isInfraProject
+                                  ? "Statutory Bid Form for Infrastructure Projects (GPPB Resolution 09-2020)."
+                                  : "Statutory Financial Bid Form for Goods, Services, and Consulting Projects."}
+                              </p>
+                            </div>
+
+                            <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
+                              <p className="text-slate-300 font-bold">
+                                {isInfraProject
+                                  ? "Ref: GPPB Res. 09-2020"
+                                  : "Ref: GPPB 6th Ed. PBDs"}
+                              </p>
+                              <p
+                                className={
+                                  isInfraProject
+                                    ? "text-amber-400"
+                                    : "text-blue-400"
+                                }
+                              >
+                                {isInfraProject
+                                  ? "Infrastructure (Auto-Selected)"
+                                  : "Goods & Services (Auto-Selected)"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
+                            {isDone && existingDoc ? (
+                              <>
+                                <button
+                                  onClick={() => openPreviewItem(existingDoc)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
+                                  title="View saved PDF"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>PDF</span>
+                                </button>
+                                {isInBidPackage ? (
+                                  <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
+                                    In Bid Package
+                                  </span>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        if (
+                                          existingDoc.documentCode ===
+                                          "GPPB-BIDFORM-INFRASTRUCTURE"
+                                        ) {
+                                          setShowBidFormInfraModal(true);
+                                        } else {
+                                          setShowBidFormGoodsModal(true);
+                                        }
+                                      }}
+                                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
+                                      title="Re-edit or update"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                      <span>Edit</span>
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteFinancialDoc(
+                                          existingDoc.id,
+                                          existingDoc.documentName,
+                                        )
+                                      }
+                                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
+                                      title="Delete from project"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <span>Del</span>
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            ) : (
+                              <button
+                                onClick={handleOpenBidForm}
+                                className={`w-full px-3 py-1.5 rounded-xl text-xs font-bold shadow transition flex items-center justify-center gap-1.5 ${
+                                  isInfraProject
+                                    ? "bg-amber-500 hover:bg-amber-400 text-slate-950"
+                                    : "bg-blue-600 hover:bg-blue-500 text-white"
+                                }`}
+                              >
+                                <FileSignature className="w-3.5 h-3.5" />
+                                <span>Create Bid Form</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* CARD 3: Bill of Quantities (BOQ) */}
+                    {(() => {
+                      const isDone = hasFinancialDocForActiveProject("BOQ");
+                      const existingDoc =
+                        getCompletedFinancialDocForActiveProject("BOQ");
+                      const isInBidPackage = existingDoc
+                        ? isDocInBidPackage(existingDoc)
+                        : false;
+
+                      return (
+                        <div
+                          className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? "border-blue-500/60 bg-blue-950/20" : isDone ? "border-emerald-500/60 bg-emerald-950/10" : "border-slate-800 hover:border-blue-500/50"}`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between flex-wrap gap-1">
+                              {isInBidPackage ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
+                                  <Layers className="w-3 h-3 text-blue-400" />{" "}
+                                  In Bid Package
+                                </span>
+                              ) : isDone ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />{" "}
+                                  Completed
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-amber-400" />{" "}
+                                  Pending
+                                </span>
+                              )}
+                              <span className="text-[9px] font-mono text-slate-400">
+                                Cols 1 to 6
+                              </span>
+                            </div>
+
+                            <div>
+                              <h3 className="text-sm font-bold text-white leading-snug">
+                                Bill of Quantities (BOQ)
+                              </h3>
+                              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                                Statutory Bill of Quantities schedule tracing
+                                columns 1-6 with unit prices, quantity &
+                                auto-totals.
+                              </p>
+                            </div>
+
+                            <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
+                              <p className="text-slate-300 font-bold">
+                                Ref: Sec. 32.2.1
+                              </p>
+                              <p className="text-blue-400">Legal 13" × 8.5"</p>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
+                            {isDone && existingDoc ? (
+                              <>
+                                <button
+                                  onClick={() => openPreviewItem(existingDoc)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
+                                  title="View saved PDF"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>PDF</span>
+                                </button>
+                                {isInBidPackage ? (
+                                  <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
+                                    In Bid Package
+                                  </span>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => setShowBoqModal(true)}
+                                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
+                                      title="Re-edit or update"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                      <span>Edit</span>
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteFinancialDoc(
+                                          existingDoc.id,
+                                          existingDoc.documentName,
+                                        )
+                                      }
+                                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
+                                      title="Delete from project"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <span>Del</span>
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setShowBoqModal(true)}
+                                className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center justify-center gap-1"
+                              >
+                                <FileSignature className="w-3.5 h-3.5" />
+                                <span>Create Form</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* CARD 4: Price Schedule for Goods */}
+                    {(() => {
+                      const isDone = hasFinancialDocForActiveProject(
+                        "GPPB-PRICESCHED-GOODS",
+                      );
+                      const existingDoc =
+                        getCompletedFinancialDocForActiveProject(
+                          "GPPB-PRICESCHED-GOODS",
+                        );
+                      const isInBidPackage = existingDoc
+                        ? isDocInBidPackage(existingDoc)
+                        : false;
+
+                      return (
+                        <div
+                          className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? "border-blue-500/60 bg-blue-950/20" : isDone ? "border-emerald-500/60 bg-emerald-950/10" : "border-slate-800 hover:border-emerald-500/50"}`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between flex-wrap gap-1">
+                              {isInBidPackage ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
+                                  <Layers className="w-3 h-3 text-blue-400" />{" "}
+                                  In Bid Package
+                                </span>
+                              ) : isDone ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />{" "}
+                                  Completed
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-amber-400" />{" "}
+                                  Pending
+                                </span>
+                              )}
+                              <span className="text-[9px] font-mono text-slate-400">
+                                Cols 1 to 10
+                              </span>
+                            </div>
+
+                            <div>
+                              <h3 className="text-sm font-bold text-white leading-snug">
+                                Price Schedule
+                              </h3>
+                              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                                Statutory Price Schedule tracing columns 1-10
+                                with EXW unit price, taxes, and auto-computed
+                                total cost.
+                              </p>
+                            </div>
+
+                            <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
+                              <p className="text-slate-300 font-bold">
+                                Ref: Section 32.2.1
+                              </p>
+                              <p className="text-emerald-400">
+                                Legal 13" × 8.5"
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
+                            {isDone && existingDoc ? (
+                              <>
+                                <button
+                                  onClick={() => openPreviewItem(existingDoc)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
+                                  title="View saved PDF"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>PDF</span>
+                                </button>
+                                {isInBidPackage ? (
+                                  <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
+                                    In Bid Package
+                                  </span>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() =>
+                                        setShowPriceScheduleGoodsModal(true)
+                                      }
+                                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
+                                      title="Re-edit or update"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                      <span>Edit</span>
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteFinancialDoc(
+                                          existingDoc.id,
+                                          existingDoc.documentName,
+                                        )
+                                      }
+                                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
+                                      title="Delete from project"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <span>Del</span>
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  setShowPriceScheduleGoodsModal(true)
+                                }
+                                className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow transition flex items-center justify-center gap-1"
+                              >
+                                <FileSignature className="w-3.5 h-3.5" />
+                                <span>Create Form</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* CARD 5: Summary of Bid Prices */}
+                    {(() => {
+                      const isDone = hasFinancialDocForActiveProject(
+                        "PBD-SUMMARY-BIDPRICE",
+                      );
+                      const existingDoc =
+                        getCompletedFinancialDocForActiveProject(
+                          "PBD-SUMMARY-BIDPRICE",
+                        );
+                      const isInBidPackage = existingDoc
+                        ? isDocInBidPackage(existingDoc)
+                        : false;
+
+                      return (
+                        <div
+                          className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? "border-blue-500/60 bg-blue-950/20" : isDone ? "border-emerald-500/60 bg-emerald-950/10" : "border-slate-800 hover:border-blue-500/50"}`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between flex-wrap gap-1">
+                              {isInBidPackage ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
+                                  <Layers className="w-3 h-3 text-blue-400" />{" "}
+                                  In Bid Package
+                                </span>
+                              ) : isDone ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />{" "}
+                                  Completed
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-amber-400" />{" "}
+                                  Pending
+                                </span>
+                              )}
+                              <span className="text-[9px] font-mono text-slate-400">
+                                Cols 1 to 4
+                              </span>
+                            </div>
+
+                            <div>
+                              <h3 className="text-sm font-bold text-white leading-snug">
+                                Summary of Bid Prices
+                              </h3>
+                              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                                Statutory Summary of Bid Prices table with Item
+                                No, Item, Particulars/Description, and Total
+                                Amount.
+                              </p>
+                            </div>
+
+                            <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
+                              <p className="text-slate-300 font-bold">
+                                Ref: Section 32.2.1
+                              </p>
+                              <p className="text-blue-400">Legal 13" × 8.5"</p>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
+                            {isDone && existingDoc ? (
+                              <>
+                                <button
+                                  onClick={() => openPreviewItem(existingDoc)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
+                                  title="View saved PDF"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>PDF</span>
+                                </button>
+                                {isInBidPackage ? (
+                                  <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
+                                    In Bid Package
+                                  </span>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() =>
+                                        setShowSummaryBidPriceModal(true)
+                                      }
+                                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
+                                      title="Re-edit or update"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                      <span>Edit</span>
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteFinancialDoc(
+                                          existingDoc.id,
+                                          existingDoc.documentName,
+                                        )
+                                      }
+                                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
+                                      title="Delete from project"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <span>Del</span>
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  setShowSummaryBidPriceModal(true)
+                                }
+                                className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow transition flex items-center justify-center gap-1"
+                              >
+                                <FileSignature className="w-3.5 h-3.5" />
+                                <span>Create Form</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* CARD 6: Cash Flow by Quarter (SF-INFR-56) */}
+                    {(() => {
+                      const isDone =
+                        hasFinancialDocForActiveProject("SF-INFR-56");
+                      const existingDoc =
+                        getCompletedFinancialDocForActiveProject("SF-INFR-56");
+                      const isInBidPackage = existingDoc
+                        ? isDocInBidPackage(existingDoc)
+                        : false;
+
+                      return (
+                        <div
+                          className={`glass-card p-4 rounded-2xl border transition space-y-3 flex flex-col justify-between ${isInBidPackage ? "border-blue-500/60 bg-blue-950/20" : isDone ? "border-emerald-500/60 bg-emerald-950/10" : "border-slate-800 hover:border-purple-500/50"}`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between flex-wrap gap-1">
+                              {isInBidPackage ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/40 flex items-center gap-1">
+                                  <Layers className="w-3 h-3 text-blue-400" />{" "}
+                                  In Bid Package
+                                </span>
+                              ) : isDone ? (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />{" "}
+                                  Completed
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20 flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-amber-400" />{" "}
+                                  Pending
+                                </span>
+                              )}
+                              <span className="text-[9px] font-mono text-slate-400">
+                                SF-INFR-56
+                              </span>
+                            </div>
+
+                            <div>
+                              <h3 className="text-sm font-bold text-white leading-snug">
+                                Cash Flow by Quarter
+                              </h3>
+                              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                                Statutory Cash Flow and Payment Schedule form
+                                (SF-INFR-56) with quarterly accomplishments &
+                                cumulative amounts.
+                              </p>
+                            </div>
+
+                            <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 space-y-0.5 text-[10px] font-mono text-slate-400">
+                              <p className="text-slate-300 font-bold">
+                                Ref: SF-INFR-56
+                              </p>
+                              <p className="text-purple-400">
+                                Legal 13" × 8.5"
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1">
+                            {isDone && existingDoc ? (
+                              <>
+                                <button
+                                  onClick={() => openPreviewItem(existingDoc)}
+                                  className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-400 bg-blue-600/20 hover:bg-blue-600 hover:text-white transition flex items-center gap-1 border border-blue-500/30"
+                                  title="View saved PDF"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>PDF</span>
+                                </button>
+                                {isInBidPackage ? (
+                                  <span className="text-[10px] font-mono text-blue-300 font-bold bg-blue-950/80 px-2.5 py-1.5 rounded-xl border border-blue-500/30">
+                                    In Bid Package
+                                  </span>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => setShowCashFlowModal(true)}
+                                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-amber-400 bg-amber-600/20 hover:bg-amber-600 hover:text-white transition flex items-center gap-1 border border-amber-500/30"
+                                      title="Re-edit or update"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                      <span>Edit</span>
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteFinancialDoc(
+                                          existingDoc.id,
+                                          existingDoc.documentName,
+                                        )
+                                      }
+                                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-600/20 hover:bg-red-600 hover:text-white transition flex items-center gap-1 border border-red-500/30"
+                                      title="Delete from project"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <span>Del</span>
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => setShowCashFlowModal(true)}
+                                className="w-full px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 shadow transition flex items-center justify-center gap-1"
+                              >
+                                <FileSignature className="w-3.5 h-3.5" />
+                                <span>Create Form</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
-                )}
-                {replaceTargetItem.requiresExpiryDate && (
-                  <div>
-                    <label className="block text-slate-300 font-medium mb-1">New Expiration Date</label>
-                    <input
-                      type="date"
-                      value={expiryDate}
-                      onChange={(e) => setExpiryDate(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">New Replacement PDF File <span className="text-red-400">*</span></label>
-                <div className="border-2 border-dashed border-slate-800 rounded-xl p-4 text-center hover:border-emerald-500 transition cursor-pointer bg-slate-950">
-                  <label className="cursor-pointer block space-y-1">
-                    <FileText className="w-6 h-6 text-emerald-400 mx-auto" />
-                    <p className="text-xs text-slate-300 font-semibold">{selectedFile?.name || 'Click to select replacement PDF'}</p>
-                    <input type="file" accept=".pdf" onChange={(e) => handleFileSelection(e.target.files?.[0])} className="hidden" />
-                  </label>
                 </div>
-                {uploadError && <p className="text-xs text-red-400 mt-1">{uploadError}</p>}
-              </div>
+              )}
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
-                <button type="button" onClick={() => setReplaceTargetItem(null)} className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">
-                  Cancel
-                </button>
-                <button type="submit" className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-xl transition">
-                  Save Replacement & Update Vault
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+              {filteredGridItems.length === 0 &&
+              selectedCategory !== "FINANCIAL" ? (
+                <div className="glass-panel p-12 text-center rounded-2xl border border-slate-800 space-y-4">
+                  <div className="w-12 h-12 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto">
+                    <FileCheck className="w-6 h-6" />
+                  </div>
+                  <div className="max-w-md mx-auto space-y-2">
+                    <h3 className="text-base font-bold text-white">
+                      No Documents in Selected Category
+                    </h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      No uploaded vault items match category{" "}
+                      <span className="text-white font-mono font-bold">
+                        {selectedCategory.replace("_", " ")}
+                      </span>
+                      . Click "Upload Vault Document" above to add new permits
+                      or exhibits.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      resetFormState();
+                      setCustomUploadCategory(
+                        selectedCategory === "ALL"
+                          ? "ELIGIBILITY_CLASS_B"
+                          : (selectedCategory as DocCategory),
+                      );
+                      setShowCustomUploadModal(true);
+                    }}
+                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white shadow transition inline-flex items-center gap-2"
+                    style={{
+                      backgroundColor: currentTenant?.brandColor || "#1e40af",
+                    }}
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>Upload Vault Document</span>
+                  </button>
+                </div>
+              ) : filteredGridItems.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredGridItems.map((item) => {
+                    const isSelected = selectedItemIds.includes(item.id);
+                    const projInfo = getProjectInfoForDoc(item);
 
-      {/* EDIT DOCUMENT METADATA MODAL */}
-      {editTargetItem && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleIn my-auto">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Edit3 className="w-4 h-4 text-amber-400" />
-                <span>Edit Document Details — {editTargetItem.documentName}</span>
-              </h3>
-              <button onClick={() => setEditTargetItem(null)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
+                    return (
+                      <SpotlightCard
+                        key={item.id}
+                        spotlightColor="rgba(59, 130, 246, 0.22)"
+                        enableTilt={true}
+                        className={`p-5 rounded-2xl border transition-all duration-300 space-y-4 flex flex-col justify-between group cursor-pointer shadow-xl ${
+                          isSelected
+                            ? "border-blue-500 bg-blue-950/20 shadow-blue-500/10"
+                            : `${projInfo.accentCardBorder} hover:border-slate-700`
+                        }`}
+                        onClick={() => toggleSelectDoc(item.id)}
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-600/20 text-blue-400 font-bold border border-blue-500/30">
+                                {item.category.replace("_", " ")}
+                              </span>
+                              <span
+                                className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold border flex items-center gap-1 ${projInfo.badgeClass}`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${projInfo.dotColor}`}
+                                />
+                                {projInfo.type.toUpperCase()}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20 shrink-0">
+                              v{item.versionNumber}.0
+                            </span>
+                          </div>
+
+                          <div>
+                            <h3 className="text-sm font-bold text-white group-hover:text-blue-300 transition-colors leading-snug">
+                              {item.documentName}
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-1 font-mono">
+                              Serial No: {item.documentNumber || "N/A"}
+                            </p>
+                          </div>
+
+                          <div
+                            className={`p-3 rounded-xl bg-slate-950/70 border ${projInfo.accentBorder} space-y-1.5 text-[11px] font-mono text-slate-400 backdrop-blur-sm`}
+                          >
+                            {item.philgepsRefNo && (
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-slate-800 text-slate-300">
+                                    Project
+                                  </span>
+                                  <span
+                                    className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${projInfo.pillClass}`}
+                                  >
+                                    {projInfo.type}
+                                  </span>
+                                </div>
+                                <p
+                                  className={`${projInfo.textAccent} font-bold truncate text-[11px] pt-0.5`}
+                                >
+                                  [{item.philgepsRefNo}]{" "}
+                                  {item.projectTitle || ""}
+                                </p>
+                              </div>
+                            )}
+                            {item.issuedDate && (
+                              <p>
+                                Issued:{" "}
+                                <span className="text-slate-200">
+                                  {item.issuedDate}
+                                </span>
+                              </p>
+                            )}
+                            {item.expiryDate && (
+                              <p>
+                                Expires:{" "}
+                                <span className="text-emerald-400 font-semibold">
+                                  {item.expiryDate}
+                                </span>
+                              </p>
+                            )}
+                            <p className="truncate">File: {item.fileName}</p>
+                          </div>
+                        </div>
+
+                        <div
+                          className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={() => openPreviewItem(item)}
+                            className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30 cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View PDF</span>
+                          </button>
+
+                          <button
+                            onClick={() => openEditModal(item)}
+                            className="px-2.5 py-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-amber-500/30 cursor-pointer"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>Edit</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setReplaceTargetItem(item);
+                              resetFormState();
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30 cursor-pointer"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>Replace</span>
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              handleDeleteFinancialDoc(
+                                item.id,
+                                item.documentName,
+                              )
+                            }
+                            className="px-2.5 py-1.5 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30 cursor-pointer"
+                            title="Delete document from vault"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      </SpotlightCard>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
+          )}
 
-            <form onSubmit={handleEditSubmit} className="p-6 space-y-4 text-xs">
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 font-mono">
-                Correct or update document metadata such as document title, serial number, and statutory validity dates.
+        {/* LEGAL TEMPLATE FILLER MODALS */}
+        {fillingTemplateItem && fillingTemplateItem.code === "(b)" && (
+          <StatementOngoingContractsModal
+            tenant={currentTenant}
+            activeProjectRefNo={activeProjectRefNo}
+            activeProjectTitle={activeProjectTitle}
+            activeProcuringEntity={activeProcuringEntity}
+            onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+              handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+            }}
+            onClose={() => setFillingTemplateItem(null)}
+          />
+        )}
+
+        {fillingTemplateItem && fillingTemplateItem.code === "(c)" && (
+          <StatementSlccModal
+            tenant={currentTenant}
+            activeProjectRefNo={activeProjectRefNo}
+            activeProjectTitle={activeProjectTitle}
+            activeProcuringEntity={activeProcuringEntity}
+            onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+              handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+            }}
+            onClose={() => setFillingTemplateItem(null)}
+          />
+        )}
+
+        {fillingTemplateItem &&
+          (fillingTemplateItem.code === "SEC-VI" ||
+            fillingTemplateItem.code === "(f.d)" ||
+            fillingTemplateItem.name
+              .toLowerCase()
+              .includes("schedule of requirements") ||
+            fillingTemplateItem.name.toLowerCase().includes("section vi")) && (
+            <SectionViScheduleOfRequirements
+              item={fillingTemplateItem}
+              tenant={currentTenant}
+              activeProjectRefNo={activeProjectRefNo}
+              activeProjectTitle={activeProjectTitle}
+              activeProcuringEntity={activeProcuringEntity}
+              onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+                handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+              }}
+              onClose={() => setFillingTemplateItem(null)}
+            />
+          )}
+
+        {fillingTemplateItem &&
+          (fillingTemplateItem.code === "SEC-VII" ||
+            fillingTemplateItem.name
+              .toLowerCase()
+              .includes("technical specifications") ||
+            fillingTemplateItem.name.toLowerCase().includes("section vii")) && (
+            <TechnicalSpecifications
+              item={fillingTemplateItem}
+              tenant={currentTenant}
+              activeProjectRefNo={activeProjectRefNo}
+              activeProjectTitle={activeProjectTitle}
+              activeProcuringEntity={activeProcuringEntity}
+              onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+                handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+              }}
+              onClose={() => setFillingTemplateItem(null)}
+            />
+          )}
+
+        {/* FRAMEWORK AGREEMENT LIST TEMPLATE */}
+        {fillingTemplateItem &&
+          (fillingTemplateItem.code === "FAL-01" ||
+            fillingTemplateItem.code === "SEC-VI-FAL" ||
+            fillingTemplateItem.name
+              .toLowerCase()
+              .includes("framework agreement") ||
+            fillingTemplateItem.name
+              .toLowerCase()
+              .includes("framework agreement list")) && (
+            <FrameworkAgreementList
+              item={fillingTemplateItem}
+              tenant={currentTenant}
+              activeProjectRefNo={activeProjectRefNo}
+              activeProjectTitle={activeProjectTitle}
+              activeProcuringEntity={activeProcuringEntity}
+              onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+                handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+              }}
+              onClose={() => setFillingTemplateItem(null)}
+            />
+          )}
+
+        {fillingTemplateItem &&
+          (fillingTemplateItem.code === "(h)" ||
+            fillingTemplateItem.code === "AFTER-SALES" ||
+            fillingTemplateItem.name.toLowerCase().includes("after sales")) && (
+            <AfterSalesServiceModal
+              item={fillingTemplateItem}
+              tenant={currentTenant}
+              activeProjectRefNo={activeProjectRefNo}
+              activeProjectTitle={activeProjectTitle}
+              activeProcuringEntity={activeProcuringEntity}
+              onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+                handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+              }}
+              onClose={() => setFillingTemplateItem(null)}
+            />
+          )}
+
+        {fillingTemplateItem &&
+          (fillingTemplateItem.code === "NFCC" ||
+            fillingTemplateItem.name.toLowerCase().includes("nfcc") ||
+            fillingTemplateItem.name
+              .toLowerCase()
+              .includes("net financial contracting")) && (
+            <NfccModal
+              item={fillingTemplateItem}
+              tenant={currentTenant}
+              activeProjectRefNo={activeProjectRefNo}
+              activeProjectTitle={activeProjectTitle}
+              activeProcuringEntity={activeProcuringEntity}
+              onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+                handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+              }}
+              onClose={() => setFillingTemplateItem(null)}
+            />
+          )}
+
+        {fillingTemplateItem &&
+          fillingTemplateItem.code !== "(b)" &&
+          fillingTemplateItem.code !== "(c)" &&
+          fillingTemplateItem.code !== "SEC-VI" &&
+          fillingTemplateItem.code !== "SEC-VII" &&
+          fillingTemplateItem.code !== "(f.d)" &&
+          fillingTemplateItem.code !== "FAL-01" &&
+          fillingTemplateItem.code !== "(h)" &&
+          fillingTemplateItem.code !== "NFCC" &&
+          !fillingTemplateItem.name
+            .toLowerCase()
+            .includes("schedule of requirements") &&
+          !fillingTemplateItem.name.toLowerCase().includes("section vi") &&
+          !fillingTemplateItem.name
+            .toLowerCase()
+            .includes("technical specifications") &&
+          !fillingTemplateItem.name.toLowerCase().includes("section vii") &&
+          !fillingTemplateItem.name
+            .toLowerCase()
+            .includes("framework agreement") &&
+          !fillingTemplateItem.name.toLowerCase().includes("after sales") &&
+          !fillingTemplateItem.name.toLowerCase().includes("nfcc") &&
+          !fillingTemplateItem.name
+            .toLowerCase()
+            .includes("net financial contracting") && (
+            <TechnicalExhibitTemplateModal
+              item={fillingTemplateItem}
+              tenant={currentTenant}
+              activeProjectRefNo={activeProjectRefNo}
+              activeProjectTitle={activeProjectTitle}
+              activeProcuringEntity={activeProcuringEntity}
+              onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
+                handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+              }}
+              onClose={() => setFillingTemplateItem(null)}
+            />
+          )}
+
+        {/* CLASS A MASTER UPLOAD MODAL */}
+        {uploadTargetDef && (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleIn my-auto">
+              <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-blue-400" />
+                  <span>
+                    Upload Statutory Document — {uploadTargetDef.name}
+                  </span>
+                </h3>
+                <button
+                  onClick={() => setUploadTargetDef(null)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Document Title / Name <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={editDocName}
-                  onChange={(e) => setEditDocName(e.target.value)}
-                  required
-                  placeholder="e.g. Mayor's Permit / Business Permit 2026"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-medium focus:outline-none focus:border-amber-500"
-                />
-              </div>
+              <form
+                onSubmit={handleUploadSubmit}
+                className="p-6 space-y-4 text-xs"
+              >
+                {uploadTargetDef.code === "DOC-2" && (
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">
+                      Registration Entity Sub-Type
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDtiSecType("DTI")}
+                        className={`py-2 rounded-lg font-bold border transition ${dtiSecType === "DTI" ? "bg-blue-600 text-white border-blue-500" : "bg-slate-950 text-slate-400 border-slate-800"}`}
+                      >
+                        DTI Registration
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDtiSecType("SEC")}
+                        className={`py-2 rounded-lg font-bold border transition ${dtiSecType === "SEC" ? "bg-blue-600 text-white border-blue-500" : "bg-slate-950 text-slate-400 border-slate-800"}`}
+                      >
+                        SEC Certificate
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Document Serial / Permit Number</label>
-                <input
-                  type="text"
-                  value={editDocNumber}
-                  onChange={(e) => setEditDocNumber(e.target.value)}
-                  placeholder="e.g. PERMIT-2026-9012"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Issue Date</label>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Document Serial / Permit Number
+                  </label>
                   <input
-                    type="date"
-                    value={editIssuedDate}
-                    onChange={(e) => setEditIssuedDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                    type="text"
+                    value={docNumber}
+                    onChange={(e) => setDocNumber(e.target.value)}
+                    placeholder="e.g. PERMIT-2026-9012"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Expiration Date</label>
-                  <input
-                    type="date"
-                    value={editExpiryDate}
-                    onChange={(e) => setEditExpiryDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
-                  />
+
+                <div className="grid grid-cols-2 gap-3">
+                  {uploadTargetDef.requiresIssueDate && (
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        Issue Date <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={issuedDate}
+                        onChange={(e) => setIssuedDate(e.target.value)}
+                        required
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  )}
+                  {uploadTargetDef.requiresExpiryDate && (
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        Expiration Date <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={expiryDate}
+                        onChange={(e) => setExpiryDate(e.target.value)}
+                        required
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
-                <button type="button" onClick={() => setEditTargetItem(null)} className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">
-                  Cancel
-                </button>
-                <button type="submit" className="px-5 py-2 rounded-xl text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 shadow-xl transition">
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Upload PDF File (Large PDF Supported up to 250 MB){" "}
+                    <span className="text-red-400">*</span>
+                  </label>
+                  <div className="border-2 border-dashed border-slate-800 rounded-xl p-4 text-center hover:border-blue-500 transition cursor-pointer bg-slate-950">
+                    <label className="cursor-pointer block space-y-1">
+                      <FileText className="w-6 h-6 text-blue-400 mx-auto" />
+                      <p className="text-xs text-slate-300 font-semibold">
+                        {selectedFile?.name || "Click to select PDF document"}
+                      </p>
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={(e) =>
+                          handleFileSelection(e.target.files?.[0])
+                        }
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  {uploadError && (
+                    <p className="text-xs text-red-400 mt-1">{uploadError}</p>
+                  )}
+                </div>
 
-      {/* RE-TAG BIDDING PROJECT MODAL */}
-      {retagTargetItem && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleIn my-auto">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-blue-400" />
-                <span>Assign / Update Bidding Project Tag</span>
-              </h3>
-              <button onClick={() => setRetagTargetItem(null)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setUploadTargetDef(null)}
+                    className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-xl transition"
+                  >
+                    Upload & Save Document
+                  </button>
+                </div>
+              </form>
             </div>
+          </div>
+        )}
 
-            <form onSubmit={handleRetagSubmit} className="p-6 space-y-4 text-xs">
-              <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-300 font-mono space-y-1">
-                <p className="font-bold text-white">Document: {retagTargetItem.documentName}</p>
-                <p>Tagging this document ensures zero cross-project data leakage and accurate filtering in Technical Eligibility.</p>
+        {/* DOCUMENT REPLACEMENT MODAL */}
+        {replaceTargetItem && (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleIn my-auto">
+              <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-emerald-400" />
+                  <span>
+                    Upload Replacement Document —{" "}
+                    {replaceTargetItem.documentName}
+                  </span>
+                </h3>
+                <button
+                  onClick={() => setReplaceTargetItem(null)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Select Bidding Project (Opportunity Finder)</label>
-                <select
-                  value={retagProjectRefNo}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setRetagProjectRefNo(val);
-                    const found = oppProjects.find(p => p.refNo === val);
-                    if (found) {
-                      setRetagProjectTitle(found.title);
+              <form
+                onSubmit={handleReplaceSubmit}
+                className="p-6 space-y-4 text-xs"
+              >
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300 font-mono">
+                  Uploading replacement will archive version{" "}
+                  <strong>v{replaceTargetItem.versionNumber}.0</strong> and
+                  increment version to{" "}
+                  <strong>v{replaceTargetItem.versionNumber + 1}.0</strong>.
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    New Serial / Permit Number
+                  </label>
+                  <input
+                    type="text"
+                    value={docNumber}
+                    onChange={(e) => setDocNumber(e.target.value)}
+                    placeholder={
+                      replaceTargetItem.documentNumber ||
+                      "New Document Serial Number"
                     }
-                  }}
-                  className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-400 cursor-pointer"
-                >
-                  {oppProjects.map(p => (
-                    <option key={p.id} value={p.refNo}>
-                      [{p.refNo}] {p.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Project Reference Number</label>
-                <input
-                  type="text"
-                  value={retagProjectRefNo}
-                  onChange={(e) => setRetagProjectRefNo(e.target.value)}
-                  placeholder="e.g. PRJ-2026-901283"
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Bidding Project Title</label>
-                <input
-                  type="text"
-                  value={retagProjectTitle}
-                  onChange={(e) => setRetagProjectTitle(e.target.value)}
-                  placeholder="e.g. Supply and Delivery of IT Equipment"
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-medium focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setRetagTargetItem(null)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-xl transition"
-                >
-                  Update Project Tag
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MERGED PDF VIEWER MODAL */}
-      {showMergeModal && (
-        <MergedPdfViewerModal
-          selectedItems={selectedVaultObjects}
-          tenant={currentTenant}
-          vaultDocs={vaultItems}
-          onClose={() => setShowMergeModal(false)}
-        />
-      )}
-
-      {/* SINGLE CONTINUOUS STREAM PDF PREVIEW MODAL */}
-      {previewPdfItem && (
-        <PdfPreviewModal
-          item={previewPdfItem}
-          tenant={currentTenant}
-          onClose={() => setPreviewPdfItem(null)}
-          pdfDataUrl={getPdfData(previewPdfItem.id) || previewPdfItem.fileDataUrl}
-          hidePrintExport={true}
-        />
-      )}
-
-      {/* UPLOAD CUSTOM DOCUMENT MODAL */}
-      {showCustomUploadModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleIn my-auto">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Upload className="w-4 h-4 text-blue-400" />
-                <span>Upload Custom Vault Document</span>
-              </h3>
-              <button onClick={() => setShowCustomUploadModal(false)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCustomUploadSubmit} className="p-6 space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Target Category</label>
-                <select
-                  value={customUploadCategory}
-                  onChange={(e) => setCustomUploadCategory(e.target.value as DocCategory)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
-                >
-                  <option value="ELIGIBILITY_CLASS_A">Class A Legal Eligibility</option>
-                  <option value="ELIGIBILITY_CLASS_B">Class B Joint Venture</option>
-                  <option value="TECHNICAL">Class A Technical Eligibility</option>
-                  <option value="FINANCIAL">Financial Documents</option>
-                  <option value="CORPORATE_LEGAL">Corporate Legal</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Document Name <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={customDocName}
-                  onChange={(e) => setCustomDocName(e.target.value)}
-                  placeholder="e.g. Joint Venture Agreement 2026"
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Document Serial Number</label>
-                <input
-                  type="text"
-                  value={docNumber}
-                  onChange={(e) => setDocNumber(e.target.value)}
-                  placeholder="e.g. JVA-2026-901"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Issue Date</label>
-                  <input
-                    type="date"
-                    value={issuedDate}
-                    onChange={(e) => setIssuedDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-emerald-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Expiration Date</label>
-                  <input
-                    type="date"
-                    value={expiryDate}
-                    onChange={(e) => setExpiryDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-              </div>
 
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">PDF File (Max 100 MB) <span className="text-red-400">*</span></label>
-                <div className="border-2 border-dashed border-slate-800 rounded-xl p-4 text-center hover:border-blue-500 transition cursor-pointer bg-slate-950">
-                  <label className="cursor-pointer block space-y-1">
-                    <FileText className="w-6 h-6 text-blue-400 mx-auto" />
-                    <p className="text-xs text-slate-300 font-semibold">{selectedFile?.name || 'Click to select PDF'}</p>
-                    <input type="file" accept=".pdf" onChange={(e) => handleFileSelection(e.target.files?.[0])} className="hidden" />
+                <div className="grid grid-cols-2 gap-3">
+                  {replaceTargetItem.requiresIssueDate && (
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        New Issue Date
+                      </label>
+                      <input
+                        type="date"
+                        value={issuedDate}
+                        onChange={(e) => setIssuedDate(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  )}
+                  {replaceTargetItem.requiresExpiryDate && (
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        New Expiration Date
+                      </label>
+                      <input
+                        type="date"
+                        value={expiryDate}
+                        onChange={(e) => setExpiryDate(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    New Replacement PDF File{" "}
+                    <span className="text-red-400">*</span>
                   </label>
+                  <div className="border-2 border-dashed border-slate-800 rounded-xl p-4 text-center hover:border-emerald-500 transition cursor-pointer bg-slate-950">
+                    <label className="cursor-pointer block space-y-1">
+                      <FileText className="w-6 h-6 text-emerald-400 mx-auto" />
+                      <p className="text-xs text-slate-300 font-semibold">
+                        {selectedFile?.name ||
+                          "Click to select replacement PDF"}
+                      </p>
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={(e) =>
+                          handleFileSelection(e.target.files?.[0])
+                        }
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  {uploadError && (
+                    <p className="text-xs text-red-400 mt-1">{uploadError}</p>
+                  )}
                 </div>
-                {uploadError && <p className="text-xs text-red-400 mt-1">{uploadError}</p>}
-              </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowCustomUploadModal(false)}
-                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white shadow-xl transition"
-                  style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
-                >
-                  Upload Document
-                </button>
-              </div>
-            </form>
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setReplaceTargetItem(null)}
+                    className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 shadow-xl transition"
+                  >
+                    Save Replacement & Update Vault
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* STATUTORY FINANCIAL BID FORM FOR GOODS MODAL */}
-      {showBidFormGoodsModal && (
-        <BidFormForGoodsModal
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={handleSaveCompletedBidFormGoods}
-          onClose={() => setShowBidFormGoodsModal(false)}
-        />
-      )}
+        {/* EDIT DOCUMENT METADATA MODAL */}
+        {editTargetItem && (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleIn my-auto">
+              <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Edit3 className="w-4 h-4 text-amber-400" />
+                  <span>
+                    Edit Document Details — {editTargetItem.documentName}
+                  </span>
+                </h3>
+                <button
+                  onClick={() => setEditTargetItem(null)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-      {/* STATUTORY FINANCIAL BID FORM FOR INFRASTRUCTURE MODAL */}
-      {showBidFormInfraModal && (
-        <BidFormForInfrastructureModal
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={handleSaveCompletedBidFormInfra}
-          onClose={() => setShowBidFormInfraModal(false)}
-        />
-      )}
+              <form
+                onSubmit={handleEditSubmit}
+                className="p-6 space-y-4 text-xs"
+              >
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 font-mono">
+                  Correct or update document metadata such as document title,
+                  serial number, and statutory validity dates.
+                </div>
 
-      {/* STATUTORY BILL OF QUANTITIES (BOQ) MODAL */}
-      {showBoqModal && (
-        <BillOfQuantitiesModal
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={handleSaveCompletedBoq}
-          onClose={() => setShowBoqModal(false)}
-        />
-      )}
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Document Title / Name{" "}
+                    <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editDocName}
+                    onChange={(e) => setEditDocName(e.target.value)}
+                    required
+                    placeholder="e.g. Mayor's Permit / Business Permit 2026"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-medium focus:outline-none focus:border-amber-500"
+                  />
+                </div>
 
-      {/* STATUTORY CASH FLOW BY QUARTER (SF-INFR-56) MODAL */}
-      {showCashFlowModal && (
-        <CashFlowByQuarterModal
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={handleSaveCompletedCashFlow}
-          onClose={() => setShowCashFlowModal(false)}
-        />
-      )}
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Document Serial / Permit Number
+                  </label>
+                  <input
+                    type="text"
+                    value={editDocNumber}
+                    onChange={(e) => setEditDocNumber(e.target.value)}
+                    placeholder="e.g. PERMIT-2026-9012"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-amber-500"
+                  />
+                </div>
 
-      {/* STATUTORY PRICE SCHEDULE FOR GOODS MODAL */}
-      {showPriceScheduleGoodsModal && (
-        <PriceSchedule4GoodsModal
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={handleSaveCompletedPriceScheduleGoods}
-          onClose={() => setShowPriceScheduleGoodsModal(false)}
-        />
-      )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">
+                      Issue Date
+                    </label>
+                    <input
+                      type="date"
+                      value={editIssuedDate}
+                      onChange={(e) => setEditIssuedDate(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">
+                      Expiration Date
+                    </label>
+                    <input
+                      type="date"
+                      value={editExpiryDate}
+                      onChange={(e) => setEditExpiryDate(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
 
-      {/* STATUTORY SUMMARY OF BID PRICES MODAL */}
-      {showSummaryBidPriceModal && (
-        <SummaryOfBidPriceModal
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={handleSaveCompletedSummaryBidPrice}
-          onClose={() => setShowSummaryBidPriceModal(false)}
-        />
-      )}
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setEditTargetItem(null)}
+                    className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 shadow-xl transition"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
-      {/* STATUTORY (L) DETAILED ESTIMATES FORM MODAL */}
-      {showDetailedEstimatesModal && (
-        <DetailedEstimatesModal
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onSaveAndComplete={handleSaveCompletedDetailedEstimates}
-          onClose={() => setShowDetailedEstimatesModal(false)}
-        />
-      )}
+        {/* RE-TAG BIDDING PROJECT MODAL */}
+        {retagTargetItem && (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleIn my-auto">
+              <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-blue-400" />
+                  <span>Assign / Update Bidding Project Tag</span>
+                </h3>
+                <button
+                  onClick={() => setRetagTargetItem(null)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
 
-      {/* STATUTORY NFCC MODAL */}
-      {showNfccModal && (
-        <NfccModal
-          tenant={currentTenant}
-          activeProjectRefNo={activeProjectRefNo}
-          activeProjectTitle={activeProjectTitle}
-          activeProcuringEntity={activeProcuringEntity}
-          onClose={() => setShowNfccModal(false)}
-          onSaveAndComplete={(pdfDataUrl?: string, docName?: string, projRefNo?: string, projTitle?: string) => {
-            const newId = `fin-nfcc-${Date.now()}`;
-            const refNo = projRefNo || activeProjectRefNo || (oppProjects[0]?.refNo || '');
-            const title = projTitle || activeProjectTitle || (oppProjects[0]?.title || '');
+              <form
+                onSubmit={handleRetagSubmit}
+                className="p-6 space-y-4 text-xs"
+              >
+                <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-300 font-mono space-y-1">
+                  <p className="font-bold text-white">
+                    Document: {retagTargetItem.documentName}
+                  </p>
+                  <p>
+                    Tagging this document ensures zero cross-project data
+                    leakage and accurate filtering in Technical Eligibility.
+                  </p>
+                </div>
 
-            const newItem: DocumentVaultItem = {
-              id: newId,
-              tenantId: activeTenantId,
-              documentCode: 'NFCC',
-              documentName: docName || `Net Financial Contracting Capacity - [${refNo}]`,
-              category: 'FINANCIAL',
-              procurementApplicability: ['GOODS', 'INFRASTRUCTURE', 'CONSULTING_SERVICES'],
-              legalBasisReference: 'Section 23.4.1.4 of RA 12009 / RA 9184',
-              versionNumber: 1,
-              fileHash: Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
-              fileSizeBytes: 185000,
-              fileName: `${refNo}_Financial_Envelope_NFCC.pdf`,
-              fileDataUrl: pdfDataUrl,
-              status: 'ACTIVE',
-              uploadedByName: currentUser?.fullName || 'Authorized Financial Manager',
-              isOptional: false,
-              requiresIssueDate: false,
-              requiresExpiryDate: false,
-              philgepsRefNo: refNo,
-              projectTitle: title
-            };
-            storePdfData(newId, pdfDataUrl);
-            setVaultItems(prev => [newItem, ...prev]);
-            setShowNfccModal(false);
-            notifySuccess('NFCC Statement Saved!', `Net Financial Contracting Capacity statement saved to Financial Documents vault.`);
-          }}
-        />
-      )}
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Select Bidding Project (Opportunity Finder)
+                  </label>
+                  <select
+                    value={retagProjectRefNo}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setRetagProjectRefNo(val);
+                      const found = oppProjects.find((p) => p.refNo === val);
+                      if (found) {
+                        setRetagProjectTitle(found.title);
+                      }
+                    }}
+                    className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-400 cursor-pointer"
+                  >
+                    {oppProjects.map((p) => (
+                      <option key={p.id} value={p.refNo}>
+                        [{p.refNo}] {p.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-    </div>
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Project Reference Number
+                  </label>
+                  <input
+                    type="text"
+                    value={retagProjectRefNo}
+                    onChange={(e) => setRetagProjectRefNo(e.target.value)}
+                    placeholder="e.g. PRJ-2026-901283"
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Bidding Project Title
+                  </label>
+                  <input
+                    type="text"
+                    value={retagProjectTitle}
+                    onChange={(e) => setRetagProjectTitle(e.target.value)}
+                    placeholder="e.g. Supply and Delivery of IT Equipment"
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-medium focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setRetagTargetItem(null)}
+                    className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-xl transition"
+                  >
+                    Update Project Tag
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MERGED PDF VIEWER MODAL */}
+        {showMergeModal && (
+          <MergedPdfViewerModal
+            selectedItems={selectedVaultObjects}
+            tenant={currentTenant}
+            vaultDocs={vaultItems}
+            onClose={() => setShowMergeModal(false)}
+          />
+        )}
+
+        {/* SINGLE CONTINUOUS STREAM PDF PREVIEW MODAL */}
+        {previewPdfItem && (
+          <PdfPreviewModal
+            item={previewPdfItem}
+            tenant={currentTenant}
+            onClose={() => setPreviewPdfItem(null)}
+            pdfDataUrl={
+              getPdfData(previewPdfItem.id) || previewPdfItem.fileDataUrl
+            }
+            hidePrintExport={true}
+          />
+        )}
+
+        {/* UPLOAD CUSTOM DOCUMENT MODAL */}
+        {showCustomUploadModal && (
+          <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleIn my-auto">
+              <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-blue-400" />
+                  <span>Upload Custom Vault Document</span>
+                </h3>
+                <button
+                  onClick={() => setShowCustomUploadModal(false)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={handleCustomUploadSubmit}
+                className="p-6 space-y-4 text-xs"
+              >
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Target Category
+                  </label>
+                  <select
+                    value={customUploadCategory}
+                    onChange={(e) =>
+                      setCustomUploadCategory(e.target.value as DocCategory)
+                    }
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value="ELIGIBILITY_CLASS_A">
+                      Class A Legal Eligibility
+                    </option>
+                    <option value="ELIGIBILITY_CLASS_B">
+                      Class B Joint Venture
+                    </option>
+                    <option value="TECHNICAL">
+                      Class A Technical Eligibility
+                    </option>
+                    <option value="FINANCIAL">Financial Documents</option>
+                    <option value="CORPORATE_LEGAL">Corporate Legal</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Document Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={customDocName}
+                    onChange={(e) => setCustomDocName(e.target.value)}
+                    placeholder="e.g. Joint Venture Agreement 2026"
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    Document Serial Number
+                  </label>
+                  <input
+                    type="text"
+                    value={docNumber}
+                    onChange={(e) => setDocNumber(e.target.value)}
+                    placeholder="e.g. JVA-2026-901"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">
+                      Issue Date
+                    </label>
+                    <input
+                      type="date"
+                      value={issuedDate}
+                      onChange={(e) => setIssuedDate(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">
+                      Expiration Date
+                    </label>
+                    <input
+                      type="date"
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    PDF File (Max 100 MB){" "}
+                    <span className="text-red-400">*</span>
+                  </label>
+                  <div className="border-2 border-dashed border-slate-800 rounded-xl p-4 text-center hover:border-blue-500 transition cursor-pointer bg-slate-950">
+                    <label className="cursor-pointer block space-y-1">
+                      <FileText className="w-6 h-6 text-blue-400 mx-auto" />
+                      <p className="text-xs text-slate-300 font-semibold">
+                        {selectedFile?.name || "Click to select PDF"}
+                      </p>
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={(e) =>
+                          handleFileSelection(e.target.files?.[0])
+                        }
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  {uploadError && (
+                    <p className="text-xs text-red-400 mt-1">{uploadError}</p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomUploadModal(false)}
+                    className="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl text-xs font-semibold text-white shadow-xl transition"
+                    style={{
+                      backgroundColor: currentTenant?.brandColor || "#1e40af",
+                    }}
+                  >
+                    Upload Document
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* STATUTORY FINANCIAL BID FORM FOR GOODS MODAL */}
+        {showBidFormGoodsModal && (
+          <BidFormForGoodsModal
+            tenant={currentTenant}
+            activeProjectRefNo={activeProjectRefNo}
+            activeProjectTitle={activeProjectTitle}
+            activeProcuringEntity={activeProcuringEntity}
+            onSaveAndComplete={handleSaveCompletedBidFormGoods}
+            onClose={() => setShowBidFormGoodsModal(false)}
+          />
+        )}
+
+        {/* STATUTORY FINANCIAL BID FORM FOR INFRASTRUCTURE MODAL */}
+        {showBidFormInfraModal && (
+          <BidFormForInfrastructureModal
+            tenant={currentTenant}
+            activeProjectRefNo={activeProjectRefNo}
+            activeProjectTitle={activeProjectTitle}
+            activeProcuringEntity={activeProcuringEntity}
+            onSaveAndComplete={handleSaveCompletedBidFormInfra}
+            onClose={() => setShowBidFormInfraModal(false)}
+          />
+        )}
+
+        {/* STATUTORY BILL OF QUANTITIES (BOQ) MODAL */}
+        {showBoqModal && (
+          <BillOfQuantitiesModal
+            tenant={currentTenant}
+            activeProjectRefNo={activeProjectRefNo}
+            activeProjectTitle={activeProjectTitle}
+            activeProcuringEntity={activeProcuringEntity}
+            onSaveAndComplete={handleSaveCompletedBoq}
+            onClose={() => setShowBoqModal(false)}
+          />
+        )}
+
+        {/* STATUTORY CASH FLOW BY QUARTER (SF-INFR-56) MODAL */}
+        {showCashFlowModal && (
+          <CashFlowByQuarterModal
+            tenant={currentTenant}
+            activeProjectRefNo={activeProjectRefNo}
+            activeProjectTitle={activeProjectTitle}
+            activeProcuringEntity={activeProcuringEntity}
+            onSaveAndComplete={handleSaveCompletedCashFlow}
+            onClose={() => setShowCashFlowModal(false)}
+          />
+        )}
+
+        {/* STATUTORY PRICE SCHEDULE FOR GOODS MODAL */}
+        {showPriceScheduleGoodsModal && (
+          <PriceSchedule4GoodsModal
+            tenant={currentTenant}
+            activeProjectRefNo={activeProjectRefNo}
+            activeProjectTitle={activeProjectTitle}
+            activeProcuringEntity={activeProcuringEntity}
+            onSaveAndComplete={handleSaveCompletedPriceScheduleGoods}
+            onClose={() => setShowPriceScheduleGoodsModal(false)}
+          />
+        )}
+
+        {/* STATUTORY SUMMARY OF BID PRICES MODAL */}
+        {showSummaryBidPriceModal && (
+          <SummaryOfBidPriceModal
+            tenant={currentTenant}
+            activeProjectRefNo={activeProjectRefNo}
+            activeProjectTitle={activeProjectTitle}
+            activeProcuringEntity={activeProcuringEntity}
+            onSaveAndComplete={handleSaveCompletedSummaryBidPrice}
+            onClose={() => setShowSummaryBidPriceModal(false)}
+          />
+        )}
+
+        {/* STATUTORY (L) DETAILED ESTIMATES FORM MODAL */}
+        {showDetailedEstimatesModal && (
+          <DetailedEstimatesModal
+            tenant={currentTenant}
+            activeProjectRefNo={activeProjectRefNo}
+            activeProjectTitle={activeProjectTitle}
+            activeProcuringEntity={activeProcuringEntity}
+            onSaveAndComplete={handleSaveCompletedDetailedEstimates}
+            onClose={() => setShowDetailedEstimatesModal(false)}
+          />
+        )}
+
+        {/* STATUTORY NFCC MODAL */}
+        {showNfccModal && (
+          <NfccModal
+            tenant={currentTenant}
+            activeProjectRefNo={activeProjectRefNo}
+            activeProjectTitle={activeProjectTitle}
+            activeProcuringEntity={activeProcuringEntity}
+            onClose={() => setShowNfccModal(false)}
+            onSaveAndComplete={(
+              pdfDataUrl?: string,
+              docName?: string,
+              projRefNo?: string,
+              projTitle?: string,
+            ) => {
+              const newId = `fin-nfcc-${Date.now()}`;
+              const refNo =
+                projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
+              const title =
+                projTitle || activeProjectTitle || oppProjects[0]?.title || "";
+
+              const newItem: DocumentVaultItem = {
+                id: newId,
+                tenantId: activeTenantId,
+                documentCode: "NFCC",
+                documentName:
+                  docName || `Net Financial Contracting Capacity - [${refNo}]`,
+                category: "FINANCIAL",
+                procurementApplicability: [
+                  "GOODS",
+                  "INFRASTRUCTURE",
+                  "CONSULTING_SERVICES",
+                ],
+                legalBasisReference: "Section 23.4.1.4 of RA 12009 / RA 9184",
+                versionNumber: 1,
+                fileHash: Array.from({ length: 64 }, () =>
+                  Math.floor(Math.random() * 16).toString(16),
+                ).join(""),
+                fileSizeBytes: 185000,
+                fileName: `${refNo}_Financial_Envelope_NFCC.pdf`,
+                fileDataUrl: pdfDataUrl,
+                status: "ACTIVE",
+                uploadedByName:
+                  currentUser?.fullName || "Authorized Financial Manager",
+                isOptional: false,
+                requiresIssueDate: false,
+                requiresExpiryDate: false,
+                philgepsRefNo: refNo,
+                projectTitle: title,
+              };
+              storePdfData(newId, pdfDataUrl);
+              setVaultItems((prev) => [newItem, ...prev]);
+              setShowNfccModal(false);
+              notifySuccess(
+                "NFCC Statement Saved!",
+                `Net Financial Contracting Capacity statement saved to Financial Documents vault.`,
+              );
+            }}
+          />
+        )}
+      </div>
     </VaultErrorBoundary>
   );
 };

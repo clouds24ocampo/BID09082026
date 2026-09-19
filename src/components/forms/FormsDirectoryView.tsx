@@ -1,16 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { getOpportunityProjects, OpportunityProjectOption } from '../../utils/opportunityProjects';
-import { SectionViScheduleOfRequirements } from '../vault/templates/SectionViScheduleOfRequirements';
-import { TechnicalSpecifications } from '../vault/templates/TechnicalSpecifications';
-import { FrameworkAgreementList } from '../vault/templates/FrameworkAgreementList';
-import { OmnibusSwornStatementModal } from '../vault/templates/OmnibusSwornStatementModal';
-import { BidSecuringDeclarationModal } from '../vault/templates/BidSecuringDeclarationModal';
-import PsdModal from '../vault/templates/psd';
-import StatutoryDocumentsGuideModal from '../vault/templates/StatutoryDocumentsGuideModal';
-import { PdfPreviewModal } from '../vault/PdfPreviewModal';
-import VaultErrorBoundary from '../common/VaultErrorBoundary';
-import { savePdfData, loadPdfData as loadPdfDataFromDB } from '../../utils/vaultIndexedDB';
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../../context/AuthContext";
+import {
+  getOpportunityProjects,
+  OpportunityProjectOption,
+} from "../../utils/opportunityProjects";
+import { SectionViScheduleOfRequirements } from "../vault/templates/SectionViScheduleOfRequirements";
+import { TechnicalSpecifications } from "../vault/templates/TechnicalSpecifications";
+import { FrameworkAgreementList } from "../vault/templates/FrameworkAgreementList";
+import { OmnibusSwornStatementModal } from "../vault/templates/OmnibusSwornStatementModal";
+import { BidSecuringDeclarationModal } from "../vault/templates/BidSecuringDeclarationModal";
+import PsdModal from "../vault/templates/psd";
+import StatutoryDocumentsGuideModal from "../vault/templates/StatutoryDocumentsGuideModal";
+import { PdfPreviewModal } from "../vault/PdfPreviewModal";
+import VaultErrorBoundary from "../common/VaultErrorBoundary";
+import {
+  savePdfData,
+  loadPdfData as loadPdfDataFromDB,
+} from "../../utils/vaultIndexedDB";
 import {
   ShieldCheck,
   Search,
@@ -22,16 +28,16 @@ import {
   Eye,
   Trash2,
   FileSignature,
-  BookOpen
-} from 'lucide-react';
+  BookOpen,
+} from "lucide-react";
 
 export interface FormItem {
   id: string;
   formCode: string;
   title: string;
-  category: 'NOTARIZED' | 'ELIGIBILITY' | 'TECHNICAL' | 'FINANCIAL';
+  category: "NOTARIZED" | "ELIGIBILITY" | "TECHNICAL" | "FINANCIAL";
   governingLaw: string;
-  format: 'PDF' | 'DOCX' | 'TEMPLATE';
+  format: "PDF" | "DOCX" | "TEMPLATE";
   description: string;
   notaryRequirement: string;
 }
@@ -50,81 +56,111 @@ export interface CompletedNotarizedForm {
 
 const OFFICIAL_NOTARIZED_DOCS: FormItem[] = [
   {
-    id: 'form-oss',
-    formCode: 'GPPB-OSS-2025',
-    title: 'Omnibus Sworn Statement (Notarized OSS - RA 12009 Standard)',
-    category: 'NOTARIZED',
-    governingLaw: 'RA 12009 / GPPB Resolution No. 02-2025',
-    format: 'TEMPLATE',
-    notaryRequirement: 'Requires Notary Public Jurat & Community Tax Certificate (CTC)',
-    description: 'Mandatory notarized sworn statement certifying authenticity of documents, non-blacklisting, and authorized signatory powers.'
+    id: "form-oss",
+    formCode: "GPPB-OSS-2025",
+    title: "Omnibus Sworn Statement (Notarized OSS - RA 12009 Standard)",
+    category: "NOTARIZED",
+    governingLaw: "RA 12009 / GPPB Resolution No. 02-2025",
+    format: "TEMPLATE",
+    notaryRequirement:
+      "Requires Notary Public Jurat & Community Tax Certificate (CTC)",
+    description:
+      "Mandatory notarized sworn statement certifying authenticity of documents, non-blacklisting, and authorized signatory powers.",
   },
   {
-    id: 'form-bsd',
-    formCode: 'GPPB-BSD-2025',
-    title: 'Bid Securing Declaration / Bid Security / Bid Bond (Notarized BSD Template)',
-    category: 'NOTARIZED',
-    governingLaw: 'RA 12009 Section 27.5 / GPPB Res 02-2025',
-    format: 'TEMPLATE',
-    notaryRequirement: 'Requires Notary Public Jurat & Government-issued ID details',
-    description: 'Statutory notarized bid security undertaking binding the bidder to execute the contract if awarded within bid validity period.'
+    id: "form-bsd",
+    formCode: "GPPB-BSD-2025",
+    title:
+      "Bid Securing Declaration / Bid Security / Bid Bond (Notarized BSD Template)",
+    category: "NOTARIZED",
+    governingLaw: "RA 12009 Section 27.5 / GPPB Res 02-2025",
+    format: "TEMPLATE",
+    notaryRequirement:
+      "Requires Notary Public Jurat & Government-issued ID details",
+    description:
+      "Statutory notarized bid security undertaking binding the bidder to execute the contract if awarded within bid validity period.",
   },
   {
-    id: 'form-psd',
-    formCode: 'GPPB-PSD-2025',
-    title: 'Performance Securing Declaration (PSD - RA 12009 Section 76 & Framework Agreement)',
-    category: 'NOTARIZED',
-    governingLaw: 'Section 76, IRR of RA 12009 / GPPB Resolution No. 09-2020',
-    format: 'TEMPLATE',
-    notaryRequirement: 'Requires Notary Public Jurat & Government-issued ID details',
-    description: 'Official statutory undertaking guaranteeing faithful performance within 10 days from Notice of Award (NOA) pursuant to Section 76 of RA 12009.'
-  }
+    id: "form-psd",
+    formCode: "GPPB-PSD-2025",
+    title:
+      "Performance Securing Declaration (PSD - RA 12009 Section 76 & Framework Agreement)",
+    category: "NOTARIZED",
+    governingLaw: "Section 76, IRR of RA 12009 / GPPB Resolution No. 09-2020",
+    format: "TEMPLATE",
+    notaryRequirement:
+      "Requires Notary Public Jurat & Government-issued ID details",
+    description:
+      "Official statutory undertaking guaranteeing faithful performance within 10 days from Notice of Award (NOA) pursuant to Section 76 of RA 12009.",
+  },
 ];
 
 export const FormsDirectoryView: React.FC = () => {
   const { currentTenant } = useAuth();
   const [forms] = useState<FormItem[]>(OFFICIAL_NOTARIZED_DOCS);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Sub-Tab Navigation State
-  const [formsSubTab, setFormsSubTab] = useState<'TEMPLATES' | 'COMPLETED'>('TEMPLATES');
+  const [formsSubTab, setFormsSubTab] = useState<"TEMPLATES" | "COMPLETED">(
+    "TEMPLATES",
+  );
 
   // Completed Forms Storage State
-  const [completedForms, setCompletedForms] = useState<CompletedNotarizedForm[]>([]);
-  const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>('ALL');
+  const [completedForms, setCompletedForms] = useState<
+    CompletedNotarizedForm[]
+  >([]);
+  const [selectedProjectFilter, setSelectedProjectFilter] =
+    useState<string>("ALL");
   const [previewPdfItem, setPreviewPdfItem] = useState<any | null>(null);
 
   // Opportunity Finder State Integration
-  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
-  const [selectedOppId, setSelectedOppId] = useState<string>('');
-  const [activeProject, setActiveProject] = useState<OpportunityProjectOption | null>(null);
+  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>(
+    [],
+  );
+  const [selectedOppId, setSelectedOppId] = useState<string>("");
+  const [activeProject, setActiveProject] =
+    useState<OpportunityProjectOption | null>(null);
 
   // Active Interactive Template Modal State
-  const [activeTemplateModal, setActiveTemplateModal] = useState<'SEC-VI' | 'SEC-VII' | 'FAL-01' | 'GPPB-OSS-2025' | 'GPPB-BSD-2025' | 'GPPB-PSD-2025' | null>(null);
+  const [activeTemplateModal, setActiveTemplateModal] = useState<
+    | "SEC-VI"
+    | "SEC-VII"
+    | "FAL-01"
+    | "GPPB-OSS-2025"
+    | "GPPB-BSD-2025"
+    | "GPPB-PSD-2025"
+    | null
+  >(null);
   const [showGuideModal, setShowGuideModal] = useState(false);
-  const [guideInitialCode, setGuideInitialCode] = useState<string>('PSD');
+  const [guideInitialCode, setGuideInitialCode] = useState<string>("PSD");
 
   // Load real saved opportunity projects & saved completed forms from IndexedDB + localStorage
   useEffect(() => {
     const list = getOpportunityProjects(currentTenant?.id);
     setOppProjects(list);
     if (list.length > 0) {
-      let storedRef = '';
+      let storedRef = "";
       try {
-        const rawStored = localStorage.getItem(`bidocs_active_project_${currentTenant?.id}`) || localStorage.getItem('bidocs_active_project');
+        const rawStored =
+          localStorage.getItem(`bidocs_active_project_${currentTenant?.id}`) ||
+          localStorage.getItem("bidocs_active_project");
         if (rawStored) {
           const parsed = JSON.parse(rawStored);
-          storedRef = parsed.refNo || '';
+          storedRef = parsed.refNo || "";
         }
       } catch (e) {}
 
-      const preferred = list.find((p) => p.refNo === storedRef || p.id === storedRef) || list[0];
+      const preferred =
+        list.find((p) => p.refNo === storedRef || p.id === storedRef) ||
+        list[0];
       setSelectedOppId(preferred.id);
       setActiveProject(preferred);
     }
 
-    const tenantId = currentTenant?.id || 'default';
-    const saved = localStorage.getItem(`bidocs_completed_notarized_${tenantId}`);
+    const tenantId = currentTenant?.id || "default";
+    const saved = localStorage.getItem(
+      `bidocs_completed_notarized_${tenantId}`,
+    );
     if (saved) {
       try {
         const parsed: CompletedNotarizedForm[] = JSON.parse(saved);
@@ -135,52 +171,75 @@ export const FormsDirectoryView: React.FC = () => {
           if (!form.fileDataUrl) {
             const dbDataUrl = await loadPdfDataFromDB(form.id);
             if (dbDataUrl) {
-              setCompletedForms(prev => prev.map(f => f.id === form.id ? { ...f, fileDataUrl: dbDataUrl } : f));
+              setCompletedForms((prev) =>
+                prev.map((f) =>
+                  f.id === form.id ? { ...f, fileDataUrl: dbDataUrl } : f,
+                ),
+              );
             }
           }
         });
       } catch (e) {
-        console.error('[FormsDirectoryView] Failed to parse saved completed forms:', e);
+        console.error(
+          "[FormsDirectoryView] Failed to parse saved completed forms:",
+          e,
+        );
       }
     }
   }, [currentTenant?.id]);
 
   const saveCompletedForm = async (newForm: CompletedNotarizedForm) => {
-    const tenantId = currentTenant?.id || 'default';
+    const tenantId = currentTenant?.id || "default";
 
     // 1. Offload heavy PDF binary to IndexedDB (200MB+ storage capability)
     if (newForm.fileDataUrl) {
       try {
         await savePdfData(newForm.id, newForm.fileDataUrl);
       } catch (dbErr) {
-        console.warn('[FormsDirectoryView] IndexedDB savePdfData warning:', dbErr);
+        console.warn(
+          "[FormsDirectoryView] IndexedDB savePdfData warning:",
+          dbErr,
+        );
       }
     }
 
     // 2. Update state and localStorage with clean metadata (stripped of heavy PDF binary)
-    setCompletedForms(prev => {
-      const updated = [newForm, ...prev.filter(f => f.id !== newForm.id)];
+    setCompletedForms((prev) => {
+      const updated = [newForm, ...prev.filter((f) => f.id !== newForm.id)];
 
-      const cleanForStorage = updated.map(f => {
+      const cleanForStorage = updated.map((f) => {
         const { fileDataUrl: _fd, ...fRest } = f;
         return fRest;
       });
 
       try {
-        localStorage.setItem(`bidocs_completed_notarized_${tenantId}`, JSON.stringify(cleanForStorage));
+        localStorage.setItem(
+          `bidocs_completed_notarized_${tenantId}`,
+          JSON.stringify(cleanForStorage),
+        );
       } catch (lsErr) {
-        console.warn('[FormsDirectoryView] Safely caught localStorage QuotaExceededError:', lsErr);
+        console.warn(
+          "[FormsDirectoryView] Safely caught localStorage QuotaExceededError:",
+          lsErr,
+        );
       }
       return updated;
     });
   };
 
   const handleDeleteCompletedForm = (id: string, title: string) => {
-    if (confirm(`Are you sure you want to delete "${title}" from Completed Documents to be Printed?`)) {
-      const tenantId = currentTenant?.id || 'default';
-      setCompletedForms(prev => {
-        const updated = prev.filter(f => f.id !== id);
-        localStorage.setItem(`bidocs_completed_notarized_${tenantId}`, JSON.stringify(updated));
+    if (
+      confirm(
+        `Are you sure you want to delete "${title}" from Completed Documents to be Printed?`,
+      )
+    ) {
+      const tenantId = currentTenant?.id || "default";
+      setCompletedForms((prev) => {
+        const updated = prev.filter((f) => f.id !== id);
+        localStorage.setItem(
+          `bidocs_completed_notarized_${tenantId}`,
+          JSON.stringify(updated),
+        );
         return updated;
       });
     }
@@ -188,7 +247,7 @@ export const FormsDirectoryView: React.FC = () => {
 
   const handlePrintDocument = (form: CompletedNotarizedForm) => {
     if (form.fileDataUrl) {
-      const printWin = window.open('', '_blank');
+      const printWin = window.open("", "_blank");
       if (printWin) {
         printWin.document.write(`
           <!DOCTYPE html>
@@ -209,7 +268,9 @@ export const FormsDirectoryView: React.FC = () => {
         printWin.document.close();
       }
     } else {
-      alert(`Preparing print layout for "${form.title}"... Please use Export/Print inside the document editor.`);
+      alert(
+        `Preparing print layout for "${form.title}"... Please use Export/Print inside the document editor.`,
+      );
     }
   };
 
@@ -225,25 +286,25 @@ export const FormsDirectoryView: React.FC = () => {
     (f) =>
       f.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       f.formCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.governingLaw.toLowerCase().includes(searchQuery.toLowerCase())
+      f.governingLaw.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const handleFormAction = (form: FormItem) => {
-    if (form.formCode === 'GPPB-SEC-VI') {
-      setActiveTemplateModal('SEC-VI');
-    } else if (form.formCode === 'GPPB-SEC-VII') {
-      setActiveTemplateModal('SEC-VII');
-    } else if (form.formCode === 'GPPB-FAL-01') {
-      setActiveTemplateModal('FAL-01');
-    } else if (form.formCode === 'GPPB-OSS-2025') {
-      setActiveTemplateModal('GPPB-OSS-2025');
-    } else if (form.formCode === 'GPPB-BSD-2025') {
-      setActiveTemplateModal('GPPB-BSD-2025');
-    } else if (form.formCode === 'GPPB-PSD-2025') {
-      setActiveTemplateModal('GPPB-PSD-2025');
+    if (form.formCode === "GPPB-SEC-VI") {
+      setActiveTemplateModal("SEC-VI");
+    } else if (form.formCode === "GPPB-SEC-VII") {
+      setActiveTemplateModal("SEC-VII");
+    } else if (form.formCode === "GPPB-FAL-01") {
+      setActiveTemplateModal("FAL-01");
+    } else if (form.formCode === "GPPB-OSS-2025") {
+      setActiveTemplateModal("GPPB-OSS-2025");
+    } else if (form.formCode === "GPPB-BSD-2025") {
+      setActiveTemplateModal("GPPB-BSD-2025");
+    } else if (form.formCode === "GPPB-PSD-2025") {
+      setActiveTemplateModal("GPPB-PSD-2025");
     } else {
       alert(
-        `Generates notarized template "${form.title}" pre-filled for project [${activeProject?.refNo || 'N/A'}] and corporate entity "${currentTenant?.companyName || 'Bidding Entity'}".`
+        `Generates notarized template "${form.title}" pre-filled for project [${activeProject?.refNo || "N/A"}] and corporate entity "${currentTenant?.companyName || "Bidding Entity"}".`,
       );
     }
   };
@@ -251,7 +312,6 @@ export const FormsDirectoryView: React.FC = () => {
   return (
     <VaultErrorBoundary fallbackTitle="Notarized Documents Render Protected">
       <div className="space-y-6 animate-fadeIn pb-12">
-
         {/* Top Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
           <div>
@@ -267,7 +327,12 @@ export const FormsDirectoryView: React.FC = () => {
                   </span>
                 </h1>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Official PhilGEPS & GPPB legal notarized document templates pre-populated for <span className="text-slate-200 font-semibold">{currentTenant?.companyName}</span>.
+                  Official PhilGEPS & GPPB legal notarized document templates
+                  pre-populated for{" "}
+                  <span className="text-slate-200 font-semibold">
+                    {currentTenant?.companyName}
+                  </span>
+                  .
                 </p>
               </div>
             </div>
@@ -275,10 +340,10 @@ export const FormsDirectoryView: React.FC = () => {
 
           <button
             onClick={() => {
-              setGuideInitialCode('PSD');
+              setGuideInitialCode("PSD");
               setShowGuideModal(true);
             }}
-            className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-950 to-indigo-950 hover:from-blue-900 hover:to-indigo-900 border border-blue-500/40 text-blue-300 hover:text-white text-xs font-bold transition flex items-center gap-2 shadow-lg hover:shadow-blue-500/10 shrink-0"
+            className="px-4 py-2.5 rounded-xl bg-linear-to-r from-blue-950 to-indigo-950 hover:from-blue-900 hover:to-indigo-900 border border-blue-500/40 text-blue-300 hover:text-white text-xs font-bold transition flex items-center gap-2 shadow-lg hover:shadow-blue-500/10 shrink-0"
           >
             <BookOpen className="w-4 h-4 text-blue-400" />
             <span>Statutory Filing & Answering Guide</span>
@@ -286,12 +351,14 @@ export const FormsDirectoryView: React.FC = () => {
         </div>
 
         {/* OPPORTUNITY FINDER PROJECT CONNECTION BAR */}
-        <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950/40 to-slate-900 border border-blue-500/40 space-y-4 shadow-xl">
+        <div className="p-5 rounded-2xl bg-linear-to-r from-slate-900 via-blue-950/40 to-slate-900 border border-blue-500/40 space-y-4 shadow-xl">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1.5 flex-1">
               <label className="text-slate-200 font-mono text-xs font-bold flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-blue-400" />
-                <span>Select Active Bidding Opportunity from Opportunity Finder:</span>
+                <span>
+                  Select Active Bidding Opportunity from Opportunity Finder:
+                </span>
               </label>
               <select
                 value={selectedOppId}
@@ -299,10 +366,15 @@ export const FormsDirectoryView: React.FC = () => {
                 className="w-full bg-slate-950 border border-blue-500/60 rounded-xl px-4 py-2.5 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer hover:border-blue-400"
               >
                 {oppProjects.length === 0 ? (
-                  <option value="">-- No Saved Projects in Opportunity Finder (Add Opportunity to Connect) --</option>
+                  <option value="">
+                    -- No Saved Projects in Opportunity Finder (Add Opportunity
+                    to Connect) --
+                  </option>
                 ) : (
                   <>
-                    <option value="">-- Select Active Opportunity / Bidding Project --</option>
+                    <option value="">
+                      -- Select Active Opportunity / Bidding Project --
+                    </option>
                     {oppProjects.map((p) => (
                       <option key={p.id} value={p.id}>
                         [{p.refNo}] {p.title} — {p.procuringEntity} ({p.abc})
@@ -316,18 +388,30 @@ export const FormsDirectoryView: React.FC = () => {
             {activeProject && (
               <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center gap-4 text-xs font-mono shrink-0">
                 <div>
-                  <div className="text-[10px] text-slate-400 uppercase">Selected Project Ref</div>
-                  <div className="font-bold text-blue-400">{activeProject.refNo}</div>
+                  <div className="text-[10px] text-slate-400 uppercase">
+                    Selected Project Ref
+                  </div>
+                  <div className="font-bold text-blue-400">
+                    {activeProject.refNo}
+                  </div>
                 </div>
                 <div className="h-8 w-px bg-slate-800" />
                 <div>
-                  <div className="text-[10px] text-slate-400 uppercase">Procuring Entity</div>
-                  <div className="font-bold text-white truncate max-w-[180px]">{activeProject.procuringEntity}</div>
+                  <div className="text-[10px] text-slate-400 uppercase">
+                    Procuring Entity
+                  </div>
+                  <div className="font-bold text-white truncate max-w-45">
+                    {activeProject.procuringEntity}
+                  </div>
                 </div>
                 <div className="h-8 w-px bg-slate-800" />
                 <div>
-                  <div className="text-[10px] text-slate-400 uppercase">Approved Budget (ABC)</div>
-                  <div className="font-bold text-emerald-400">{activeProject.abc}</div>
+                  <div className="text-[10px] text-slate-400 uppercase">
+                    Approved Budget (ABC)
+                  </div>
+                  <div className="font-bold text-emerald-400">
+                    {activeProject.abc}
+                  </div>
                 </div>
               </div>
             )}
@@ -336,7 +420,12 @@ export const FormsDirectoryView: React.FC = () => {
           <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs flex items-center gap-2 font-mono">
             <Sparkles className="w-4 h-4 shrink-0 text-blue-400" />
             <span>
-              Selecting a project auto-injects <strong>Project Ref No, Solicitation No, Title, Procuring Entity, Submission Time, and Company TIN</strong> across all notarized documents below.
+              Selecting a project auto-injects{" "}
+              <strong>
+                Project Ref No, Solicitation No, Title, Procuring Entity,
+                Submission Time, and Company TIN
+              </strong>{" "}
+              across all notarized documents below.
             </span>
           </div>
         </div>
@@ -344,11 +433,12 @@ export const FormsDirectoryView: React.FC = () => {
         {/* SUB-TABS NAVIGATION BAR */}
         <div className="flex items-center gap-2 border-b border-slate-800 pb-3 font-mono text-xs">
           <button
-            onClick={() => setFormsSubTab('TEMPLATES')}
-            className={`px-4 py-2.5 rounded-xl font-bold transition flex items-center gap-2 ${formsSubTab === 'TEMPLATES'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-              : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
+            onClick={() => setFormsSubTab("TEMPLATES")}
+            className={`px-4 py-2.5 rounded-xl font-bold transition flex items-center gap-2 ${
+              formsSubTab === "TEMPLATES"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
+                : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
           >
             <FileSignature className="w-4 h-4" />
             <span>Notarized Templates Checklist</span>
@@ -358,25 +448,29 @@ export const FormsDirectoryView: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setFormsSubTab('COMPLETED')}
-            className={`px-4 py-2.5 rounded-xl font-bold transition flex items-center gap-2 ${formsSubTab === 'COMPLETED'
-              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20'
-              : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
+            onClick={() => setFormsSubTab("COMPLETED")}
+            className={`px-4 py-2.5 rounded-xl font-bold transition flex items-center gap-2 ${
+              formsSubTab === "COMPLETED"
+                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
           >
             <Printer className="w-4 h-4" />
             <span>Completed Documents to be Printed</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] border ${completedForms.length > 0
-              ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40 font-bold'
-              : 'bg-slate-950 text-slate-500 border-slate-800'
-              }`}>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] border ${
+                completedForms.length > 0
+                  ? "bg-emerald-950 text-emerald-300 border-emerald-500/40 font-bold"
+                  : "bg-slate-950 text-slate-500 border-slate-800"
+              }`}
+            >
               {completedForms.length} Saved
             </span>
           </button>
         </div>
 
         {/* SUB-TAB 1: NOTARIZED TEMPLATES CHECKLIST */}
-        {formsSubTab === 'TEMPLATES' && (
+        {formsSubTab === "TEMPLATES" && (
           <div className="space-y-6">
             {/* Search Input & Category Filters */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -392,7 +486,11 @@ export const FormsDirectoryView: React.FC = () => {
               </div>
 
               <div className="text-xs text-slate-400 font-mono">
-                Showing <span className="text-white font-bold">{filteredForms.length}</span> Notarized & Legal Forms
+                Showing{" "}
+                <span className="text-white font-bold">
+                  {filteredForms.length}
+                </span>{" "}
+                Notarized & Legal Forms
               </div>
             </div>
 
@@ -416,24 +514,34 @@ export const FormsDirectoryView: React.FC = () => {
                     <h3 className="text-base font-bold text-white leading-snug group-hover:text-blue-300 transition">
                       {form.title}
                     </h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">{form.description}</p>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      {form.description}
+                    </p>
 
                     <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800/80 space-y-1 text-[11px]">
-                      <div className="text-blue-400 font-mono font-medium">📜 Basis: {form.governingLaw}</div>
-                      <div className="text-amber-400/90 font-mono font-medium">⚖️ {form.notaryRequirement}</div>
+                      <div className="text-blue-400 font-mono font-medium">
+                        📜 Basis: {form.governingLaw}
+                      </div>
+                      <div className="text-amber-400/90 font-mono font-medium">
+                        ⚖️ {form.notaryRequirement}
+                      </div>
                     </div>
                   </div>
 
                   <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
                     <span className="text-[10px] text-slate-500 font-mono">
-                      TIN: {currentTenant?.tin || '000-000-000-000'}
+                      TIN: {currentTenant?.tin || "000-000-000-000"}
                     </span>
 
                     <div className="flex items-center gap-2">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          const initialCode = form.formCode.includes('PSD') ? 'PSD' : form.formCode.includes('BSD') ? 'BSD' : 'OSS';
+                          const initialCode = form.formCode.includes("PSD")
+                            ? "PSD"
+                            : form.formCode.includes("BSD")
+                              ? "BSD"
+                              : "OSS";
                           setGuideInitialCode(initialCode);
                           setShowGuideModal(true);
                         }}
@@ -446,7 +554,7 @@ export const FormsDirectoryView: React.FC = () => {
 
                       <button
                         onClick={() => handleFormAction(form)}
-                        className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg transition flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500"
+                        className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-lg transition flex items-center gap-1.5 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500"
                       >
                         <FileCheck className="w-3.5 h-3.5" />
                         <span>Fill & Generate Document</span>
@@ -460,28 +568,33 @@ export const FormsDirectoryView: React.FC = () => {
         )}
 
         {/* SUB-TAB 2: COMPLETED DOCUMENTS TO BE PRINTED */}
-        {formsSubTab === 'COMPLETED' && (
+        {formsSubTab === "COMPLETED" && (
           <div className="space-y-4">
             {(() => {
               const allProjectsInCompleted = (() => {
                 const seen = new Set<string>();
-                const list: { refNo: string; title: string; count: number }[] = [];
+                const list: { refNo: string; title: string; count: number }[] =
+                  [];
 
-                oppProjects.forEach(p => {
+                oppProjects.forEach((p) => {
                   if (p.refNo && !seen.has(p.refNo)) {
                     seen.add(p.refNo);
-                    const count = completedForms.filter(c => c.projectRefNo === p.refNo).length;
+                    const count = completedForms.filter(
+                      (c) => c.projectRefNo === p.refNo,
+                    ).length;
                     list.push({ refNo: p.refNo, title: p.title, count });
                   }
                 });
 
-                completedForms.forEach(c => {
+                completedForms.forEach((c) => {
                   if (c.projectRefNo && !seen.has(c.projectRefNo)) {
                     seen.add(c.projectRefNo);
                     list.push({
                       refNo: c.projectRefNo,
-                      title: c.projectTitle || 'Bidding Opportunity',
-                      count: completedForms.filter(item => item.projectRefNo === c.projectRefNo).length
+                      title: c.projectTitle || "Bidding Opportunity",
+                      count: completedForms.filter(
+                        (item) => item.projectRefNo === c.projectRefNo,
+                      ).length,
                     });
                   }
                 });
@@ -489,8 +602,8 @@ export const FormsDirectoryView: React.FC = () => {
                 return list;
               })();
 
-              const displayedCompleted = completedForms.filter(item => {
-                if (selectedProjectFilter === 'ALL') return true;
+              const displayedCompleted = completedForms.filter((item) => {
+                if (selectedProjectFilter === "ALL") return true;
                 return item.projectRefNo === selectedProjectFilter;
               });
 
@@ -501,13 +614,25 @@ export const FormsDirectoryView: React.FC = () => {
                       <CheckCircle2 className="w-6 h-6" />
                     </div>
                     <div className="max-w-md mx-auto space-y-2">
-                      <h3 className="text-base font-bold text-white">No Completed Notarized Documents to Print Yet</h3>
+                      <h3 className="text-base font-bold text-white">
+                        No Completed Notarized Documents to Print Yet
+                      </h3>
                       <p className="text-xs text-slate-400 leading-relaxed">
-                        Select a Bidding Opportunity above and click <span className="text-white font-bold">"Fill & Generate Document"</span> on Omnibus Sworn Statement or Bid Securing Declaration. Upon clicking <span className="text-emerald-400 font-bold">"Submit" / "Save & Complete"</span>, your generated legal document will automatically appear here ready to print!
+                        Select a Bidding Opportunity above and click{" "}
+                        <span className="text-white font-bold">
+                          "Fill & Generate Document"
+                        </span>{" "}
+                        on Omnibus Sworn Statement or Bid Securing Declaration.
+                        Upon clicking{" "}
+                        <span className="text-emerald-400 font-bold">
+                          "Submit" / "Save & Complete"
+                        </span>
+                        , your generated legal document will automatically
+                        appear here ready to print!
                       </p>
                     </div>
                     <button
-                      onClick={() => setFormsSubTab('TEMPLATES')}
+                      onClick={() => setFormsSubTab("TEMPLATES")}
                       className="px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow transition inline-flex items-center gap-2"
                     >
                       <FileSignature className="w-4 h-4" />
@@ -523,24 +648,31 @@ export const FormsDirectoryView: React.FC = () => {
                   <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 font-mono">
                     <div className="flex items-center gap-2 text-xs font-bold text-blue-400">
                       <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
-                      <span>Filter Completed Documents by Bidding Project:</span>
+                      <span>
+                        Filter Completed Documents by Bidding Project:
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                       <select
                         value={selectedProjectFilter}
-                        onChange={(e) => setSelectedProjectFilter(e.target.value)}
+                        onChange={(e) =>
+                          setSelectedProjectFilter(e.target.value)
+                        }
                         className="w-full sm:w-auto bg-slate-950 border border-blue-500/60 rounded-xl px-3.5 py-1.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-blue-400 shadow-inner cursor-pointer"
                       >
-                        <option value="ALL">All Bidding Projects ({completedForms.length} Total Saved)</option>
-                        {allProjectsInCompleted.map(p => (
+                        <option value="ALL">
+                          All Bidding Projects ({completedForms.length} Total
+                          Saved)
+                        </option>
+                        {allProjectsInCompleted.map((p) => (
                           <option key={p.refNo} value={p.refNo}>
                             [{p.refNo}] {p.title} ({p.count} saved)
                           </option>
                         ))}
                       </select>
-                      {selectedProjectFilter !== 'ALL' && (
+                      {selectedProjectFilter !== "ALL" && (
                         <button
-                          onClick={() => setSelectedProjectFilter('ALL')}
+                          onClick={() => setSelectedProjectFilter("ALL")}
                           className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-950 border border-slate-800 hover:text-white transition shrink-0"
                         >
                           Clear Filter
@@ -559,7 +691,8 @@ export const FormsDirectoryView: React.FC = () => {
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-mono px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> Ready to Print
+                              <CheckCircle2 className="w-3 h-3" /> Ready to
+                              Print
                             </span>
                             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">
                               v{form.versionNumber}.0
@@ -567,18 +700,27 @@ export const FormsDirectoryView: React.FC = () => {
                           </div>
 
                           <div>
-                            <h3 className="text-sm font-bold text-white leading-snug">{form.title}</h3>
-                            <p className="text-xs text-slate-400 mt-1 font-mono">Completed: {form.completedAt}</p>
+                            <h3 className="text-sm font-bold text-white leading-snug">
+                              {form.title}
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-1 font-mono">
+                              Completed: {form.completedAt}
+                            </p>
                           </div>
 
                           <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2 text-[11px] font-mono text-slate-400">
                             <div className="p-2.5 rounded-lg bg-blue-950/90 border border-blue-500/50 text-[11px] font-mono space-y-1">
                               <span className="text-blue-300 font-bold flex items-center gap-1">
-                                <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" /> Tagged Bidding Project:
+                                <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />{" "}
+                                Tagged Bidding Project:
                               </span>
-                              <span className="text-white font-bold block truncate">[{form.projectRefNo}] {form.projectTitle}</span>
+                              <span className="text-white font-bold block truncate">
+                                [{form.projectRefNo}] {form.projectTitle}
+                              </span>
                             </div>
-                            <p className="text-slate-300 font-semibold">Procuring Agency: {form.procuringEntity}</p>
+                            <p className="text-slate-300 font-semibold">
+                              Procuring Agency: {form.procuringEntity}
+                            </p>
                           </div>
                         </div>
 
@@ -594,14 +736,16 @@ export const FormsDirectoryView: React.FC = () => {
 
                           {form.fileDataUrl && (
                             <button
-                              onClick={() => setPreviewPdfItem({
-                                id: form.id,
-                                documentName: form.title,
-                                documentNumber: form.projectRefNo,
-                                fileDataUrl: form.fileDataUrl,
-                                philgepsRefNo: form.projectRefNo,
-                                projectTitle: form.projectTitle
-                              })}
+                              onClick={() =>
+                                setPreviewPdfItem({
+                                  id: form.id,
+                                  documentName: form.title,
+                                  documentNumber: form.projectRefNo,
+                                  fileDataUrl: form.fileDataUrl,
+                                  philgepsRefNo: form.projectRefNo,
+                                  projectTitle: form.projectTitle,
+                                })
+                              }
                               className="px-3 py-2 rounded-xl bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-blue-500/30"
                               title="View completed PDF"
                             >
@@ -611,7 +755,9 @@ export const FormsDirectoryView: React.FC = () => {
                           )}
 
                           <button
-                            onClick={() => handleDeleteCompletedForm(form.id, form.title)}
+                            onClick={() =>
+                              handleDeleteCompletedForm(form.id, form.title)
+                            }
                             className="px-3 py-2 rounded-xl bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-red-500/30"
                             title="Delete from completed list"
                           >
@@ -629,7 +775,7 @@ export const FormsDirectoryView: React.FC = () => {
         )}
 
         {/* INTERACTIVE TEMPLATE MODALS LAUNCHER */}
-        {activeTemplateModal === 'SEC-VI' && (
+        {activeTemplateModal === "SEC-VI" && (
           <SectionViScheduleOfRequirements
             tenant={currentTenant}
             activeProjectRefNo={activeProject?.refNo}
@@ -638,24 +784,32 @@ export const FormsDirectoryView: React.FC = () => {
             onSaveAndComplete={(dataUrl, customName, projRef, projTitle) => {
               const newCompleted: CompletedNotarizedForm = {
                 id: `completed-secvi-${Date.now()}`,
-                formCode: 'SEC-VI',
-                title: customName || 'Section VI: Schedule of Requirements & Delivery Timeline',
-                projectRefNo: projRef || activeProject?.refNo || '',
-                projectTitle: projTitle || activeProject?.title || 'Bidding Opportunity',
-                procuringEntity: activeProject?.procuringEntity || 'Procuring Agency',
+                formCode: "SEC-VI",
+                title:
+                  customName ||
+                  "Section VI: Schedule of Requirements & Delivery Timeline",
+                projectRefNo: projRef || activeProject?.refNo || "",
+                projectTitle:
+                  projTitle || activeProject?.title || "Bidding Opportunity",
+                procuringEntity:
+                  activeProject?.procuringEntity || "Procuring Agency",
                 fileDataUrl: dataUrl,
-                completedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                versionNumber: 1
+                completedAt: new Date().toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                }),
+                versionNumber: 1,
               };
               saveCompletedForm(newCompleted);
               setActiveTemplateModal(null);
-              setFormsSubTab('COMPLETED');
+              setFormsSubTab("COMPLETED");
             }}
             onClose={() => setActiveTemplateModal(null)}
           />
         )}
 
-        {activeTemplateModal === 'SEC-VII' && (
+        {activeTemplateModal === "SEC-VII" && (
           <TechnicalSpecifications
             tenant={currentTenant}
             activeProjectRefNo={activeProject?.refNo}
@@ -664,24 +818,32 @@ export const FormsDirectoryView: React.FC = () => {
             onSaveAndComplete={(dataUrl, customName, projRef, projTitle) => {
               const newCompleted: CompletedNotarizedForm = {
                 id: `completed-techspecs-${Date.now()}`,
-                formCode: 'SEC-VII',
-                title: customName || 'Section VII: Technical Specifications Statement of Compliance',
-                projectRefNo: projRef || activeProject?.refNo || '',
-                projectTitle: projTitle || activeProject?.title || 'Bidding Opportunity',
-                procuringEntity: activeProject?.procuringEntity || 'Procuring Agency',
+                formCode: "SEC-VII",
+                title:
+                  customName ||
+                  "Section VII: Technical Specifications Statement of Compliance",
+                projectRefNo: projRef || activeProject?.refNo || "",
+                projectTitle:
+                  projTitle || activeProject?.title || "Bidding Opportunity",
+                procuringEntity:
+                  activeProject?.procuringEntity || "Procuring Agency",
                 fileDataUrl: dataUrl,
-                completedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                versionNumber: 1
+                completedAt: new Date().toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                }),
+                versionNumber: 1,
               };
               saveCompletedForm(newCompleted);
               setActiveTemplateModal(null);
-              setFormsSubTab('COMPLETED');
+              setFormsSubTab("COMPLETED");
             }}
             onClose={() => setActiveTemplateModal(null)}
           />
         )}
 
-        {activeTemplateModal === 'FAL-01' && (
+        {activeTemplateModal === "FAL-01" && (
           <FrameworkAgreementList
             tenant={currentTenant}
             activeProjectRefNo={activeProject?.refNo}
@@ -690,24 +852,30 @@ export const FormsDirectoryView: React.FC = () => {
             onSaveAndComplete={(dataUrl, customName, projRef, projTitle) => {
               const newCompleted: CompletedNotarizedForm = {
                 id: `completed-fal-${Date.now()}`,
-                formCode: 'FAL-01',
-                title: customName || 'Framework Agreement List & Compliance',
-                projectRefNo: projRef || activeProject?.refNo || '',
-                projectTitle: projTitle || activeProject?.title || 'Bidding Opportunity',
-                procuringEntity: activeProject?.procuringEntity || 'Procuring Agency',
+                formCode: "FAL-01",
+                title: customName || "Framework Agreement List & Compliance",
+                projectRefNo: projRef || activeProject?.refNo || "",
+                projectTitle:
+                  projTitle || activeProject?.title || "Bidding Opportunity",
+                procuringEntity:
+                  activeProject?.procuringEntity || "Procuring Agency",
                 fileDataUrl: dataUrl,
-                completedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                versionNumber: 1
+                completedAt: new Date().toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                }),
+                versionNumber: 1,
               };
               saveCompletedForm(newCompleted);
               setActiveTemplateModal(null);
-              setFormsSubTab('COMPLETED');
+              setFormsSubTab("COMPLETED");
             }}
             onClose={() => setActiveTemplateModal(null)}
           />
         )}
 
-        {activeTemplateModal === 'GPPB-OSS-2025' && (
+        {activeTemplateModal === "GPPB-OSS-2025" && (
           <OmnibusSwornStatementModal
             tenant={currentTenant}
             activeProjectRefNo={activeProject?.refNo}
@@ -716,24 +884,30 @@ export const FormsDirectoryView: React.FC = () => {
             onSaveAndComplete={(dataUrl, customName, projRef, projTitle) => {
               const newCompleted: CompletedNotarizedForm = {
                 id: `notarized-oss-${Date.now()}`,
-                formCode: 'GPPB-OSS-2025',
-                title: customName || 'Omnibus Sworn Statement (Notarized OSS)',
-                projectRefNo: projRef || activeProject?.refNo || '',
-                projectTitle: projTitle || activeProject?.title || 'Bidding Opportunity',
-                procuringEntity: activeProject?.procuringEntity || 'Procuring Agency',
+                formCode: "GPPB-OSS-2025",
+                title: customName || "Omnibus Sworn Statement (Notarized OSS)",
+                projectRefNo: projRef || activeProject?.refNo || "",
+                projectTitle:
+                  projTitle || activeProject?.title || "Bidding Opportunity",
+                procuringEntity:
+                  activeProject?.procuringEntity || "Procuring Agency",
                 fileDataUrl: dataUrl,
-                completedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                versionNumber: 1
+                completedAt: new Date().toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                }),
+                versionNumber: 1,
               };
               saveCompletedForm(newCompleted);
               setActiveTemplateModal(null);
-              setFormsSubTab('COMPLETED');
+              setFormsSubTab("COMPLETED");
             }}
             onClose={() => setActiveTemplateModal(null)}
           />
         )}
 
-        {activeTemplateModal === 'GPPB-BSD-2025' && (
+        {activeTemplateModal === "GPPB-BSD-2025" && (
           <BidSecuringDeclarationModal
             tenant={currentTenant}
             activeProjectRefNo={activeProject?.refNo}
@@ -742,24 +916,30 @@ export const FormsDirectoryView: React.FC = () => {
             onSaveAndComplete={(dataUrl, customName, projRef, projTitle) => {
               const newCompleted: CompletedNotarizedForm = {
                 id: `notarized-bsd-${Date.now()}`,
-                formCode: 'GPPB-BSD-2025',
-                title: customName || 'Bid Securing Declaration / Bid Security',
-                projectRefNo: projRef || activeProject?.refNo || '',
-                projectTitle: projTitle || activeProject?.title || 'Bidding Opportunity',
-                procuringEntity: activeProject?.procuringEntity || 'Procuring Agency',
+                formCode: "GPPB-BSD-2025",
+                title: customName || "Bid Securing Declaration / Bid Security",
+                projectRefNo: projRef || activeProject?.refNo || "",
+                projectTitle:
+                  projTitle || activeProject?.title || "Bidding Opportunity",
+                procuringEntity:
+                  activeProject?.procuringEntity || "Procuring Agency",
                 fileDataUrl: dataUrl,
-                completedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                versionNumber: 1
+                completedAt: new Date().toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                }),
+                versionNumber: 1,
               };
               saveCompletedForm(newCompleted);
               setActiveTemplateModal(null);
-              setFormsSubTab('COMPLETED');
+              setFormsSubTab("COMPLETED");
             }}
             onClose={() => setActiveTemplateModal(null)}
           />
         )}
 
-        {activeTemplateModal === 'GPPB-PSD-2025' && (
+        {activeTemplateModal === "GPPB-PSD-2025" && (
           <PsdModal
             tenant={currentTenant}
             activeProjectRefNo={activeProject?.refNo}
@@ -768,18 +948,26 @@ export const FormsDirectoryView: React.FC = () => {
             onSaveAndComplete={(dataUrl, customName, projRef, projTitle) => {
               const newCompleted: CompletedNotarizedForm = {
                 id: `notarized-psd-${Date.now()}`,
-                formCode: 'GPPB-PSD-2025',
-                title: customName || 'Performance Securing Declaration (Notarized PSD)',
-                projectRefNo: projRef || activeProject?.refNo || '',
-                projectTitle: projTitle || activeProject?.title || 'Bidding Opportunity',
-                procuringEntity: activeProject?.procuringEntity || 'Procuring Agency',
+                formCode: "GPPB-PSD-2025",
+                title:
+                  customName ||
+                  "Performance Securing Declaration (Notarized PSD)",
+                projectRefNo: projRef || activeProject?.refNo || "",
+                projectTitle:
+                  projTitle || activeProject?.title || "Bidding Opportunity",
+                procuringEntity:
+                  activeProject?.procuringEntity || "Procuring Agency",
                 fileDataUrl: dataUrl,
-                completedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                versionNumber: 1
+                completedAt: new Date().toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                }),
+                versionNumber: 1,
               };
               saveCompletedForm(newCompleted);
               setActiveTemplateModal(null);
-              setFormsSubTab('COMPLETED');
+              setFormsSubTab("COMPLETED");
             }}
             onClose={() => setActiveTemplateModal(null)}
           />
@@ -803,7 +991,6 @@ export const FormsDirectoryView: React.FC = () => {
             onClose={() => setShowGuideModal(false)}
           />
         )}
-
       </div>
     </VaultErrorBoundary>
   );

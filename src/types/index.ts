@@ -1,56 +1,83 @@
-export type UserRole = 
-  | 'COMPANY_OWNER' 
-  | 'HIGHER_MANAGER' 
-  | 'BID_MANAGER' 
-  | 'ESTIMATOR' 
-  | 'SYSTEM_ADMIN';
+export type UserRole =
+  | "COMPANY_OWNER"
+  | "HIGHER_MANAGER"
+  | "BID_MANAGER"
+  | "ESTIMATOR"
+  | "DOCUMENT_PREPARER"
+  | "SYSTEM_ADMIN";
 
 export const isApproverRole = (role?: UserRole): boolean => {
-  return role === 'COMPANY_OWNER' || role === 'HIGHER_MANAGER' || role === 'SYSTEM_ADMIN';
+  return (
+    role === "COMPANY_OWNER" ||
+    role === "HIGHER_MANAGER" ||
+    role === "SYSTEM_ADMIN"
+  );
 };
 
 export const isPreparerRole = (role?: UserRole): boolean => {
-  return role === 'BID_MANAGER' || role === 'ESTIMATOR';
+  return (
+    role === "BID_MANAGER" ||
+    role === "ESTIMATOR" ||
+    role === "DOCUMENT_PREPARER"
+  );
 };
 
 export const getRoleDisplayName = (role?: UserRole): string => {
   switch (role) {
-    case 'COMPANY_OWNER': return 'Company Owner (Approver)';
-    case 'HIGHER_MANAGER': return 'Higher Manager (Approver)';
-    case 'ESTIMATOR': return 'Technical Estimator (Preparer)';
-    case 'BID_MANAGER': return 'Bid Manager (Preparer)';
-    case 'SYSTEM_ADMIN': return 'System Administrator';
-    default: return 'Authorized User';
+    case "COMPANY_OWNER":
+      return "Company Owner (Approver)";
+    case "HIGHER_MANAGER":
+      return "Higher Manager (Approver)";
+    case "ESTIMATOR":
+      return "Technical Estimator (Preparer)";
+    case "BID_MANAGER":
+      return "Bid Manager (Preparer)";
+    case "DOCUMENT_PREPARER":
+      return "Document Preparer (POW / Quotation / Bid Docs)";
+    case "SYSTEM_ADMIN":
+      return "System Administrator";
+    default:
+      return "Authorized User";
   }
 };
 
-export type ProcurementType = 
-  | 'GOODS' 
-  | 'INFRASTRUCTURE' 
-  | 'CONSULTING_SERVICES' 
-  | 'Goods & Supply' 
-  | 'Goods & Supply with Installation' 
-  | 'Infrastructure' 
-  | 'Consulting';
+export type ProcurementType =
+  | "GOODS"
+  | "INFRASTRUCTURE"
+  | "CONSULTING_SERVICES"
+  | "Goods & Supply"
+  | "Goods & Supply with Installation"
+  | "Infrastructure"
+  | "Consulting";
 
-export type SectorType = 'Government' | 'Private';
+export type SectorType = "Government" | "Private";
 
-export type LegalRegime = 'RA_9184' | 'RA_12009_NGPA';
+export type LegalRegime = "RA_9184" | "RA_12009_NGPA";
 
-export type DocCategory = 'ELIGIBILITY_CLASS_A' | 'ELIGIBILITY_CLASS_B' | 'TECHNICAL' | 'FINANCIAL' | 'CORPORATE_LEGAL';
+export type DocCategory =
+  | "ELIGIBILITY_CLASS_A"
+  | "ELIGIBILITY_CLASS_B"
+  | "TECHNICAL"
+  | "FINANCIAL"
+  | "CORPORATE_LEGAL";
 
-export type DocStatus = 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED' | 'ARCHIVED' | 'NOT_UPLOADED';
+export type DocStatus =
+  | "ACTIVE"
+  | "EXPIRING_SOON"
+  | "EXPIRED"
+  | "ARCHIVED"
+  | "NOT_UPLOADED";
 
-export type BidLifecycleStatus = 
-  | 'INTENT_TO_BID'
-  | 'PACKAGE_ASSEMBLING'
-  | 'DOCUMENTS_REVIEWED'
-  | 'SUBMITTED'
-  | 'OPENED'
-  | 'POST_QUALIFICATION'
-  | 'AWARDED'
-  | 'LOST'
-  | 'DISQUALIFIED';
+export type BidLifecycleStatus =
+  | "INTENT_TO_BID"
+  | "PACKAGE_ASSEMBLING"
+  | "DOCUMENTS_REVIEWED"
+  | "SUBMITTED"
+  | "OPENED"
+  | "POST_QUALIFICATION"
+  | "AWARDED"
+  | "LOST"
+  | "DISQUALIFIED";
 
 export interface Signatory {
   name: string;
@@ -164,7 +191,7 @@ export interface PhilGEPSOpportunity {
   pdfFileName?: string;
   pdfFileSize?: number;
   pdfFileDataUrl?: string;
-  status: 'OPEN' | 'CLOSED' | 'AWARDED' | 'AWARDED_TO_OTHERS' | 'CANCELLED';
+  status: "OPEN" | "CLOSED" | "AWARDED" | "AWARDED_TO_OTHERS" | "CANCELLED";
   location: string;
   description: string;
   pdfAttachments?: {
@@ -179,10 +206,15 @@ export interface ChecklistRequirement {
   id: string;
   requirementCode: string;
   requirementName: string;
-  envelope: 'ENVELOPE_1_ELIGIBILITY_TECHNICAL' | 'ENVELOPE_2_FINANCIAL';
+  envelope: "ENVELOPE_1_ELIGIBILITY_TECHNICAL" | "ENVELOPE_2_FINANCIAL";
   isMandatory: boolean;
   legalRegime: LegalRegime;
-  status: 'MISSING' | 'ATTACHED' | 'VERIFIED_VALID' | 'EXPIRED' | 'NOT_APPLICABLE';
+  status:
+    | "MISSING"
+    | "ATTACHED"
+    | "VERIFIED_VALID"
+    | "EXPIRED"
+    | "NOT_APPLICABLE";
   linkedDocId?: string;
 }
 

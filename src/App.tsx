@@ -1,47 +1,61 @@
-import React, { useState } from 'react';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { LoginPage } from './components/auth/LoginPage';
-import { RegisterPage } from './components/auth/RegisterPage';
-import { AppShell } from './components/layout/AppShell';
-import { DashboardView } from './components/dashboard/DashboardView';
-import { DocumentVaultView } from './components/vault/DocumentVaultView';
-import { OpportunityFinderView } from './components/opportunities/OpportunityFinderView';
-import { BidPackageBuilderView } from './components/bids/bidpackage';
-import { FormsDirectoryView } from './components/forms/FormsDirectoryView';
-import { PackagingCoversView } from './components/covers/PackagingCoversView';
-import { TenantSettingsView } from './components/settings/TenantSettingsView';
-import { CompanyProfileView } from './components/profile/CompanyProfileView';
-import { ProjectProfileView } from './components/projects/ProjectProfileView';
-import PowModal from './components/vault/templates/POW';
-import VaultErrorBoundary from './components/common/VaultErrorBoundary';
+import React, { useState } from "react";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { LoginPage } from "./components/auth/LoginPage";
+import { RegisterPage } from "./components/auth/RegisterPage";
+import { AppShell } from "./components/layout/AppShell";
+import { DashboardView } from "./components/dashboard/DashboardView";
+import { DocumentVaultView } from "./components/vault/DocumentVaultView";
+import { OpportunityFinderView } from "./components/opportunities/OpportunityFinderView";
+import { BidPackageBuilderView } from "./components/bids/bidpackage";
+import { FormsDirectoryView } from "./components/forms/FormsDirectoryView";
+import { PackagingCoversView } from "./components/covers/PackagingCoversView";
+import { TenantSettingsView } from "./components/settings/TenantSettingsView";
+import { CompanyProfileView } from "./components/profile/CompanyProfileView";
+import { ProjectProfileView } from "./components/projects/ProjectProfileView";
+import PowModal from "./components/vault/templates/POW";
+import VaultErrorBoundary from "./components/common/VaultErrorBoundary";
 
 const MainApp: React.FC = () => {
   const { currentUser, currentTenant, tenants } = useAuth();
-  const [authMode, setAuthMode] = useState<'login' | 'register'>(() => {
-    return tenants.length === 0 ? 'register' : 'login';
+  const [authMode, setAuthMode] = useState<"login" | "register">(() => {
+    return tenants.length === 0 ? "register" : "login";
   });
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState("dashboard");
 
   if (!currentUser || !currentTenant || tenants.length === 0) {
-    if (authMode === 'register' || tenants.length === 0) {
-      return <RegisterPage onSwitchToLogin={() => setAuthMode('login')} />;
+    if (authMode === "register" || tenants.length === 0) {
+      return <RegisterPage onSwitchToLogin={() => setAuthMode("login")} />;
     }
-    return <LoginPage onSwitchToRegister={() => setAuthMode('register')} />;
+    return <LoginPage onSwitchToRegister={() => setAuthMode("register")} />;
   }
 
   return (
     <AppShell activeTab={activeTab} setActiveTab={setActiveTab}>
-      <VaultErrorBoundary key={activeTab} fallbackTitle={`${activeTab.replace('-', ' ').toUpperCase()} Module View`}>
-        {activeTab === 'dashboard' && <DashboardView setActiveTab={setActiveTab} />}
-        {activeTab === 'pow' && <PowModal tenant={currentTenant} setActiveTab={setActiveTab} />}
-        {activeTab === 'opportunities' && <OpportunityFinderView setActiveTab={setActiveTab} />}
-        {activeTab === 'project-profile' && <ProjectProfileView setActiveTab={setActiveTab} />}
-        {activeTab === 'vault' && <DocumentVaultView />}
-        {activeTab === 'bids' && <BidPackageBuilderView />}
-        {activeTab === 'covers' && <PackagingCoversView />}
-        {activeTab === 'forms' && <FormsDirectoryView />}
-        {activeTab === 'profile' && <CompanyProfileView />}
-        {activeTab === 'settings' && <TenantSettingsView />}
+      <VaultErrorBoundary
+        key={activeTab}
+        fallbackTitle={`${activeTab.replace("-", " ").toUpperCase()} Module View`}
+      >
+        {activeTab === "dashboard" && (
+          <DashboardView setActiveTab={setActiveTab} />
+        )}
+        {activeTab === "tor" && (
+          <PowModal tenant={currentTenant} setActiveTab={setActiveTab} />
+        )}
+        {activeTab === "pow" && (
+          <PowModal tenant={currentTenant} setActiveTab={setActiveTab} />
+        )}
+        {activeTab === "opportunities" && (
+          <OpportunityFinderView setActiveTab={setActiveTab} />
+        )}
+        {activeTab === "project-profile" && (
+          <ProjectProfileView setActiveTab={setActiveTab} />
+        )}
+        {activeTab === "vault" && <DocumentVaultView />}
+        {activeTab === "bids" && <BidPackageBuilderView />}
+        {activeTab === "covers" && <PackagingCoversView />}
+        {activeTab === "forms" && <FormsDirectoryView />}
+        {activeTab === "profile" && <CompanyProfileView />}
+        {activeTab === "settings" && <TenantSettingsView />}
       </VaultErrorBoundary>
     </AppShell>
   );

@@ -1,8 +1,13 @@
-import React, { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { PhilGEPSOpportunity, ProcurementType, SectorType, OpportunityPdfAttachment } from '../../types';
-import VaultErrorBoundary from '../common/VaultErrorBoundary';
-import { savePdfData, loadPdfData } from '../../utils/vaultIndexedDB';
+import React, { useState } from "react";
+import { useAuth } from "../../context/AuthContext";
+import {
+  PhilGEPSOpportunity,
+  ProcurementType,
+  SectorType,
+  OpportunityPdfAttachment,
+} from "../../types";
+import VaultErrorBoundary from "../common/VaultErrorBoundary";
+import { savePdfData, loadPdfData } from "../../utils/vaultIndexedDB";
 import {
   Search,
   Building2,
@@ -18,22 +23,31 @@ import {
   Trash2,
   RefreshCw,
   Lock,
-  FileCheck
-} from 'lucide-react';
-import { SpotlightCard } from '../common/SpotlightCard';
-import { BorderBeam } from '../common/BorderBeam';
-import { ShinyText } from '../common/ShinyText';
-import { CyberBadge } from '../common/CyberBadge';
+  FileCheck,
+} from "lucide-react";
+import { SpotlightCard } from "../common/SpotlightCard";
+import { BorderBeam } from "../common/BorderBeam";
+import { ShinyText } from "../common/ShinyText";
+import { CyberBadge } from "../common/CyberBadge";
 
 const formatPhpCurrency = (val: number | string): string => {
-  if (val === '' || val === null || val === undefined) return '';
-  const num = typeof val === 'number' ? val : parseFloat(String(val).replace(/[^0-9.]/g, ''));
-  if (isNaN(num)) return '';
-  return '₱' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (val === "" || val === null || val === undefined) return "";
+  const num =
+    typeof val === "number"
+      ? val
+      : parseFloat(String(val).replace(/[^0-9.]/g, ""));
+  if (isNaN(num)) return "";
+  return (
+    "₱" +
+    num.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
 };
 
 const parsePhpCurrency = (val: string): number => {
-  const cleaned = val.replace(/[^0-9.]/g, '');
+  const cleaned = val.replace(/[^0-9.]/g, "");
   const num = parseFloat(cleaned);
   return isNaN(num) ? 0 : num;
 };
@@ -42,45 +56,58 @@ const readFileAsDataUrl = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('Unable to read file'));
+    reader.onerror = () => reject(new Error("Unable to read file"));
     reader.readAsDataURL(file);
   });
 };
 
-const downloadFile = (fileName: string, dataUrl?: string, file?: File | null) => {
+const downloadFile = (
+  fileName: string,
+  dataUrl?: string,
+  file?: File | null,
+) => {
   if (!fileName) return;
   const href = dataUrl || (file ? URL.createObjectURL(file) : undefined);
   if (!href) return;
 
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = href;
   link.download = fileName;
   document.body.appendChild(link);
   link.click();
   link.remove();
 
-  if (file && href.startsWith('blob:')) {
+  if (file && href.startsWith("blob:")) {
     URL.revokeObjectURL(href);
   }
 };
 
-export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => void }> = ({ setActiveTab }) => {
+export const OpportunityFinderView: React.FC<{
+  setActiveTab: (tab: string) => void;
+}> = ({ setActiveTab }) => {
   const { currentTenant } = useAuth();
-  const tenantId = currentTenant?.id || '';
+  const tenantId = currentTenant?.id || "";
 
-  const [opportunities, setOpportunities] = useState<PhilGEPSOpportunity[]>(() => {
-    try {
-      if (tenantId) {
-        const saved = localStorage.getItem(`bidocs_opportunities_${tenantId}`);
-        if (saved) return JSON.parse(saved);
+  const [opportunities, setOpportunities] = useState<PhilGEPSOpportunity[]>(
+    () => {
+      try {
+        if (tenantId) {
+          const saved = localStorage.getItem(
+            `bidocs_opportunities_${tenantId}`,
+          );
+          if (saved) return JSON.parse(saved);
+        }
+      } catch (e) {
+        console.error(
+          "[OpportunityFinder] Error parsing initial opportunities state:",
+          e,
+        );
       }
-    } catch (e) {
-      console.error('[OpportunityFinder] Error parsing initial opportunities state:', e);
-    }
-    return [];
-  });
-  const [selectedType, setSelectedType] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
+      return [];
+    },
+  );
+  const [selectedType, setSelectedType] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Re-sync opportunities state & hydrate PDF binaries from IndexedDB safely in one pass
   React.useEffect(() => {
@@ -98,47 +125,64 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         const parsed: PhilGEPSOpportunity[] = JSON.parse(saved);
 
         // Single-pass async hydration of all PDF data from IndexedDB
-        const hydratedOps = await Promise.all(parsed.map(async (op) => {
-          let loadedPdf = op.pdfFileDataUrl;
-          if (!loadedPdf) {
-            try {
-              loadedPdf = await loadPdfData(`op_pdf_${op.id}`);
-            } catch (e) {}
-          }
-
-          let updatedAtts = op.pdfAttachments;
-          if (op.pdfAttachments) {
-            const attsCopy = { ...op.pdfAttachments };
-            for (const slotKey of ['bidBulletin', 'supplementalDocs', 'procuringEntityDocs', 'receiptOfBidDocs'] as const) {
-              if (attsCopy[slotKey] && !attsCopy[slotKey]?.fileDataUrl) {
-                try {
-                  const attData = await loadPdfData(`op_att_${op.id}_${slotKey}`);
-                  if (attData) {
-                    attsCopy[slotKey] = { ...attsCopy[slotKey]!, fileDataUrl: attData };
-                  }
-                } catch (e) {}
-              }
+        const hydratedOps = await Promise.all(
+          parsed.map(async (op) => {
+            let loadedPdf = op.pdfFileDataUrl;
+            if (!loadedPdf) {
+              try {
+                loadedPdf = await loadPdfData(`op_pdf_${op.id}`);
+              } catch (e) {}
             }
-            updatedAtts = attsCopy;
-          }
 
-          return {
-            ...op,
-            pdfFileDataUrl: loadedPdf,
-            pdfAttachments: updatedAtts
-          };
-        }));
+            let updatedAtts = op.pdfAttachments;
+            if (op.pdfAttachments) {
+              const attsCopy = { ...op.pdfAttachments };
+              for (const slotKey of [
+                "bidBulletin",
+                "supplementalDocs",
+                "procuringEntityDocs",
+                "receiptOfBidDocs",
+              ] as const) {
+                if (attsCopy[slotKey] && !attsCopy[slotKey]?.fileDataUrl) {
+                  try {
+                    const attData = await loadPdfData(
+                      `op_att_${op.id}_${slotKey}`,
+                    );
+                    if (attData) {
+                      attsCopy[slotKey] = {
+                        ...attsCopy[slotKey]!,
+                        fileDataUrl: attData,
+                      };
+                    }
+                  } catch (e) {}
+                }
+              }
+              updatedAtts = attsCopy;
+            }
+
+            return {
+              ...op,
+              pdfFileDataUrl: loadedPdf,
+              pdfAttachments: updatedAtts,
+            };
+          }),
+        );
 
         if (!cancelled) {
           setOpportunities(hydratedOps);
         }
       } catch (e) {
-        console.error('[OpportunityFinder] Error parsing saved opportunities:', e);
+        console.error(
+          "[OpportunityFinder] Error parsing saved opportunities:",
+          e,
+        );
       }
     };
 
     hydrateOps();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [tenantId]);
 
   // Persist opportunities safely to IndexedDB + clean localStorage metadata
@@ -149,12 +193,18 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     const saveTasks: Promise<void>[] = [];
     for (const op of opsList) {
       if (op.pdfFileDataUrl && op.pdfFileDataUrl.length > 500) {
-        saveTasks.push(savePdfData(`op_pdf_${op.id}`, op.pdfFileDataUrl).catch(() => {}));
+        saveTasks.push(
+          savePdfData(`op_pdf_${op.id}`, op.pdfFileDataUrl).catch(() => {}),
+        );
       }
       if (op.pdfAttachments) {
         for (const [slotKey, att] of Object.entries(op.pdfAttachments)) {
           if (att?.fileDataUrl && att.fileDataUrl.length > 500) {
-            saveTasks.push(savePdfData(`op_att_${op.id}_${slotKey}`, att.fileDataUrl).catch(() => {}));
+            saveTasks.push(
+              savePdfData(`op_att_${op.id}_${slotKey}`, att.fileDataUrl).catch(
+                () => {},
+              ),
+            );
           }
         }
       }
@@ -164,7 +214,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     }
 
     // 2. Prepare clean metadata without heavy base64 strings for localStorage
-    const cleanList = opsList.map(op => {
+    const cleanList = opsList.map((op) => {
       const { pdfFileDataUrl: _pdf, pdfAttachments: atts, ...opRest } = op;
       let cleanAtts: Record<string, any> | undefined = undefined;
       if (atts) {
@@ -178,38 +228,42 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
       }
       return {
         ...opRest,
-        pdfAttachments: cleanAtts
+        pdfAttachments: cleanAtts,
       };
     });
 
     try {
-      localStorage.setItem(`bidocs_opportunities_${tenantId}`, JSON.stringify(cleanList));
-      localStorage.setItem('bidocs_opportunities', JSON.stringify(cleanList));
+      localStorage.setItem(
+        `bidocs_opportunities_${tenantId}`,
+        JSON.stringify(cleanList),
+      );
+      localStorage.setItem("bidocs_opportunities", JSON.stringify(cleanList));
     } catch (err) {
-      console.warn('[OpportunityFinder] localStorage quota safe handle:', err);
+      console.warn("[OpportunityFinder] localStorage quota safe handle:", err);
     }
   };
 
   const getProcurementTypeBadgeStyle = (type: string) => {
-    const normalized = (type || '').toLowerCase();
-    if (normalized.includes('infra')) {
-      return 'bg-amber-950/90 text-amber-400 border-amber-600/70 shadow-sm font-bold';
+    const normalized = (type || "").toLowerCase();
+    if (normalized.includes("infra")) {
+      return "bg-amber-950/90 text-amber-400 border-amber-600/70 shadow-sm font-bold";
     }
-    if (normalized.includes('goods') || normalized.includes('supply')) {
-      return 'bg-blue-950/90 text-blue-400 border-blue-600/70 shadow-sm font-bold';
+    if (normalized.includes("goods") || normalized.includes("supply")) {
+      return "bg-blue-950/90 text-blue-400 border-blue-600/70 shadow-sm font-bold";
     }
-    if (normalized.includes('consult')) {
-      return 'bg-emerald-950/90 text-emerald-400 border-emerald-600/70 shadow-sm font-bold';
+    if (normalized.includes("consult")) {
+      return "bg-emerald-950/90 text-emerald-400 border-emerald-600/70 shadow-sm font-bold";
     }
-    return 'bg-purple-950/90 text-purple-300 border-purple-800/60 shadow-sm font-bold';
+    return "bg-purple-950/90 text-purple-300 border-purple-800/60 shadow-sm font-bold";
   };
 
   const getProcurementTypeTextStyle = (type: string) => {
-    const normalized = (type || '').toLowerCase();
-    if (normalized.includes('infra')) return 'text-amber-400 font-bold';
-    if (normalized.includes('goods') || normalized.includes('supply')) return 'text-blue-400 font-bold';
-    if (normalized.includes('consult')) return 'text-emerald-400 font-bold';
-    return 'text-purple-300 font-bold';
+    const normalized = (type || "").toLowerCase();
+    if (normalized.includes("infra")) return "text-amber-400 font-bold";
+    if (normalized.includes("goods") || normalized.includes("supply"))
+      return "text-blue-400 font-bold";
+    if (normalized.includes("consult")) return "text-emerald-400 font-bold";
+    return "text-purple-300 font-bold";
   };
 
   const handleWorkOnProject = (op: PhilGEPSOpportunity) => {
@@ -218,51 +272,72 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
       const activeData = {
         refNo: activeRef,
         title: op.title,
-        procuringEntity: op.procuringEntity
+        procuringEntity: op.procuringEntity,
       };
-      localStorage.setItem(`bidocs_active_project_${tenantId}`, JSON.stringify(activeData));
-      localStorage.setItem('bidocs_active_project', JSON.stringify(activeData));
-      localStorage.setItem(`bidocs_active_vault_project_${tenantId}`, activeRef);
-      localStorage.setItem('bidocs_active_vault_project', activeRef);
+      localStorage.setItem(
+        `bidocs_active_project_${tenantId}`,
+        JSON.stringify(activeData),
+      );
+      localStorage.setItem("bidocs_active_project", JSON.stringify(activeData));
+      localStorage.setItem(
+        `bidocs_active_vault_project_${tenantId}`,
+        activeRef,
+      );
+      localStorage.setItem("bidocs_active_vault_project", activeRef);
     } catch (e) {
-      console.error('[OpportunityFinder] Error setting active project:', e);
+      console.error("[OpportunityFinder] Error setting active project:", e);
     }
-    setActiveTab('vault');
+    setActiveTab("vault");
   };
 
   // Modals state
   const [showAddEditModal, setShowAddEditModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<PhilGEPSOpportunity | null>(null);
-  const [viewingItem, setViewingItem] = useState<PhilGEPSOpportunity | null>(null);
-  const [deletingItem, setDeletingItem] = useState<PhilGEPSOpportunity | null>(null);
-  const [previewPdfSlot, setPreviewPdfSlot] = useState<{ title: string; dataUrl?: string; fileName: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<PhilGEPSOpportunity | null>(
+    null,
+  );
+  const [viewingItem, setViewingItem] = useState<PhilGEPSOpportunity | null>(
+    null,
+  );
+  const [deletingItem, setDeletingItem] = useState<PhilGEPSOpportunity | null>(
+    null,
+  );
+  const [previewPdfSlot, setPreviewPdfSlot] = useState<{
+    title: string;
+    dataUrl?: string;
+    fileName: string;
+  } | null>(null);
 
   // Form Fields & Specification States
-  const [philgepsRefNo, setPhilgepsRefNo] = useState('');
-  const [solicitationNumber, setSolicitationNumber] = useState('');
-  const [areaOfDelivery, setAreaOfDelivery] = useState('');
-  const [projectReferenceNumber, setProjectReferenceNumber] = useState('');
-  const [sector, setSector] = useState<SectorType>('Government');
-  const [biddingProjectTitle, setBiddingProjectTitle] = useState('');
+  const [philgepsRefNo, setPhilgepsRefNo] = useState("");
+  const [solicitationNumber, setSolicitationNumber] = useState("");
+  const [areaOfDelivery, setAreaOfDelivery] = useState("");
+  const [projectReferenceNumber, setProjectReferenceNumber] = useState("");
+  const [sector, setSector] = useState<SectorType>("Government");
+  const [biddingProjectTitle, setBiddingProjectTitle] = useState("");
 
   // Procuring Entity Group State
-  const [procuringEntityName, setProcuringEntityName] = useState('');
-  const [procuringEntityContactNumber, setProcuringEntityContactNumber] = useState('');
-  const [procuringEntityAddress, setProcuringEntityAddress] = useState('');
-  const [procuringEntityEmail, setProcuringEntityEmail] = useState('');
-  const [procuringEntityPosition, setProcuringEntityPosition] = useState('');
-  const [procuringEntityContactPerson, setProcuringEntityContactPerson] = useState('');
-  const [headOfProcuringEntity, setHeadOfProcuringEntity] = useState('');
-  const [headOfProcuringEntityPosition, setHeadOfProcuringEntityPosition] = useState('');
+  const [procuringEntityName, setProcuringEntityName] = useState("");
+  const [procuringEntityContactNumber, setProcuringEntityContactNumber] =
+    useState("");
+  const [procuringEntityAddress, setProcuringEntityAddress] = useState("");
+  const [procuringEntityEmail, setProcuringEntityEmail] = useState("");
+  const [procuringEntityPosition, setProcuringEntityPosition] = useState("");
+  const [procuringEntityContactPerson, setProcuringEntityContactPerson] =
+    useState("");
+  const [headOfProcuringEntity, setHeadOfProcuringEntity] = useState("");
+  const [headOfProcuringEntityPosition, setHeadOfProcuringEntityPosition] =
+    useState("");
 
-  const [procurementType, setProcurementType] = useState<ProcurementType>('Goods & Supply');
+  const [procurementType, setProcurementType] =
+    useState<ProcurementType>("Goods & Supply");
 
   // Dates
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date().toISOString().split("T")[0];
   const [dateCreated, setDateCreated] = useState(todayStr);
   const [datePublished, setDatePublished] = useState(todayStr);
-  const [preBidConferenceDatetime, setPreBidConferenceDatetime] = useState('');
-  const [submissionDeadlineDatetime, setSubmissionDeadlineDatetime] = useState('');
+  const [preBidConferenceDatetime, setPreBidConferenceDatetime] = useState("");
+  const [submissionDeadlineDatetime, setSubmissionDeadlineDatetime] =
+    useState("");
 
   // Creation-flow PDF attachments state (4 slots)
   const [draftPdfAttachments, setDraftPdfAttachments] = useState<{
@@ -274,51 +349,54 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
   // File & Currency
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [pdfFileName, setPdfFileName] = useState('');
-  const [pdfFileDataUrl, setPdfFileDataUrl] = useState('');
-  const [approvedBudgetStr, setApprovedBudgetStr] = useState('');
+  const [pdfFileName, setPdfFileName] = useState("");
+  const [pdfFileDataUrl, setPdfFileDataUrl] = useState("");
+  const [approvedBudgetStr, setApprovedBudgetStr] = useState("");
 
   // Validation Error States
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const generateUniqueProjectId = (existingOps: PhilGEPSOpportunity[]) => {
-    let candidate = '';
+    let candidate = "";
     let isTaken = true;
     let attempts = 0;
     while (isTaken && attempts < 500) {
       const suffix = Math.floor(Math.random() * 89999 + 10000);
       candidate = `PRJ-2026-${suffix}`;
-      isTaken = (existingOps || []).some(o => (o?.projectReferenceNumber || '').trim().toUpperCase() === candidate);
+      isTaken = (existingOps || []).some(
+        (o) =>
+          (o?.projectReferenceNumber || "").trim().toUpperCase() === candidate,
+      );
       attempts++;
     }
     return candidate;
   };
 
   const resetForm = () => {
-    setPhilgepsRefNo('');
-    setSolicitationNumber('');
-    setAreaOfDelivery('');
-    setProjectReferenceNumber('');
-    setSector('Government');
-    setBiddingProjectTitle('');
-    setProcuringEntityName('');
-    setProcuringEntityContactNumber('');
-    setProcuringEntityAddress('');
-    setProcuringEntityEmail('');
-    setProcuringEntityPosition('');
-    setProcuringEntityContactPerson('');
-    setHeadOfProcuringEntity('');
-    setHeadOfProcuringEntityPosition('');
-    setProcurementType('Goods & Supply');
-    setDateCreated(new Date().toISOString().split('T')[0]);
-    setDatePublished(new Date().toISOString().split('T')[0]);
-    setPreBidConferenceDatetime('');
-    setSubmissionDeadlineDatetime('');
+    setPhilgepsRefNo("");
+    setSolicitationNumber("");
+    setAreaOfDelivery("");
+    setProjectReferenceNumber("");
+    setSector("Government");
+    setBiddingProjectTitle("");
+    setProcuringEntityName("");
+    setProcuringEntityContactNumber("");
+    setProcuringEntityAddress("");
+    setProcuringEntityEmail("");
+    setProcuringEntityPosition("");
+    setProcuringEntityContactPerson("");
+    setHeadOfProcuringEntity("");
+    setHeadOfProcuringEntityPosition("");
+    setProcurementType("Goods & Supply");
+    setDateCreated(new Date().toISOString().split("T")[0]);
+    setDatePublished(new Date().toISOString().split("T")[0]);
+    setPreBidConferenceDatetime("");
+    setSubmissionDeadlineDatetime("");
     setDraftPdfAttachments({});
     setPdfFile(null);
-    setPdfFileName('');
-    setPdfFileDataUrl('');
-    setApprovedBudgetStr('');
+    setPdfFileName("");
+    setPdfFileDataUrl("");
+    setApprovedBudgetStr("");
     setEditingItem(null);
     setErrors({});
   };
@@ -330,48 +408,59 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
   const handleOpenEditModal = (op: PhilGEPSOpportunity) => {
     setEditingItem(op);
-    setPhilgepsRefNo(op.philgepsRefNo || '');
-    setSolicitationNumber(op.solicitationNumber || `SOL-2026-${Math.floor(Math.random() * 8999 + 1000)}`);
-    setAreaOfDelivery(op.areaOfDelivery || op.location || 'NCR, Philippines');
-    setProjectReferenceNumber(op.projectReferenceNumber || '');
-    setSector(op.sector || 'Government');
-    setBiddingProjectTitle(op.title || '');
-    setProcuringEntityName(op.procuringEntity || '');
-    setProcuringEntityContactNumber(op.procuringEntityContactNumber || '');
-    setProcuringEntityAddress(op.procuringEntityAddress || '');
-    setProcuringEntityEmail(op.procuringEntityEmail || '');
-    setProcuringEntityPosition(op.procuringEntityPosition || '');
-    setProcuringEntityContactPerson(op.procuringEntityContactPerson || '');
-    setHeadOfProcuringEntity(op.headOfProcuringEntity || '');
-    setHeadOfProcuringEntityPosition(op.headOfProcuringEntityPosition || '');
-    setProcurementType(op.procurementType || 'Goods & Supply');
-    setDateCreated(op.dateCreated || new Date().toISOString().split('T')[0]);
-    setDatePublished(op.datePublished || new Date().toISOString().split('T')[0]);
-    setPreBidConferenceDatetime(op.preBidConferenceDatetime || '');
-    setSubmissionDeadlineDatetime(op.submissionDeadlineDatetime || '');
+    setPhilgepsRefNo(op.philgepsRefNo || "");
+    setSolicitationNumber(
+      op.solicitationNumber ||
+        `SOL-2026-${Math.floor(Math.random() * 8999 + 1000)}`,
+    );
+    setAreaOfDelivery(op.areaOfDelivery || op.location || "NCR, Philippines");
+    setProjectReferenceNumber(op.projectReferenceNumber || "");
+    setSector(op.sector || "Government");
+    setBiddingProjectTitle(op.title || "");
+    setProcuringEntityName(op.procuringEntity || "");
+    setProcuringEntityContactNumber(op.procuringEntityContactNumber || "");
+    setProcuringEntityAddress(op.procuringEntityAddress || "");
+    setProcuringEntityEmail(op.procuringEntityEmail || "");
+    setProcuringEntityPosition(op.procuringEntityPosition || "");
+    setProcuringEntityContactPerson(op.procuringEntityContactPerson || "");
+    setHeadOfProcuringEntity(op.headOfProcuringEntity || "");
+    setHeadOfProcuringEntityPosition(op.headOfProcuringEntityPosition || "");
+    setProcurementType(op.procurementType || "Goods & Supply");
+    setDateCreated(op.dateCreated || new Date().toISOString().split("T")[0]);
+    setDatePublished(
+      op.datePublished || new Date().toISOString().split("T")[0],
+    );
+    setPreBidConferenceDatetime(op.preBidConferenceDatetime || "");
+    setSubmissionDeadlineDatetime(op.submissionDeadlineDatetime || "");
     setDraftPdfAttachments(op.pdfAttachments || {});
-    setPdfFileName(op.pdfFileName || 'PhilGEPS_Notice.pdf');
-    setPdfFileDataUrl(op.pdfFileDataUrl || '');
+    setPdfFileName(op.pdfFileName || "PhilGEPS_Notice.pdf");
+    setPdfFileDataUrl(op.pdfFileDataUrl || "");
     setApprovedBudgetStr(formatPhpCurrency(op.approvedBudget || 0));
     setErrors({});
     setShowAddEditModal(true);
   };
 
   // MULTI-FIELD SEARCH FILTER WITH NULL SAFETY
-  const filteredOps = (opportunities || []).filter(op => {
+  const filteredOps = (opportunities || []).filter((op) => {
     if (!op) return false;
     const q = searchQuery.toLowerCase().trim();
     if (!q) {
-      return selectedType === 'ALL' || op.procurementType === selectedType;
+      return selectedType === "ALL" || op.procurementType === selectedType;
     }
 
-    const matchesName = (op.title || '').toLowerCase().includes(q);
-    const matchesProjNo = (op.projectReferenceNumber || '').toLowerCase().includes(q) || (op.philgepsRefNo || '').toLowerCase().includes(q);
-    const matchesAddress = (op.procuringEntityAddress || '').toLowerCase().includes(q) || (op.location || '').toLowerCase().includes(q);
-    const matchesArea = (op.areaOfDelivery || '').toLowerCase().includes(q);
+    const matchesName = (op.title || "").toLowerCase().includes(q);
+    const matchesProjNo =
+      (op.projectReferenceNumber || "").toLowerCase().includes(q) ||
+      (op.philgepsRefNo || "").toLowerCase().includes(q);
+    const matchesAddress =
+      (op.procuringEntityAddress || "").toLowerCase().includes(q) ||
+      (op.location || "").toLowerCase().includes(q);
+    const matchesArea = (op.areaOfDelivery || "").toLowerCase().includes(q);
 
-    const matchesSearch = matchesName || matchesProjNo || matchesAddress || matchesArea;
-    const matchesType = selectedType === 'ALL' || op.procurementType === selectedType;
+    const matchesSearch =
+      matchesName || matchesProjNo || matchesAddress || matchesArea;
+    const matchesType =
+      selectedType === "ALL" || op.procurementType === selectedType;
     return matchesSearch && matchesType;
   });
 
@@ -379,17 +468,26 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-      setErrors(prev => ({ ...prev, pdfFile: 'Only PDF files (.pdf) are accepted.' }));
+    if (
+      !file.name.toLowerCase().endsWith(".pdf") &&
+      file.type !== "application/pdf"
+    ) {
+      setErrors((prev) => ({
+        ...prev,
+        pdfFile: "Only PDF files (.pdf) are accepted.",
+      }));
       setPdfFile(null);
-      setPdfFileName('');
+      setPdfFileName("");
       return;
     }
 
     if (file.size > 100 * 1024 * 1024) {
-      setErrors(prev => ({ ...prev, pdfFile: 'File size exceeds maximum allowed limit of 100 MB.' }));
+      setErrors((prev) => ({
+        ...prev,
+        pdfFile: "File size exceeds maximum allowed limit of 100 MB.",
+      }));
       setPdfFile(null);
-      setPdfFileName('');
+      setPdfFileName("");
       return;
     }
 
@@ -401,7 +499,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
     setPdfFile(file);
     setPdfFileName(file.name);
-    setErrors(prev => {
+    setErrors((prev) => {
       const copy = { ...prev };
       delete copy.pdfFile;
       return copy;
@@ -410,18 +508,27 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
   // Creation-flow PDF Slot Attachment Upload Handler
   const handleDraftSlotUpload = (
-    slotKey: 'bidBulletin' | 'supplementalDocs' | 'procuringEntityDocs' | 'receiptOfBidDocs',
-    file: File | undefined
+    slotKey:
+      | "bidBulletin"
+      | "supplementalDocs"
+      | "procuringEntityDocs"
+      | "receiptOfBidDocs",
+    file: File | undefined,
   ) => {
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-      alert('Only PDF files (.pdf) are accepted.');
+    if (
+      !file.name.toLowerCase().endsWith(".pdf") &&
+      file.type !== "application/pdf"
+    ) {
+      alert("Only PDF files (.pdf) are accepted.");
       return;
     }
 
     if (file.size > 100 * 1024 * 1024) {
-      alert(`File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds maximum allowed limit of 100 MB.`);
+      alert(
+        `File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds maximum allowed limit of 100 MB.`,
+      );
       return;
     }
 
@@ -432,12 +539,12 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         fileName: file.name,
         fileSizeBytes: file.size,
         uploadedAt: new Date().toLocaleString(),
-        fileDataUrl: dataUrl
+        fileDataUrl: dataUrl,
       };
 
-      setDraftPdfAttachments(prev => ({
+      setDraftPdfAttachments((prev) => ({
         ...prev,
-        [slotKey]: attachmentObj
+        [slotKey]: attachmentObj,
       }));
     };
     reader.readAsDataURL(file);
@@ -454,14 +561,15 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
     const newErrors: Record<string, string> = {};
 
     if (!biddingProjectTitle.trim()) {
-      newErrors.biddingProjectTitle = 'Bidding Project Title is required.';
+      newErrors.biddingProjectTitle = "Bidding Project Title is required.";
     } else if (biddingProjectTitle.length > 500) {
-      newErrors.biddingProjectTitle = 'Title cannot exceed 500 characters.';
+      newErrors.biddingProjectTitle = "Title cannot exceed 500 characters.";
     }
 
     const numBudget = parsePhpCurrency(approvedBudgetStr);
     if (!approvedBudgetStr || numBudget <= 0) {
-      newErrors.approvedBudget = 'Approved Budget for Contract (ABC) is required and must be greater than ₱0.00.';
+      newErrors.approvedBudget =
+        "Approved Budget for Contract (ABC) is required and must be greater than ₱0.00.";
     }
 
     setErrors(newErrors);
@@ -479,21 +587,32 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         resolvedPdfDataUrl = await readFileAsDataUrl(pdfFile);
         resolvedPdfName = pdfFile.name;
       } catch (error) {
-        console.error('Error reading PDF file:', error);
+        console.error("Error reading PDF file:", error);
       }
     }
 
     if (!validateForm()) return;
 
     const numBudget = parsePhpCurrency(approvedBudgetStr);
-    const rawRef = philgepsRefNo.trim() || `PhilGEPS-${Math.floor(Math.random() * 899999 + 100000)}`;
-    const finalPhilgepsRefNo = rawRef.toUpperCase().startsWith('PHILGEPS-') ? rawRef.toUpperCase() : `PhilGEPS-${rawRef}`;
-    const finalSolicitation = solicitationNumber.trim() || `SOL-2026-${Math.floor(Math.random() * 8999 + 1000)}`;
-    const finalEntity = procuringEntityName.trim() || 'Government Procurement Entity';
-    const finalPhone = procuringEntityContactNumber.trim() || '+63 917 123 4567';
-    const finalAddress = procuringEntityAddress.trim() || 'Metro Manila, Philippines';
-    const finalEmail = procuringEntityEmail.trim() || 'bac_secretariat@procuring.gov.ph';
-    const finalPosition = procuringEntityPosition.trim() || 'BAC Secretariat Head';
+    const rawRef =
+      philgepsRefNo.trim() ||
+      `PhilGEPS-${Math.floor(Math.random() * 899999 + 100000)}`;
+    const finalPhilgepsRefNo = rawRef.toUpperCase().startsWith("PHILGEPS-")
+      ? rawRef.toUpperCase()
+      : `PhilGEPS-${rawRef}`;
+    const finalSolicitation =
+      solicitationNumber.trim() ||
+      `SOL-2026-${Math.floor(Math.random() * 8999 + 1000)}`;
+    const finalEntity =
+      procuringEntityName.trim() || "Government Procurement Entity";
+    const finalPhone =
+      procuringEntityContactNumber.trim() || "+63 917 123 4567";
+    const finalAddress =
+      procuringEntityAddress.trim() || "Metro Manila, Philippines";
+    const finalEmail =
+      procuringEntityEmail.trim() || "bac_secretariat@procuring.gov.ph";
+    const finalPosition =
+      procuringEntityPosition.trim() || "BAC Secretariat Head";
     const finalContactPerson = procuringEntityContactPerson.trim();
     const finalHope = headOfProcuringEntity.trim();
     const finalHopePos = headOfProcuringEntityPosition.trim();
@@ -519,17 +638,19 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         headOfProcuringEntityPosition: finalHopePos,
         procurementType,
         approvedBudget: numBudget,
-        dateCreated: dateCreated || new Date().toISOString().split('T')[0],
-        datePublished: datePublished || new Date().toISOString().split('T')[0],
+        dateCreated: dateCreated || new Date().toISOString().split("T")[0],
+        datePublished: datePublished || new Date().toISOString().split("T")[0],
         preBidConferenceDatetime,
         submissionDeadlineDatetime,
         pdfFileName: finalPdfName,
         pdfFileSize: pdfFile?.size || editingItem.pdfFileSize || 1024,
         pdfFileDataUrl: resolvedPdfDataUrl || editingItem.pdfFileDataUrl,
-        pdfAttachments: draftPdfAttachments
+        pdfAttachments: draftPdfAttachments,
       };
 
-      const updatedList = opportunities.map(o => o.id === editingItem.id ? updatedOp : o);
+      const updatedList = opportunities.map((o) =>
+        o.id === editingItem.id ? updatedOp : o,
+      );
       setOpportunities(updatedList);
       await saveOpportunitiesSafely(updatedList);
 
@@ -555,21 +676,25 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         headOfProcuringEntity: finalHope,
         headOfProcuringEntityPosition: finalHopePos,
         procurementType,
-        legalRegime: 'RA_12009_NGPA',
+        legalRegime: "RA_12009_NGPA",
         approvedBudget: numBudget,
-        dateCreated: dateCreated || new Date().toISOString().split('T')[0],
-        datePublished: datePublished || new Date().toISOString().split('T')[0],
+        dateCreated: dateCreated || new Date().toISOString().split("T")[0],
+        datePublished: datePublished || new Date().toISOString().split("T")[0],
         preBidConferenceDatetime,
         submissionDeadlineDatetime,
-        submissionDeadline: submissionDeadlineDatetime ? new Date(submissionDeadlineDatetime).toISOString() : new Date().toISOString(),
-        bidOpeningDate: submissionDeadlineDatetime ? new Date(submissionDeadlineDatetime).toISOString() : new Date().toISOString(),
+        submissionDeadline: submissionDeadlineDatetime
+          ? new Date(submissionDeadlineDatetime).toISOString()
+          : new Date().toISOString(),
+        bidOpeningDate: submissionDeadlineDatetime
+          ? new Date(submissionDeadlineDatetime).toISOString()
+          : new Date().toISOString(),
         pdfFileName: finalPdfName,
         pdfFileSize: pdfFile?.size || 1024,
         pdfFileDataUrl: resolvedPdfDataUrl,
-        status: 'OPEN',
+        status: "OPEN",
         location: finalAddress,
         description: `${biddingProjectTitle.trim()} — Procured by ${finalEntity}`,
-        pdfAttachments: draftPdfAttachments
+        pdfAttachments: draftPdfAttachments,
       };
 
       const newList = [newOp, ...opportunities];
@@ -580,12 +705,18 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         const activeData = {
           refNo: newOp.projectReferenceNumber || newOp.philgepsRefNo,
           title: newOp.title,
-          procuringEntity: newOp.procuringEntity
+          procuringEntity: newOp.procuringEntity,
         };
-        localStorage.setItem(`bidocs_active_project_${tenantId}`, JSON.stringify(activeData));
-        localStorage.setItem('bidocs_active_project', JSON.stringify(activeData));
+        localStorage.setItem(
+          `bidocs_active_project_${tenantId}`,
+          JSON.stringify(activeData),
+        );
+        localStorage.setItem(
+          "bidocs_active_project",
+          JSON.stringify(activeData),
+        );
       } catch (err) {
-        console.error('[OpportunityFinder] Error setting active project:', err);
+        console.error("[OpportunityFinder] Error setting active project:", err);
       }
     }
 
@@ -595,18 +726,23 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
   const handleDeleteOpportunity = async () => {
     if (!deletingItem) return;
-    const updated = opportunities.filter(o => o.id !== deletingItem.id);
+    const updated = opportunities.filter((o) => o.id !== deletingItem.id);
     setOpportunities(updated);
     await saveOpportunitiesSafely(updated);
 
     // If deleting the currently active project, remove its active markers
     try {
-      const activeRaw = localStorage.getItem(`bidocs_active_project_${tenantId}`);
+      const activeRaw = localStorage.getItem(
+        `bidocs_active_project_${tenantId}`,
+      );
       if (activeRaw) {
         const parsed = JSON.parse(activeRaw);
-        if (parsed.refNo === deletingItem.projectReferenceNumber || parsed.refNo === deletingItem.philgepsRefNo) {
+        if (
+          parsed.refNo === deletingItem.projectReferenceNumber ||
+          parsed.refNo === deletingItem.philgepsRefNo
+        ) {
           localStorage.removeItem(`bidocs_active_project_${tenantId}`);
-          localStorage.removeItem('bidocs_active_project');
+          localStorage.removeItem("bidocs_active_project");
         }
       }
     } catch (_) {}
@@ -618,18 +754,27 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
   // Slot Upload Handler for Detail View
   const handleSlotAttachmentUploadDetail = (
     opId: string,
-    slotKey: 'bidBulletin' | 'supplementalDocs' | 'procuringEntityDocs' | 'receiptOfBidDocs',
-    file: File | undefined
+    slotKey:
+      | "bidBulletin"
+      | "supplementalDocs"
+      | "procuringEntityDocs"
+      | "receiptOfBidDocs",
+    file: File | undefined,
   ) => {
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
-      alert('Only PDF files (.pdf) are accepted.');
+    if (
+      !file.name.toLowerCase().endsWith(".pdf") &&
+      file.type !== "application/pdf"
+    ) {
+      alert("Only PDF files (.pdf) are accepted.");
       return;
     }
 
     if (file.size > 100 * 1024 * 1024) {
-      alert(`File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds 100 MB limit.`);
+      alert(
+        `File size (${(file.size / (1024 * 1024)).toFixed(2)} MB) exceeds 100 MB limit.`,
+      );
       return;
     }
 
@@ -641,14 +786,14 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         fileName: file.name,
         fileSizeBytes: file.size,
         uploadedAt: new Date().toLocaleString(),
-        fileDataUrl: dataUrl
+        fileDataUrl: dataUrl,
       };
 
-      const updatedOps = opportunities.map(op => {
+      const updatedOps = opportunities.map((op) => {
         if (op.id === opId) {
           const updatedAttachments = {
             ...(op.pdfAttachments || {}),
-            [slotKey]: attachmentObj
+            [slotKey]: attachmentObj,
           };
           const updatedOp = { ...op, pdfAttachments: updatedAttachments };
           if (viewingItem?.id === opId) setViewingItem(updatedOp);
@@ -666,25 +811,35 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
   return (
     <VaultErrorBoundary fallbackTitle="Opportunity Finder Protected">
       <div className="space-y-6 animate-fadeIn">
-
         {/* Header Banner — 3D Glass with BorderBeam & Telemetry */}
-        <div className="relative rounded-2xl p-5 md:p-6 bg-gradient-to-r from-slate-900/90 via-[#0a1128]/85 to-slate-900/90 border border-slate-800/90 shadow-2xl backdrop-blur-xl overflow-hidden">
-          <BorderBeam size={180} duration={12} colorFrom="#3b82f6" colorTo="#10b981" />
-          
+        <div className="relative rounded-2xl p-5 md:p-6 bg-linear-to-r from-slate-900/90 via-[#0a1128]/85 to-slate-900/90 border border-slate-800/90 shadow-2xl backdrop-blur-xl overflow-hidden">
+          <BorderBeam
+            size={180}
+            duration={12}
+            colorFrom="#3b82f6"
+            colorTo="#10b981"
+          />
+
           <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
                 <span
                   className="w-3.5 h-3.5 rounded-full ring-4 ring-blue-500/20"
-                  style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
+                  style={{
+                    backgroundColor: currentTenant?.brandColor || "#1e40af",
+                  }}
                 />
                 <h1 className="text-2xl font-black text-white tracking-tight">
                   <ShinyText text="Opportunity Finder" speed={6} />
-                  <span className="text-slate-400 font-medium text-lg ml-2 font-sans">& Statutory Bidding Registry</span>
+                  <span className="text-slate-400 font-medium text-lg ml-2 font-sans">
+                    & Statutory Bidding Registry
+                  </span>
                 </h1>
               </div>
               <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-2">
-                <span>Real-time PhilGEPS bidding opportunities repository for</span>
+                <span>
+                  Real-time PhilGEPS bidding opportunities repository for
+                </span>
                 <span className="text-slate-200 font-bold bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700/60 font-mono">
                   {currentTenant?.companyName}
                 </span>
@@ -692,9 +847,9 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
-              <CyberBadge 
-                label="PhilGEPS Sync Live" 
-                variant="blue" 
+              <CyberBadge
+                label="PhilGEPS Sync Live"
+                variant="blue"
                 telemetry={`${filteredOps.length} Projects`}
                 pulse={true}
               />
@@ -702,7 +857,9 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
               <button
                 onClick={handleOpenAddModal}
                 className="px-4 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg shadow-blue-500/25 transition-all duration-300 flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
-                style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
+                style={{
+                  backgroundColor: currentTenant?.brandColor || "#1e40af",
+                }}
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Bidding Opportunity</span>
@@ -714,22 +871,29 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
         {/* Filters and Search */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
-            {['ALL', 'Goods & Supply', 'Goods & Supply with Installation', 'Infrastructure', 'Consulting'].map((t) => (
+            {[
+              "ALL",
+              "Goods & Supply",
+              "Goods & Supply with Installation",
+              "Infrastructure",
+              "Consulting",
+            ].map((t) => (
               <button
                 key={t}
                 onClick={() => setSelectedType(t)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${selectedType === t
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                  }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
+                  selectedType === t
+                    ? "bg-blue-600 text-white shadow-md"
+                    : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                }`}
               >
-                {t === 'ALL' ? 'All Procurement Types' : t}
+                {t === "ALL" ? "All Procurement Types" : t}
               </button>
             ))}
           </div>
 
           {/* Global Multi-Field Search Input */}
-          <div className="relative min-w-[280px]">
+          <div className="relative min-w-70">
             <input
               type="text"
               value={searchQuery}
@@ -757,17 +921,26 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     {op.projectReferenceNumber}
                   </span>
                   <div className="flex items-center gap-1.5">
-                    {(op.projectReferenceNumber?.startsWith('POW-') || op.projectReferenceNumber?.startsWith('RFQ-') || /^\d{4}-\d{2}-\d{2}-\d{4}-[A-Z0-9]+/i.test(op.projectReferenceNumber || '')) && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40 flex items-center gap-1 shadow-sm" title="Originated from Program of Work / Quotation. Deliverables synced to Section VI.">
+                    {(op.projectReferenceNumber?.startsWith("POW-") ||
+                      op.projectReferenceNumber?.startsWith("RFQ-") ||
+                      /^\d{4}-\d{2}-\d{2}-\d{4}-[A-Z0-9]+/i.test(
+                        op.projectReferenceNumber || "",
+                      )) && (
+                      <span
+                        className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40 flex items-center gap-1 shadow-sm"
+                        title="Originated from Program of Work / Quotation. Deliverables synced to Section VI."
+                      >
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                         POW Synced
                       </span>
                     )}
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${getProcurementTypeBadgeStyle(op.procurementType)}`}>
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded border ${getProcurementTypeBadgeStyle(op.procurementType)}`}
+                    >
                       {op.procurementType}
                     </span>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800/80 text-slate-300 font-semibold border border-slate-700/60">
-                      {op.sector || 'Government'}
+                      {op.sector || "Government"}
                     </span>
                   </div>
                 </div>
@@ -781,32 +954,52 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     <span className="truncate">{op.procuringEntity}</span>
                   </p>
                   <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono mt-2 pt-1.5 border-t border-slate-800/60">
-                    <span>PhilGEPS: <strong className="text-slate-200">{op.philgepsRefNo}</strong></span>
-                    <span>Solicitation: <strong className="text-slate-200">{op.solicitationNumber}</strong></span>
+                    <span>
+                      PhilGEPS:{" "}
+                      <strong className="text-slate-200">
+                        {op.philgepsRefNo}
+                      </strong>
+                    </span>
+                    <span>
+                      Solicitation:{" "}
+                      <strong className="text-slate-200">
+                        {op.solicitationNumber}
+                      </strong>
+                    </span>
                   </div>
                 </div>
 
                 <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2 text-xs font-mono backdrop-blur-sm">
                   <div className="flex items-center justify-between text-slate-400">
-                    <span className="text-slate-400">Approved Budget (ABC)</span>
+                    <span className="text-slate-400">
+                      Approved Budget (ABC)
+                    </span>
                     <span className="text-emerald-400 font-extrabold tracking-tight drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]">
                       {formatPhpCurrency(op.approvedBudget)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-slate-400 text-[11px]">
                     <span>Project Type</span>
-                    <span className={`truncate max-w-[180px] font-semibold ${getProcurementTypeTextStyle(op.procurementType)}`}>
+                    <span
+                      className={`truncate max-w-45 font-semibold ${getProcurementTypeTextStyle(op.procurementType)}`}
+                    >
                       {op.procurementType}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-slate-400 text-[11px]">
                     <span>Area of Delivery</span>
-                    <span className="text-slate-200 truncate max-w-[140px]">{op.areaOfDelivery || op.location}</span>
+                    <span className="text-slate-200 truncate max-w-35">
+                      {op.areaOfDelivery || op.location}
+                    </span>
                   </div>
                   {op.submissionDeadlineDatetime && (
                     <div className="flex items-center justify-between text-slate-400 text-[11px]">
                       <span>Submission Deadline</span>
-                      <span className="text-amber-400 font-semibold">{new Date(op.submissionDeadlineDatetime).toLocaleDateString()}</span>
+                      <span className="text-amber-400 font-semibold">
+                        {new Date(
+                          op.submissionDeadlineDatetime,
+                        ).toLocaleDateString()}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -832,11 +1025,14 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   </button>
 
                   <button
-                    onClick={() => setPreviewPdfSlot({
-                      title: 'Official PhilGEPS PDF Notice Document',
-                      fileName: op.pdfFileName || `${op.philgepsRefNo}_Notice.pdf`,
-                      dataUrl: op.pdfFileDataUrl
-                    })}
+                    onClick={() =>
+                      setPreviewPdfSlot({
+                        title: "Official PhilGEPS PDF Notice Document",
+                        fileName:
+                          op.pdfFileName || `${op.philgepsRefNo}_Notice.pdf`,
+                        dataUrl: op.pdfFileDataUrl,
+                      })
+                    }
                     className="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white transition text-xs font-semibold flex items-center gap-1 border border-emerald-500/30 cursor-pointer"
                     title="View Official PhilGEPS PDF Notice Document"
                   >
@@ -845,7 +1041,12 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   </button>
 
                   <button
-                    onClick={() => downloadFile(op.pdfFileName || `${op.philgepsRefNo}_Notice.pdf`, op.pdfFileDataUrl)}
+                    onClick={() =>
+                      downloadFile(
+                        op.pdfFileName || `${op.philgepsRefNo}_Notice.pdf`,
+                        op.pdfFileDataUrl,
+                      )
+                    }
                     className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition text-xs font-semibold flex items-center gap-1 border border-slate-700/80 cursor-pointer"
                     title="Download Official PhilGEPS PDF Notice Document"
                   >
@@ -877,9 +1078,8 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
         {/* DETAIL VIEW MODAL & 4 PDF ATTACHMENT SLOTS */}
         {viewingItem && (
-          <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
+          <div className="fixed inset-0 z-100 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
             <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[92vh] flex flex-col">
-
               {/* Modal Header Bar */}
               <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-20 shrink-0">
                 <div className="flex items-center gap-3">
@@ -887,83 +1087,153 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     {viewingItem.projectReferenceNumber}
                   </span>
                   <div>
-                    <h3 className="text-sm font-bold text-white leading-tight">{viewingItem.title}</h3>
+                    <h3 className="text-sm font-bold text-white leading-tight">
+                      {viewingItem.title}
+                    </h3>
                     <p className="text-xs text-slate-400 font-mono">
-                      PhilGEPS Ref: {viewingItem.philgepsRefNo} • Solicitation: {viewingItem.solicitationNumber}
+                      PhilGEPS Ref: {viewingItem.philgepsRefNo} • Solicitation:{" "}
+                      {viewingItem.solicitationNumber}
                     </p>
                   </div>
                 </div>
-                <button onClick={() => setViewingItem(null)} className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition">
+                <button
+                  onClick={() => setViewingItem(null)}
+                  className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition"
+                >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="p-6 sm:p-8 space-y-6 text-xs overflow-y-auto flex-1 max-h-[calc(92vh-90px)]">
-
                 {/* Grid 1: Stored Fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                    <span className="text-slate-400 text-[10px] uppercase font-mono block">Procuring Entity</span>
-                    <p className="font-bold text-white">{viewingItem.procuringEntity}</p>
+                    <span className="text-slate-400 text-[10px] uppercase font-mono block">
+                      Procuring Entity
+                    </span>
+                    <p className="font-bold text-white">
+                      {viewingItem.procuringEntity}
+                    </p>
                     {viewingItem.headOfProcuringEntity && (
                       <p className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
                         <span className="text-slate-400">HoPE/Signatory:</span>
-                        <strong className="text-white">{viewingItem.headOfProcuringEntity}</strong>
-                        <span className="text-slate-500 font-normal">({viewingItem.headOfProcuringEntityPosition || 'Head of Procuring Entity'})</span>
+                        <strong className="text-white">
+                          {viewingItem.headOfProcuringEntity}
+                        </strong>
+                        <span className="text-slate-500 font-normal">
+                          (
+                          {viewingItem.headOfProcuringEntityPosition ||
+                            "Head of Procuring Entity"}
+                          )
+                        </span>
                       </p>
                     )}
                     {viewingItem.procuringEntityContactPerson && (
                       <p className="text-[11px] text-cyan-400 font-semibold flex items-center gap-1 mt-0.5">
                         <span className="text-slate-400">BAC Contact:</span>
-                        <strong className="text-white">{viewingItem.procuringEntityContactPerson}</strong>
-                        <span className="text-slate-500 font-normal">({viewingItem.procuringEntityPosition || 'BAC Secretariat'})</span>
+                        <strong className="text-white">
+                          {viewingItem.procuringEntityContactPerson}
+                        </strong>
+                        <span className="text-slate-500 font-normal">
+                          (
+                          {viewingItem.procuringEntityPosition ||
+                            "BAC Secretariat"}
+                          )
+                        </span>
                       </p>
                     )}
                   </div>
 
                   <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                    <span className="text-slate-400 text-[10px] uppercase font-mono block">Area of Delivery</span>
-                    <p className="font-bold text-slate-200">{viewingItem.areaOfDelivery || viewingItem.location}</p>
-                    <p className="text-[11px] text-slate-500 font-mono">{viewingItem.procuringEntityAddress}</p>
+                    <span className="text-slate-400 text-[10px] uppercase font-mono block">
+                      Area of Delivery
+                    </span>
+                    <p className="font-bold text-slate-200">
+                      {viewingItem.areaOfDelivery || viewingItem.location}
+                    </p>
+                    <p className="text-[11px] text-slate-500 font-mono">
+                      {viewingItem.procuringEntityAddress}
+                    </p>
                   </div>
 
                   <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                    <span className="text-slate-400 text-[10px] uppercase font-mono block">Approved Budget (ABC)</span>
-                    <p className="font-bold text-emerald-400 text-sm">{formatPhpCurrency(viewingItem.approvedBudget)}</p>
-                    <p className="text-[11px] text-slate-400">{viewingItem.procurementType}</p>
+                    <span className="text-slate-400 text-[10px] uppercase font-mono block">
+                      Approved Budget (ABC)
+                    </span>
+                    <p className="font-bold text-emerald-400 text-sm">
+                      {formatPhpCurrency(viewingItem.approvedBudget)}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      {viewingItem.procurementType}
+                    </p>
                   </div>
 
                   <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                    <span className="text-slate-400 text-[10px] uppercase font-mono block">Date Created & Published</span>
-                    <p className="font-bold text-slate-200">Created: {viewingItem.dateCreated || 'N/A'}</p>
-                    <p className="text-[11px] text-slate-400">Published: {viewingItem.datePublished || 'N/A'}</p>
+                    <span className="text-slate-400 text-[10px] uppercase font-mono block">
+                      Date Created & Published
+                    </span>
+                    <p className="font-bold text-slate-200">
+                      Created: {viewingItem.dateCreated || "N/A"}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      Published: {viewingItem.datePublished || "N/A"}
+                    </p>
                   </div>
 
                   <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                    <span className="text-slate-400 text-[10px] uppercase font-mono block">Pre-Bid Conference</span>
-                    <p className="font-bold text-slate-200">{viewingItem.preBidConferenceDatetime ? new Date(viewingItem.preBidConferenceDatetime).toLocaleString() : 'N/A'}</p>
+                    <span className="text-slate-400 text-[10px] uppercase font-mono block">
+                      Pre-Bid Conference
+                    </span>
+                    <p className="font-bold text-slate-200">
+                      {viewingItem.preBidConferenceDatetime
+                        ? new Date(
+                            viewingItem.preBidConferenceDatetime,
+                          ).toLocaleString()
+                        : "N/A"}
+                    </p>
                   </div>
 
                   <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                    <span className="text-slate-400 text-[10px] uppercase font-mono block">Submission Deadline</span>
-                    <p className="font-bold text-amber-400">{viewingItem.submissionDeadlineDatetime ? new Date(viewingItem.submissionDeadlineDatetime).toLocaleString() : 'N/A'}</p>
+                    <span className="text-slate-400 text-[10px] uppercase font-mono block">
+                      Submission Deadline
+                    </span>
+                    <p className="font-bold text-amber-400">
+                      {viewingItem.submissionDeadlineDatetime
+                        ? new Date(
+                            viewingItem.submissionDeadlineDatetime,
+                          ).toLocaleString()
+                        : "N/A"}
+                    </p>
                   </div>
                 </div>
 
                 {/* POW / RFQ LINKED SYNC BANNER */}
-                {(viewingItem.projectReferenceNumber?.startsWith('POW-') || viewingItem.projectReferenceNumber?.startsWith('RFQ-') || /^\d{4}-\d{2}-\d{2}-\d{4}-[A-Z0-9]+/i.test(viewingItem.projectReferenceNumber || '')) && (
-                  <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/50 via-slate-900 to-amber-950/30 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg shadow-amber-950/30">
+                {(viewingItem.projectReferenceNumber?.startsWith("POW-") ||
+                  viewingItem.projectReferenceNumber?.startsWith("RFQ-") ||
+                  /^\d{4}-\d{2}-\d{2}-\d{4}-[A-Z0-9]+/i.test(
+                    viewingItem.projectReferenceNumber || "",
+                  )) && (
+                  <div className="p-4 rounded-2xl bg-linear-to-r from-amber-950/50 via-slate-900 to-amber-950/30 border border-amber-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg shadow-amber-950/30">
                     <div className="flex items-center gap-3">
                       <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
                         <FileCheck className="w-5 h-5" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="font-bold text-amber-300 text-sm">Originating from Program of Work (POW) / Quotation</p>
-                          <span className="text-[10px] font-mono bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded border border-amber-500/30 font-bold">Auto-Synced</span>
+                          <p className="font-bold text-amber-300 text-sm">
+                            Originating from Program of Work (POW) / Quotation
+                          </p>
+                          <span className="text-[10px] font-mono bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded border border-amber-500/30 font-bold">
+                            Auto-Synced
+                          </span>
                         </div>
                         <p className="text-slate-300 text-xs mt-0.5">
-                          All deliverable item descriptions, units, and quantities are synced to <strong className="text-amber-300">Section VI (Schedule of Requirements)</strong> and ready for 27 statutory bidding documents.
+                          All deliverable item descriptions, units, and
+                          quantities are synced to{" "}
+                          <strong className="text-amber-300">
+                            Section VI (Schedule of Requirements)
+                          </strong>{" "}
+                          and ready for 27 statutory bidding documents.
                         </p>
                       </div>
                     </div>
@@ -972,7 +1242,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                         handleWorkOnProject(viewingItem);
                         setViewingItem(null);
                       }}
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold text-xs shrink-0 transition shadow-lg shadow-amber-600/30 flex items-center gap-1.5 cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-linear-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold text-xs shrink-0 transition shadow-lg shadow-amber-600/30 flex items-center gap-1.5 cursor-pointer"
                     >
                       <FileCheck className="w-4 h-4" />
                       <span>Open in Document Vault ➔</span>
@@ -981,7 +1251,7 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                 )}
 
                 {/* OFFICIAL PHILGEPS PDF NOTICE DOCUMENT BANNER */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/80 to-slate-900 border border-blue-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="p-4 rounded-2xl bg-linear-to-r from-blue-950/80 to-slate-900 border border-blue-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="p-3 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30 shrink-0">
                       <FileText className="w-6 h-6" />
@@ -989,20 +1259,30 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     <div>
                       <h4 className="text-sm font-bold text-white flex items-center gap-2">
                         <span>Official PhilGEPS PDF Notice Document</span>
-                        <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">Verified</span>
+                        <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">
+                          Verified
+                        </span>
                       </h4>
                       <p className="text-xs text-slate-300 font-mono mt-0.5">
-                        File: <strong className="text-blue-300">{viewingItem.pdfFileName || `${viewingItem.philgepsRefNo}_Notice.pdf`}</strong>
+                        File:{" "}
+                        <strong className="text-blue-300">
+                          {viewingItem.pdfFileName ||
+                            `${viewingItem.philgepsRefNo}_Notice.pdf`}
+                        </strong>
                       </p>
                     </div>
                   </div>
 
                   <button
-                    onClick={() => setPreviewPdfSlot({
-                      title: 'Official PhilGEPS PDF Notice Document',
-                      fileName: viewingItem.pdfFileName || `${viewingItem.philgepsRefNo}_Notice.pdf`,
-                      dataUrl: viewingItem.pdfFileDataUrl
-                    })}
+                    onClick={() =>
+                      setPreviewPdfSlot({
+                        title: "Official PhilGEPS PDF Notice Document",
+                        fileName:
+                          viewingItem.pdfFileName ||
+                          `${viewingItem.philgepsRefNo}_Notice.pdf`,
+                        dataUrl: viewingItem.pdfFileDataUrl,
+                      })
+                    }
                     className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-lg transition flex items-center justify-center gap-2 shrink-0"
                   >
                     <Eye className="w-4 h-4" />
@@ -1010,7 +1290,13 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   </button>
 
                   <button
-                    onClick={() => downloadFile(viewingItem.pdfFileName || `${viewingItem.philgepsRefNo}_Notice.pdf`, viewingItem.pdfFileDataUrl)}
+                    onClick={() =>
+                      downloadFile(
+                        viewingItem.pdfFileName ||
+                          `${viewingItem.philgepsRefNo}_Notice.pdf`,
+                        viewingItem.pdfFileDataUrl,
+                      )
+                    }
                     className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs shadow-lg transition flex items-center justify-center gap-2 shrink-0"
                   >
                     <Download className="w-4 h-4" />
@@ -1025,33 +1311,70 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                       <FileText className="w-4 h-4 text-blue-400" />
                       Additional Bidding PDF Documents (4 Dedicated Slots)
                     </h4>
-                    <span className="text-[11px] text-slate-400 font-mono">Max 100 MB per PDF</span>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      Max 100 MB per PDF
+                    </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
-                      { key: 'bidBulletin', title: '1. Bid Bulletin', color: 'border-blue-500/30' },
-                      { key: 'supplementalDocs', title: '2. Bid Supplemental Documents', color: 'border-emerald-500/30' },
-                      { key: 'procuringEntityDocs', title: '3. Bid Docs from Procuring Entity', color: 'border-amber-500/30' },
-                      { key: 'receiptOfBidDocs', title: '4. Receipt of Bid Docs', color: 'border-purple-500/30' },
+                      {
+                        key: "bidBulletin",
+                        title: "1. Bid Bulletin",
+                        color: "border-blue-500/30",
+                      },
+                      {
+                        key: "supplementalDocs",
+                        title: "2. Bid Supplemental Documents",
+                        color: "border-emerald-500/30",
+                      },
+                      {
+                        key: "procuringEntityDocs",
+                        title: "3. Bid Docs from Procuring Entity",
+                        color: "border-amber-500/30",
+                      },
+                      {
+                        key: "receiptOfBidDocs",
+                        title: "4. Receipt of Bid Docs",
+                        color: "border-purple-500/30",
+                      },
                     ].map((slot) => {
-                      const slotKey = slot.key as 'bidBulletin' | 'supplementalDocs' | 'procuringEntityDocs' | 'receiptOfBidDocs';
+                      const slotKey = slot.key as
+                        | "bidBulletin"
+                        | "supplementalDocs"
+                        | "procuringEntityDocs"
+                        | "receiptOfBidDocs";
                       const attachment = viewingItem.pdfAttachments?.[slotKey];
 
                       return (
-                        <div key={slot.key} className={`p-4 rounded-2xl bg-slate-950 border ${slot.color} space-y-3 flex flex-col justify-between`}>
+                        <div
+                          key={slot.key}
+                          className={`p-4 rounded-2xl bg-slate-950 border ${slot.color} space-y-3 flex flex-col justify-between`}
+                        >
                           <div>
-                            <h5 className="font-bold text-white text-xs">{slot.title}</h5>
+                            <h5 className="font-bold text-white text-xs">
+                              {slot.title}
+                            </h5>
                             {attachment ? (
                               <div className="mt-2 p-2.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
-                                <p className="font-mono text-xs text-blue-300 font-bold truncate">{attachment.fileName}</p>
+                                <p className="font-mono text-xs text-blue-300 font-bold truncate">
+                                  {attachment.fileName}
+                                </p>
                                 <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                                  <span>{(attachment.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB</span>
+                                  <span>
+                                    {(
+                                      attachment.fileSizeBytes /
+                                      (1024 * 1024)
+                                    ).toFixed(2)}{" "}
+                                    MB
+                                  </span>
                                   <span>Uploaded: {attachment.uploadedAt}</span>
                                 </div>
                               </div>
                             ) : (
-                              <p className="text-[11px] text-slate-500 mt-2 italic font-mono">No PDF file attached to this slot.</p>
+                              <p className="text-[11px] text-slate-500 mt-2 italic font-mono">
+                                No PDF file attached to this slot.
+                              </p>
                             )}
                           </div>
 
@@ -1059,7 +1382,13 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                             {attachment ? (
                               <>
                                 <button
-                                  onClick={() => setPreviewPdfSlot({ title: slot.title, dataUrl: attachment.fileDataUrl, fileName: attachment.fileName })}
+                                  onClick={() =>
+                                    setPreviewPdfSlot({
+                                      title: slot.title,
+                                      dataUrl: attachment.fileDataUrl,
+                                      fileName: attachment.fileName,
+                                    })
+                                  }
                                   className="px-2.5 py-1.5 rounded-lg bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white transition text-[11px] font-semibold flex items-center gap-1 border border-blue-500/30"
                                 >
                                   <Eye className="w-3 h-3" />
@@ -1072,7 +1401,13 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                                   <input
                                     type="file"
                                     accept=".pdf"
-                                    onChange={(e) => handleSlotAttachmentUploadDetail(viewingItem.id, slotKey, e.target.files?.[0])}
+                                    onChange={(e) =>
+                                      handleSlotAttachmentUploadDetail(
+                                        viewingItem.id,
+                                        slotKey,
+                                        e.target.files?.[0],
+                                      )
+                                    }
                                     className="hidden"
                                   />
                                 </label>
@@ -1084,7 +1419,13 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                                 <input
                                   type="file"
                                   accept=".pdf"
-                                  onChange={(e) => handleSlotAttachmentUploadDetail(viewingItem.id, slotKey, e.target.files?.[0])}
+                                  onChange={(e) =>
+                                    handleSlotAttachmentUploadDetail(
+                                      viewingItem.id,
+                                      slotKey,
+                                      e.target.files?.[0],
+                                    )
+                                  }
                                   className="hidden"
                                 />
                               </label>
@@ -1095,7 +1436,6 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     })}
                   </div>
                 </div>
-
               </div>
 
               <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-900/95 sticky bottom-0 z-10 shrink-0">
@@ -1127,21 +1467,21 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   Close Details
                 </button>
               </div>
-
             </div>
           </div>
         )}
 
         {/* ADD / EDIT OPPORTUNITY MODAL (BEAUTIFUL SPACIOUS RESPONSIVE DIALOG) */}
         {showAddEditModal && (
-          <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
+          <div className="fixed inset-0 z-100 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn">
             <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[92vh] flex flex-col">
-
               {/* Modal Fixed Header */}
               <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 sticky top-0 z-10 shrink-0">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <Plus className="w-4 h-4 text-blue-400" />
-                  {editingItem ? 'Edit Bidding Opportunity' : 'Add Bidding Opportunity'}
+                  {editingItem
+                    ? "Edit Bidding Opportunity"
+                    : "Add Bidding Opportunity"}
                 </h3>
                 <button
                   type="button"
@@ -1153,16 +1493,19 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
               </div>
 
               {/* Form Wrapping Scrollable Body & Fixed Footer */}
-              <form onSubmit={handleSaveOpportunity} className="flex-1 flex flex-col overflow-hidden min-h-0">
-
+              <form
+                onSubmit={handleSaveOpportunity}
+                className="flex-1 flex flex-col overflow-hidden min-h-0"
+              >
                 {/* Scrollable Form Body */}
                 <div className="p-5 sm:p-7 space-y-5 text-xs overflow-y-auto flex-1 min-h-0 max-h-[calc(92vh-140px)]">
-
                   {Object.keys(errors).length > 0 && (
                     <div className="p-3.5 rounded-xl bg-red-950/90 border border-red-500/60 flex items-start gap-3 text-red-200 shadow-lg">
                       <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
                       <div>
-                        <h4 className="font-bold text-xs text-white">Please check the required fields below:</h4>
+                        <h4 className="font-bold text-xs text-white">
+                          Please check the required fields below:
+                        </h4>
                         <ul className="list-disc list-inside mt-1 text-[11px] space-y-0.5">
                           {Object.values(errors).map((err, i) => (
                             <li key={i}>{err}</li>
@@ -1177,15 +1520,27 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
                       <div className="flex items-center gap-2 text-slate-300 font-mono">
                         <Lock className="w-4 h-4 text-amber-400 shrink-0" />
-                        <span>Project Reference Number (Project ID): <strong className="text-white font-bold">{projectReferenceNumber}</strong></span>
+                        <span>
+                          Project Reference Number (Project ID):{" "}
+                          <strong className="text-white font-bold">
+                            {projectReferenceNumber}
+                          </strong>
+                        </span>
                       </div>
-                      <span className="text-[10px] bg-slate-800 text-slate-400 font-mono px-2 py-0.5 rounded border border-slate-700 font-bold">LOCKED / READ-ONLY</span>
+                      <span className="text-[10px] bg-slate-800 text-slate-400 font-mono px-2 py-0.5 rounded border border-slate-700 font-bold">
+                        LOCKED / READ-ONLY
+                      </span>
                     </div>
                   )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">PhilGEPS Ref. No. <span className="text-slate-500 font-mono text-[11px]">(Auto-generated if blank)</span></label>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        PhilGEPS Ref. No.{" "}
+                        <span className="text-slate-500 font-mono text-[11px]">
+                          (Auto-generated if blank)
+                        </span>
+                      </label>
                       <input
                         type="text"
                         value={philgepsRefNo}
@@ -1193,11 +1548,20 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                         placeholder="e.g. 10928371"
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
                       />
-                      {errors.philgepsRefNo && <p className="text-[11px] text-red-400 mt-1">{errors.philgepsRefNo}</p>}
+                      {errors.philgepsRefNo && (
+                        <p className="text-[11px] text-red-400 mt-1">
+                          {errors.philgepsRefNo}
+                        </p>
+                      )}
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">Solicitation No. <span className="text-slate-500 font-mono text-[11px]">(Auto-generated if blank)</span></label>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        Solicitation No.{" "}
+                        <span className="text-slate-500 font-mono text-[11px]">
+                          (Auto-generated if blank)
+                        </span>
+                      </label>
                       <input
                         type="text"
                         value={solicitationNumber}
@@ -1205,14 +1569,22 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                         placeholder="e.g. SOL-2026-0912"
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
                       />
-                      {errors.solicitationNumber && <p className="text-[11px] text-red-400 mt-1">{errors.solicitationNumber}</p>}
+                      {errors.solicitationNumber && (
+                        <p className="text-[11px] text-red-400 mt-1">
+                          {errors.solicitationNumber}
+                        </p>
+                      )}
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">Sector <span className="text-red-400">*</span></label>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        Sector <span className="text-red-400">*</span>
+                      </label>
                       <select
                         value={sector}
-                        onChange={(e) => setSector(e.target.value as SectorType)}
+                        onChange={(e) =>
+                          setSector(e.target.value as SectorType)
+                        }
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
                       >
                         <option value="Government">Government</option>
@@ -1221,14 +1593,20 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">Procurement Type <span className="text-red-400">*</span></label>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        Procurement Type <span className="text-red-400">*</span>
+                      </label>
                       <select
                         value={procurementType}
-                        onChange={(e) => setProcurementType(e.target.value as ProcurementType)}
+                        onChange={(e) =>
+                          setProcurementType(e.target.value as ProcurementType)
+                        }
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
                       >
                         <option value="Goods & Supply">Goods & Supply</option>
-                        <option value="Goods & Supply with Installation">Goods & Supply with Installation</option>
+                        <option value="Goods & Supply with Installation">
+                          Goods & Supply with Installation
+                        </option>
                         <option value="Infrastructure">Infrastructure</option>
                         <option value="Consulting">Consulting</option>
                       </select>
@@ -1236,7 +1614,10 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Bidding Project Title <span className="text-red-400">*</span></label>
+                    <label className="block text-slate-300 font-medium mb-1">
+                      Bidding Project Title{" "}
+                      <span className="text-red-400">*</span>
+                    </label>
                     <input
                       type="text"
                       value={biddingProjectTitle}
@@ -1246,7 +1627,11 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                       maxLength={500}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                     />
-                    {errors.biddingProjectTitle && <p className="text-[11px] text-red-400 mt-1">{errors.biddingProjectTitle}</p>}
+                    {errors.biddingProjectTitle && (
+                      <p className="text-[11px] text-red-400 mt-1">
+                        {errors.biddingProjectTitle}
+                      </p>
+                    )}
                   </div>
 
                   {/* Procuring Entity Details */}
@@ -1257,22 +1642,30 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">Entity Name</label>
+                        <label className="block text-slate-300 font-medium mb-1">
+                          Entity Name
+                        </label>
                         <input
                           type="text"
                           value={procuringEntityName}
-                          onChange={(e) => setProcuringEntityName(e.target.value)}
+                          onChange={(e) =>
+                            setProcuringEntityName(e.target.value)
+                          }
                           placeholder="e.g. Department of Information & Communications Technology"
                           className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">Contact Number</label>
+                        <label className="block text-slate-300 font-medium mb-1">
+                          Contact Number
+                        </label>
                         <input
                           type="text"
                           value={procuringEntityContactNumber}
-                          onChange={(e) => setProcuringEntityContactNumber(e.target.value)}
+                          onChange={(e) =>
+                            setProcuringEntityContactNumber(e.target.value)
+                          }
                           placeholder="+63 917 123 4567"
                           className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
                         />
@@ -1281,18 +1674,24 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">Email Address</label>
+                        <label className="block text-slate-300 font-medium mb-1">
+                          Email Address
+                        </label>
                         <input
                           type="email"
                           value={procuringEntityEmail}
-                          onChange={(e) => setProcuringEntityEmail(e.target.value)}
+                          onChange={(e) =>
+                            setProcuringEntityEmail(e.target.value)
+                          }
                           placeholder="bac_secretariat@dict.gov.ph"
                           className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">Area of Delivery</label>
+                        <label className="block text-slate-300 font-medium mb-1">
+                          Area of Delivery
+                        </label>
                         <input
                           type="text"
                           value={areaOfDelivery}
@@ -1311,18 +1710,24 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                         <input
                           type="text"
                           value={headOfProcuringEntity}
-                          onChange={(e) => setHeadOfProcuringEntity(e.target.value)}
+                          onChange={(e) =>
+                            setHeadOfProcuringEntity(e.target.value)
+                          }
                           placeholder="e.g. Engr. Melchor B. Valdez / Hon. Mayor Juan Doe"
                           className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">HoPE Official Position / Title</label>
+                        <label className="block text-slate-300 font-medium mb-1">
+                          HoPE Official Position / Title
+                        </label>
                         <input
                           type="text"
                           value={headOfProcuringEntityPosition}
-                          onChange={(e) => setHeadOfProcuringEntityPosition(e.target.value)}
+                          onChange={(e) =>
+                            setHeadOfProcuringEntityPosition(e.target.value)
+                          }
                           placeholder="e.g. District Engineer / Regional Director / City Mayor"
                           className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
                         />
@@ -1337,18 +1742,24 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                         <input
                           type="text"
                           value={procuringEntityContactPerson}
-                          onChange={(e) => setProcuringEntityContactPerson(e.target.value)}
+                          onChange={(e) =>
+                            setProcuringEntityContactPerson(e.target.value)
+                          }
                           placeholder="e.g. Engr. Maria A. Santos"
                           className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">BAC Officer Position</label>
+                        <label className="block text-slate-300 font-medium mb-1">
+                          BAC Officer Position
+                        </label>
                         <input
                           type="text"
                           value={procuringEntityPosition}
-                          onChange={(e) => setProcuringEntityPosition(e.target.value)}
+                          onChange={(e) =>
+                            setProcuringEntityPosition(e.target.value)
+                          }
                           placeholder="BAC Secretariat Head / Procurement Officer"
                           className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
                         />
@@ -1356,11 +1767,15 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">Address</label>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        Address
+                      </label>
                       <input
                         type="text"
                         value={procuringEntityAddress}
-                        onChange={(e) => setProcuringEntityAddress(e.target.value)}
+                        onChange={(e) =>
+                          setProcuringEntityAddress(e.target.value)
+                        }
                         placeholder="DICT Building, C.P. Garcia Ave., Diliman, Quezon City"
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                       />
@@ -1370,7 +1785,9 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   {/* Restored Dates: Created & Published */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">Date Created</label>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        Date Created
+                      </label>
                       <input
                         type="date"
                         value={dateCreated}
@@ -1380,7 +1797,9 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">Date Published</label>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        Date Published
+                      </label>
                       <input
                         type="date"
                         value={datePublished}
@@ -1393,28 +1812,42 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   {/* Pre-Bid & Deadline Datetime */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">Pre-Bid Conference Date & Time <span className="text-slate-500 font-mono text-[11px]">(Optional)</span></label>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        Pre-Bid Conference Date & Time{" "}
+                        <span className="text-slate-500 font-mono text-[11px]">
+                          (Optional)
+                        </span>
+                      </label>
                       <input
                         type="datetime-local"
                         value={preBidConferenceDatetime}
-                        onChange={(e) => setPreBidConferenceDatetime(e.target.value)}
+                        onChange={(e) =>
+                          setPreBidConferenceDatetime(e.target.value)
+                        }
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-medium mb-1">Submission Deadline Date & Time</label>
+                      <label className="block text-slate-300 font-medium mb-1">
+                        Submission Deadline Date & Time
+                      </label>
                       <input
                         type="datetime-local"
                         value={submissionDeadlineDatetime}
-                        onChange={(e) => setSubmissionDeadlineDatetime(e.target.value)}
+                        onChange={(e) =>
+                          setSubmissionDeadlineDatetime(e.target.value)
+                        }
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Approved Budget for Contract (ABC) <span className="text-red-400">*</span></label>
+                    <label className="block text-slate-300 font-medium mb-1">
+                      Approved Budget for Contract (ABC){" "}
+                      <span className="text-red-400">*</span>
+                    </label>
                     <input
                       type="text"
                       value={approvedBudgetStr}
@@ -1424,17 +1857,33 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                       required
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-blue-500"
                     />
-                    {errors.approvedBudget && <p className="text-[11px] text-red-400 mt-1">{errors.approvedBudget}</p>}
+                    {errors.approvedBudget && (
+                      <p className="text-[11px] text-red-400 mt-1">
+                        {errors.approvedBudget}
+                      </p>
+                    )}
                   </div>
 
                   {/* Main Notice PDF Upload */}
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">Official PhilGEPS PDF Notice Document (Max 100 MB) <span className="text-slate-500 font-mono text-[11px]">(Optional)</span></label>
+                    <label className="block text-slate-300 font-medium mb-1">
+                      Official PhilGEPS PDF Notice Document (Max 100 MB){" "}
+                      <span className="text-slate-500 font-mono text-[11px]">
+                        (Optional)
+                      </span>
+                    </label>
                     <div className="border-2 border-dashed border-slate-800 rounded-xl p-4 text-center hover:border-blue-500 transition cursor-pointer bg-slate-950">
                       <label className="cursor-pointer block space-y-1">
                         <FileText className="w-6 h-6 text-blue-400 mx-auto" />
-                        <p className="text-xs text-slate-300 font-semibold">{pdfFileName || 'Click to select PDF document'}</p>
-                        <input type="file" accept=".pdf" onChange={handlePdfUpload} className="hidden" />
+                        <p className="text-xs text-slate-300 font-semibold">
+                          {pdfFileName || "Click to select PDF document"}
+                        </p>
+                        <input
+                          type="file"
+                          accept=".pdf"
+                          onChange={handlePdfUpload}
+                          className="hidden"
+                        />
                       </label>
                     </div>
 
@@ -1442,7 +1891,13 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                       <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
                         <button
                           type="button"
-                          onClick={() => setPreviewPdfSlot({ title: 'Official PhilGEPS PDF Notice Document', fileName: pdfFileName || 'PhilGEPS_Notice.pdf', dataUrl: pdfFileDataUrl })}
+                          onClick={() =>
+                            setPreviewPdfSlot({
+                              title: "Official PhilGEPS PDF Notice Document",
+                              fileName: pdfFileName || "PhilGEPS_Notice.pdf",
+                              dataUrl: pdfFileDataUrl,
+                            })
+                          }
                           disabled={!pdfFileDataUrl}
                           className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed"
                         >
@@ -1450,10 +1905,17 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                         </button>
                         <button
                           type="button"
-                          onClick={() => downloadFile(pdfFileName || 'PhilGEPS_Notice.pdf', pdfFileDataUrl, pdfFile)}
+                          onClick={() =>
+                            downloadFile(
+                              pdfFileName || "PhilGEPS_Notice.pdf",
+                              pdfFileDataUrl,
+                              pdfFile,
+                            )
+                          }
                           className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold transition"
                         >
-                          <Download className="w-3.5 h-3.5 inline-block mr-1" /> Download
+                          <Download className="w-3.5 h-3.5 inline-block mr-1" />{" "}
+                          Download
                         </button>
                       </div>
                     )}
@@ -1466,27 +1928,51 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                         <Upload className="w-4 h-4 text-blue-400" />
                         Upload PDF Attachments During Creation / Edit
                       </h4>
-                      <span className="text-[10px] text-slate-400 font-mono">Max 100 MB per slot</span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        Max 100 MB per slot
+                      </span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {[
-                        { key: 'bidBulletin', label: 'Bid Bulletin' },
-                        { key: 'supplementalDocs', label: 'Bid Supplemental Docs' },
-                        { key: 'procuringEntityDocs', label: 'Procuring Entity Docs' },
-                        { key: 'receiptOfBidDocs', label: 'Receipt of Bid Docs' }
+                        { key: "bidBulletin", label: "Bid Bulletin" },
+                        {
+                          key: "supplementalDocs",
+                          label: "Bid Supplemental Docs",
+                        },
+                        {
+                          key: "procuringEntityDocs",
+                          label: "Procuring Entity Docs",
+                        },
+                        {
+                          key: "receiptOfBidDocs",
+                          label: "Receipt of Bid Docs",
+                        },
                       ].map((s) => {
-                        const slotKey = s.key as 'bidBulletin' | 'supplementalDocs' | 'procuringEntityDocs' | 'receiptOfBidDocs';
+                        const slotKey = s.key as
+                          | "bidBulletin"
+                          | "supplementalDocs"
+                          | "procuringEntityDocs"
+                          | "receiptOfBidDocs";
                         const att = draftPdfAttachments[slotKey];
 
                         return (
-                          <div key={s.key} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+                          <div
+                            key={s.key}
+                            className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2"
+                          >
                             <div className="min-w-0">
-                              <span className="font-semibold text-white text-[11px] block">{s.label}</span>
+                              <span className="font-semibold text-white text-[11px] block">
+                                {s.label}
+                              </span>
                               {att ? (
-                                <span className="text-[10px] text-blue-400 font-mono truncate block">{att.fileName}</span>
+                                <span className="text-[10px] text-blue-400 font-mono truncate block">
+                                  {att.fileName}
+                                </span>
                               ) : (
-                                <span className="text-[10px] text-slate-500 italic block">No PDF attached</span>
+                                <span className="text-[10px] text-slate-500 italic block">
+                                  No PDF attached
+                                </span>
                               )}
                             </div>
 
@@ -1495,7 +1981,13 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => setPreviewPdfSlot({ title: s.label, dataUrl: att.fileDataUrl, fileName: att.fileName })}
+                                    onClick={() =>
+                                      setPreviewPdfSlot({
+                                        title: s.label,
+                                        dataUrl: att.fileDataUrl,
+                                        fileName: att.fileName,
+                                      })
+                                    }
                                     className="px-2 py-1 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white text-[10px] font-bold transition flex items-center gap-0.5 border border-blue-500/30"
                                   >
                                     <Eye className="w-3 h-3" /> View
@@ -1503,7 +1995,12 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
                                   <button
                                     type="button"
-                                    onClick={() => downloadFile(att.fileName, att.fileDataUrl)}
+                                    onClick={() =>
+                                      downloadFile(
+                                        att.fileName,
+                                        att.fileDataUrl,
+                                      )
+                                    }
                                     className="px-2 py-1 rounded bg-slate-800 text-slate-200 hover:bg-slate-700 text-[10px] font-bold transition flex items-center gap-0.5 border border-slate-700/80"
                                   >
                                     <Download className="w-3 h-3" /> Download
@@ -1513,11 +2010,16 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
                               <label className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-bold transition cursor-pointer flex items-center gap-0.5">
                                 <Upload className="w-3 h-3 text-blue-400" />
-                                <span>{att ? 'Replace' : 'Upload'}</span>
+                                <span>{att ? "Replace" : "Upload"}</span>
                                 <input
                                   type="file"
                                   accept=".pdf"
-                                  onChange={(e) => handleDraftSlotUpload(slotKey, e.target.files?.[0])}
+                                  onChange={(e) =>
+                                    handleDraftSlotUpload(
+                                      slotKey,
+                                      e.target.files?.[0],
+                                    )
+                                  }
                                   className="hidden"
                                 />
                               </label>
@@ -1527,7 +2029,6 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                       })}
                     </div>
                   </div>
-
                 </div>
 
                 {/* Fixed Modal Action Buttons Footer */}
@@ -1542,29 +2043,38 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                   <button
                     type="submit"
                     className="px-5 py-2 rounded-xl text-xs font-semibold text-white shadow-xl transition flex items-center gap-1.5 hover:opacity-90 cursor-pointer"
-                    style={{ backgroundColor: currentTenant?.brandColor || '#1e40af' }}
+                    style={{
+                      backgroundColor: currentTenant?.brandColor || "#1e40af",
+                    }}
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>{editingItem ? 'Save Changes' : 'Create & Save Opportunity'}</span>
+                    <span>
+                      {editingItem
+                        ? "Save Changes"
+                        : "Create & Save Opportunity"}
+                    </span>
                   </button>
                 </div>
-
               </form>
-
             </div>
           </div>
         )}
 
         {/* CONFIRM DELETE MODAL */}
         {deletingItem && (
-          <div className="fixed inset-0 z-[150] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+          <div className="fixed inset-0 z-150 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
             <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl animate-scaleIn">
               <div className="flex items-center gap-3 text-red-400">
                 <AlertCircle className="w-6 h-6 shrink-0" />
-                <h3 className="text-base font-bold text-white">Delete Bidding Opportunity?</h3>
+                <h3 className="text-base font-bold text-white">
+                  Delete Bidding Opportunity?
+                </h3>
               </div>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Are you sure you want to permanently delete <strong className="text-white">{deletingItem.title}</strong> (Ref: {deletingItem.philgepsRefNo})? All linked PDF attachments will be permanently removed.
+                Are you sure you want to permanently delete{" "}
+                <strong className="text-white">{deletingItem.title}</strong>{" "}
+                (Ref: {deletingItem.philgepsRefNo})? All linked PDF attachments
+                will be permanently removed.
               </p>
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
@@ -1586,17 +2096,24 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
 
         {/* INLINE SLOT PDF PREVIEW MODAL (100% FULL SCREEN EDGE-TO-EDGE MODAL) */}
         {previewPdfSlot && (
-          <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col p-0 overflow-hidden animate-fadeIn">
+          <div className="fixed inset-0 z-200 bg-slate-950 flex flex-col p-0 overflow-hidden animate-fadeIn">
             <div className="bg-slate-900 border-none rounded-none w-full h-full shadow-none flex flex-col overflow-hidden">
               <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900 shrink-0 z-30 shadow-md">
                 <div className="flex items-center gap-2">
                   <FileText className="w-5 h-5 text-blue-400" />
-                  <h3 className="text-sm font-bold text-white">{previewPdfSlot.title} — {previewPdfSlot.fileName}</h3>
+                  <h3 className="text-sm font-bold text-white">
+                    {previewPdfSlot.title} — {previewPdfSlot.fileName}
+                  </h3>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => downloadFile(previewPdfSlot.fileName, previewPdfSlot.dataUrl)}
+                    onClick={() =>
+                      downloadFile(
+                        previewPdfSlot.fileName,
+                        previewPdfSlot.dataUrl,
+                      )
+                    }
                     className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow"
                   >
                     <Download className="w-4 h-4" />
@@ -1622,15 +2139,18 @@ export const OpportunityFinderView: React.FC<{ setActiveTab: (tab: string) => vo
                 ) : (
                   <div className="p-12 text-center text-slate-400 space-y-2">
                     <FileText className="w-12 h-12 text-blue-400 mx-auto opacity-70" />
-                    <p className="text-xs font-mono font-bold text-white">{previewPdfSlot.fileName}</p>
-                    <p className="text-xs text-slate-500">PDF Document Active in Opportunity Vault</p>
+                    <p className="text-xs font-mono font-bold text-white">
+                      {previewPdfSlot.fileName}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      PDF Document Active in Opportunity Vault
+                    </p>
                   </div>
                 )}
               </div>
             </div>
           </div>
         )}
-
       </div>
     </VaultErrorBoundary>
   );

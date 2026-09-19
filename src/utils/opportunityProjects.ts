@@ -1,4 +1,4 @@
-import { debugLog } from './debugLog';
+import { debugLog } from "./debugLog";
 
 export interface OpportunityProjectOption {
   id: string;
@@ -13,12 +13,16 @@ export interface OpportunityProjectOption {
   headOfProcuringEntityPosition?: string;
   location?: string;
   abc: string;
-  category?: 'Goods' | 'Infrastructure' | string;
+  category?: "Goods" | "Infrastructure" | string;
   dateTimeSubmitted: string;
 }
 
 // High-speed in-memory cache for ultra-fast zero-latency project lookups
-let oppCache: { tenantId?: string; data: OpportunityProjectOption[]; timestamp: number } | null = null;
+let oppCache: {
+  tenantId?: string;
+  data: OpportunityProjectOption[];
+  timestamp: number;
+} | null = null;
 const CACHE_TTL_MS = 2000;
 
 export const invalidateOpportunityProjectsCache = () => {
@@ -30,9 +34,15 @@ export const invalidateOpportunityProjectsCache = () => {
  * Scans tenant-scoped keys, un-scoped keys, and all bidocs_opportunities_* keys to ensure 100% project retrieval.
  * Strictly deduplicates projects by ID and Reference Number.
  */
-export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOption[] => {
+export const getOpportunityProjects = (
+  tenantId?: string,
+): OpportunityProjectOption[] => {
   const now = Date.now();
-  if (oppCache && oppCache.tenantId === tenantId && (now - oppCache.timestamp) < CACHE_TTL_MS) {
+  if (
+    oppCache &&
+    oppCache.tenantId === tenantId &&
+    now - oppCache.timestamp < CACHE_TTL_MS
+  ) {
     return oppCache.data;
   }
 
@@ -41,7 +51,9 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
 
     // 1. If tenantId is provided, load tenant-scoped opportunities strictly
     if (tenantId) {
-      const savedTenant = localStorage.getItem(`bidocs_opportunities_${tenantId}`);
+      const savedTenant = localStorage.getItem(
+        `bidocs_opportunities_${tenantId}`,
+      );
       if (savedTenant) {
         try {
           const parsed = JSON.parse(savedTenant);
@@ -52,7 +64,7 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
       }
       // If no tenant-specific items found, check legacy key
       if (rawItems.length === 0) {
-        const savedLegacy = localStorage.getItem('bidocs_opportunities');
+        const savedLegacy = localStorage.getItem("bidocs_opportunities");
         if (savedLegacy) {
           try {
             const parsed = JSON.parse(savedLegacy);
@@ -64,7 +76,7 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
       }
     } else {
       // 2. No tenantId provided: Load general legacy opportunities key
-      const savedLegacy = localStorage.getItem('bidocs_opportunities');
+      const savedLegacy = localStorage.getItem("bidocs_opportunities");
       if (savedLegacy) {
         try {
           const parsed = JSON.parse(savedLegacy);
@@ -77,7 +89,7 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
       // 3. Scan all keys starting with bidocs_opportunities only when no tenantId is specified
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith('bidocs_opportunities')) {
+        if (key && key.startsWith("bidocs_opportunities")) {
           const val = localStorage.getItem(key);
           if (val) {
             try {
@@ -92,74 +104,130 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
     }
 
     if (rawItems.length > 0) {
-      const rawList: OpportunityProjectOption[] = rawItems.map((item: any, idx: number) => {
-        const rawDateTime = item.submissionDeadlineDatetime || item.submissionDeadlineDate || item.submissionDeadline || item.dateSubmitted || '';
+      const rawList: OpportunityProjectOption[] = rawItems.map(
+        (item: any, idx: number) => {
+          const rawDateTime =
+            item.submissionDeadlineDatetime ||
+            item.submissionDeadlineDate ||
+            item.submissionDeadline ||
+            item.dateSubmitted ||
+            "";
 
-        let formattedDateTime = '';
-        if (rawDateTime) {
-          if (rawDateTime.includes('T')) {
-            formattedDateTime = rawDateTime.substring(0, 16);
-          } else if (rawDateTime.includes(' ')) {
-            formattedDateTime = rawDateTime.replace(' ', 'T').substring(0, 16);
+          let formattedDateTime = "";
+          if (rawDateTime) {
+            if (rawDateTime.includes("T")) {
+              formattedDateTime = rawDateTime.substring(0, 16);
+            } else if (rawDateTime.includes(" ")) {
+              formattedDateTime = rawDateTime
+                .replace(" ", "T")
+                .substring(0, 16);
+            } else {
+              const timePart =
+                item.submissionDeadlineTime || item.submissionTime || "14:00";
+              formattedDateTime = `${rawDateTime}T${timePart}`;
+            }
           } else {
-            const timePart = item.submissionDeadlineTime || item.submissionTime || '14:00';
-            formattedDateTime = `${rawDateTime}T${timePart}`;
+            const today = new Date().toISOString().split("T")[0];
+            formattedDateTime = `${today}T14:00`;
           }
-        } else {
-          const today = new Date().toISOString().split('T')[0];
-          formattedDateTime = `${today}T14:00`;
-        }
 
-        const projectAddress = item.deliveryLocation || item.location || item.areaOfDelivery || item.procuringEntityAddress || item.clientAddress || (typeof item.procuringEntity === 'string' ? item.procuringEntity : item.procuringEntity?.address) || '';
+          const projectAddress =
+            item.deliveryLocation ||
+            item.location ||
+            item.areaOfDelivery ||
+            item.procuringEntityAddress ||
+            item.clientAddress ||
+            (typeof item.procuringEntity === "string"
+              ? item.procuringEntity
+              : item.procuringEntity?.address) ||
+            "";
 
-        return {
-          id: item.id || `opp-stg-${idx}`,
-          refNo: item.philgepsRefNo || item.projectReferenceNumber || item.refNo || `PRJ-${idx + 1}`,
-          solicitationNo: item.solicitationNumber || item.solicitationNo || 'N/A',
-          title: item.title || item.biddingProjectTitle || 'Untitled Opportunity',
-          procuringEntity: typeof item.procuringEntity === 'string'
-            ? item.procuringEntity
-            : item.procuringEntity?.name || item.procuringEntityName || 'Government Agency',
-          procuringEntityAddress: projectAddress,
-          procuringEntityContactPerson: item.procuringEntityContactPerson || '',
-          procuringEntityPosition: item.procuringEntityPosition || '',
-          headOfProcuringEntity: item.headOfProcuringEntity || '',
-          headOfProcuringEntityPosition: item.headOfProcuringEntityPosition || '',
-          location: projectAddress,
-          abc: item.approvedBudgetStr || (item.approvedBudgetValue ? `₱${Number(item.approvedBudgetValue).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : (item.approvedBudget ? `₱${Number(item.approvedBudget).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '₱0.00')),
-          category: (() => {
-            const rawCat = (item.procurementType || item.projectType || item.category || item.classification || '').toString().toUpperCase();
-            
-            // 1. Primary Authority: Explicit procurement type or category from PhilGEPS / Opportunity Setup
-            if (rawCat.includes('INFRA') || rawCat.includes('CIVIL')) return 'Infrastructure';
-            if (rawCat.includes('CONSULT')) return 'Consulting';
-            if (rawCat.includes('GOOD')) return 'Goods';
+          return {
+            id: item.id || `opp-stg-${idx}`,
+            refNo:
+              item.philgepsRefNo ||
+              item.projectReferenceNumber ||
+              item.refNo ||
+              `PRJ-${idx + 1}`,
+            solicitationNo:
+              item.solicitationNumber || item.solicitationNo || "N/A",
+            title:
+              item.title || item.biddingProjectTitle || "Untitled Opportunity",
+            procuringEntity:
+              typeof item.procuringEntity === "string"
+                ? item.procuringEntity
+                : item.procuringEntity?.name ||
+                  item.procuringEntityName ||
+                  "Government Agency",
+            procuringEntityAddress: projectAddress,
+            procuringEntityContactPerson:
+              item.procuringEntityContactPerson || "",
+            procuringEntityPosition: item.procuringEntityPosition || "",
+            headOfProcuringEntity: item.headOfProcuringEntity || "",
+            headOfProcuringEntityPosition:
+              item.headOfProcuringEntityPosition || "",
+            location: projectAddress,
+            abc:
+              item.approvedBudgetStr ||
+              (item.approvedBudgetValue
+                ? `₱${Number(item.approvedBudgetValue).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                : item.approvedBudget
+                  ? `₱${Number(item.approvedBudget).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                  : "₱0.00"),
+            category: (() => {
+              const rawCat = (
+                item.procurementType ||
+                item.projectType ||
+                item.category ||
+                item.classification ||
+                ""
+              )
+                .toString()
+                .toUpperCase();
 
-            // 2. Fallback: Title or Reference Number inference if category was not explicitly specified
-            const titleLower = (item.title || item.biddingProjectTitle || '').toLowerCase();
-            const refUpper = (item.philgepsRefNo || item.refNo || '').toUpperCase();
+              // 1. Primary Authority: Explicit procurement type or category from PhilGEPS / Opportunity Setup
+              if (rawCat.includes("INFRA") || rawCat.includes("CIVIL"))
+                return "Infrastructure";
+              if (rawCat.includes("CONSULT")) return "Consulting";
+              if (rawCat.includes("GOOD")) return "Goods";
 
-            if (
-              refUpper.includes('INFRA') ||
-              titleLower.includes('construction') ||
-              titleLower.includes('civil works') ||
-              titleLower.includes('road opening') ||
-              titleLower.includes('drainage system') ||
-              titleLower.includes('building') ||
-              titleLower.includes('renovation') ||
-              titleLower.includes('rehabilitation')
-            ) {
-              return 'Infrastructure';
-            }
-            if (titleLower.includes('consult') || titleLower.includes('feasibility')) {
-              return 'Consulting';
-            }
+              // 2. Fallback: Title or Reference Number inference if category was not explicitly specified
+              const titleLower = (
+                item.title ||
+                item.biddingProjectTitle ||
+                ""
+              ).toLowerCase();
+              const refUpper = (
+                item.philgepsRefNo ||
+                item.refNo ||
+                ""
+              ).toUpperCase();
 
-            return 'Goods';
-          })(),
-          dateTimeSubmitted: formattedDateTime
-        };
-      });
+              if (
+                refUpper.includes("INFRA") ||
+                titleLower.includes("construction") ||
+                titleLower.includes("civil works") ||
+                titleLower.includes("road opening") ||
+                titleLower.includes("drainage system") ||
+                titleLower.includes("building") ||
+                titleLower.includes("renovation") ||
+                titleLower.includes("rehabilitation")
+              ) {
+                return "Infrastructure";
+              }
+              if (
+                titleLower.includes("consult") ||
+                titleLower.includes("feasibility")
+              ) {
+                return "Consulting";
+              }
+
+              return "Goods";
+            })(),
+            dateTimeSubmitted: formattedDateTime,
+          };
+        },
+      );
 
       // Strict Deduplication by ID & Reference Number
       const seenKeys = new Set<string>();
@@ -174,30 +242,40 @@ export const getOpportunityProjects = (tenantId?: string): OpportunityProjectOpt
       }
 
       // #region agent log
-      debugLog('opportunityProjects.ts:getOpportunityProjects', 'Project list resolved', {
-        tenantId: tenantId || null,
-        projectCount: uniqueProjects.length,
-        rawItemCount: rawItems.length
-      }, 'E');
+      debugLog(
+        "opportunityProjects.ts:getOpportunityProjects",
+        "Project list resolved",
+        {
+          tenantId: tenantId || null,
+          projectCount: uniqueProjects.length,
+          rawItemCount: rawItems.length,
+        },
+        "E",
+      );
       // #endregion
 
       oppCache = {
         tenantId,
         data: uniqueProjects,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       return uniqueProjects;
     }
   } catch (e) {
-    console.error('[OpportunityProjects] Error reading storage:', e);
+    console.error("[OpportunityProjects] Error reading storage:", e);
   }
 
   // #region agent log
-  debugLog('opportunityProjects.ts:getOpportunityProjects', 'Project list resolved', {
-    tenantId: tenantId || null,
-    projectCount: 0,
-    scannedAllTenants: !tenantId
-  }, 'E');
+  debugLog(
+    "opportunityProjects.ts:getOpportunityProjects",
+    "Project list resolved",
+    {
+      tenantId: tenantId || null,
+      projectCount: 0,
+      scannedAllTenants: !tenantId,
+    },
+    "E",
+  );
   // #endregion
 
   return [];
@@ -218,7 +296,7 @@ export interface ProjectMergeRecord {
 export const markProjectBidMergeDone = (
   tenantId: string,
   projectRefOrId: string,
-  details?: Partial<ProjectMergeRecord>
+  details?: Partial<ProjectMergeRecord>,
 ) => {
   if (!projectRefOrId) return;
   const cleanRef = projectRefOrId.trim();
@@ -227,18 +305,26 @@ export const markProjectBidMergeDone = (
     mergedAt: details?.mergedAt || new Date().toISOString(),
     fileName: details?.fileName,
     copiesCount: details?.copiesCount || 3,
-    completedBy: details?.completedBy || 'BiDOCS Merge Engine',
-    ...details
+    completedBy: details?.completedBy || "BiDOCS Merge Engine",
+    ...details,
   };
 
   try {
     if (tenantId) {
-      localStorage.setItem(`bidocs_merged_done_${tenantId}_${cleanRef}`, JSON.stringify(record));
+      localStorage.setItem(
+        `bidocs_merged_done_${tenantId}_${cleanRef}`,
+        JSON.stringify(record),
+      );
     }
-    localStorage.setItem(`bidocs_merged_done_${cleanRef}`, JSON.stringify(record));
+    localStorage.setItem(
+      `bidocs_merged_done_${cleanRef}`,
+      JSON.stringify(record),
+    );
 
     // Update merged project list for tenant
-    const listKey = tenantId ? `bidocs_merged_projects_list_${tenantId}` : 'bidocs_merged_projects_list';
+    const listKey = tenantId
+      ? `bidocs_merged_projects_list_${tenantId}`
+      : "bidocs_merged_projects_list";
     const rawList = localStorage.getItem(listKey);
     let list: string[] = [];
     if (rawList) {
@@ -251,7 +337,7 @@ export const markProjectBidMergeDone = (
       localStorage.setItem(listKey, JSON.stringify(list));
     }
   } catch (e) {
-    console.error('[OpportunityProjects] Error marking bid merge done:', e);
+    console.error("[OpportunityProjects] Error marking bid merge done:", e);
   }
 };
 
@@ -261,33 +347,50 @@ export const markProjectBidMergeDone = (
  */
 export const isProjectBidMergeDone = (
   tenantId: string,
-  project: { id?: string; projectReferenceNumber?: string; philgepsRefNo?: string; refNo?: string; status?: string }
+  project: {
+    id?: string;
+    projectReferenceNumber?: string;
+    philgepsRefNo?: string;
+    refNo?: string;
+    status?: string;
+  },
 ): boolean => {
   if (!project) return false;
-  if (project.status === 'AWARDED') return true;
+  if (project.status === "AWARDED") return true;
 
   const candidateRefs = [
     project.projectReferenceNumber,
     project.philgepsRefNo,
     project.refNo,
-    project.id
+    project.id,
   ].filter(Boolean) as string[];
 
   // 1. Check direct keys
   for (const ref of candidateRefs) {
-    if (tenantId && localStorage.getItem(`bidocs_merged_done_${tenantId}_${ref}`)) return true;
+    if (
+      tenantId &&
+      localStorage.getItem(`bidocs_merged_done_${tenantId}_${ref}`)
+    )
+      return true;
     if (localStorage.getItem(`bidocs_merged_done_${ref}`)) return true;
-    const winStatus = tenantId ? localStorage.getItem(`bidocs_project_win_status_${tenantId}_${ref}`) : null;
-    if (winStatus === 'WIN' || winStatus === 'WON') return true;
+    const winStatus = tenantId
+      ? localStorage.getItem(`bidocs_project_win_status_${tenantId}_${ref}`)
+      : null;
+    if (winStatus === "WIN" || winStatus === "WON") return true;
   }
 
   // 2. Check merged projects list
   try {
-    const listKey = tenantId ? `bidocs_merged_projects_list_${tenantId}` : 'bidocs_merged_projects_list';
+    const listKey = tenantId
+      ? `bidocs_merged_projects_list_${tenantId}`
+      : "bidocs_merged_projects_list";
     const rawList = localStorage.getItem(listKey);
     if (rawList) {
       const list: string[] = JSON.parse(rawList);
-      if (Array.isArray(list) && candidateRefs.some(ref => list.includes(ref))) {
+      if (
+        Array.isArray(list) &&
+        candidateRefs.some((ref) => list.includes(ref))
+      ) {
         return true;
       }
     }
@@ -298,8 +401,8 @@ export const isProjectBidMergeDone = (
 
 export interface DocumentApprovalRecord {
   recordId: string;
-  docType: 'POW' | 'QUOTATION' | 'BIDDING_PACKAGE';
-  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED';
+  docType: "TOR" | "POW" | "QUOTATION" | "BIDDING_PACKAGE";
+  status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED";
   submittedBy?: string;
   submittedByRole?: string;
   submittedAt?: string;
@@ -310,20 +413,20 @@ export interface DocumentApprovalRecord {
 }
 
 /**
- * Retrieves approval status for a POW, Quotation, or Bidding Package
+ * Retrieves approval status for a TOR, POW, Quotation, or Bidding Package
  */
 export const getDocumentApproval = (
   tenantId: string,
-  recordId: string
+  recordId: string,
 ): DocumentApprovalRecord | null => {
   if (!recordId) return null;
-  const cleanKey = recordId.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-  const tKey = tenantId || 'default';
+  const cleanKey = recordId.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+  const tKey = tenantId || "default";
   try {
     const raw = localStorage.getItem(`bidocs_approval_${tKey}_${cleanKey}`);
     if (raw) return JSON.parse(raw);
   } catch (e) {
-    console.error('[DocumentApproval] Error reading approval record:', e);
+    console.error("[DocumentApproval] Error reading approval record:", e);
   }
   return null;
 };
@@ -333,22 +436,24 @@ export const getDocumentApproval = (
  */
 export const saveDocumentApproval = (
   tenantId: string,
-  record: DocumentApprovalRecord
+  record: DocumentApprovalRecord,
 ): void => {
   if (!record.recordId) return;
-  const cleanKey = record.recordId.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-  const tKey = tenantId || 'default';
+  const cleanKey = record.recordId.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+  const tKey = tenantId || "default";
   try {
-    localStorage.setItem(`bidocs_approval_${tKey}_${cleanKey}`, JSON.stringify(record));
-    if (typeof window !== 'undefined') {
+    localStorage.setItem(
+      `bidocs_approval_${tKey}_${cleanKey}`,
+      JSON.stringify(record),
+    );
+    if (typeof window !== "undefined") {
       window.dispatchEvent(
-        new CustomEvent('bidocs:approval_updated', {
-          detail: { tenantId: tKey, record }
-        })
+        new CustomEvent("bidocs:approval_updated", {
+          detail: { tenantId: tKey, record },
+        }),
       );
     }
   } catch (e) {
-    console.error('[DocumentApproval] Error saving approval record:', e);
+    console.error("[DocumentApproval] Error saving approval record:", e);
   }
 };
-

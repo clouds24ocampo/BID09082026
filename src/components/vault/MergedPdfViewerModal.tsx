@@ -1,20 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { DocumentVaultItem, Tenant, isApproverRole, isPreparerRole, getRoleDisplayName } from '../../types';
-import { useAuth } from '../../context/AuthContext';
-import { DocumentCoverPage } from './DocumentCoverPage';
-import { exportMergedThreeLayerPdf, ExportDocumentUnit } from '../../utils/pdfExportEngine';
-import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
-import { loadPdfData } from '../../utils/vaultIndexedDB';
-import { 
-  markProjectBidMergeDone, 
-  getDocumentApproval, 
-  saveDocumentApproval, 
-  DocumentApprovalRecord 
-} from '../../utils/opportunityProjects';
-import ApprovalGateModal from '../common/ApprovalGateModal';
-import { 
-  X, 
-  CheckCircle2, 
+import React, { useState, useEffect } from "react";
+import {
+  DocumentVaultItem,
+  Tenant,
+  isApproverRole,
+  isPreparerRole,
+  getRoleDisplayName,
+} from "../../types";
+import { useAuth } from "../../context/AuthContext";
+import { DocumentCoverPage } from "./DocumentCoverPage";
+import {
+  exportMergedThreeLayerPdf,
+  ExportDocumentUnit,
+} from "../../utils/pdfExportEngine";
+import { resolveDocumentPdfAttachment } from "../../utils/systemDocumentPdfGenerator";
+import { loadPdfData } from "../../utils/vaultIndexedDB";
+import {
+  markProjectBidMergeDone,
+  getDocumentApproval,
+  saveDocumentApproval,
+  DocumentApprovalRecord,
+} from "../../utils/opportunityProjects";
+import ApprovalGateModal from "../common/ApprovalGateModal";
+import {
+  X,
+  CheckCircle2,
   GripVertical,
   ShieldCheck,
   Download,
@@ -26,8 +35,8 @@ import {
   ArrowDown,
   Lock,
   Clock,
-  ArrowRight
-} from 'lucide-react';
+  ArrowRight,
+} from "lucide-react";
 
 interface MergedPdfViewerModalProps {
   selectedItems: DocumentVaultItem[];
@@ -40,84 +49,99 @@ interface MergedPdfViewerModalProps {
   vaultDocs?: DocumentVaultItem[];
 }
 
-export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({ 
-  selectedItems, 
-  tenant, 
+export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
+  selectedItems,
+  tenant,
   onClose,
   activeProject,
-  projectRefNo = '',
-  projectTitle = '',
-  procuringEntity = '',
-  vaultDocs = []
+  projectRefNo = "",
+  projectTitle = "",
+  procuringEntity = "",
+  vaultDocs = [],
 }) => {
   // Bundle Organization State: Record of bundleId -> DocumentVaultItem[]
   const [bundles, setBundles] = useState<Record<string, DocumentVaultItem[]>>({
-    'Bundle 1': selectedItems,
-    'Bundle 2': [],
-    'Bundle 3': []
+    "Bundle 1": selectedItems,
+    "Bundle 2": [],
+    "Bundle 3": [],
   });
 
-  const [activeBundle, setActiveBundle] = useState<string>('Bundle 1');
-  const [activeTab, setActiveTab] = useState<'ORGANIZER' | 'PREVIEW'>('ORGANIZER');
+  const [activeBundle, setActiveBundle] = useState<string>("Bundle 1");
+  const [activeTab, setActiveTab] = useState<"ORGANIZER" | "PREVIEW">(
+    "ORGANIZER",
+  );
   const [resolvedPdfs, setResolvedPdfs] = useState<Record<string, string>>({});
   const [isResolving, setIsResolving] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
-  const [statusText, setStatusText] = useState<string>('');
+  const [statusText, setStatusText] = useState<string>("");
 
   const { currentUser } = useAuth();
-  const [approvalRecord, setApprovalRecord] = useState<DocumentApprovalRecord | null>(null);
-  const [showApprovalGateModal, setShowApprovalGateModal] = useState<boolean>(false);
+  const [approvalRecord, setApprovalRecord] =
+    useState<DocumentApprovalRecord | null>(null);
+  const [showApprovalGateModal, setShowApprovalGateModal] =
+    useState<boolean>(false);
 
-  const activeRef = (selectedItems[0]?.philgepsRefNo || projectRefNo || 'PACKAGE').replace(/[^a-zA-Z0-9]/g, '_');
+  const activeRef = (
+    selectedItems[0]?.philgepsRefNo ||
+    projectRefNo ||
+    "PACKAGE"
+  ).replace(/[^a-zA-Z0-9]/g, "_");
 
   useEffect(() => {
-    const rec = getDocumentApproval(tenant?.id || '', activeRef);
+    const rec = getDocumentApproval(tenant?.id || "", activeRef);
     setApprovalRecord(rec);
   }, [tenant?.id, activeRef]);
 
   const handleSubmitForApproval = () => {
-    const nowStr = new Date().toLocaleString('en-PH');
-    const subName = currentUser?.fullName || 'Technical Estimator';
-    const subRole = currentUser?.role ? getRoleDisplayName(currentUser.role) : 'Bid Manager';
+    const nowStr = new Date().toLocaleString("en-PH");
+    const subName = currentUser?.fullName || "Technical Estimator";
+    const subRole = currentUser?.role
+      ? getRoleDisplayName(currentUser.role)
+      : "Bid Manager";
     const rec: DocumentApprovalRecord = {
       recordId: activeRef,
-      docType: 'BIDDING_PACKAGE',
-      status: 'PENDING_APPROVAL',
+      docType: "BIDDING_PACKAGE",
+      status: "PENDING_APPROVAL",
       submittedBy: subName,
       submittedByRole: subRole,
-      submittedAt: nowStr
+      submittedAt: nowStr,
     };
-    saveDocumentApproval(tenant?.id || '', rec);
+    saveDocumentApproval(tenant?.id || "", rec);
     setApprovalRecord(rec);
   };
 
   const handleApprovePackage = (notes?: string) => {
-    const nowStr = new Date().toLocaleString('en-PH');
-    const appName = currentUser?.fullName || tenant?.authorizedSignatory?.name || 'Company Owner';
-    const appRole = currentUser?.role ? getRoleDisplayName(currentUser.role) : 'Company Owner';
+    const nowStr = new Date().toLocaleString("en-PH");
+    const appName =
+      currentUser?.fullName ||
+      tenant?.authorizedSignatory?.name ||
+      "Company Owner";
+    const appRole = currentUser?.role
+      ? getRoleDisplayName(currentUser.role)
+      : "Company Owner";
     const rec: DocumentApprovalRecord = {
       recordId: activeRef,
-      docType: 'BIDDING_PACKAGE',
-      status: 'APPROVED',
-      submittedBy: approvalRecord?.submittedBy || 'Estimator',
-      submittedByRole: approvalRecord?.submittedByRole || 'Bid Manager',
+      docType: "BIDDING_PACKAGE",
+      status: "APPROVED",
+      submittedBy: approvalRecord?.submittedBy || "Estimator",
+      submittedByRole: approvalRecord?.submittedByRole || "Bid Manager",
       submittedAt: approvalRecord?.submittedAt,
       approvedBy: appName,
       approvedByRole: appRole,
       approvedAt: nowStr,
-      notes: notes || approvalRecord?.notes
+      notes: notes || approvalRecord?.notes,
     };
-    saveDocumentApproval(tenant?.id || '', rec);
+    saveDocumentApproval(tenant?.id || "", rec);
     setApprovalRecord(rec);
   };
 
   const handleRevertToDraft = () => {
     const rec: DocumentApprovalRecord = {
       recordId: activeRef,
-      docType: 'BIDDING_PACKAGE',
-      status: 'DRAFT'
+      docType: "BIDDING_PACKAGE",
+      status: "DRAFT",
     };
-    saveDocumentApproval(tenant?.id || '', rec);
+    saveDocumentApproval(tenant?.id || "", rec);
     setApprovalRecord(rec);
   };
 
@@ -148,17 +172,22 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
             const resolved = await resolveDocumentPdfAttachment(item as any, {
               tenant,
               activeProject,
-              projectRefNo: projectRefNo || item.philgepsRefNo || item.documentNumber || '',
-              projectTitle: projectTitle || item.projectTitle || '',
-              procuringEntity: procuringEntity || (item as any).procuringEntity || '',
-              vaultDocs: vaultDocs.length > 0 ? vaultDocs : selectedItems
+              projectRefNo:
+                projectRefNo || item.philgepsRefNo || item.documentNumber || "",
+              projectTitle: projectTitle || item.projectTitle || "",
+              procuringEntity:
+                procuringEntity || (item as any).procuringEntity || "",
+              vaultDocs: vaultDocs.length > 0 ? vaultDocs : selectedItems,
             });
 
             if (resolved) {
               newResolved[item.id] = resolved;
             }
           } catch (err) {
-            console.warn(`[MergedPdfViewerModal] Error resolving doc ${item.documentName}:`, err);
+            console.warn(
+              `[MergedPdfViewerModal] Error resolving doc ${item.documentName}:`,
+              err,
+            );
           }
         }
       }
@@ -170,31 +199,41 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
     };
 
     resolveAllItems();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [selectedItems, tenant, projectRefNo, projectTitle]);
 
-  const moveItemInBundle = (bundleName: string, index: number, direction: 'UP' | 'DOWN') => {
+  const moveItemInBundle = (
+    bundleName: string,
+    index: number,
+    direction: "UP" | "DOWN",
+  ) => {
     const list = [...(bundles[bundleName] || [])];
-    if (direction === 'UP' && index === 0) return;
-    if (direction === 'DOWN' && index === list.length - 1) return;
+    if (direction === "UP" && index === 0) return;
+    if (direction === "DOWN" && index === list.length - 1) return;
 
-    const targetIndex = direction === 'UP' ? index - 1 : index + 1;
+    const targetIndex = direction === "UP" ? index - 1 : index + 1;
     const temp = list[index];
     list[index] = list[targetIndex];
     list[targetIndex] = temp;
 
-    setBundles(prev => ({ ...prev, [bundleName]: list }));
+    setBundles((prev) => ({ ...prev, [bundleName]: list }));
   };
 
-  const moveItemToBundle = (item: DocumentVaultItem, fromBundle: string, toBundle: string) => {
+  const moveItemToBundle = (
+    item: DocumentVaultItem,
+    fromBundle: string,
+    toBundle: string,
+  ) => {
     if (fromBundle === toBundle) return;
-    setBundles(prev => {
-      const fromList = (prev[fromBundle] || []).filter(i => i.id !== item.id);
+    setBundles((prev) => {
+      const fromList = (prev[fromBundle] || []).filter((i) => i.id !== item.id);
       const toList = [...(prev[toBundle] || []), item];
       return {
         ...prev,
         [fromBundle]: fromList,
-        [toBundle]: toList
+        [toBundle]: toList,
       };
     });
   };
@@ -202,12 +241,15 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
   const addNewBundle = () => {
     const nextNum = Object.keys(bundles).length + 1;
     const newName = `Bundle ${nextNum}`;
-    setBundles(prev => ({ ...prev, [newName]: [] }));
+    setBundles((prev) => ({ ...prev, [newName]: [] }));
     setActiveBundle(newName);
   };
 
   const handlePrintBundle = () => {
-    if (isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED') {
+    if (
+      isPreparerRole(currentUser?.role) &&
+      approvalRecord?.status !== "APPROVED"
+    ) {
       setShowApprovalGateModal(true);
       return;
     }
@@ -215,7 +257,10 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
   };
 
   const handleExportBundle = async () => {
-    if (isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED') {
+    if (
+      isPreparerRole(currentUser?.role) &&
+      approvalRecord?.status !== "APPROVED"
+    ) {
       setShowApprovalGateModal(true);
       return;
     }
@@ -223,7 +268,9 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
     if (items.length === 0) return;
 
     setIsExporting(true);
-    setStatusText(`Resolving & preparing ${items.length} document attachments...`);
+    setStatusText(
+      `Resolving & preparing ${items.length} document attachments...`,
+    );
 
     try {
       // Resolve attachments for all bundle items in parallel
@@ -239,55 +286,68 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
           return await resolveDocumentPdfAttachment(doc as any, {
             tenant,
             activeProject,
-            projectRefNo: projectRefNo || doc.philgepsRefNo || doc.documentNumber || '',
-            projectTitle: projectTitle || doc.projectTitle || '',
-            procuringEntity: procuringEntity || (doc as any).procuringEntity || '',
-            vaultDocs: vaultDocs.length > 0 ? vaultDocs : selectedItems
+            projectRefNo:
+              projectRefNo || doc.philgepsRefNo || doc.documentNumber || "",
+            projectTitle: projectTitle || doc.projectTitle || "",
+            procuringEntity:
+              procuringEntity || (doc as any).procuringEntity || "",
+            vaultDocs: vaultDocs.length > 0 ? vaultDocs : selectedItems,
           });
-        })
+        }),
       );
 
       // Use dedicated off-screen cover elements by ID (avoids grabbing wrong elements)
       const units: ExportDocumentUnit[] = items.map((doc, idx) => {
-        const coverEl = document.getElementById(`bundle-cover-${doc.id}`) as HTMLElement | null;
+        const coverEl = document.getElementById(
+          `bundle-cover-${doc.id}`,
+        ) as HTMLElement | null;
         return {
           title: doc.documentName,
           coverElement: coverEl || null,
           fileDataUrl: resolvedList[idx] || null,
           documentName: doc.documentName,
           documentCode: doc.documentCode || (doc as any).code,
-          fileName: (doc as any).fileName
+          fileName: (doc as any).fileName,
         };
       });
 
-      setStatusText(`Compiling ${units.length} document streams with "Page X of Y" pagination...`);
+      setStatusText(
+        `Compiling ${units.length} document streams with "Page X of Y" pagination...`,
+      );
 
-      const today = new Date().toISOString().split('T')[0];
-      const activeRef = (items[0]?.philgepsRefNo || projectRefNo || 'PACKAGE').replace(/[^a-zA-Z0-9]/g, '_');
-      const fileName = `${activeRef}_${activeBundle.replace(/\s+/g, '_')}_${today}.pdf`;
+      const today = new Date().toISOString().split("T")[0];
+      const activeRef = (
+        items[0]?.philgepsRefNo ||
+        projectRefNo ||
+        "PACKAGE"
+      ).replace(/[^a-zA-Z0-9]/g, "_");
+      const fileName = `${activeRef}_${activeBundle.replace(/\s+/g, "_")}_${today}.pdf`;
 
       await exportMergedThreeLayerPdf(units, fileName, undefined, {
         companyName: tenant?.companyName,
         signatoryName: tenant?.authorizedSignatory?.name,
         signatoryTitle: tenant?.authorizedSignatory?.title,
         projectRefNo: projectRefNo || items[0]?.philgepsRefNo,
-        projectTitle: projectTitle || items[0]?.projectTitle
+        projectTitle: projectTitle || items[0]?.projectTitle,
       });
-      setStatusText('Package Merged Successfully!');
+      setStatusText("Package Merged Successfully!");
 
       if (tenant?.id && activeRef) {
         markProjectBidMergeDone(tenant.id, activeRef, {
           fileName,
-          completedBy: tenant.authorizedSignatory?.name || 'BiDOCS Bundle Organizer'
+          completedBy:
+            tenant.authorizedSignatory?.name || "BiDOCS Bundle Organizer",
         });
       }
     } catch (err) {
-      console.error('Error exporting merged bundle:', err);
-      alert('An error occurred while compiling the merged package. Please try again.');
+      console.error("Error exporting merged bundle:", err);
+      alert(
+        "An error occurred while compiling the merged package. Please try again.",
+      );
     } finally {
       setTimeout(() => {
         setIsExporting(false);
-        setStatusText('');
+        setStatusText("");
       }, 1500);
     }
   };
@@ -297,7 +357,6 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl overflow-hidden shadow-2xl animate-scaleIn my-auto max-h-[95vh] flex flex-col">
-        
         {/* Modal Header */}
         <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/95 sticky top-0 z-20 shrink-0">
           <div className="flex items-center gap-3">
@@ -309,7 +368,9 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
                 <span>Document Bundle Organizer & Merged PDF Compiler</span>
               </h3>
               <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                Organize documents into bundles, set custom order, and compile into Legal (8.5" × 13") merged PDF packages with attached document streams.
+                Organize documents into bundles, set custom order, and compile
+                into Legal (8.5" × 13") merged PDF packages with attached
+                document streams.
               </p>
             </div>
           </div>
@@ -317,17 +378,21 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
           <div className="flex items-center gap-2">
             <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
               <button
-                onClick={() => setActiveTab('ORGANIZER')}
+                onClick={() => setActiveTab("ORGANIZER")}
                 className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${
-                  activeTab === 'ORGANIZER' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                  activeTab === "ORGANIZER"
+                    ? "bg-blue-600 text-white"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
                 Bundle Organizer
               </button>
               <button
-                onClick={() => setActiveTab('PREVIEW')}
+                onClick={() => setActiveTab("PREVIEW")}
                 className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${
-                  activeTab === 'PREVIEW' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                  activeTab === "PREVIEW"
+                    ? "bg-blue-600 text-white"
+                    : "text-slate-400 hover:text-white"
                 }`}
               >
                 Preview Merged {activeBundle}
@@ -336,19 +401,23 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
 
             {/* Approval Status Badge & Executive Controls */}
             <div className="flex items-center gap-2 mr-1">
-              <span className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold uppercase tracking-wider border flex items-center gap-1.5 ${
-                approvalRecord?.status === 'APPROVED'
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                  : approvalRecord?.status === 'PENDING_APPROVAL'
-                  ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-              }`}>
-                {approvalRecord?.status === 'APPROVED' ? (
+              <span
+                className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold uppercase tracking-wider border flex items-center gap-1.5 ${
+                  approvalRecord?.status === "APPROVED"
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                    : approvalRecord?.status === "PENDING_APPROVAL"
+                      ? "bg-blue-500/20 text-blue-300 border-blue-500/40"
+                      : "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                }`}
+              >
+                {approvalRecord?.status === "APPROVED" ? (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>APPROVED ({approvalRecord.approvedBy || 'Owner'})</span>
+                    <span>
+                      APPROVED ({approvalRecord.approvedBy || "Owner"})
+                    </span>
                   </>
-                ) : approvalRecord?.status === 'PENDING_APPROVAL' ? (
+                ) : approvalRecord?.status === "PENDING_APPROVAL" ? (
                   <>
                     <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
                     <span>PENDING APPROVAL</span>
@@ -362,7 +431,7 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
               </span>
 
               {isApproverRole(currentUser?.role) ? (
-                approvalRecord?.status !== 'APPROVED' ? (
+                approvalRecord?.status !== "APPROVED" ? (
                   <button
                     type="button"
                     onClick={() => handleApprovePackage()}
@@ -383,7 +452,7 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
                   </button>
                 )
               ) : (
-                approvalRecord?.status === 'DRAFT' && (
+                approvalRecord?.status === "DRAFT" && (
                   <button
                     type="button"
                     onClick={handleSubmitForApproval}
@@ -401,54 +470,69 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
               onClick={handleExportBundle}
               disabled={isExporting}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold text-white transition shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
-                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
-                  ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40'
-                  : 'bg-emerald-600 hover:bg-emerald-500'
+                isPreparerRole(currentUser?.role) &&
+                approvalRecord?.status !== "APPROVED"
+                  ? "bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40"
+                  : "bg-emerald-600 hover:bg-emerald-500"
               }`}
               title={
-                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
-                  ? 'Owner approval required before exporting'
+                isPreparerRole(currentUser?.role) &&
+                approvalRecord?.status !== "APPROVED"
+                  ? "Owner approval required before exporting"
                   : `Export ${activeBundle} to PDF`
               }
             >
               {isExporting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
-              ) : isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? (
+              ) : isPreparerRole(currentUser?.role) &&
+                approvalRecord?.status !== "APPROVED" ? (
                 <Lock className="w-4 h-4 text-amber-400" />
               ) : (
                 <Download className="w-4 h-4" />
               )}
               <span>
-                {isExporting ? 'Compiling...' : `Export ${activeBundle} to PDF`}
-                {isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? ' 🔒' : ''}
+                {isExporting ? "Compiling..." : `Export ${activeBundle} to PDF`}
+                {isPreparerRole(currentUser?.role) &&
+                approvalRecord?.status !== "APPROVED"
+                  ? " 🔒"
+                  : ""}
               </span>
             </button>
 
             <button
               onClick={handlePrintBundle}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold text-white transition shadow flex items-center gap-1.5 cursor-pointer ${
-                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
-                  ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40'
-                  : 'bg-blue-600 hover:bg-blue-500'
+                isPreparerRole(currentUser?.role) &&
+                approvalRecord?.status !== "APPROVED"
+                  ? "bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40"
+                  : "bg-blue-600 hover:bg-blue-500"
               }`}
               title={
-                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
-                  ? 'Owner approval required before printing'
+                isPreparerRole(currentUser?.role) &&
+                approvalRecord?.status !== "APPROVED"
+                  ? "Owner approval required before printing"
                   : `Print ${activeBundle}`
               }
             >
-              {isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? (
+              {isPreparerRole(currentUser?.role) &&
+              approvalRecord?.status !== "APPROVED" ? (
                 <Lock className="w-4 h-4 text-amber-400" />
               ) : (
                 <Printer className="w-4 h-4" />
               )}
               <span>
                 Print {activeBundle}
-                {isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? ' 🔒' : ''}
+                {isPreparerRole(currentUser?.role) &&
+                approvalRecord?.status !== "APPROVED"
+                  ? " 🔒"
+                  : ""}
               </span>
             </button>
 
-            <button onClick={onClose} className="p-2 text-slate-400 hover:text-white cursor-pointer">
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-white cursor-pointer"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -462,9 +546,9 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
                 key={bName}
                 onClick={() => setActiveBundle(bName)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold font-mono transition flex items-center gap-2 cursor-pointer ${
-                  activeBundle === bName 
-                    ? 'bg-blue-600 text-white shadow-md border border-blue-400' 
-                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  activeBundle === bName
+                    ? "bg-blue-600 text-white shadow-md border border-blue-400"
+                    : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
                 }`}
               >
                 <span>{bName}</span>
@@ -491,26 +575,44 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
               </span>
             )}
             <span className="text-slate-400 text-xs font-mono shrink-0">
-              Active Bundle: <strong className="text-white">{activeBundle}</strong> ({currentBundleItems.length} Docs)
+              Active Bundle:{" "}
+              <strong className="text-white">{activeBundle}</strong> (
+              {currentBundleItems.length} Docs)
             </span>
           </div>
         </div>
 
         {/* TAB 1: BUNDLE ORGANIZER & REORDERING */}
-        {activeTab === 'ORGANIZER' && (
+        {activeTab === "ORGANIZER" && (
           <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-4">
             <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <GripVertical className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>Assign documents to <strong className="text-white font-mono">Bundle 1, Bundle 2, or Bundle 3</strong> and set the exact compilation order using the <strong className="text-white font-mono">Move Up / Move Down</strong> controls. Each document prepends a Legal (8.5" × 13") Front Cover Page followed by its full document body.</span>
+                <span>
+                  Assign documents to{" "}
+                  <strong className="text-white font-mono">
+                    Bundle 1, Bundle 2, or Bundle 3
+                  </strong>{" "}
+                  and set the exact compilation order using the{" "}
+                  <strong className="text-white font-mono">
+                    Move Up / Move Down
+                  </strong>{" "}
+                  controls. Each document prepends a Legal (8.5" × 13") Front
+                  Cover Page followed by its full document body.
+                </span>
               </div>
             </div>
 
             {currentBundleItems.length === 0 ? (
               <div className="p-12 text-center border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/50 space-y-2">
                 <Layers className="w-10 h-10 text-slate-600 mx-auto" />
-                <h4 className="text-sm font-bold text-white">No documents assigned to {activeBundle}</h4>
-                <p className="text-xs text-slate-400">Select another bundle or move documents into {activeBundle} using the dropdown selectors below.</p>
+                <h4 className="text-sm font-bold text-white">
+                  No documents assigned to {activeBundle}
+                </h4>
+                <p className="text-xs text-slate-400">
+                  Select another bundle or move documents into {activeBundle}{" "}
+                  using the dropdown selectors below.
+                </p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -518,7 +620,7 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
                   const isReady = !!(resolvedPdfs[doc.id] || doc.fileDataUrl);
 
                   return (
-                    <div 
+                    <div
                       key={doc.id}
                       className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-4 text-xs hover:border-slate-700 transition"
                     >
@@ -528,7 +630,9 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
                         </span>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-white text-sm">{doc.documentName}</h4>
+                            <h4 className="font-bold text-white text-sm">
+                              {doc.documentName}
+                            </h4>
                             {isReady ? (
                               <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold flex items-center gap-1">
                                 <CheckCircle2 className="w-2.5 h-2.5" />
@@ -542,8 +646,11 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
                             )}
                           </div>
                           <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                            {doc.documentNumber ? `No: ${doc.documentNumber} • ` : ''}
-                            Category: {doc.category.replace('_', ' ')} • Cover Page + Full Document Stream Attached
+                            {doc.documentNumber
+                              ? `No: ${doc.documentNumber} • `
+                              : ""}
+                            Category: {doc.category.replace("_", " ")} • Cover
+                            Page + Full Document Stream Attached
                           </p>
                         </div>
                       </div>
@@ -551,14 +658,24 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
                       <div className="flex items-center gap-3">
                         {/* Bundle Assign Dropdown */}
                         <div className="flex items-center gap-1">
-                          <span className="text-[11px] text-slate-500 font-mono">Move to:</span>
+                          <span className="text-[11px] text-slate-500 font-mono">
+                            Move to:
+                          </span>
                           <select
                             value={activeBundle}
-                            onChange={(e) => moveItemToBundle(doc, activeBundle, e.target.value)}
+                            onChange={(e) =>
+                              moveItemToBundle(
+                                doc,
+                                activeBundle,
+                                e.target.value,
+                              )
+                            }
                             className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 text-xs font-mono focus:outline-none focus:border-blue-500 cursor-pointer"
                           >
                             {Object.keys(bundles).map((b) => (
-                              <option key={b} value={b}>{b}</option>
+                              <option key={b} value={b}>
+                                {b}
+                              </option>
                             ))}
                           </select>
                         </div>
@@ -566,12 +683,14 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
                         {/* Move Up / Move Down Sequence Controls */}
                         <div className="flex items-center gap-1">
                           <button
-                            onClick={() => moveItemInBundle(activeBundle, idx, 'UP')}
+                            onClick={() =>
+                              moveItemInBundle(activeBundle, idx, "UP")
+                            }
                             disabled={idx === 0}
                             className={`p-2 rounded-lg border transition cursor-pointer ${
-                              idx === 0 
-                                ? 'bg-slate-950 text-slate-700 border-slate-900 cursor-not-allowed' 
-                                : 'bg-slate-800 text-slate-200 hover:bg-slate-700 border-slate-700'
+                              idx === 0
+                                ? "bg-slate-950 text-slate-700 border-slate-900 cursor-not-allowed"
+                                : "bg-slate-800 text-slate-200 hover:bg-slate-700 border-slate-700"
                             }`}
                             title="Move Up in Sequence"
                           >
@@ -579,12 +698,14 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
                           </button>
 
                           <button
-                            onClick={() => moveItemInBundle(activeBundle, idx, 'DOWN')}
+                            onClick={() =>
+                              moveItemInBundle(activeBundle, idx, "DOWN")
+                            }
                             disabled={idx === currentBundleItems.length - 1}
                             className={`p-2 rounded-lg border transition cursor-pointer ${
-                              idx === currentBundleItems.length - 1 
-                                ? 'bg-slate-950 text-slate-700 border-slate-900 cursor-not-allowed' 
-                                : 'bg-slate-800 text-slate-200 hover:bg-slate-700 border-slate-700'
+                              idx === currentBundleItems.length - 1
+                                ? "bg-slate-950 text-slate-700 border-slate-900 cursor-not-allowed"
+                                : "bg-slate-800 text-slate-200 hover:bg-slate-700 border-slate-700"
                             }`}
                             title="Move Down in Sequence"
                           >
@@ -600,10 +721,12 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
 
             <div className="pt-4 text-right">
               <button
-                onClick={() => setActiveTab('PREVIEW')}
+                onClick={() => setActiveTab("PREVIEW")}
                 disabled={currentBundleItems.length === 0}
                 className={`px-5 py-2.5 rounded-xl text-xs font-semibold text-white transition shadow-xl cursor-pointer ${
-                  currentBundleItems.length === 0 ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500'
+                  currentBundleItems.length === 0
+                    ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-500"
                 }`}
               >
                 Proceed to Preview Merged {activeBundle} →
@@ -613,41 +736,59 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
         )}
 
         {/* TAB 2: PREVIEW MERGED PACKAGE FOR ACTIVE BUNDLE */}
-        {activeTab === 'PREVIEW' && (
+        {activeTab === "PREVIEW" && (
           <div className="p-6 overflow-y-auto flex-1 bg-slate-950 space-y-12 text-center">
             {currentBundleItems.map((doc, idx) => {
               const pdfUrl = resolvedPdfs[doc.id] || doc.fileDataUrl;
 
               return (
-                <div key={doc.id} className="space-y-6 max-w-[1180px] mx-auto border-b-2 border-slate-800 pb-12">
+                <div
+                  key={doc.id}
+                  className="space-y-6 max-w-295 mx-auto border-b-2 border-slate-800 pb-12"
+                >
                   <div className="inline-flex items-center gap-2 text-xs font-mono font-bold text-blue-400 bg-blue-900/40 px-4 py-1.5 rounded-full border border-blue-500/30">
-                    <span>{activeBundle.toUpperCase()} — DOCUMENT #{idx + 1}: {doc.documentName}</span>
+                    <span>
+                      {activeBundle.toUpperCase()} — DOCUMENT #{idx + 1}:{" "}
+                      {doc.documentName}
+                    </span>
                   </div>
-                  
+
                   {/* Page 1: Front Cover Page (Legal 13" x 8.5") */}
-                  <DocumentCoverPage item={doc} tenant={tenant} folderCopy={activeBundle} incrementNumber={idx + 1} />
+                  <DocumentCoverPage
+                    item={doc}
+                    tenant={tenant}
+                    folderCopy={activeBundle}
+                    incrementNumber={idx + 1}
+                  />
 
                   {/* Page 2+: Content Page (Legal 13" x 8.5" Fit-to-Page) */}
                   <div className="space-y-2 pt-2">
                     <div className="text-[11px] font-mono text-slate-400 flex items-center justify-center gap-2">
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>ATTACHED DOCUMENT CONTENT STREAM — Legal (8.5" × 13") Vector Fit</span>
+                      <span>
+                        ATTACHED DOCUMENT CONTENT STREAM — Legal (8.5" × 13")
+                        Vector Fit
+                      </span>
                     </div>
                     {pdfUrl ? (
-                      <div className="single-page-paper w-full min-h-[760px] aspect-[13/8.5] rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-900 shadow-2xl mx-auto p-2">
+                      <div className="single-page-paper w-full min-h-190 aspect-13/8.5 rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-900 shadow-2xl mx-auto p-2">
                         <iframe
                           src={`${pdfUrl}#toolbar=1&navpanes=0`}
                           title={doc.documentName}
-                          className="w-full h-[740px] border-none object-contain bg-slate-900"
+                          className="w-full h-185 border-none object-contain bg-slate-900"
                         />
                       </div>
                     ) : (
-                      <div className="single-page-paper w-full aspect-[13/8.5] min-h-[400px] border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900 text-slate-300 p-8 flex flex-col items-center justify-center space-y-4 shadow-2xl mx-auto">
+                      <div className="single-page-paper w-full aspect-13/8.5 min-h-100 border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900 text-slate-300 p-8 flex flex-col items-center justify-center space-y-4 shadow-2xl mx-auto">
                         <Loader2 className="w-12 h-12 text-purple-400 animate-spin mx-auto" />
                         <div className="space-y-2 text-center">
-                          <h4 className="text-base font-black uppercase text-white">Generating {doc.documentName} PDF Stream...</h4>
+                          <h4 className="text-base font-black uppercase text-white">
+                            Generating {doc.documentName} PDF Stream...
+                          </h4>
                           <p className="text-xs font-mono text-slate-400 leading-relaxed max-w-md mx-auto">
-                            System is assembling official statutory tables, signatures, and QR verification codes for inclusion in {activeBundle}.
+                            System is assembling official statutory tables,
+                            signatures, and QR verification codes for inclusion
+                            in {activeBundle}.
                           </p>
                         </div>
                       </div>
@@ -662,8 +803,15 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
         {/* Footer */}
         <div className="p-3 border-t border-slate-800 flex items-center justify-between bg-slate-900/95 text-xs text-slate-400 sticky bottom-0 z-10 shrink-0">
           <span className="font-mono text-[11px]">
-            {activeBundle}: <strong className="text-white">{currentBundleItems.length} Documents Compiled</strong>
-            {statusText && <span className="ml-3 text-purple-400 font-bold">{statusText}</span>}
+            {activeBundle}:{" "}
+            <strong className="text-white">
+              {currentBundleItems.length} Documents Compiled
+            </strong>
+            {statusText && (
+              <span className="ml-3 text-purple-400 font-bold">
+                {statusText}
+              </span>
+            )}
           </span>
 
           <div className="flex items-center gap-2">
@@ -671,15 +819,23 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
               onClick={handleExportBundle}
               disabled={isExporting || currentBundleItems.length === 0}
               className={`px-4 py-1.5 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
-                isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
-                  ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40'
-                  : 'bg-blue-600 hover:bg-blue-500'
+                isPreparerRole(currentUser?.role) &&
+                approvalRecord?.status !== "APPROVED"
+                  ? "bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40"
+                  : "bg-blue-600 hover:bg-blue-500"
               }`}
             >
-              {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+              {isExporting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
               <span>
                 Compile & Download {activeBundle}
-                {isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED' ? ' 🔒' : ''}
+                {isPreparerRole(currentUser?.role) &&
+                approvalRecord?.status !== "APPROVED"
+                  ? " 🔒"
+                  : ""}
               </span>
             </button>
             <button
@@ -694,16 +850,24 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
         {/* OFF-SCREEN CONTAINER FOR PRE-RENDERING COVER PAGES */}
         <div
           className="fixed pointer-events-none"
-          style={{ left: '-9999px', top: '0px', width: '816px', zIndex: -1 }}
+          style={{ left: "-9999px", top: "0px", width: "816px", zIndex: -1 }}
           aria-hidden="true"
         >
           {selectedItems.map((doc, idx) => (
-            <div key={`bundle-cover-${doc.id}`} id={`bundle-cover-${doc.id}`} style={{ width: '800px' }}>
-              <DocumentCoverPage item={doc} tenant={tenant} folderCopy={activeBundle} incrementNumber={idx + 1} />
+            <div
+              key={`bundle-cover-${doc.id}`}
+              id={`bundle-cover-${doc.id}`}
+              style={{ width: "800px" }}
+            >
+              <DocumentCoverPage
+                item={doc}
+                tenant={tenant}
+                folderCopy={activeBundle}
+                incrementNumber={idx + 1}
+              />
             </div>
           ))}
         </div>
-
       </div>
 
       {/* 🔒 OWNER / HIGHER MANAGER APPROVAL GATE MODAL */}
@@ -729,4 +893,3 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
     </div>
   );
 };
-
