@@ -14,11 +14,7 @@ import {
   Camera,
   Upload,
   FileText,
-  Eye,
-  Briefcase,
-  Layers,
-  MapPin,
-  Calendar
+  Briefcase
 } from 'lucide-react';
 
 export interface ProgressPhotoItem {
@@ -67,7 +63,7 @@ export const ProgressphotoModalContent: React.FC<ProgressphotoModalProps> = ({
 }) => {
   const todayStr = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
+  const [, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
   const [companyName, setCompanyName] = useState<string>(tenant?.companyName || '');
@@ -160,7 +156,7 @@ export const ProgressphotoModalContent: React.FC<ProgressphotoModalProps> = ({
       reader.onload = (event) => {
         const dataUrl = event.target?.result as string;
         const newPhoto: ProgressPhotoItem = {
-          id: `photo-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          id: `photo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           stage: 'DURING',
           caption: file.name.replace(/\.[^/.]+$/, ''),
           station: 'Station 0+000 / Site Location',
@@ -320,7 +316,7 @@ export const ProgressphotoModalContent: React.FC<ProgressphotoModalProps> = ({
           <button
             onClick={handleSaveAndComplete}
             disabled={isSaving}
-            className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-blue-600/30 border border-blue-400/40 cursor-pointer disabled:opacity-50"
+            className="px-4 py-1.5 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-blue-600/30 border border-blue-400/40 cursor-pointer disabled:opacity-50"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Save & Attach to Vault</span>
@@ -465,7 +461,7 @@ export const ProgressphotoModalContent: React.FC<ProgressphotoModalProps> = ({
               ))}
             </div>
 
-            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-75 overflow-y-auto pr-1">
               {filteredPhotos.length === 0 ? (
                 <div className="p-6 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg">
                   No individual photos attached yet. Click "+ Add Images" to upload site pictures.
@@ -531,7 +527,7 @@ export const ProgressphotoModalContent: React.FC<ProgressphotoModalProps> = ({
         {/* Right Side: Preview Sheet or PDF Viewer (7 cols) */}
         <div className="lg:col-span-7 p-6 overflow-y-auto bg-slate-950 flex justify-center items-start">
           {directPdfDataUrl ? (
-            <div className="w-full h-[750px] bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col">
+            <div className="w-full h-187.5 bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col" style={{ height: '750px' }}>
               <div className="px-4 py-2 bg-slate-800 border-b border-slate-700 flex justify-between items-center text-xs font-mono text-slate-300">
                 <span>PDF Preview: {directPdfFileName || 'Progress Photos'}</span>
                 <span className="text-emerald-400 font-bold">Uploaded Document Ready</span>
@@ -545,8 +541,8 @@ export const ProgressphotoModalContent: React.FC<ProgressphotoModalProps> = ({
           ) : (
             <div
               id="progphoto-print-sheet"
-              className="w-[816px] min-h-[1248px] bg-white text-slate-900 p-10 shadow-2xl rounded-sm flex flex-col justify-between text-[11.5px] leading-tight"
-              style={{ boxSizing: 'border-box' }}
+              className="w-204 min-h-312 bg-white text-slate-900 p-10 shadow-2xl rounded-sm flex flex-col justify-between text-[11.5px] leading-tight"
+              style={{ boxSizing: 'border-box', width: '816px', minHeight: '1248px' }}
             >
               <div>
                 {/* Letterhead */}

@@ -3,7 +3,6 @@ import {
   isApproverRole,
   isPreparerRole,
   getRoleDisplayName,
-  UserRole,
 } from "../../types";
 import {
   getDocumentApproval,

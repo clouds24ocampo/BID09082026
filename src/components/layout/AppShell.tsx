@@ -25,7 +25,6 @@ import {
   Briefcase,
   FileSpreadsheet,
   Users,
-  ArrowRightLeft,
 } from "lucide-react";
 
 import { AuroraBackground } from "../common/AuroraBackground";
@@ -311,6 +310,8 @@ export const AppShell: React.FC<AppShellProps> = ({
           {/* User Profile Drawer Toggle */}
           <div className="relative">
             <button
+              data-testid="user-profile-menu-toggle"
+              id="user-profile-menu-btn"
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex items-center gap-2 p-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition cursor-pointer"
             >

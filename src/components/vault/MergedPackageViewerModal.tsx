@@ -34,9 +34,7 @@ import {
   Eye,
   Maximize2,
   Lock,
-  Clock,
   ArrowRight,
-  ShieldCheck
 } from 'lucide-react';
 import DocumentQrCode from '../common/DocumentQrCode';
 
@@ -704,7 +702,7 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
               className={`px-4 py-2 rounded-xl text-xs font-bold text-white transition shadow-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-50 border ${
                 isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
                   ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-amber-500/40'
-                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-950/40 border-purple-400/30'
+                  : 'bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-purple-950/40 border-purple-400/30'
               }`}
               title={
                 isPreparerRole(currentUser?.role) && approvalRecord?.status !== 'APPROVED'
@@ -831,7 +829,7 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
         </div>
 
         {/* MAIN BODY: SPLIT VIEW (DOCUMENTS SEQUENCE ON LEFT, INTERACTIVE PDF VIEWER ON RIGHT) */}
-        <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0 min-h-[550px]">
+        <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-0 min-h-137.5">
           
           {/* LEFT SIDEBAR: Arranged Documents Checklist */}
           <div className="lg:col-span-4 border-r border-slate-800 bg-slate-950/50 p-4 overflow-y-auto space-y-3">
@@ -914,7 +912,7 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
                 <div className="space-y-1.5">
                   <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5 relative shadow-inner">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 transition-all duration-300 ease-out shadow-[0_0_12px_rgba(168,85,247,0.6)]"
+                      className="h-full rounded-full bg-linear-to-r from-blue-500 via-indigo-500 to-purple-500 transition-all duration-300 ease-out shadow-[0_0_12px_rgba(168,85,247,0.6)]"
                       style={{ width: `${Math.min(100, Math.max(5, compileProgress.percent))}%` }}
                     />
                   </div>
@@ -960,15 +958,15 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
                 </div>
 
                 {/* Embedded PDF Viewer */}
-                <div className="flex-1 w-full bg-slate-900 relative min-h-[500px]">
+                <div className="flex-1 w-full bg-slate-900 relative min-h-125">
                   <object
                     data={`${currentPdfDataUrl}#toolbar=1&navpanes=0&scrollbar=1`}
                     type="application/pdf"
-                    className="w-full h-full min-h-[500px] border-none bg-slate-900 rounded-b-xl"
+                    className="w-full h-full min-h-125 border-none bg-slate-900 rounded-b-xl"
                   >
                     <iframe
                       src={`${currentPdfDataUrl}#toolbar=1&navpanes=0&scrollbar=1`}
-                      className="w-full h-full min-h-[500px] border-none bg-slate-900"
+                      className="w-full h-full min-h-125 border-none bg-slate-900"
                       title={`Merged PDF Preview for ${activeFolder}`}
                     />
                   </object>

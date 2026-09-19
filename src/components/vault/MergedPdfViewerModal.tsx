@@ -34,7 +34,6 @@ import {
   ArrowUp,
   ArrowDown,
   Lock,
-  Clock,
   ArrowRight,
 } from "lucide-react";
 

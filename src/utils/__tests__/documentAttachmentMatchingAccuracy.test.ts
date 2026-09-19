@@ -359,13 +359,6 @@ describe('Document Attachment Matching Accuracy & Corporate Isolation', () => {
     const detailedDataUrl = await resolveDocumentPdfAttachment(detailedDoc, ctx);
     expect(detailedDataUrl).toBeTruthy();
 
-    // Create a mock cover PDF
-    const coverPdf = await PDFDocument.create();
-    const cPage = coverPdf.addPage([612, 936]);
-    cPage.drawText('ENVELOPE 2: FINANCIAL BID PROPOSAL', { x: 50, y: 850 });
-    cPage.drawText('(FORM L) DETAILED ESTIMATES', { x: 50, y: 800 });
-    const coverDataUrl = await coverPdf.saveAsBase64({ dataUri: true });
-
     // Test ORIGINAL copy package
     const originalBytes = await buildMergedThreeLayerPdfBytes([
       {

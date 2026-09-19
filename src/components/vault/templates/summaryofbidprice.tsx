@@ -58,7 +58,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
   // Signatory & Enterprise
   const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || '');
   const [companyName, setCompanyName] = useState(tenant?.companyName || '');
-  const [dateSubmitted, setDateSubmitted] = useState('March 19, 2026');
+  const [, setDateSubmitted] = useState('March 19, 2026');
 
   // Dynamic Summary Material Items
   const [items, setItems] = useState<SummaryBidPriceRow[]>([]);

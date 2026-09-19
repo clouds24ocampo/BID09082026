@@ -4,7 +4,6 @@ import {
   PhilGEPSOpportunity,
   ProcurementType,
   isApproverRole,
-  isPreparerRole,
   getRoleDisplayName,
 } from "../../../types";
 import { useAuth } from "../../../context/AuthContext";
@@ -38,7 +37,6 @@ import {
   FileCheck,
   CheckCircle2,
   Building2,
-  Calendar,
   FileSpreadsheet,
   DollarSign,
   Briefcase,
@@ -48,25 +46,15 @@ import {
   Upload,
   FileText,
   ShieldCheck,
-  Printer,
   Sparkles,
-  Sliders,
-  CheckSquare,
   Tag,
   Receipt,
-  FileBadge,
   UserCheck,
-  PenTool,
-  Award,
-  Edit3,
   Truck,
   RefreshCw,
   ArrowRight,
   FolderPlus,
-  ExternalLink,
   FileUp,
-  Globe,
-  ChevronRight,
   Lock,
   Scale,
 } from "lucide-react";
@@ -167,6 +155,8 @@ export interface PowItem {
   statementOfCompliance?: string; // e.g. "COMPLY" / "BIDDER COMPLIED"
 }
 
+export type PowTabType = "matrix" | "summary" | "signatories" | "tor" | "dr" | "print";
+
 export interface PowModalProps {
   item?: { id: string; code: string; name: string };
   tenant?: Tenant | null;
@@ -182,6 +172,7 @@ export interface PowModalProps {
   projectLocation?: string;
   dateTimeSubmitted?: string;
   initialMode?: PowDocumentMode;
+  initialTab?: PowTabType;
   onSaveAndComplete?: (
     fileDataUrl?: string,
     customName?: string,
@@ -428,6 +419,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
   projectLocation: propProjectLocation = "",
   dateTimeSubmitted: propDateTimeSubmitted = "",
   initialMode = "POW",
+  initialTab,
   onSaveAndComplete,
   onClose,
   setActiveTab: setAppActiveTab,
@@ -495,7 +487,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
   const [rfqNumber, setRfqNumber] = useState<string>(
     activeProjectRefNo ? `RFQ-${activeProjectRefNo}` : "RFQ-2026-09-0042",
   );
-  const [canvassDate, setCanvassDate] = useState<string>(todayStr);
+  const [canvassDate] = useState<string>(todayStr);
   const [priceValidity, setPriceValidity] =
     useState<string>("90 Calendar Days");
   const [deliveryPeriod, setDeliveryPeriod] = useState<string>(
@@ -596,9 +588,15 @@ export const POWModalContent: React.FC<PowModalProps> = ({
   const [items, setItems] = useState<PowItem[]>(PRESET_ROAD_DRAINAGE);
 
   // Active View Tab: 'matrix' | 'summary' | 'signatories' | 'tor' | 'dr' | 'print'
-  const [activeTab, setActiveTab] = useState<
-    "matrix" | "summary" | "signatories" | "tor" | "dr" | "print"
-  >("tor");
+  const [activeTab, setActiveTab] = useState<PowTabType>(
+    initialTab || (initialMode === "POW" ? "matrix" : "matrix"),
+  );
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Terms of Reference (TOR) Upload & PDF Storage
   const [torPdfDataUrl, setTorPdfDataUrl] = useState<string>("");
@@ -4414,7 +4412,9 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                 activeTrackingNumber={trackingNumber}
                 powScopeItems={items}
                 initialPreset={
-                  docMode === "POW" ? "DPWH_INFRA" : "LGU_GOODS_SERVICES"
+                  initialTab === "tor"
+                    ? "LTCISCC_COMMAND_CENTER"
+                    : "LTCISCC_COMMAND_CENTER"
                 }
                 isEmbedded={true}
                 onSaveAndComplete={handleTorGenerated}

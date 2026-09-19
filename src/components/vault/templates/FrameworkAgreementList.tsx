@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
-import { generateAndDownloadThreeLayerPdf } from '../../../utils/pdfExportEngine';
 import { generateFrameworkAgreementListVectorPdf } from '../../../utils/vectorPdfGenerator';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import { autoFitPageChunks, calculateRowHeight, getAutoFitTypographyClass } from '../../../utils/autoFitEngine';
@@ -576,7 +575,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
     <div
       key={`fal-page-${pIdx}`}
       id={pIdx === 0 ? 'framework-paper' : `framework-paper-p${pIdx + 1}`}
-      className="single-page-paper print-document-sheet portrait bg-white text-black p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] h-auto max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
+      className="single-page-paper print-document-sheet portrait bg-white p-6 border-2 border-slate-900 shadow-2xl mx-auto rounded-none w-[816px] min-h-[1248px] h-auto max-w-[816px] flex flex-col justify-between font-serif mb-8 box-border relative text-slate-950"
     >
       <div className="w-full">
         {/* COMPANY & PROJECT HEADER BLOCK (PAGE 1 ONLY) */}
@@ -667,7 +666,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
 
                   {/* 2. Description (Read-Only) */}
                   <td className="border border-black px-3.5 py-2 font-serif align-top break-words">
-                    <div className={`font-serif text-slate-950 pt-0.5 whitespace-pre-wrap font-normal break-words [overflow-wrap:break-word] leading-normal text-justify ${getTableFontSizeClass()}`}>
+                    <div className={`font-serif text-slate-950 pt-0.5 whitespace-pre-wrap font-normal break-words leading-normal text-justify ${getTableFontSizeClass()}`}>
                       {formatDescriptionText(rowItem.description)}
                     </div>
                   </td>
@@ -956,7 +955,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex-1 space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-slate-200 font-mono text-xs font-bold flex items-center gap-1.5 text-blue-300">
+                  <label className="font-mono text-xs font-bold flex items-center gap-1.5 text-blue-300">
                     <Building2 className="w-4 h-4 text-blue-400" />
                     <span>Target Bidding Project:</span>
                   </label>
@@ -1054,7 +1053,7 @@ export const FrameworkAgreementList: React.FC<FrameworkAgreementListProps> = ({
             <button
               onClick={handleSave}
               disabled={isExporting}
-              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 transition shadow-lg flex items-center gap-2 cursor-pointer"
+              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 transition shadow-lg flex items-center gap-2 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{isExporting ? 'Saving Package...' : 'Save & Complete Package'}</span>

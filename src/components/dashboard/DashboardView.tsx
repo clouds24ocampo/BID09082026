@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   CheckCircle2,
   Layers,
-  FileStack,
   ChevronRight
 } from 'lucide-react';
 
@@ -74,7 +73,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
     <div className="space-y-6 animate-fadeIn">
 
       {/* Welcome & Tenant Banner — HORIZONX / REACTBITS 3D GLOW BANNER */}
-      <div className="relative rounded-3xl overflow-hidden border border-slate-700/60 bg-gradient-to-br from-slate-900/90 via-[#0b1020]/95 to-slate-900/90 shadow-2xl p-6 sm:p-8">
+      <div className="relative rounded-3xl overflow-hidden border border-slate-700/60 bg-linear-to-br from-slate-900/90 via-[#0b1020]/95 to-slate-900/90 shadow-2xl p-6 sm:p-8">
         <BorderBeam size={260} duration={9} colorFrom={brandColor} colorTo="#8b5cf6" borderWidth={1.8} />
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
@@ -93,7 +92,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
                 TIN: {currentTenant?.tin || 'Not Configured'}
               </span>
               <span className="hidden sm:inline-block w-1 h-1 rounded-full bg-slate-600" />
-              <span className="hidden sm:inline text-xs text-emerald-400 font-mono font-semibold flex items-center gap-1">
+              <span className="hidden sm:inline-flex text-xs text-emerald-400 font-mono font-semibold items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 SYSTEM ONLINE
               </span>
@@ -397,7 +396,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
                   </div>
                   <p className="font-semibold text-slate-200 leading-snug">{op.title}</p>
                   <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/60">
-                    <span className="text-slate-400 truncate max-w-[160px]">{op.procuringEntity}</span>
+                    <span className="text-slate-400 truncate max-w-40">{op.procuringEntity}</span>
                     <span className="font-mono font-bold text-emerald-400">₱{(op.approvedBudget || 0).toLocaleString()}</span>
                   </div>
                 </div>

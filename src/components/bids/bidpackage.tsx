@@ -44,10 +44,8 @@ import {
   FileStack,
   Upload
 } from 'lucide-react';
-import { SpotlightCard } from '../common/SpotlightCard';
 import { BorderBeam } from '../common/BorderBeam';
 import { ShinyText } from '../common/ShinyText';
-import { CyberBadge } from '../common/CyberBadge';
 
 
 export type FolderCopyType = 'ORIGINAL' | 'COPY_1' | 'COPY_2';
@@ -872,7 +870,7 @@ export const BidPackageBuilderView: React.FC = () => {
 
       if (!isAlreadyInFolder) {
         originalItems.push({
-          id: `pkg-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+          id: `pkg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           documentName: def.name,
           documentNumber: projectRefNo,
           category: def.category,
@@ -1535,7 +1533,7 @@ export const BidPackageBuilderView: React.FC = () => {
     <div className="space-y-6 animate-fadeIn text-left min-h-[60vh] p-2 sm:p-4 md:p-6">
       
       {/* 1. Target Bidding Project Identifier Container + Header Controls — HorizonX 3D Glass */}
-      <div className="relative w-full bg-gradient-to-r from-slate-900/95 via-[#080d1a]/90 to-slate-900/95 border border-slate-800/90 rounded-2xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl overflow-hidden">
+      <div className="relative w-full bg-linear-to-r from-slate-900/95 via-[#080d1a]/90 to-slate-900/95 border border-slate-800/90 rounded-2xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl overflow-hidden">
         <BorderBeam size={220} duration={14} colorFrom="#3b82f6" colorTo="#6366f1" />
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
@@ -1590,7 +1588,7 @@ export const BidPackageBuilderView: React.FC = () => {
                 setSelectedDocIdsToAdd([]);
                 setShowAddCompletedModal(true);
               }}
-              className="px-4 py-2.5 rounded-full text-xs font-black bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-950/40 transition flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 rounded-full text-xs font-black bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-950/40 transition flex items-center gap-2 cursor-pointer"
               title={`Add completed legal, technical, or financial documents to the ${activeFolderCopy} folder`}
             >
               <ListPlus className="w-4 h-4 text-blue-200" />
@@ -1608,7 +1606,7 @@ export const BidPackageBuilderView: React.FC = () => {
                 setCoverFolderCopyChoice(activeFolderCopy);
                 setShowUnifiedCoverModal(true);
               }}
-              className="px-4 py-2.5 rounded-full text-xs font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-lg shadow-amber-950/30 transition flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 rounded-full text-xs font-black bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-lg shadow-amber-950/30 transition flex items-center gap-2 cursor-pointer"
               title="View, Print & Preview All Cover Pages (Mother Box, Envelopes & Folders)"
             >
               <Box className="w-4 h-4 text-slate-950" />
@@ -1651,12 +1649,12 @@ export const BidPackageBuilderView: React.FC = () => {
             onClick={() => setActiveEnvelope('ENVELOPE_1')}
             className={`group relative p-5 rounded-2xl border text-left transition-all duration-300 cursor-pointer overflow-hidden ${
               activeEnvelope === 'ENVELOPE_1'
-                ? 'bg-gradient-to-br from-[#0c1938] to-[#081026] border-blue-500 shadow-xl shadow-blue-950/40 ring-1 ring-blue-500/60'
+                ? 'bg-linear-to-br from-[#0c1938] to-[#081026] border-blue-500 shadow-xl shadow-blue-950/40 ring-1 ring-blue-500/60'
                 : 'bg-[#080d1a]/80 border-slate-800/90 hover:border-slate-700 hover:bg-[#0c1426]/60'
             }`}
           >
             {activeEnvelope === 'ENVELOPE_1' && (
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-blue-400 to-indigo-500" />
+              <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-blue-600 via-blue-400 to-indigo-500" />
             )}
 
             <div className="flex items-start justify-between gap-3">
@@ -1700,12 +1698,12 @@ export const BidPackageBuilderView: React.FC = () => {
             onClick={() => setActiveEnvelope('ENVELOPE_2')}
             className={`group relative p-5 rounded-2xl border text-left transition-all duration-300 cursor-pointer overflow-hidden ${
               activeEnvelope === 'ENVELOPE_2'
-                ? 'bg-gradient-to-br from-[#0c2e22] to-[#081f18] border-emerald-500 shadow-xl shadow-emerald-950/40 ring-1 ring-emerald-500/60'
+                ? 'bg-linear-to-br from-[#0c2e22] to-[#081f18] border-emerald-500 shadow-xl shadow-emerald-950/40 ring-1 ring-emerald-500/60'
                 : 'bg-[#080d1a]/80 border-slate-800/90 hover:border-slate-700 hover:bg-[#0c1426]/60'
             }`}
           >
             {activeEnvelope === 'ENVELOPE_2' && (
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-600 via-emerald-400 to-teal-500" />
+              <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-emerald-600 via-emerald-400 to-teal-500" />
             )}
 
             <div className="flex items-start justify-between gap-3">
@@ -1795,7 +1793,7 @@ export const BidPackageBuilderView: React.FC = () => {
             <button
               onClick={() => handleMergeAllDocuments('CURRENT_FOLDER')}
               disabled={isMergingAll || (currentFolderItems.length === 0 && originalCount === 0)}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-emerald-950/40 cursor-pointer disabled:opacity-50 border border-emerald-400/40"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-emerald-950/40 cursor-pointer disabled:opacity-50 border border-emerald-400/40"
               title={`Compile current envelope (${activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1' : 'Envelope 2'}) in ${activeFolderCopy} and download merged PDF`}
             >
               {isMergingAll ? (
@@ -1810,7 +1808,7 @@ export const BidPackageBuilderView: React.FC = () => {
             <button
               onClick={() => handleMergeAllDocuments('ALL_ENVELOPES')}
               disabled={isMergingAll || packageItems.length === 0}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-cyan-950/40 cursor-pointer disabled:opacity-50 border border-cyan-400/40"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-linear-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-cyan-950/40 cursor-pointer disabled:opacity-50 border border-cyan-400/40"
               title={`Compile ALL documents across BOTH Envelope 1 and Envelope 2 in ${activeFolderCopy} into one complete bid package`}
             >
               <FileStack className="w-3.5 h-3.5 text-cyan-200" />
@@ -1821,7 +1819,7 @@ export const BidPackageBuilderView: React.FC = () => {
             <button
               onClick={() => setShowMergedPackageViewerModal(true)}
               disabled={packageItemsForMerge.length === 0}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-purple-950/40 cursor-pointer disabled:opacity-50 border border-purple-400/40"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-purple-950/40 cursor-pointer disabled:opacity-50 border border-purple-400/40"
               title="Open Merged Bid Packages Folder to view and download ORIGINAL, COPY 1, and COPY 2 PDFs"
             >
               <FileStack className="w-3.5 h-3.5 text-purple-200" />
@@ -1854,8 +1852,8 @@ export const BidPackageBuilderView: React.FC = () => {
                 className={`group relative p-4 sm:p-5 rounded-xl border text-left transition-all duration-200 cursor-pointer overflow-hidden ${
                   isSelected
                     ? activeEnvelope === 'ENVELOPE_1'
-                      ? 'bg-gradient-to-b from-[#0f1f45] to-[#0a1329] border-blue-500/90 shadow-lg shadow-blue-950/50 ring-1 ring-blue-500'
-                      : 'bg-gradient-to-b from-[#0f382a] to-[#0a2118] border-emerald-500/90 shadow-lg shadow-emerald-950/50 ring-1 ring-emerald-500'
+                      ? 'bg-linear-to-b from-[#0f1f45] to-[#0a1329] border-blue-500/90 shadow-lg shadow-blue-950/50 ring-1 ring-blue-500'
+                      : 'bg-linear-to-b from-[#0f382a] to-[#0a2118] border-emerald-500/90 shadow-lg shadow-emerald-950/50 ring-1 ring-emerald-500'
                     : 'bg-[#050b17] border-slate-800 hover:border-slate-700 hover:bg-[#071024]'
                 }`}
               >
@@ -1947,7 +1945,7 @@ export const BidPackageBuilderView: React.FC = () => {
               <button
                 onClick={() => handleMergeAllDocuments('CURRENT_FOLDER')}
                 disabled={isMergingAll || filteredItems.length === 0}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border border-emerald-400/30"
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border border-emerald-400/30"
                 title={`Direct 1-click compile & download ${activeFolderCopy} package with live progress bar`}
               >
                 {isMergingAll ? (
@@ -2495,7 +2493,7 @@ export const BidPackageBuilderView: React.FC = () => {
                   <button
                     onClick={handleDownloadAllPackagingLabels}
                     disabled={isDownloadingAllCovers}
-                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white flex items-center gap-1.5 cursor-pointer shadow-lg transition disabled:opacity-50"
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white flex items-center gap-1.5 cursor-pointer shadow-lg transition disabled:opacity-50"
                     title="Download all packaging covers, envelopes, folder separators and Table of Contents in 1 PDF bundle"
                   >
                     {isDownloadingAllCovers ? (
@@ -2687,7 +2685,10 @@ export const BidPackageBuilderView: React.FC = () => {
                 {/* VIEW 1: MOTHER BOX LABEL COVER (MASTER ENCLOSURE)            */}
                 {/* ============================================================ */}
                 {coverModalTab === 'MOTHER' && (
-                  <div className="landscape-unified-cover w-[13in] max-w-[1200px] min-h-[780px] aspect-[13/8.5] bg-white text-black p-6 sm:p-8 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 box-border">
+                  <div 
+                    className="landscape-unified-cover w-312 max-w-300 min-h-195 aspect-13/8.5 bg-white text-black p-6 sm:p-8 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 box-border"
+                    style={{ width: '13in' }}
+                  >
                     
                     {/* Inner Frame */}
                     <div className="absolute inset-2.5 border-2 border-black rounded-xl pointer-events-none" />
@@ -2836,7 +2837,10 @@ export const BidPackageBuilderView: React.FC = () => {
                 {/* VIEW 2: ENVELOPE OUTER COVER (ENVELOPE 1 OR ENVELOPE 2)      */}
                 {/* ============================================================ */}
                 {coverModalTab === 'ENVELOPE' && (
-                  <div className="landscape-unified-cover w-[13in] max-w-[1200px] min-h-[780px] aspect-[13/8.5] bg-white text-black p-6 sm:p-8 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 box-border">
+                  <div 
+                    className="landscape-unified-cover w-312 max-w-300 min-h-195 aspect-13/8.5 bg-white text-black p-6 sm:p-8 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 box-border"
+                    style={{ width: '13in' }}
+                  >
                     
                     {/* Inner Frame */}
                     <div className="absolute inset-2.5 border-2 border-black rounded-xl pointer-events-none" />
@@ -2983,7 +2987,10 @@ export const BidPackageBuilderView: React.FC = () => {
                 {/* VIEW 3: FOLDER COVER PAGE (ORIGINAL / COPY 1 / COPY 2)       */}
                 {/* ============================================================ */}
                 {coverModalTab === 'FOLDER' && (
-                  <div className="landscape-unified-cover w-[13in] max-w-[1200px] min-h-[780px] aspect-[13/8.5] bg-white text-black p-8 sm:p-10 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-8 print:m-0 box-border">
+                  <div 
+                    className="landscape-unified-cover w-312 max-w-300 min-h-195 aspect-13/8.5 bg-white text-black p-8 sm:p-10 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-8 print:m-0 box-border"
+                    style={{ width: '13in' }}
+                  >
                     
                     {/* Inner Frame */}
                     <div className="absolute inset-3 border-2 border-black rounded-xl pointer-events-none" />
@@ -3096,7 +3103,10 @@ export const BidPackageBuilderView: React.FC = () => {
                   );
 
                   return (
-                    <div className="landscape-unified-cover w-[13in] max-w-[1200px] min-h-[780px] aspect-[13/8.5] bg-white text-black p-6 sm:p-8 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 box-border">
+                    <div 
+                      className="landscape-unified-cover w-312 max-w-300 min-h-195 aspect-13/8.5 bg-white text-black p-6 sm:p-8 border-4 border-black flex flex-col justify-between font-sans relative shadow-2xl print:shadow-none print:border-4 print:p-6 print:m-0 box-border"
+                      style={{ width: '13in' }}
+                    >
                       
                       {/* Inner Frame */}
                       <div className="absolute inset-2.5 border-2 border-black rounded-xl pointer-events-none" />
@@ -3238,7 +3248,7 @@ export const BidPackageBuilderView: React.FC = () => {
               {/* OFFSCREEN & PRINT-ALL COMPLETE 15-ITEM PACKAGING SET */}
               <div 
                 id="print-all-covers-section"
-                className="print-all-covers-section fixed -left-[9999px] -top-[9999px] print:static print:block pointer-events-none opacity-0 print:opacity-100 overflow-hidden print:overflow-visible"
+                className="print-all-covers-section fixed left-[-9999px] top-[-9999px] print:static print:block pointer-events-none opacity-0 print:opacity-100 overflow-hidden print:overflow-visible"
                 aria-hidden={!isPrintingAllCovers}
               >
                 {/* 1. Mother Box Label Cover */}
@@ -3269,7 +3279,7 @@ export const BidPackageBuilderView: React.FC = () => {
                           <div><strong>ABC:</strong> {activeProject?.abc || '₱0.00'}</div>
                         </div>
                       </div>
-                      <div className="p-3 border-4 border-black bg-black text-white text-center rounded-xl font-mono font-black text-sm uppercase text-amber-300">
+                      <div className="p-3 border-4 border-black bg-black text-center rounded-xl font-mono font-black text-sm uppercase text-amber-300">
                         MOTHER ENVELOPE: OFFICIAL BID PROPOSAL
                       </div>
                       <div className="p-2 border-2 border-red-600 bg-red-50 text-center rounded-xl text-xs font-black text-red-700 uppercase">
@@ -3320,7 +3330,7 @@ export const BidPackageBuilderView: React.FC = () => {
                             <div><strong>ABC:</strong> {activeProject?.abc || '₱0.00'}</div>
                           </div>
                         </div>
-                        <div className="p-3 border-4 border-black bg-black text-white text-center rounded-xl font-mono font-black text-sm uppercase text-amber-300">
+                        <div className="p-3 border-4 border-black bg-black text-center rounded-xl font-mono font-black text-sm uppercase text-amber-300">
                           {env === 'ENVELOPE_1' ? 'ENVELOPE NO. 1: TECHNICAL & ELIGIBILITY COMPONENT' : 'ENVELOPE NO. 2: FINANCIAL BID PROPOSAL'}
                         </div>
                         <div className="p-2 border-2 border-red-600 bg-red-50 text-center rounded-xl text-xs font-black text-red-700 uppercase">
@@ -3541,7 +3551,7 @@ export const BidPackageBuilderView: React.FC = () => {
                       await generateAndDownloadThreeLayerPdf(coverElem, null, undefined, fileName);
                     }
                   }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow"
+                  className="px-3 py-1.5 rounded-lg text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow"
                   title="Download Cover Page merged with the actual attached document"
                 >
                   <Layers className="w-3.5 h-3.5" />
@@ -3550,7 +3560,7 @@ export const BidPackageBuilderView: React.FC = () => {
 
                 <button
                   onClick={() => window.print()}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow"
+                  className="px-3 py-1.5 rounded-lg text-xs bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center gap-1.5 cursor-pointer shadow"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   <span>Print Cover</span>
@@ -3562,7 +3572,7 @@ export const BidPackageBuilderView: React.FC = () => {
             </div>
 
             <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-950 flex justify-center print:p-0 print:bg-white">
-              <div className="max-w-[850px] w-full mx-auto">
+              <div className="max-w-212.5 w-full mx-auto" style={{ maxWidth: '850px' }}>
                 {(() => {
                   const linkedVaultDoc = vaultDocs.find(v => v.id === selectedDocForCover.vaultDocId) ||
                     vaultDocs.find(v => {
@@ -3765,7 +3775,7 @@ export const BidPackageBuilderView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleSaveReorder(reorderList)}
-                className="px-6 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition shadow flex items-center gap-1.5 cursor-pointer font-bold"
+                className="px-6 py-2 rounded-xl text-xs text-white bg-indigo-600 hover:bg-indigo-500 transition shadow flex items-center gap-1.5 cursor-pointer font-bold"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Save Reordered Sequence</span>

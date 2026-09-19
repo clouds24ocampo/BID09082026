@@ -59,7 +59,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
   // Opportunity Projects Auto-Fill Integration
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
-  const [dateTimeSubmitted, setDateTimeSubmitted] = useState('March 19, 2026');
+  const [, setDateTimeSubmitted] = useState('March 19, 2026');
 
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
@@ -226,8 +226,8 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-950 space-y-6">
 
           {/* Instrument Selection Toggle Card (OUTSIDE THE PAPER) */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950/40 to-slate-900 border border-blue-500/40 space-y-3 no-print">
-            <label className="block text-xs font-mono font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+          <div className="p-4 rounded-2xl bg-linear-to-r from-slate-900 via-blue-950/40 to-slate-900 border border-blue-500/40 space-y-3 no-print">
+            <label className="text-xs font-mono font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-blue-400" />
               <span>Select Bid Security Form Type (Template Selection):</span>
             </label>
@@ -286,7 +286,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
               <div className="col-span-full">
-                <label className="block text-slate-200 font-mono mb-1 font-bold flex items-center gap-2 text-xs">
+                <label className="text-slate-200 font-mono mb-1 font-bold flex items-center gap-2 text-xs">
                   <Building2 className="w-4 h-4 text-blue-400" />
                   <span>Select Active Bidding Opportunity (Auto-Fills Form Parameters):</span>
                 </label>
@@ -438,7 +438,7 @@ export const BidSecuringDeclarationModal: React.FC<BidSecuringDeclarationModalPr
                       type="text"
                       value={localConfirmingBank}
                       onChange={(e) => setLocalConfirmingBank(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-bold text-emerald-400"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 font-bold text-emerald-400"
                     />
                   </div>
 

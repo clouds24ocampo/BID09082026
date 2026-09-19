@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Tenant } from "../../../types";
-import { generateAndDownloadThreeLayerPdf } from "../../../utils/pdfExportEngine";
 import { generateSectionViVectorPdf } from "../../../utils/vectorPdfGenerator";
 import {
   getOpportunityProjects,

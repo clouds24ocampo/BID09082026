@@ -45,7 +45,7 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
   // Opportunity Projects Auto-Fill Integration
   const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
-  const [dateTimeSubmitted, setDateTimeSubmitted] = useState('March 19, 2026');
+  const [, setDateTimeSubmitted] = useState('March 19, 2026');
 
   useEffect(() => {
     const list = getOpportunityProjects(tenant?.id);
@@ -215,7 +215,7 @@ export const OmnibusSwornStatementModal: React.FC<OmnibusSwornStatementModalProp
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
               <div className="col-span-full">
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-slate-200 font-mono font-bold flex items-center gap-2 text-xs text-blue-300">
+                  <label className="font-mono font-bold flex items-center gap-2 text-xs text-blue-300">
                     <Building2 className="w-4 h-4 text-blue-400" />
                     <span>Target Bidding Project:</span>
                   </label>

@@ -208,7 +208,7 @@ export const OrganizationalChartModal: React.FC<OrganizationalChartModalProps> =
     activeProcuringEntity || 'Department of Information and Communications Technology (DICT)'
   );
   const [, setSolicitationNumber] = useState(initialSolNo || 'SOL-DICT-2026-089');
-  const [dateTimeSubmitted, setDateTimeSubmitted] = useState(initialDateTime || '');
+  const [, setDateTimeSubmitted] = useState(initialDateTime || '');
 
   // Signatory details
   const [signatoryName, setSignatoryName] = useState(
@@ -566,7 +566,7 @@ export const OrganizationalChartModal: React.FC<OrganizationalChartModalProps> =
             <button
               onClick={handleSaveAndComplete}
               disabled={isProcessing}
-              className="px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 transition shadow flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-1.5 rounded-xl text-xs font-bold text-white bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 transition shadow flex items-center gap-1.5 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-300" />
               <span>{isProcessing ? 'Saving...' : 'Save & Attach to Vault'}</span>

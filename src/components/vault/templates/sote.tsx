@@ -9,11 +9,7 @@ import {
   Download,
   CheckCircle2,
   Clock,
-  Briefcase,
-  Layers,
-  ShieldCheck,
-  Building2,
-  Calendar
+  Briefcase
 } from 'lucide-react';
 
 export interface SoteModalProps {
@@ -55,7 +51,7 @@ export const SoteModalContent: React.FC<SoteModalProps> = ({
 }) => {
   const todayStr = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
+  const [, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
   const [companyName, setCompanyName] = useState<string>(tenant?.companyName || '');
@@ -280,7 +276,7 @@ export const SoteModalContent: React.FC<SoteModalProps> = ({
           <button
             onClick={handleSaveAndComplete}
             disabled={isSaving}
-            className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-blue-600/30 border border-blue-400/40 cursor-pointer disabled:opacity-50"
+            className="px-4 py-1.5 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-blue-600/30 border border-blue-400/40 cursor-pointer disabled:opacity-50"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Save & Attach to Vault</span>
@@ -410,7 +406,7 @@ export const SoteModalContent: React.FC<SoteModalProps> = ({
                   type="text"
                   value={revisedExpiryDate}
                   onChange={(e) => setRevisedExpiryDate(e.target.value)}
-                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white font-semibold text-amber-300"
+                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs font-semibold text-amber-300"
                 />
               </div>
             </div>

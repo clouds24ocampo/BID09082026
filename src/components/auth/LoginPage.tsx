@@ -127,7 +127,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
           repeat: Infinity,
           ease: 'easeInOut'
         }}
-        className="absolute w-[45rem] h-[45rem] rounded-full blur-[160px] pointer-events-none z-0"
+        className="absolute w-180 h-180 rounded-full blur-[160px] pointer-events-none z-0"
         style={{ backgroundColor: activeTenantPreview.brandColor || '#0284c7' }}
       />
 
@@ -142,7 +142,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
           repeat: Infinity,
           ease: 'easeInOut'
         }}
-        className="absolute -bottom-28 -left-28 w-[30rem] h-[30rem] rounded-full bg-gradient-to-br from-slate-300 via-slate-600 to-slate-950 border border-slate-700/50 shadow-[inset_-30px_-30px_70px_rgba(0,0,0,0.95),0_0_50px_rgba(56,189,248,0.15)] pointer-events-none opacity-40 xl:opacity-80 z-0"
+        className="absolute -bottom-28 -left-28 w-120 h-120 rounded-full bg-linear-to-br from-slate-300 via-slate-600 to-slate-950 border border-slate-700/50 shadow-[inset_-30px_-30px_70px_rgba(0,0,0,0.95),0_0_50px_rgba(56,189,248,0.15)] pointer-events-none opacity-40 xl:opacity-80 z-0"
       >
         {/* Dynamic Craters */}
         <div className="absolute top-16 left-28 w-16 h-16 rounded-full bg-slate-800/60 border border-slate-600/40 shadow-inner" />
@@ -164,7 +164,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
         }}
         className="absolute z-0 pointer-events-none flex items-center gap-2 opacity-70"
       >
-        <div className="w-16 h-[2px] bg-gradient-to-r from-transparent to-cyan-400 shadow-[0_0_8px_#38bdf8]" />
+        <div className="w-16 h-0.5 bg-linear-to-r from-transparent to-cyan-400 shadow-[0_0_8px_#38bdf8]" />
         <Rocket className="w-6 h-6 text-cyan-300 transform -rotate-45 drop-shadow-[0_0_10px_#38bdf8]" />
       </motion.div>
 
@@ -186,7 +186,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
 
           <div className="space-y-3">
             <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
-              BiDOCS <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-500">Vault</span>
+              BiDOCS <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-400 via-sky-300 to-blue-500">Vault</span>
             </h1>
             <p className="text-base sm:text-lg text-slate-300 leading-relaxed">
               Philippine Public Bidding & Procurement Architect.
@@ -271,7 +271,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
                 }}
               >
                 <Building2 className="w-3.5 h-3.5" style={{ color: activeTenantPreview.brandColor || '#38bdf8' }} />
-                <span className="truncate max-w-[150px] font-semibold">
+                <span className="truncate max-w-37.5 font-semibold">
                   {tenants.length > 0 ? activeTenantPreview.companyName : 'Register Company Account'}
                 </span>
               </motion.div>

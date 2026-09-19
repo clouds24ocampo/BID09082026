@@ -53,7 +53,7 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
   const [contractLocation, setContractLocation] = useState(activeProcuringEntity || '');
   const [companyName, setCompanyName] = useState(tenant?.companyName || '');
   const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '');
-  const [dateSubmitted, setDateSubmitted] = useState('March 19, 2026');
+  const [, setDateSubmitted] = useState('March 19, 2026');
   const [totalLabel] = useState('Total Calculated Bid Price (Delivered Final Destination)');
 
   // BOQ Materials Items State

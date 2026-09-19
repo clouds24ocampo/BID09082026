@@ -3,14 +3,12 @@ import { useAuth } from '../../context/AuthContext';
 import { LegalRegime, ProcurementType, UserRole } from '../../types';
 import {
   Building2,
-  Palette,
   ShieldCheck,
   ArrowRight,
   ArrowLeft,
   Check,
   CheckCircle2,
   Award,
-  Briefcase,
   Sparkles,
   Zap,
   Lock,
@@ -93,7 +91,21 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
         fullName: 'Engr. Ferdinand R. Valenzuela',
         role: 'COMPANY_OWNER',
         password: 'Password123!'
-      }
+      },
+      [
+        {
+          email: 'm.santos@apexcloudph.com',
+          fullName: 'Arch. Maria Clarissa Santos',
+          role: 'ESTIMATOR',
+          password: 'Password123!'
+        },
+        {
+          email: 'j.delacruz@apexcloudph.com',
+          fullName: 'Atty. Jose Maria dela Cruz',
+          role: 'HIGHER_MANAGER',
+          password: 'Password123!'
+        }
+      ]
     );
   };
 
@@ -160,9 +172,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
     }
   };
 
-  const displayCompanyName = companyName.trim() || 'Your Enterprise Corp.';
   const displayBrandCode = (brandCode.trim() || companyName.substring(0, 4) || 'BID').toUpperCase();
-  const displaySignatory = signatoryName.trim() || fullName.trim() || 'Authorized Managing Officer';
 
   return (
     <AuroraBackground className="min-h-screen text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-10 relative overflow-hidden font-sans">
@@ -215,7 +225,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
           </div>
 
           {/* Quick-Launch 1-Click Demo Button */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/40 border border-blue-500/30 shadow-lg backdrop-blur-md space-y-2">
+          <div className="p-4 rounded-2xl bg-linear-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/40 border border-blue-500/30 shadow-lg backdrop-blur-md space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5 font-mono">
                 <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" /> Instant Developer Sandbox
@@ -230,7 +240,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
             <button
               type="button"
               onClick={handleQuickFillDemo}
-              className="w-full py-2 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 shadow-lg shadow-blue-900/40 transition-all duration-300 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="w-full py-2 rounded-xl text-xs font-extrabold text-white bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 shadow-lg shadow-blue-900/40 transition-all duration-300 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
               <span>⚡ 1-Click Launch Demo Enterprise</span>
@@ -251,7 +261,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
 
         {/* ─── RIGHT PANEL: INTERACTIVE 3D ONBOARDING COCKPIT ─── */}
         <div className="lg:col-span-7 flex flex-col">
-          <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-br from-[#0a0f1d]/95 via-[#080d1a]/95 to-[#060914]/95 border border-slate-800/90 shadow-2xl backdrop-blur-2xl flex-1 flex flex-col justify-between overflow-hidden">
+          <div className="relative rounded-3xl p-6 sm:p-8 bg-linear-to-br from-[#0a0f1d]/95 via-[#080d1a]/95 to-[#060914]/95 border border-slate-800/90 shadow-2xl backdrop-blur-2xl flex-1 flex flex-col justify-between overflow-hidden">
             <BorderBeam size={220} duration={12} colorFrom={brandColor} colorTo="#6366f1" />
 
             <div className="relative z-10 space-y-6">

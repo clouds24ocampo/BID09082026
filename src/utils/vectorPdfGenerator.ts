@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { generateQrCodeDataUrl, QrCodeDetails } from './qrCodeGenerator';
+import type { QrCodeDetails } from './qrCodeGenerator';
 import { ScheduleItem, formatDescriptionText, formatPaperAmount } from '../components/vault/templates/SectionViScheduleOfRequirements';
 import { TechSpecItem } from '../components/vault/templates/TechnicalSpecifications';
 

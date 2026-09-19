@@ -10,9 +10,7 @@ import {
   CheckCircle2,
   FileCheck,
   ShieldCheck,
-  Briefcase,
-  Building2,
-  Calendar
+  Briefcase
 } from 'lucide-react';
 
 export interface CaModalProps {
@@ -50,9 +48,7 @@ export const CaModalContent: React.FC<CaModalProps> = ({
   onSaveAndComplete,
   onClose
 }) => {
-  const todayStr = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
+  const [, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
   const [companyName, setCompanyName] = useState<string>(tenant?.companyName || '');
@@ -273,7 +269,7 @@ export const CaModalContent: React.FC<CaModalProps> = ({
           <button
             onClick={handleSaveAndComplete}
             disabled={isSaving}
-            className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-blue-600/30 border border-blue-400/40 cursor-pointer disabled:opacity-50"
+            className="px-4 py-1.5 bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-blue-600/30 border border-blue-400/40 cursor-pointer disabled:opacity-50"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Save & Attach to Vault</span>

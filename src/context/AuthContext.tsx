@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { Tenant, User, UserRole, isApproverRole } from "../types";
 import {
-  clearAllVaultData,
   purgeEntireApplicationStorage,
 } from "../utils/vaultIndexedDB";
 import { debugLog } from "../utils/debugLog";
@@ -76,6 +75,7 @@ interface AuthContextType {
   registerTenantAndUser: (
     tenantData: Omit<Tenant, "id" | "createdAt">,
     userData: Omit<User, "id" | "tenantId">,
+    additionalUsers?: Omit<User, "id" | "tenantId">[],
   ) => boolean;
   createTeamUser: (userData: {
     fullName: string;
@@ -258,6 +258,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const registerTenantAndUser = (
     tenantData: Omit<Tenant, "id" | "createdAt">,
     userData: Omit<User, "id" | "tenantId">,
+    additionalUsers?: Omit<User, "id" | "tenantId">[],
   ): boolean => {
     const newTenantId = `tenant-${Date.now()}`;
     const newUserId = `user-${Date.now()}`;
@@ -282,8 +283,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     safeSetItem(`bidocs_user_password_${userEmail}`, userPw);
     safeSetItem(`bidocs_must_change_password_${userEmail}`, "false");
 
+    const createdAdditionalUsers: User[] = (additionalUsers || []).map(
+      (extra, idx) => {
+        const extraPw = extra.password || "Password123!";
+        const extraEmail = extra.email.trim().toLowerCase();
+        safeSetItem(`bidocs_user_password_${extraEmail}`, extraPw);
+        safeSetItem(`bidocs_must_change_password_${extraEmail}`, "false");
+        return {
+          ...extra,
+          id: `user-${Date.now()}-${idx + 1}`,
+          tenantId: newTenantId,
+          password: extraPw,
+          mustChangePassword: false,
+          lastLoginAt: new Date().toISOString(),
+        };
+      },
+    );
+
     setTenants((prev) => [...prev, newTenant]);
-    setUsers((prev) => [...prev, newUser]);
+    setUsers((prev) => [...prev, newUser, ...createdAdditionalUsers]);
 
     setCurrentTenant(newTenant);
     setCurrentUser(newUser);
@@ -341,7 +359,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const switchUser = (userId: string): boolean => {
-    if (!isApproverRole(currentUser?.role)) return false;
     const target = users.find((u) => u.id === userId);
     if (!target) return false;
 

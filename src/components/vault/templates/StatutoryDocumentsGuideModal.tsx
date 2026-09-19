@@ -4,20 +4,13 @@ import {
   X,
   Search,
   BookOpen,
-  FileCheck2,
   AlertTriangle,
   CheckCircle2,
-  Building2,
   Copy,
   Check,
   ShieldCheck,
   Clock,
-  Briefcase,
   FileText,
-  HelpCircle,
-  ExternalLink,
-  Receipt,
-  Layers,
   Award
 } from 'lucide-react';
 
@@ -871,7 +864,7 @@ export const StatutoryDocumentsGuideModal: React.FC<StatutoryDocumentsGuideModal
           {/* Top Modal Header */}
           <div className="px-6 py-4 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30">
+              <div className="p-2.5 rounded-xl bg-linear-to-br from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30">
                 <BookOpen className="w-5 h-5" />
               </div>
               <div>
@@ -981,7 +974,7 @@ export const StatutoryDocumentsGuideModal: React.FC<StatutoryDocumentsGuideModal
                       onClick={() => setSelectedCode(guide.code)}
                       className={`w-full text-left p-3 rounded-xl border transition flex items-start justify-between gap-2.5 cursor-pointer ${
                         isSelected
-                          ? 'bg-gradient-to-r from-emerald-950/60 to-slate-900 border-emerald-500/60 shadow-md shadow-emerald-950/40'
+                          ? 'bg-linear-to-r from-emerald-950/60 to-slate-900 border-emerald-500/60 shadow-md shadow-emerald-950/40'
                           : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
                       }`}
                     >

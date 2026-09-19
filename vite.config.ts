@@ -9,7 +9,7 @@ export default defineConfig({
     tailwindcss(),
     {
       name: 'auto-browser-refresh-on-revision',
-      handleHotUpdate({ server, modules, timestamp }) {
+      handleHotUpdate({ server, modules, timestamp }: { server: any; modules: any[]; timestamp: number }) {
         // Instantly invalidate changed modules
         try {
           const invalidatedModules = new Set<any>();
@@ -47,7 +47,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
-        manualChunks(id) {
+        manualChunks(id: string) {
           const normalized = id.replace(/\\/g, '/');
           if (normalized.includes('node_modules')) {
             if (normalized.includes('pdf-lib') || normalized.includes('html2canvas') || normalized.includes('jspdf')) {

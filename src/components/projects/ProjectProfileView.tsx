@@ -6,7 +6,6 @@ import {
   SectorType,
   LegalRegime,
   DocumentVaultItem,
-  Tenant,
   DocCategory,
 } from "../../types";
 import {
@@ -36,7 +35,6 @@ import {
   Building2,
   Calendar,
   DollarSign,
-  Clock,
   ShieldCheck,
   CheckCircle2,
   FileSignature,
@@ -45,7 +43,6 @@ import {
   Copy,
   Printer,
   X,
-  FileCheck,
   FolderKanban,
   Box,
   MapPin,
@@ -58,25 +55,17 @@ import {
   Download,
   FileText,
   Receipt,
-  FileSpreadsheet,
-  AlertCircle,
   AlertTriangle,
-  TrendingUp,
   FolderOpen,
   Award,
-  HardHat,
   FileCheck2,
   Check,
-  Percent,
-  Calculator,
   Trophy,
   Sparkles,
   RefreshCw,
   HelpCircle,
   BookOpen,
-  Folder,
   FileStack,
-  Maximize2,
   Paperclip,
   Image as ImageIcon,
   UploadCloud,
@@ -4613,19 +4602,6 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
                               </tr>
                             ) : (
                               filteredBidDocs.map((doc, idx) => {
-                                const vaultMatch = vaultDocs.find(
-                                  (v) =>
-                                    (doc.vaultMatchCategory &&
-                                      v.category === doc.vaultMatchCategory) ||
-                                    (v.documentCode &&
-                                      v.documentCode.toUpperCase() ===
-                                        doc.code.toUpperCase()) ||
-                                    (v.documentName &&
-                                      v.documentName
-                                        .toLowerCase()
-                                        .includes(doc.name.toLowerCase())),
-                                );
-                                const isAttached = !!vaultMatch;
                                 const isGenerating =
                                   isGeneratingDocPdf === doc.id;
 

@@ -15,11 +15,8 @@ import {
   Download,
   Edit3,
   Building2,
-  CheckCircle2,
   Sparkles,
   RefreshCw,
-  Layers,
-  Check
 } from 'lucide-react';
 
 export type CoverTabType = 'MOTHER' | 'ENVELOPE' | 'FOLDER' | 'SEPARATOR';
@@ -64,7 +61,7 @@ export const PackagingCoversView: React.FC = () => {
   const [bundleScope, setBundleScope] = useState<'ALL_9_COVERS' | 'ORIGINAL_ONLY'>('ALL_9_COVERS');
   const [isExportingBundle, setIsExportingBundle] = useState(false);
   const [bundleProgress, setBundleProgress] = useState<{ percent: number; status: string } | null>(null);
-  const [printMode, setPrintMode] = useState<'ACTIVE' | 'ALL'>('ACTIVE');
+  const [, setPrintMode] = useState<'ACTIVE' | 'ALL'>('ACTIVE');
 
   // Initialize Opportunity Projects & Synchronize with Default
   useEffect(() => {
@@ -198,7 +195,7 @@ export const PackagingCoversView: React.FC = () => {
       {/* TOP HEADER CONTROLS BAR */}
       <div className="glass-panel p-4 sm:p-5 rounded-2xl border border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-4 shadow-xl print:hidden no-export">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-amber-950/40 shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-linear-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-amber-950/40 shrink-0">
             <Box className="w-6 h-6" />
           </div>
           <div>
@@ -223,7 +220,7 @@ export const PackagingCoversView: React.FC = () => {
               <select
                 value={selectedOppId}
                 onChange={(e) => handleSelectOpp(e.target.value)}
-                className="bg-transparent text-white font-mono text-xs font-bold focus:outline-none cursor-pointer max-w-[170px] truncate"
+                className="bg-transparent text-white font-mono text-xs font-bold focus:outline-none cursor-pointer max-w-42.5 truncate"
                 title="Synchronize cover metadata from active Opportunity Finder project"
               >
                 {oppProjects.map(p => (
@@ -269,7 +266,7 @@ export const PackagingCoversView: React.FC = () => {
             <button
               onClick={handleExportBundlePdf}
               disabled={isExportingBundle}
-              className="relative group px-3.5 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 transition-all duration-200 flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-950/30 hover:shadow-amber-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative group px-3.5 py-2 rounded-xl text-xs font-black bg-linear-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 transition-all duration-200 flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-950/30 hover:shadow-amber-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               title="1-Click Download all statutory packaging covers (Mother Box, Envelopes & Folders) as a single Legal Landscape PDF"
             >
               {isExportingBundle ? (
@@ -352,7 +349,7 @@ export const PackagingCoversView: React.FC = () => {
           </div>
           <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-amber-500/30">
             <div
-              className="bg-gradient-to-r from-amber-500 to-amber-400 h-full transition-all duration-300 rounded-full"
+              className="bg-linear-to-r from-amber-500 to-amber-400 h-full transition-all duration-300 rounded-full"
               style={{ width: `${bundleProgress.percent}%` }}
             />
           </div>

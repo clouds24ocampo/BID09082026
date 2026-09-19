@@ -22,7 +22,6 @@ import { PackageItem } from "../bids/bidpackage";
 import VaultErrorBoundary from "../common/VaultErrorBoundary";
 import {
   saveVaultItems,
-  upsertVaultItem,
   loadVaultItems,
   deleteVaultItem,
   savePdfData,

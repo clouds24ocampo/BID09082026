@@ -11,10 +11,7 @@ import {
   Trash2,
   CheckCircle2,
   RefreshCw,
-  Building2,
-  Calendar,
   FileSpreadsheet,
-  DollarSign,
   Briefcase,
   Layers,
   Activity,
@@ -80,7 +77,7 @@ export const SwaModalContent: React.FC<SwaModalProps> = ({
 }) => {
   const todayStr = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  const [oppProjects, setOppProjects] = useState<OpportunityProjectOption[]>([]);
+  const [, setOppProjects] = useState<OpportunityProjectOption[]>([]);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
   // SWA Header Fields (Accurate Philippine Gov Standard)
@@ -545,7 +542,7 @@ export const SwaModalContent: React.FC<SwaModalProps> = ({
           <button
             onClick={handleSaveAndComplete}
             disabled={isSaving}
-            className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/30 border border-emerald-400/40 cursor-pointer disabled:opacity-50"
+            className="px-4 py-1.5 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/30 border border-emerald-400/40 cursor-pointer disabled:opacity-50"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Save & Attach to Vault</span>

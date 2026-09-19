@@ -3,7 +3,6 @@ import { useAuth } from "../../context/AuthContext";
 import {
   UserRole,
   isApproverRole,
-  isPreparerRole,
   getRoleDisplayName,
 } from "../../types";
 import {
@@ -14,12 +13,8 @@ import {
   CheckCircle2,
   Users,
   UserPlus,
-  ShieldCheck,
-  UserCheck,
   Trash2,
   ArrowRightLeft,
-  Lock,
-  FileCheck,
   AlertCircle,
 } from "lucide-react";
 

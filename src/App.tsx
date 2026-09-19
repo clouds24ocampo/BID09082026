@@ -39,10 +39,18 @@ const MainApp: React.FC = () => {
           <DashboardView setActiveTab={setActiveTab} />
         )}
         {activeTab === "tor" && (
-          <PowModal tenant={currentTenant} setActiveTab={setActiveTab} />
+          <PowModal
+            tenant={currentTenant}
+            setActiveTab={setActiveTab}
+            initialTab="tor"
+          />
         )}
         {activeTab === "pow" && (
-          <PowModal tenant={currentTenant} setActiveTab={setActiveTab} />
+          <PowModal
+            tenant={currentTenant}
+            setActiveTab={setActiveTab}
+            initialTab="matrix"
+          />
         )}
         {activeTab === "opportunities" && (
           <OpportunityFinderView setActiveTab={setActiveTab} />

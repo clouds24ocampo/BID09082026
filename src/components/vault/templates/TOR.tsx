@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Tenant,
   isApproverRole,
-  isPreparerRole,
   getRoleDisplayName,
 } from "../../../types";
 import { useAuth } from "../../../context/AuthContext";
@@ -14,12 +13,11 @@ import {
   saveDocumentApproval,
   DocumentApprovalRecord,
 } from "../../../utils/opportunityProjects";
-import { computeStatutoryTaxes, TaxType, ProjectTaxCategory } from "./POW";
+import { computeStatutoryTaxes, TaxType, ProjectTaxCategory, generateDateTimeTrackingId } from "./POW";
 import ApprovalGateModal from "../../common/ApprovalGateModal";
 import {
   FileText,
   Building2,
-  Calendar,
   DollarSign,
   ShieldCheck,
   CheckCircle2,
@@ -29,22 +27,24 @@ import {
   Layers,
   Plus,
   Trash2,
-  Edit3,
-  Eye,
   RefreshCw,
-  Award,
   UserCheck,
-  Truck,
-  Wrench,
   Scale,
   Sparkles,
   Lock,
-  ArrowRight,
-  Sliders,
-  CheckSquare,
+  Clock,
 } from "lucide-react";
+import {
+  TorAnnexesWorkbench,
+  LTCISCC_SCOPE_ITEMS,
+  LTCISCC_KEY_PERSONNEL,
+  LTCISCC_EQUIPMENT_REQUIREMENTS,
+  LTCISCC_SIGNATORIES,
+  GRAND_TOTAL_ABC,
+} from "./torAnnexesData";
 
 export type TorPresetType =
+  | "LTCISCC_COMMAND_CENTER"
   | "DPWH_INFRA"
   | "LGU_GOODS_SERVICES"
   | "BARANGAY_COMMUNITY";
@@ -160,6 +160,63 @@ export const TOR_PRESET_TEMPLATES: Record<
     | "abcAmount"
   >
 > = {
+  LTCISCC_COMMAND_CENTER: {
+    presetType: "LTCISCC_COMMAND_CENTER",
+    implementingOffice:
+      "Municipal Disaster Risk Reduction and Management Office (MDRRMO) / Office of the Municipal Mayor",
+    projectLocation:
+      "Km. 5, Pico, Municipality of La Trinidad, Benguet (46 Strategic Municipal Nodes)",
+    sourceOfFunds:
+      "LGU General Fund / 20% Municipal Development Fund / LDRRM Trust Fund (Municipal Ordinance No. 28-2017)",
+    contractDurationDays: 180,
+    taxType: "VATABLE",
+    projectCategory: "GOODS",
+    retentionRate: 1,
+    backgroundRationale:
+      "Pursuant to Republic Act No. 7160 (Local Government Code of 1991), Republic Act No. 9184, Republic Act No. 12009 (New Government Procurement Act - NGPA), Republic Act No. 10121 (PDRRM Act of 2010), Republic Act No. 6975 (DILG Act), Republic Act No. 10173 (Data Privacy Act of 2012), and La Trinidad Municipal Ordinance No. 28-2017, the Municipality of La Trinidad establishes the La Trinidad Communication, Information and Surveillance Command Center (LTCISCC) as a permanent, centralized, mission-critical facility. Operating 24/7 across normal, heightened alert, and emergency modes, the Command Center consolidates real-time video surveillance, AI risk intelligence, emergency dispatch coordination, traffic management, and executive decision-support while safeguarding public rights through network-segregated digital services.",
+    generalObjectives: [
+      "Establish a permanent, centralized, 24/7 mission-critical Command Center facility integrating physical infrastructure, core computing, storage, video wall displays, and 46 strategic field nodes.",
+      "Deploy and commission enterprise platforms: iVMS-4200 Video Management System, HikCentral Professional Security Management backbone, Integrated Weather Monitoring & Risk Intelligence, and Footage Hub Multimedia Intelligence Platform.",
+      "Establish the official Municipal Digital Landing Page providing public-safe multi-source weather advisories and a controlled, approval-governed CCTV footage request system fully compliant with RA 10173 data privacy rules.",
+      "Deploy high-availability single-core armored fiber optic rings and wireless bridge networks with mandatory Three (3)-Hour on-site emergency technical response SLA.",
+    ],
+    scopeItems: LTCISCC_SCOPE_ITEMS,
+    technicalStandards: [
+      "All equipment and installations must comply with RA 9184, RA 12009 (NGPA), DICT ICT Governance Policies, and ISO 9001:2015 standards.",
+      "The primary video surveillance infrastructure must run on iVMS-4200 and HikCentral Professional enterprise management backbone with centralized audit logging.",
+      "All fiber optic aerial and underground runs must achieve <= 0.1 dB splice loss and be 100% verified using calibrated OTDR trace reports prior to acceptance.",
+      "Network architecture must enforce strict logical and physical segmentation between the internal Command Center systems and the public Municipal Digital Landing Page.",
+      "All video evidence handling, exports, and retention must strictly conform to RA 10173 (Data Privacy Act of 2012) and National Privacy Commission (NPC) advisories.",
+      "The CCTV feeds must support 24/7 continuous recording with a minimum retention period of 30 calendar days at native 4MP 25/30fps resolution.",
+      "All outdoor devices (cameras, switches, enclosures) must carry minimum IP66/IP67 ingress protection and 6kV lightning surge suppression.",
+      "Power conditioning must deliver continuous uninterruptible clean power via double-conversion UPS with auto-switching to municipal backup generator.",
+    ],
+    keyPersonnel: LTCISCC_KEY_PERSONNEL,
+    equipmentRequirements: LTCISCC_EQUIPMENT_REQUIREMENTS,
+    deliveryTerms: [
+      "Contract execution commences immediately upon issuance of the official Notice to Proceed (NTP) with an overall contract duration of one hundred eighty (180) calendar days.",
+      "Work shall be implemented in five (5) progressive phases across forty-six (46) designated municipal node sites under MDRRMO supervision.",
+      "Mandatory Three (3)-Hour on-site technical response time is strictly required for any critical CCTV feed outage or core infrastructure disruption.",
+      "Weekly progress milestone reporting and coordination meetings with the Municipal Technical Working Group (TWG) and MDRRMO.",
+    ],
+    inspectionAndAcceptance: [
+      "Phase-by-phase inspection and milestone sign-off by the LGU Inspectorate Team, MDRRMO Head, and Municipal TWG.",
+      "Factory Acceptance Testing (FAT) data verification and 100% on-site optical OTDR loss verification for every fiber strand prior to acceptance.",
+      "Mandatory 72-hour continuous burn-in test of all AI models, video wall displays, and recording servers under simulated full network load.",
+      "Issuance of Certificate of Completion followed by a three (3) year comprehensive warranty and maintenance agreement.",
+    ],
+    paymentTerms: [
+      "Advance mobilization payment of up to fifteen percent (15%) against an irrevocable standby letter of credit or bank guarantee pursuant to RA 9184 and RA 12009.",
+      "Progress billings based on verified physical and technical accomplishment across the 5 project phases, less statutory deductions: 5% Final Withholding VAT, 1% EWT (Goods) / 2% (Services), and 1% Statutory Retention Money.",
+      "Final payment released upon issuance of the Certificate of Final Acceptance and submission of the 3-Year Warranty Security.",
+    ],
+    warrantyAndLiquidatedDamages: [
+      "Comprehensive three (3) year warranty covering newly installed CCTV cameras, integrated legacy units, servers, switches, and video wall displays.",
+      "Mandatory 3-Hour Emergency On-Site Response SLA for critical system down events; 24-hour resolution guarantee for minor component failures.",
+      "Liquidated damages equivalent to one-tenth of one percent (1/10 of 1%) of the unperformed portion per calendar day of delay.",
+    ],
+    signatories: LTCISCC_SIGNATORIES,
+  },
   DPWH_INFRA: {
     presetType: "DPWH_INFRA",
     implementingOffice:
@@ -702,12 +759,12 @@ export interface TermsOfReferenceProps {
 }
 
 export const TermsOfReferenceContent: React.FC<TermsOfReferenceProps> = ({
-  initialPreset = "DPWH_INFRA",
+  initialPreset = "LTCISCC_COMMAND_CENTER",
   tenant,
-  activeProjectRefNo = "PR-2026-09-001",
-  activeProjectTitle = "Rehabilitation and Concreting of Strategic Road Infrastructure",
-  activeProcuringEntity = "Department of Public Works and Highways",
-  activeAbcAmount = 4850000.0,
+  activeProjectRefNo = "LTCISCC-ITB-2026-001",
+  activeProjectTitle = "Equipment Outlay of the La Trinidad Communication, Information and Surveillance Command Center (LTCISCC)",
+  activeProcuringEntity = "Municipality of La Trinidad, Province of Benguet",
+  activeAbcAmount = GRAND_TOTAL_ABC,
   activeTrackingNumber,
   powScopeItems,
   onSaveAndComplete,
@@ -720,12 +777,17 @@ export const TermsOfReferenceContent: React.FC<TermsOfReferenceProps> = ({
   const [selectedPreset, setSelectedPreset] =
     useState<TorPresetType>(initialPreset);
 
+  // Active Workbench Tab: Executive TOR vs Annexes
+  const [activeWorkbenchTab, setActiveWorkbenchTab] = useState<
+    "executive" | "annex-c" | "annex-ae" | "annex-bg" | "annex-di"
+  >("executive");
+
   // Form State
   const [torData, setTorData] = useState<TermsOfReferenceData>(() => {
     const basePreset = TOR_PRESET_TEMPLATES[initialPreset];
     return {
       ...basePreset,
-      trackingNumber: activeTrackingNumber || "",
+      trackingNumber: activeTrackingNumber || generateDateTimeTrackingId(),
       projectRefNo: activeProjectRefNo,
       projectTitle: activeProjectTitle,
       procuringEntity: activeProcuringEntity,
@@ -737,7 +799,8 @@ export const TermsOfReferenceContent: React.FC<TermsOfReferenceProps> = ({
   useEffect(() => {
     setTorData((prev) => ({
       ...prev,
-      trackingNumber: activeTrackingNumber || prev.trackingNumber,
+      trackingNumber:
+        activeTrackingNumber || prev.trackingNumber || generateDateTimeTrackingId(),
       projectRefNo: activeProjectRefNo || prev.projectRefNo,
       projectTitle: activeProjectTitle || prev.projectTitle,
       procuringEntity: activeProcuringEntity || prev.procuringEntity,
@@ -760,16 +823,27 @@ export const TermsOfReferenceContent: React.FC<TermsOfReferenceProps> = ({
       ...prev,
       ...template,
       presetType: preset,
-      trackingNumber: prev.trackingNumber,
-      projectRefNo: prev.projectRefNo,
-      projectTitle: prev.projectTitle,
+      trackingNumber: prev.trackingNumber || generateDateTimeTrackingId(),
+      projectRefNo:
+        preset === "LTCISCC_COMMAND_CENTER"
+          ? "LTCISCC-ITB-2026-001"
+          : prev.projectRefNo,
+      projectTitle:
+        preset === "LTCISCC_COMMAND_CENTER"
+          ? "Equipment Outlay of the La Trinidad Communication, Information and Surveillance Command Center (LTCISCC)"
+          : prev.projectTitle,
       procuringEntity:
-        preset === "DPWH_INFRA"
-          ? "Department of Public Works and Highways"
-          : preset === "LGU_GOODS_SERVICES"
-            ? "City Government Procurement Office"
-            : "Barangay Council / Bids and Awards Committee",
-      abcAmount: prev.abcAmount,
+        preset === "LTCISCC_COMMAND_CENTER"
+          ? "Municipality of La Trinidad, Province of Benguet"
+          : preset === "DPWH_INFRA"
+            ? "Department of Public Works and Highways"
+            : preset === "LGU_GOODS_SERVICES"
+              ? "City Government Procurement Office"
+              : "Barangay Council / Bids and Awards Committee",
+      abcAmount:
+        preset === "LTCISCC_COMMAND_CENTER"
+          ? GRAND_TOTAL_ABC
+          : prev.abcAmount,
     }));
   };
 
@@ -1004,17 +1078,6 @@ export const TermsOfReferenceContent: React.FC<TermsOfReferenceProps> = ({
     }
   };
 
-  // Handle Approval Granted in Modal
-  const handleApprovalGranted = (approval: DocumentApprovalRecord) => {
-    setApprovalRecord(approval);
-    setShowApprovalGate(false);
-    if (approvalActionTarget === "EXPORT") {
-      setTimeout(() => handleExportPdf(), 300);
-    } else {
-      setTimeout(() => handleSaveAndComplete(), 300);
-    }
-  };
-
   // Native Print
   const handlePrint = () => {
     window.print();
@@ -1095,9 +1158,46 @@ export const TermsOfReferenceContent: React.FC<TermsOfReferenceProps> = ({
           </div>
         </div>
 
-        {/* 3 STATUTORY PRESET SELECTORS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* PRESET 1: DPWH */}
+        {/* 4 STATUTORY PRESET SELECTORS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* PRESET 1: LTCISCC COMMAND CENTER (FLAGSHIP) */}
+          <div
+            onClick={() => handleSwitchPreset("LTCISCC_COMMAND_CENTER")}
+            className={`p-3.5 rounded-xl border cursor-pointer transition text-left space-y-1.5 relative overflow-hidden ${
+              selectedPreset === "LTCISCC_COMMAND_CENTER"
+                ? "bg-linear-to-br from-blue-900/30 via-slate-900 to-indigo-900/30 border-blue-500 text-white shadow-xl shadow-blue-950/50"
+                : "bg-slate-950/60 border-slate-800 hover:border-slate-700 text-slate-300"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-blue-400 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <span>LTCISCC Command Center</span>
+              </span>
+              {selectedPreset === "LTCISCC_COMMAND_CENTER" && (
+                <CheckCircle2 className="w-4 h-4 text-blue-400" />
+              )}
+            </div>
+            <p className="text-[11px] text-slate-200 font-semibold truncate">
+              Municipality of La Trinidad, Benguet
+            </p>
+            <p className="text-[10px] text-slate-400 leading-tight">
+              Ord. 28-2017 &amp; RA 12009: 46 field nodes, iVMS-4200, HikCentral, AI Models, Armored Fiber &amp; 3-Hr SLA.
+            </p>
+            <div className="flex items-center gap-1.5 pt-1 text-[10px] font-mono text-blue-300 flex-wrap">
+              <span className="px-1.5 py-0.5 rounded bg-blue-500/20 font-bold text-amber-300">
+                ₱14M ABC
+              </span>
+              <span className="px-1.5 py-0.5 rounded bg-blue-500/20">
+                5% VAT
+              </span>
+              <span className="px-1.5 py-0.5 rounded bg-blue-500/20">
+                3-Yr SLA
+              </span>
+            </div>
+          </div>
+
+          {/* PRESET 2: DPWH */}
           <div
             onClick={() => handleSwitchPreset("DPWH_INFRA")}
             className={`p-3.5 rounded-xl border cursor-pointer transition text-left space-y-1.5 ${
@@ -1115,7 +1215,7 @@ export const TermsOfReferenceContent: React.FC<TermsOfReferenceProps> = ({
                 <CheckCircle2 className="w-4 h-4 text-amber-400" />
               )}
             </div>
-            <p className="text-[11px] text-slate-300 font-medium">
+            <p className="text-[11px] text-slate-300 font-medium truncate">
               Civil Works &amp; Infrastructure
             </p>
             <p className="text-[10px] text-slate-400 leading-tight">
@@ -1135,7 +1235,7 @@ export const TermsOfReferenceContent: React.FC<TermsOfReferenceProps> = ({
             </div>
           </div>
 
-          {/* PRESET 2: LGU */}
+          {/* PRESET 3: LGU */}
           <div
             onClick={() => handleSwitchPreset("LGU_GOODS_SERVICES")}
             className={`p-3.5 rounded-xl border cursor-pointer transition text-left space-y-1.5 ${
@@ -1153,7 +1253,7 @@ export const TermsOfReferenceContent: React.FC<TermsOfReferenceProps> = ({
                 <CheckCircle2 className="w-4 h-4 text-blue-400" />
               )}
             </div>
-            <p className="text-[11px] text-slate-300 font-medium">
+            <p className="text-[11px] text-slate-300 font-medium truncate">
               Provincial / City / Municipal
             </p>
             <p className="text-[10px] text-slate-400 leading-tight">
@@ -1173,7 +1273,7 @@ export const TermsOfReferenceContent: React.FC<TermsOfReferenceProps> = ({
             </div>
           </div>
 
-          {/* PRESET 3: BARANGAY */}
+          {/* PRESET 4: BARANGAY */}
           <div
             onClick={() => handleSwitchPreset("BARANGAY_COMMUNITY")}
             className={`p-3.5 rounded-xl border cursor-pointer transition text-left space-y-1.5 ${
@@ -1191,7 +1291,7 @@ export const TermsOfReferenceContent: React.FC<TermsOfReferenceProps> = ({
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               )}
             </div>
-            <p className="text-[11px] text-slate-300 font-medium">
+            <p className="text-[11px] text-slate-300 font-medium truncate">
               Community Procurement (RA 12009)
             </p>
             <p className="text-[10px] text-slate-400 leading-tight">
@@ -1244,10 +1344,87 @@ export const TermsOfReferenceContent: React.FC<TermsOfReferenceProps> = ({
             )}
           </div>
         </div>
+
+        {/* INTERACTIVE WORKBENCH VIEW TABS */}
+        <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setActiveWorkbenchTab("executive")}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer shrink-0 ${
+              activeWorkbenchTab === "executive"
+                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent"
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Executive TOR (Sections I–XIV)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveWorkbenchTab("annex-c")}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer shrink-0 ${
+              activeWorkbenchTab === "annex-c"
+                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent"
+            }`}
+          >
+            <DollarSign className="w-3.5 h-3.5" />
+            <span>Annex C: BOQ &amp; Cost Breakdown (₱14,000,000.00)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveWorkbenchTab("annex-ae")}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer shrink-0 ${
+              activeWorkbenchTab === "annex-ae"
+                ? "bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent"
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Annex A &amp; E: Core Compute &amp; Software Specs</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveWorkbenchTab("annex-bg")}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer shrink-0 ${
+              activeWorkbenchTab === "annex-bg"
+                ? "bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent"
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            <span>Annex B &amp; G: SOPs &amp; 3-Hour SLA</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveWorkbenchTab("annex-di")}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition cursor-pointer shrink-0 ${
+              activeWorkbenchTab === "annex-di"
+                ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent"
+            }`}
+          >
+            <Scale className="w-3.5 h-3.5" />
+            <span>Annex D &amp; I: Data Privacy (RA 10173) &amp; TWG Directives</span>
+          </button>
+        </div>
       </div>
 
-      {/* EDITABLE STATUTORY PARAMETERS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {activeWorkbenchTab !== "executive" ? (
+        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-xl">
+          <TorAnnexesWorkbench
+            activeTab={activeWorkbenchTab}
+            onTabChange={setActiveWorkbenchTab}
+          />
+        </div>
+      ) : (
+        <>
+          {/* EDITABLE STATUTORY PARAMETERS */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* LEFT COLUMN: GENERAL PROJECT DETAILS */}
         <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 text-xs">
           <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-2">
@@ -1739,6 +1916,8 @@ export const TermsOfReferenceContent: React.FC<TermsOfReferenceProps> = ({
           </div>
         ))}
       </div>
+    </>
+  )}
 
       {/* OFF-SCREEN LEGAL 8.5" x 13" SHEET FOR HTML2CANVAS & PRINTING (RULE PDF-4) */}
       <div

@@ -8,14 +8,12 @@ import {
 import { DocumentApprovalRecord } from "../../utils/opportunityProjects";
 import {
   ShieldAlert,
-  ShieldCheck,
   CheckCircle2,
   Lock,
   X,
   Clock,
   FileText,
   ArrowRight,
-  AlertCircle,
 } from "lucide-react";
 
 interface ApprovalGateModalProps {
