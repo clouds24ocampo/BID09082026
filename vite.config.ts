@@ -9,12 +9,37 @@ export default defineConfig({
     tailwindcss(),
     {
       name: 'auto-browser-refresh-on-revision',
-      handleHotUpdate({ server }) {
-        // Instantly triggers automatic browser refresh on every code revision/save
-        server.ws.send({
-          type: 'full-reload',
-          path: '*'
-        });
+      handleHotUpdate({ server, modules, timestamp }) {
+        // Instantly invalidate changed modules
+        try {
+          const invalidatedModules = new Set<any>();
+          for (const mod of modules) {
+            server.moduleGraph.invalidateModule(
+              mod,
+              invalidatedModules,
+              timestamp,
+              true
+            );
+          }
+        } catch (_) {}
+
+        // Send full-reload unconditionally to browser
+        server.ws.send({ type: 'full-reload' });
+        if ((server as any).hot) {
+          try { (server as any).hot.send({ type: 'full-reload' }); } catch (_) {}
+        }
+
+        // Broadcast custom force-reload event to client
+        try {
+          server.ws.send({
+            type: 'custom',
+            event: 'bidocs:force-reload',
+            data: { timestamp: Date.now() }
+          });
+        } catch (_) {}
+
+        // Return empty array to bypass partial HMR and force full reload
+        return [];
       }
     }
   ],
@@ -78,16 +103,19 @@ export default defineConfig({
     }
   },
   server: {
+    host: true,
     port: 3001,
     strictPort: true,
     open: false,
     hmr: {
-      overlay: true
+      overlay: true,
+      port: 3001
     },
     watch: {
       usePolling: true,
       interval: 100,
-      ignored: ['**/AntigravitySkills/**', '**/.agents/**', '**/dist/**', '**/.git/**']
+      binaryInterval: 300,
+      ignored: ['**/AntigravitySkills/**', '**/.agents/**', '**/dist/**', '**/.git/**', '**/node_modules/**']
     }
   },
   test: {

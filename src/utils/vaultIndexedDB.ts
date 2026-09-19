@@ -608,18 +608,36 @@ export async function vacuumOrphanedBlobs(): Promise<number> {
  * Completely flush all localStorage, sessionStorage, and IndexedDB data
  */
 export async function purgeEntireApplicationStorage(): Promise<void> {
+  // Evict in-memory caches
+  memoryPdfCache.clear();
+  memoryVaultItemsCache.clear();
+
   // 1. Clear Web Storages
   try {
     localStorage.clear();
     sessionStorage.clear();
+    if (typeof caches !== 'undefined') {
+      caches.keys().then((names) => {
+        names.forEach((name) => caches.delete(name));
+      }).catch(() => {});
+    }
   } catch (_) {}
 
   // 2. Clear Vault IndexedDB
   await clearAllVaultData();
 
-  // 3. Delete BiDOCS Database completely
+  // 3. Close active cached connection before deleting to avoid locks
+  if (cachedDB) {
+    try { cachedDB.close(); } catch (_) {}
+    cachedDB = null;
+  }
+
+  // 4. Delete BiDOCS Databases completely
   try {
-    indexedDB.deleteDatabase(DB_NAME);
+    if (typeof indexedDB !== 'undefined') {
+      indexedDB.deleteDatabase(DB_NAME);
+      indexedDB.deleteDatabase('bidocs_vault_db');
+    }
   } catch (_) {}
 
   console.log('[BiDOCS] Entire database and storage flushed successfully.');

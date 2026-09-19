@@ -27,11 +27,19 @@ debugLog('main.tsx:boot', 'Application bootstrap started', {
 }, 'A');
 // #endregion
 
-// Automatic Browser Refresh on any Code Revision / Edit
+// Automatic Instant Browser Refresh on any Code Revision / Save
 const hot = (import.meta as any).hot;
 if (hot) {
+  hot.on('bidocs:force-reload', () => {
+    console.log('[Auto-Refresh] Code revision saved -> automatically reloading browser...');
+    window.location.reload();
+  });
+  hot.on('vite:beforeFullReload', () => {
+    console.log('[Auto-Refresh] Vite full reload triggered -> reloading browser...');
+    window.location.reload();
+  });
   hot.on('vite:beforeUpdate', () => {
-    console.log('[Auto-Refresh] Code revision detected, reloading browser automatically...');
+    console.log('[Auto-Refresh] Code revision detected -> reloading browser automatically...');
     window.location.reload();
   });
   hot.accept(() => {

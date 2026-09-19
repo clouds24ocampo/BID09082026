@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Tenant, User, UserRole } from '../types';
-import { clearAllVaultData } from '../utils/vaultIndexedDB';
+import { clearAllVaultData, purgeEntireApplicationStorage } from '../utils/vaultIndexedDB';
 import { debugLog } from '../utils/debugLog';
 import { safeGetItem, safeSetItem, safeGetJson, safeSetJson, safeRemoveItem } from '../utils/safeStorage';
 
@@ -8,26 +8,17 @@ const DEFAULT_TENANTS: Tenant[] = [];
 
 const DEFAULT_USERS: User[] = [];
 
-// Automatic one-time clean flush for pristine real corporation onboarding
+const FLUSH_KEY = 'bidocs_live_clean_flush_v7_new_transaction';
+
+// Automatic one-time clean flush for pristine new transaction
 const purgeLegacyMockData = () => {
   try {
     if (typeof localStorage === 'undefined') return;
-    const isFlushedForLive = safeGetItem('bidocs_live_clean_flush_v6');
+    const isFlushedForLive = safeGetItem(FLUSH_KEY);
     if (!isFlushedForLive) {
-      localStorage.clear();
-      if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
-      if (typeof caches !== 'undefined') {
-        caches.keys().then((names) => {
-          names.forEach((name) => caches.delete(name));
-        }).catch(() => {});
-      }
-      clearAllVaultData().catch(() => {});
-      try {
-        if (typeof indexedDB !== 'undefined') {
-          indexedDB.deleteDatabase('bidocs_vault_db');
-        }
-      } catch (_) {}
-      safeSetItem('bidocs_live_clean_flush_v6', 'true');
+      purgeEntireApplicationStorage().catch((e) => console.error('[AuthContext] Error purging database:', e));
+      safeSetItem(FLUSH_KEY, 'true');
+      console.log('[BiDOCS] Database and storage flushed clean for new transaction.');
     }
   } catch (e) {
     console.error('[AuthContext] Error flushing legacy mock data:', e);
@@ -287,23 +278,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetAllData = () => {
+    purgeEntireApplicationStorage().catch((e) => console.error('[AuthContext] Failed to purge application storage:', e));
     try {
-      localStorage.clear();
-      sessionStorage.clear();
-      if (typeof caches !== 'undefined') {
-        caches.keys().then((names) => {
-          names.forEach((name) => caches.delete(name));
-        }).catch(() => {});
-      }
-      localStorage.setItem('bidocs_live_clean_flush_v6', 'true');
-    } catch (e) {
-      console.error('Failed to clear browser storage:', e);
-    }
-    clearAllVaultData().catch((e) => console.error('Failed to clear vault DB:', e));
-    try {
-      if (typeof indexedDB !== 'undefined') {
-        indexedDB.deleteDatabase('bidocs_vault_db');
-      }
+      localStorage.setItem(FLUSH_KEY, 'true');
     } catch (_) {}
     setTenants([]);
     setUsers([]);
