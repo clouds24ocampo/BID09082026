@@ -585,9 +585,20 @@ export const DocumentVaultView: React.FC = () => {
     const list = getOpportunityProjects(activeTenantId);
     setOppProjects(list);
     try {
-      const savedRef = localStorage.getItem(
+      let savedRef = localStorage.getItem(
         `bidocs_active_vault_project_${activeTenantId}`,
       );
+      if (!savedRef) {
+        try {
+          const rawActive = localStorage.getItem(
+            `bidocs_active_project_${activeTenantId}`,
+          );
+          if (rawActive) {
+            const parsed = JSON.parse(rawActive);
+            if (parsed.refNo) savedRef = parsed.refNo;
+          }
+        } catch (_) {}
+      }
       if (savedRef) {
         const match = list.find((p) => p.refNo === savedRef);
         if (match) {
@@ -908,10 +919,13 @@ export const DocumentVaultView: React.FC = () => {
     projRefNo?: string,
     projTitle?: string,
   ) => {
-    const refNo =
-      projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
-    const title =
-      projTitle || activeProjectTitle || oppProjects[0]?.title || "";
+    const refNo = (projRefNo || activeProjectRefNo || "").trim();
+    const title = (projTitle || activeProjectTitle || "").trim();
+    const matchedOpp = refNo
+      ? oppProjects.find((p) => p.refNo === refNo || p.id === refNo)
+      : undefined;
+    const resolvedProjectId =
+      matchedOpp?.id || (refNo ? undefined : activeProjectId || undefined);
 
     const isInfra =
       customName?.includes("Infrastructure") ||
@@ -940,18 +954,32 @@ export const DocumentVaultView: React.FC = () => {
         ? "GPPB-BIDFORM-CONSULTING"
         : "GPPB-BIDFORM-GOODS";
 
-    const newId = `fin-bidform-${isInfra ? "infra" : isConsulting ? "consult" : "goods"}-${Date.now()}`;
+    const existingDoc = vaultItems.find(
+      (item) =>
+        item.category === "FINANCIAL" &&
+        (item.documentCode === "GPPB-BIDFORM-GOODS" ||
+          item.documentCode === "GPPB-BIDFORM-INFRASTRUCTURE" ||
+          item.documentCode === "GPPB-BIDFORM-CONSULTING") &&
+        ((refNo && item.philgepsRefNo === refNo) ||
+          (resolvedProjectId && item.projectId === resolvedProjectId)),
+    );
+
+    const docIdToUse =
+      existingDoc?.id ||
+      `fin-bidform-${isInfra ? "infra" : isConsulting ? "consult" : "goods"}-${Date.now()}`;
+    const nextVersion = existingDoc ? existingDoc.versionNumber + 1 : 1;
+
     const cleanPdfName = isInfra
-      ? `${refNo}_Financial_Envelope_Bid_Form_for_Infrastructure.pdf`
+      ? `${refNo || "INFRA"}_Financial_Envelope_Bid_Form_for_Infrastructure.pdf`
       : isConsulting
-        ? `${refNo}_Financial_Envelope_Bid_Form_for_Consulting.pdf`
-        : `${refNo}_Financial_Envelope_Bid_Form_for_Goods.pdf`;
+        ? `${refNo || "CONSULT"}_Financial_Envelope_Bid_Form_for_Consulting.pdf`
+        : `${refNo || "GOODS"}_Financial_Envelope_Bid_Form_for_Goods.pdf`;
 
     const newItem: DocumentVaultItem = {
-      id: newId,
+      id: docIdToUse,
       tenantId: activeTenantId,
       documentCode: docCode,
-      documentName: customName || `${docTypeLabel} - [${refNo}]`,
+      documentName: customName || (refNo ? `${docTypeLabel} - [${refNo}]` : docTypeLabel),
       category: "FINANCIAL",
       procurementApplicability: isInfra
         ? ["INFRASTRUCTURE"]
@@ -961,7 +989,7 @@ export const DocumentVaultView: React.FC = () => {
       legalBasisReference: isInfra
         ? "GPPB Resolution No. 09-2020 / Section 30.1 of RA 12009 (Financial Bid Form)"
         : "Section 30.1 of RA 12009 / Section 32.2.1 of RA 9184 (Financial Bid Form)",
-      versionNumber: 1,
+      versionNumber: nextVersion,
       fileHash: Array.from({ length: 64 }, () =>
         Math.floor(Math.random() * 16).toString(16),
       ).join(""),
@@ -973,30 +1001,22 @@ export const DocumentVaultView: React.FC = () => {
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
-      projectId: activeProjectId || undefined,
-      philgepsRefNo: refNo,
-      projectTitle: title,
+      projectId: resolvedProjectId,
+      philgepsRefNo: refNo || undefined,
+      projectTitle: title || undefined,
+      previousVersions: existingDoc?.previousVersions || [],
     };
 
-    storePdfData(newId, fileDataUrl);
+    storePdfData(docIdToUse, fileDataUrl);
     setVaultItems((prev) => [
       newItem,
-      ...prev.filter(
-        (item) =>
-          !(
-            item.category === "FINANCIAL" &&
-            (item.documentCode === "GPPB-BIDFORM-GOODS" ||
-              item.documentCode === "GPPB-BIDFORM-INFRASTRUCTURE" ||
-              item.documentCode === "GPPB-BIDFORM-CONSULTING") &&
-            (item.philgepsRefNo === refNo || item.projectId === activeProjectId)
-          ),
-      ),
+      ...prev.filter((item) => item.id !== docIdToUse),
     ]);
     setShowBidFormGoodsModal(false);
     setShowBidFormInfraModal(false);
     notifySuccess(
-      `${docTypeLabel} Saved!`,
-      `Duly completed statutory ${docTypeLabel} saved to vault under project [${refNo}] ${title}.`,
+      `[${docTypeLabel}, v${nextVersion}.0] Saved!`,
+      `Duly completed statutory ${docTypeLabel} saved to vault under project [${refNo || "N/A"}] ${title}.`,
     );
   };
 
@@ -1020,45 +1040,62 @@ export const DocumentVaultView: React.FC = () => {
     projRefNo?: string,
     projTitle?: string,
   ) => {
-    const newId = `fin-boq-${Date.now()}`;
-    const refNo =
-      projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
-    const title =
-      projTitle || activeProjectTitle || oppProjects[0]?.title || "";
+    const refNo = (projRefNo || activeProjectRefNo || "").trim();
+    const title = (projTitle || activeProjectTitle || "").trim();
+    const matchedOpp = refNo
+      ? oppProjects.find((p) => p.refNo === refNo || p.id === refNo)
+      : undefined;
+    const resolvedProjectId =
+      matchedOpp?.id || (refNo ? undefined : activeProjectId || undefined);
+
+    const existingDoc = vaultItems.find(
+      (item) =>
+        item.category === "FINANCIAL" &&
+        item.documentCode === "BOQ" &&
+        ((refNo && item.philgepsRefNo === refNo) ||
+          (resolvedProjectId && item.projectId === resolvedProjectId)),
+    );
+
+    const docIdToUse = existingDoc?.id || `fin-boq-${Date.now()}`;
+    const nextVersion = existingDoc ? existingDoc.versionNumber + 1 : 1;
 
     const newItem: DocumentVaultItem = {
-      id: newId,
+      id: docIdToUse,
       tenantId: activeTenantId,
       documentCode: "BOQ",
-      documentName: customName || `Bill of Quantities Schedule - [${refNo}]`,
+      documentName: customName || (refNo ? `Bill of Quantities Schedule - [${refNo}]` : "Bill of Quantities Schedule"),
       category: "FINANCIAL",
       procurementApplicability: ["GOODS", "INFRASTRUCTURE"],
       legalBasisReference:
         "Section 32.2.1 of RA 9184 / RA 12009 (Bill of Quantities / Detailed Estimates)",
-      versionNumber: 1,
+      versionNumber: nextVersion,
       fileHash: Array.from({ length: 64 }, () =>
         Math.floor(Math.random() * 16).toString(16),
       ).join(""),
       fileSizeBytes: 210000,
       fileName:
-        customName || `${refNo}_Financial_Envelope_Bill_of_Quantities.pdf`,
+        customName || `${refNo || "BOQ"}_Financial_Envelope_Bill_of_Quantities.pdf`,
       fileDataUrl: fileDataUrl,
       status: "ACTIVE",
       uploadedByName: currentUser?.fullName || "Authorized Financial Manager",
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
-      projectId: activeProjectId || undefined,
-      philgepsRefNo: refNo,
-      projectTitle: title,
+      projectId: resolvedProjectId,
+      philgepsRefNo: refNo || undefined,
+      projectTitle: title || undefined,
+      previousVersions: existingDoc?.previousVersions || [],
     };
 
-    storePdfData(newId, fileDataUrl);
-    setVaultItems((prev) => [newItem, ...prev]);
+    storePdfData(docIdToUse, fileDataUrl);
+    setVaultItems((prev) => [
+      newItem,
+      ...prev.filter((item) => item.id !== docIdToUse),
+    ]);
     setShowBoqModal(false);
     notifySuccess(
-      "Bill of Quantities Saved!",
-      `Bill of Quantities schedule saved to Financial Documents vault under project [${refNo}] ${title}.`,
+      `[Bill of Quantities, v${nextVersion}.0] Saved!`,
+      `Bill of Quantities schedule saved to Financial Documents vault under project [${refNo || "N/A"}] ${title}.`,
     );
   };
 
@@ -1070,46 +1107,63 @@ export const DocumentVaultView: React.FC = () => {
     projRefNo?: string,
     projTitle?: string,
   ) => {
-    const newId = `fin-cashflow-${Date.now()}`;
-    const refNo =
-      projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
-    const title =
-      projTitle || activeProjectTitle || oppProjects[0]?.title || "";
+    const refNo = (projRefNo || activeProjectRefNo || "").trim();
+    const title = (projTitle || activeProjectTitle || "").trim();
+    const matchedOpp = refNo
+      ? oppProjects.find((p) => p.refNo === refNo || p.id === refNo)
+      : undefined;
+    const resolvedProjectId =
+      matchedOpp?.id || (refNo ? undefined : activeProjectId || undefined);
+
+    const existingDoc = vaultItems.find(
+      (item) =>
+        item.category === "FINANCIAL" &&
+        item.documentCode === "SF-INFR-56" &&
+        ((refNo && item.philgepsRefNo === refNo) ||
+          (resolvedProjectId && item.projectId === resolvedProjectId)),
+    );
+
+    const docIdToUse = existingDoc?.id || `fin-cashflow-${Date.now()}`;
+    const nextVersion = existingDoc ? existingDoc.versionNumber + 1 : 1;
 
     const newItem: DocumentVaultItem = {
-      id: newId,
+      id: docIdToUse,
       tenantId: activeTenantId,
       documentCode: "SF-INFR-56",
       documentName:
-        customName || `Cash Flow by Quarter (SF-INFR-56) - [${refNo}]`,
+        customName || (refNo ? `Cash Flow by Quarter (SF-INFR-56) - [${refNo}]` : "Cash Flow by Quarter (SF-INFR-56)"),
       category: "FINANCIAL",
       procurementApplicability: ["INFRASTRUCTURE", "GOODS"],
       legalBasisReference:
         "Standard Form SF-INFR-56 / Section 32.2.1 of RA 9184 / RA 12009 (Cash Flow by Quarter)",
-      versionNumber: 1,
+      versionNumber: nextVersion,
       fileHash: Array.from({ length: 64 }, () =>
         Math.floor(Math.random() * 16).toString(16),
       ).join(""),
       fileSizeBytes: 220000,
       fileName:
-        customName || `${refNo}_Financial_Envelope_Cash_Flow_By_Quarter.pdf`,
+        customName || `${refNo || "CASHFLOW"}_Financial_Envelope_Cash_Flow_By_Quarter.pdf`,
       fileDataUrl: fileDataUrl,
       status: "ACTIVE",
       uploadedByName: currentUser?.fullName || "Authorized Financial Manager",
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
-      projectId: activeProjectId || undefined,
-      philgepsRefNo: refNo,
-      projectTitle: title,
+      projectId: resolvedProjectId,
+      philgepsRefNo: refNo || undefined,
+      projectTitle: title || undefined,
+      previousVersions: existingDoc?.previousVersions || [],
     };
 
-    storePdfData(newId, fileDataUrl);
-    setVaultItems((prev) => [newItem, ...prev]);
+    storePdfData(docIdToUse, fileDataUrl);
+    setVaultItems((prev) => [
+      newItem,
+      ...prev.filter((item) => item.id !== docIdToUse),
+    ]);
     setShowCashFlowModal(false);
     notifySuccess(
-      "Cash Flow Schedule Saved!",
-      `Cash Flow by Quarter and Payment Schedule (SF-INFR-56) saved to Financial Documents vault under project [${refNo}] ${title}.`,
+      `[Cash Flow Schedule, v${nextVersion}.0] Saved!`,
+      `Cash Flow by Quarter and Payment Schedule (SF-INFR-56) saved to Financial Documents vault under project [${refNo || "N/A"}] ${title}.`,
     );
   };
 
@@ -1122,47 +1176,64 @@ export const DocumentVaultView: React.FC = () => {
     projRefNo?: string,
     projTitle?: string,
   ) => {
-    const newId = `fin-pricesched-goods-${Date.now()}`;
-    const refNo =
-      projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
-    const title =
-      projTitle || activeProjectTitle || oppProjects[0]?.title || "";
+    const refNo = (projRefNo || activeProjectRefNo || "").trim();
+    const title = (projTitle || activeProjectTitle || "").trim();
+    const matchedOpp = refNo
+      ? oppProjects.find((p) => p.refNo === refNo || p.id === refNo)
+      : undefined;
+    const resolvedProjectId =
+      matchedOpp?.id || (refNo ? undefined : activeProjectId || undefined);
+
+    const existingDoc = vaultItems.find(
+      (item) =>
+        item.category === "FINANCIAL" &&
+        item.documentCode === "GPPB-PRICESCHED-GOODS" &&
+        ((refNo && item.philgepsRefNo === refNo) ||
+          (resolvedProjectId && item.projectId === resolvedProjectId)),
+    );
+
+    const docIdToUse = existingDoc?.id || `fin-pricesched-goods-${Date.now()}`;
+    const nextVersion = existingDoc ? existingDoc.versionNumber + 1 : 1;
 
     const newItem: DocumentVaultItem = {
-      id: newId,
+      id: docIdToUse,
       tenantId: activeTenantId,
       documentCode: "GPPB-PRICESCHED-GOODS",
       documentName:
-        customName || `Price Schedule for Goods (Cols 1-10) - [${refNo}]`,
+        customName || (refNo ? `Price Schedule for Goods (Cols 1-10) - [${refNo}]` : "Price Schedule for Goods (Cols 1-10)"),
       category: "FINANCIAL",
       procurementApplicability: ["GOODS"],
       legalBasisReference:
         "PBDs Section VIII / Section 32.2.1 of RA 9184 / RA 12009 (Price Schedule for Goods)",
-      versionNumber: 1,
+      versionNumber: nextVersion,
       fileHash: Array.from({ length: 64 }, () =>
         Math.floor(Math.random() * 16).toString(16),
       ).join(""),
       fileSizeBytes: 230000,
       fileName:
         customName ||
-        `${refNo}_Financial_Envelope_Price_Schedule_For_Goods.pdf`,
+        `${refNo || "PRICESCHED"}_Financial_Envelope_Price_Schedule_For_Goods.pdf`,
       fileDataUrl: fileDataUrl,
       status: "ACTIVE",
       uploadedByName: currentUser?.fullName || "Authorized Financial Manager",
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
-      projectId: activeProjectId || undefined,
-      philgepsRefNo: refNo,
-      projectTitle: title,
+      projectId: resolvedProjectId,
+      philgepsRefNo: refNo || undefined,
+      projectTitle: title || undefined,
+      previousVersions: existingDoc?.previousVersions || [],
     };
 
-    storePdfData(newId, fileDataUrl);
-    setVaultItems((prev) => [newItem, ...prev]);
+    storePdfData(docIdToUse, fileDataUrl);
+    setVaultItems((prev) => [
+      newItem,
+      ...prev.filter((item) => item.id !== docIdToUse),
+    ]);
     setShowPriceScheduleGoodsModal(false);
     notifySuccess(
-      "Price Schedule for Goods Saved!",
-      `Price Schedule for Goods (Columns 1-10) saved to Financial Documents vault under project [${refNo}] ${title}.`,
+      `[Price Schedule for Goods, v${nextVersion}.0] Saved!`,
+      `Price Schedule for Goods (Columns 1-10) saved to Financial Documents vault under project [${refNo || "N/A"}] ${title}.`,
     );
   };
 
@@ -1175,17 +1246,30 @@ export const DocumentVaultView: React.FC = () => {
     projRefNo?: string,
     projTitle?: string,
   ) => {
-    const newId = `fin-summarybid-${Date.now()}`;
-    const refNo =
-      projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
-    const title =
-      projTitle || activeProjectTitle || oppProjects[0]?.title || "";
+    const refNo = (projRefNo || activeProjectRefNo || "").trim();
+    const title = (projTitle || activeProjectTitle || "").trim();
+    const matchedOpp = refNo
+      ? oppProjects.find((p) => p.refNo === refNo || p.id === refNo)
+      : undefined;
+    const resolvedProjectId =
+      matchedOpp?.id || (refNo ? undefined : activeProjectId || undefined);
+
+    const existingDoc = vaultItems.find(
+      (item) =>
+        item.category === "FINANCIAL" &&
+        item.documentCode === "PBD-SUMMARY-BIDPRICE" &&
+        ((refNo && item.philgepsRefNo === refNo) ||
+          (resolvedProjectId && item.projectId === resolvedProjectId)),
+    );
+
+    const docIdToUse = existingDoc?.id || `fin-summarybid-${Date.now()}`;
+    const nextVersion = existingDoc ? existingDoc.versionNumber + 1 : 1;
 
     const newItem: DocumentVaultItem = {
-      id: newId,
+      id: docIdToUse,
       tenantId: activeTenantId,
       documentCode: "PBD-SUMMARY-BIDPRICE",
-      documentName: customName || `Summary of Bid Prices - [${refNo}]`,
+      documentName: customName || (refNo ? `Summary of Bid Prices - [${refNo}]` : "Summary of Bid Prices"),
       category: "FINANCIAL",
       procurementApplicability: [
         "GOODS",
@@ -1194,30 +1278,34 @@ export const DocumentVaultView: React.FC = () => {
       ],
       legalBasisReference:
         "Section 32.2.1 of RA 9184 / RA 12009 (Summary of Bid Prices)",
-      versionNumber: 1,
+      versionNumber: nextVersion,
       fileHash: Array.from({ length: 64 }, () =>
         Math.floor(Math.random() * 16).toString(16),
       ).join(""),
       fileSizeBytes: 215000,
       fileName:
-        customName || `${refNo}_Financial_Envelope_Summary_Of_Bid_Prices.pdf`,
+        customName || `${refNo || "SUMMARYBID"}_Financial_Envelope_Summary_Of_Bid_Prices.pdf`,
       fileDataUrl: fileDataUrl,
       status: "ACTIVE",
       uploadedByName: currentUser?.fullName || "Authorized Financial Manager",
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
-      projectId: activeProjectId || undefined,
-      philgepsRefNo: refNo,
-      projectTitle: title,
+      projectId: resolvedProjectId,
+      philgepsRefNo: refNo || undefined,
+      projectTitle: title || undefined,
+      previousVersions: existingDoc?.previousVersions || [],
     };
 
-    storePdfData(newId, fileDataUrl);
-    setVaultItems((prev) => [newItem, ...prev]);
+    storePdfData(docIdToUse, fileDataUrl);
+    setVaultItems((prev) => [
+      newItem,
+      ...prev.filter((item) => item.id !== docIdToUse),
+    ]);
     setShowSummaryBidPriceModal(false);
     notifySuccess(
-      "Summary of Bid Prices Saved!",
-      `Summary of Bid Prices schedule saved to Financial Documents vault under project [${refNo}] ${title}.`,
+      `[Summary of Bid Prices, v${nextVersion}.0] Saved!`,
+      `Summary of Bid Prices schedule saved to Financial Documents vault under project [${refNo || "N/A"}] ${title}.`,
     );
   };
 
@@ -1230,17 +1318,30 @@ export const DocumentVaultView: React.FC = () => {
     projRefNo?: string,
     projTitle?: string,
   ) => {
-    const newId = `fin-detest-${Date.now()}`;
-    const refNo =
-      projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
-    const title =
-      projTitle || activeProjectTitle || oppProjects[0]?.title || "";
+    const refNo = (projRefNo || activeProjectRefNo || "").trim();
+    const title = (projTitle || activeProjectTitle || "").trim();
+    const matchedOpp = refNo
+      ? oppProjects.find((p) => p.refNo === refNo || p.id === refNo)
+      : undefined;
+    const resolvedProjectId =
+      matchedOpp?.id || (refNo ? undefined : activeProjectId || undefined);
+
+    const existingDoc = vaultItems.find(
+      (item) =>
+        item.category === "FINANCIAL" &&
+        item.documentCode === "PBD-DETAILED-ESTIMATES" &&
+        ((refNo && item.philgepsRefNo === refNo) ||
+          (resolvedProjectId && item.projectId === resolvedProjectId)),
+    );
+
+    const docIdToUse = existingDoc?.id || `fin-detest-${Date.now()}`;
+    const nextVersion = existingDoc ? existingDoc.versionNumber + 1 : 1;
 
     const newItem: DocumentVaultItem = {
-      id: newId,
+      id: docIdToUse,
       tenantId: activeTenantId,
       documentCode: "PBD-DETAILED-ESTIMATES",
-      documentName: customName || `(L) Detailed Estimates Form - [${refNo}]`,
+      documentName: customName || (refNo ? `(L) Detailed Estimates Form - [${refNo}]` : "(L) Detailed Estimates Form"),
       category: "FINANCIAL",
       procurementApplicability: [
         "INFRASTRUCTURE",
@@ -1249,30 +1350,34 @@ export const DocumentVaultView: React.FC = () => {
       ],
       legalBasisReference:
         "Form (L) / Section 32.2.1 of RA 9184 / RA 12009 (Detailed Estimates Form)",
-      versionNumber: 1,
+      versionNumber: nextVersion,
       fileHash: Array.from({ length: 64 }, () =>
         Math.floor(Math.random() * 16).toString(16),
       ).join(""),
       fileSizeBytes: 240000,
       fileName:
-        customName || `${refNo}_Financial_Envelope_Detailed_Estimates.pdf`,
+        customName || `${refNo || "DETAILED_ESTIMATES"}_Financial_Envelope_Detailed_Estimates.pdf`,
       fileDataUrl: fileDataUrl,
       status: "ACTIVE",
       uploadedByName: currentUser?.fullName || "Authorized Financial Manager",
       isOptional: false,
       requiresIssueDate: false,
       requiresExpiryDate: false,
-      projectId: activeProjectId || undefined,
-      philgepsRefNo: refNo,
-      projectTitle: title,
+      projectId: resolvedProjectId,
+      philgepsRefNo: refNo || undefined,
+      projectTitle: title || undefined,
+      previousVersions: existingDoc?.previousVersions || [],
     };
 
-    storePdfData(newId, fileDataUrl);
-    setVaultItems((prev) => [newItem, ...prev]);
+    storePdfData(docIdToUse, fileDataUrl);
+    setVaultItems((prev) => [
+      newItem,
+      ...prev.filter((item) => item.id !== docIdToUse),
+    ]);
     setShowDetailedEstimatesModal(false);
     notifySuccess(
-      "Detailed Estimates Saved!",
-      `(L) Duly accomplished Detailed Estimates Form saved to Financial Documents vault under project [${refNo}] ${title}.`,
+      `[Detailed Estimates, v${nextVersion}.0] Saved!`,
+      `(L) Duly accomplished Detailed Estimates Form saved to Financial Documents vault under project [${refNo || "N/A"}] ${title}.`,
     );
   };
 
@@ -1336,10 +1441,9 @@ export const DocumentVaultView: React.FC = () => {
       matchedOpp?.refNo ||
       item.philgepsRefNo ||
       activeProjectRefNo ||
-      oppProjects[0]?.refNo ||
       "";
     const initialTitle =
-      item.projectTitle || activeProjectTitle || oppProjects[0]?.title || "";
+      item.projectTitle || activeProjectTitle || "";
     setRetagProjectRefNo(initialRef);
     setRetagProjectTitle(initialTitle);
   };
@@ -1568,21 +1672,43 @@ export const DocumentVaultView: React.FC = () => {
     if (!fillingTemplateItem) return;
 
     const itemId = fillingTemplateItem.id;
-    const projectRefToUse = projRefNo || activeProjectRefNo;
-    const projectTitleToUse = projTitle || activeProjectTitle;
+    const projectRefToUse = (projRefNo || activeProjectRefNo || "").trim();
+    const projectTitleToUse = (projTitle || activeProjectTitle || "").trim();
+    const targetRef = projectRefToUse;
+    const targetId =
+      projId?.trim() ||
+      (targetRef
+        ? oppProjects.find((p) => p.refNo === targetRef || p.id === targetRef)
+            ?.id
+        : activeProjectId?.trim());
 
-    // Check if a completed technical document already exists for this project
-    const existingDoc = vaultItems.find(
-      (item) =>
-        item.category === "TECHNICAL" &&
-        ((item.projectId && item.projectId === activeProjectId) ||
-          item.philgepsRefNo === projectRefToUse) &&
-        (item.documentCode === fillingTemplateItem.code ||
-          (fillingTemplateItem.code === "FAL-01" &&
-            (item.documentCode === "FAL-01" ||
-              item.documentCode === "SEC-VI-FAL" ||
-              item.documentName.toLowerCase().includes("framework agreement"))))
-    );
+    // Check if a completed technical document already exists for this exact project
+    const existingDoc = vaultItems.find((item) => {
+      if (item.category !== "TECHNICAL") return false;
+
+      const codeMatches =
+        item.documentCode === fillingTemplateItem.code ||
+        (fillingTemplateItem.code === "FAL-01" &&
+          (item.documentCode === "FAL-01" ||
+            item.documentCode === "SEC-VI-FAL" ||
+            item.documentName.toLowerCase().includes("framework agreement")));
+      if (!codeMatches) return false;
+
+      if (targetRef && item.philgepsRefNo) {
+        return (
+          item.philgepsRefNo.trim().toLowerCase() === targetRef.toLowerCase()
+        );
+      }
+      if (targetId && item.projectId) {
+        return item.projectId.trim().toLowerCase() === targetId.toLowerCase();
+      }
+      if (targetRef && !item.philgepsRefNo && item.projectId) {
+        return targetId
+          ? item.projectId.trim().toLowerCase() === targetId.toLowerCase()
+          : false;
+      }
+      return false;
+    });
 
     if (!techCompletedIds.includes(itemId)) {
       setTechCompletedIds((prev) => [...prev, itemId]);
@@ -1599,7 +1725,9 @@ export const DocumentVaultView: React.FC = () => {
       tenantId: activeTenantId,
       documentCode: fillingTemplateItem.code,
       documentName: docTitle,
-      documentNumber: existingDoc?.documentNumber || `EXHIBIT-${fillingTemplateItem.code.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()}-2026`,
+      documentNumber:
+        existingDoc?.documentNumber ||
+        `EXHIBIT-${fillingTemplateItem.code.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()}-2026`,
       category: "TECHNICAL",
       procurementApplicability: [
         "Goods & Supply",
@@ -1621,7 +1749,7 @@ export const DocumentVaultView: React.FC = () => {
       requiresIssueDate: false,
       requiresExpiryDate: false,
       conditionalRuleNote: "Completed GPPB Statutory Legal Template",
-      projectId: projId || activeProjectId || undefined,
+      projectId: targetId || undefined,
       philgepsRefNo: projectRefToUse || undefined,
       projectTitle: projectTitleToUse || undefined,
       previousVersions: existingDoc?.previousVersions || [],
@@ -4587,8 +4715,8 @@ export const DocumentVaultView: React.FC = () => {
             activeProjectRefNo={activeProjectRefNo}
             activeProjectTitle={activeProjectTitle}
             activeProcuringEntity={activeProcuringEntity}
-            onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
-              handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+            onSaveAndComplete={(dataUrl, docName, projRef, projTitle, projId) => {
+              handleCompleteTemplate(dataUrl, docName, projRef, projTitle, projId);
             }}
             onClose={() => setFillingTemplateItem(null)}
           />
@@ -4600,8 +4728,8 @@ export const DocumentVaultView: React.FC = () => {
             activeProjectRefNo={activeProjectRefNo}
             activeProjectTitle={activeProjectTitle}
             activeProcuringEntity={activeProcuringEntity}
-            onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
-              handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+            onSaveAndComplete={(dataUrl, docName, projRef, projTitle, projId) => {
+              handleCompleteTemplate(dataUrl, docName, projRef, projTitle, projId);
             }}
             onClose={() => setFillingTemplateItem(null)}
           />
@@ -4620,8 +4748,8 @@ export const DocumentVaultView: React.FC = () => {
               activeProjectRefNo={activeProjectRefNo}
               activeProjectTitle={activeProjectTitle}
               activeProcuringEntity={activeProcuringEntity}
-              onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
-                handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+              onSaveAndComplete={(dataUrl, docName, projRef, projTitle, projId) => {
+                handleCompleteTemplate(dataUrl, docName, projRef, projTitle, projId);
               }}
               onClose={() => setFillingTemplateItem(null)}
             />
@@ -4639,8 +4767,8 @@ export const DocumentVaultView: React.FC = () => {
               activeProjectRefNo={activeProjectRefNo}
               activeProjectTitle={activeProjectTitle}
               activeProcuringEntity={activeProcuringEntity}
-              onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
-                handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+              onSaveAndComplete={(dataUrl, docName, projRef, projTitle, projId) => {
+                handleCompleteTemplate(dataUrl, docName, projRef, projTitle, projId);
               }}
               onClose={() => setFillingTemplateItem(null)}
             />
@@ -4662,8 +4790,8 @@ export const DocumentVaultView: React.FC = () => {
               activeProjectRefNo={activeProjectRefNo}
               activeProjectTitle={activeProjectTitle}
               activeProcuringEntity={activeProcuringEntity}
-              onSaveAndComplete={(dataUrl, docName, projRef, projTitle) => {
-                handleCompleteTemplate(dataUrl, docName, projRef, projTitle);
+              onSaveAndComplete={(dataUrl, docName, projRef, projTitle, projId) => {
+                handleCompleteTemplate(dataUrl, docName, projRef, projTitle, projId);
               }}
               onClose={() => setFillingTemplateItem(null)}
             />
@@ -5474,19 +5602,36 @@ export const DocumentVaultView: React.FC = () => {
               docName?: string,
               projRefNo?: string,
               projTitle?: string,
+              projId?: string,
             ) => {
-              const newId = `fin-nfcc-${Date.now()}`;
-              const refNo =
-                projRefNo || activeProjectRefNo || oppProjects[0]?.refNo || "";
-              const title =
-                projTitle || activeProjectTitle || oppProjects[0]?.title || "";
+              const refNo = (projRefNo || activeProjectRefNo || "").trim();
+              const title = (projTitle || activeProjectTitle || "").trim();
+              const matchedOpp = refNo
+                ? oppProjects.find((p) => p.refNo === refNo || p.id === refNo)
+                : undefined;
+              const resolvedProjectId =
+                projId ||
+                matchedOpp?.id ||
+                (refNo ? undefined : activeProjectId || undefined);
+
+              const existingDoc = vaultItems.find(
+                (item) =>
+                  (item.category === "FINANCIAL" ||
+                    item.category === "TECHNICAL") &&
+                  item.documentCode === "NFCC" &&
+                  ((refNo && item.philgepsRefNo === refNo) ||
+                    (resolvedProjectId && item.projectId === resolvedProjectId)),
+              );
+
+              const docIdToUse = existingDoc?.id || `fin-nfcc-${Date.now()}`;
+              const nextVersion = existingDoc ? existingDoc.versionNumber + 1 : 1;
 
               const newItem: DocumentVaultItem = {
-                id: newId,
+                id: docIdToUse,
                 tenantId: activeTenantId,
                 documentCode: "NFCC",
                 documentName:
-                  docName || `Net Financial Contracting Capacity - [${refNo}]`,
+                  docName || (refNo ? `Net Financial Contracting Capacity - [${refNo}]` : "Net Financial Contracting Capacity"),
                 category: "FINANCIAL",
                 procurementApplicability: [
                   "GOODS",
@@ -5494,12 +5639,12 @@ export const DocumentVaultView: React.FC = () => {
                   "CONSULTING_SERVICES",
                 ],
                 legalBasisReference: "Section 23.4.1.4 of RA 12009 / RA 9184",
-                versionNumber: 1,
+                versionNumber: nextVersion,
                 fileHash: Array.from({ length: 64 }, () =>
                   Math.floor(Math.random() * 16).toString(16),
                 ).join(""),
                 fileSizeBytes: 185000,
-                fileName: `${refNo}_Financial_Envelope_NFCC.pdf`,
+                fileName: `${refNo || "NFCC"}_Financial_Envelope_NFCC.pdf`,
                 fileDataUrl: pdfDataUrl,
                 status: "ACTIVE",
                 uploadedByName:
@@ -5507,15 +5652,20 @@ export const DocumentVaultView: React.FC = () => {
                 isOptional: false,
                 requiresIssueDate: false,
                 requiresExpiryDate: false,
-                philgepsRefNo: refNo,
-                projectTitle: title,
+                projectId: resolvedProjectId,
+                philgepsRefNo: refNo || undefined,
+                projectTitle: title || undefined,
+                previousVersions: existingDoc?.previousVersions || [],
               };
-              storePdfData(newId, pdfDataUrl);
-              setVaultItems((prev) => [newItem, ...prev]);
+              storePdfData(docIdToUse, pdfDataUrl);
+              setVaultItems((prev) => [
+                newItem,
+                ...prev.filter((item) => item.id !== docIdToUse),
+              ]);
               setShowNfccModal(false);
               notifySuccess(
-                "NFCC Statement Saved!",
-                `Net Financial Contracting Capacity statement saved to Financial Documents vault.`,
+                `[NFCC, v${nextVersion}.0] Saved!`,
+                `Net Financial Contracting Capacity statement saved to Financial Documents vault under project [${refNo || "N/A"}] ${title}.`,
               );
             }}
           />
