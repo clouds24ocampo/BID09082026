@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { computeStatutoryTaxes } from '../../components/vault/templates/POW';
+import {
+  computeStatutoryTaxes,
+  DEFAULT_POW_LABOR_DESCRIPTION,
+  PRESET_LABOR_DESCRIPTIONS,
+} from '../../components/vault/templates/POW';
+import { isAmoOrPresidentRole, isPreparerRole } from '../../types';
+import { numberToWords } from '../numberToWords';
 
 describe('POW & Quotation Statutory Taxes & Labor Calculation Engine', () => {
   it('computes VATable Goods taxes correctly: Base = DC/1.12, 5% Final VAT, 1% EWT, 1% Retention', () => {
@@ -141,6 +147,97 @@ describe('POW & Quotation Statutory Taxes & Labor Calculation Engine', () => {
 
     expect(calculatedTotalCost).toBe(125000);
     expect(calculatedTotalCost / quantity).toBe(customUnitCost);
+  });
+
+  describe('AMO / President Executive Authority & Role Verification', () => {
+    it('recognizes AMO, President, Company Owner, and Higher Manager as top-tier authorities (auto-authorized)', () => {
+      // COMPANY_OWNER represents the President / AMO
+      expect(isAmoOrPresidentRole('COMPANY_OWNER')).toBe(true);
+      expect(isAmoOrPresidentRole('SYSTEM_ADMIN')).toBe(true);
+      expect(isAmoOrPresidentRole('HIGHER_MANAGER')).toBe(true);
+      // Standalone single-tenant mode defaults to authorized AMO
+      expect(isAmoOrPresidentRole(undefined)).toBe(true);
+    });
+
+    it('correctly segregates preparer roles (Estimators, Bid Managers) requiring approval', () => {
+      expect(isAmoOrPresidentRole('ESTIMATOR')).toBe(false);
+      expect(isAmoOrPresidentRole('BID_MANAGER')).toBe(false);
+      expect(isAmoOrPresidentRole('DOCUMENT_PREPARER')).toBe(false);
+
+      expect(isPreparerRole('ESTIMATOR')).toBe(true);
+      expect(isPreparerRole('BID_MANAGER')).toBe(true);
+      expect(isPreparerRole('DOCUMENT_PREPARER')).toBe(true);
+      expect(isPreparerRole('COMPANY_OWNER')).toBe(false);
+    });
+  });
+
+  describe('Direct Labor Cost Percentage & Editable Words Engine', () => {
+    it('computes default 35% labor cost from materials accurately', () => {
+      const materialsTotal = 1000000; // 1,000,000 PHP Materials
+      const defaultRate = 35; // 35%
+      const laborCost = Math.round(materialsTotal * (defaultRate / 100));
+
+      expect(laborCost).toBe(350000);
+      expect(numberToWords(laborCost)).toBe('THREE HUNDRED FIFTY THOUSAND PESOS ONLY');
+    });
+
+    it('computes various statutory labor rate presets (10%, 15%, 20%, 25%, 30%, 40%)', () => {
+      const materialsTotal = 2500000;
+      const presets = [10, 15, 20, 25, 30, 35, 40];
+
+      const results = presets.map((pct) => ({
+        pct,
+        laborCost: Math.round(materialsTotal * (pct / 100)),
+      }));
+
+      expect(results.find((r) => r.pct === 10)?.laborCost).toBe(250000);
+      expect(results.find((r) => r.pct === 15)?.laborCost).toBe(375000);
+      expect(results.find((r) => r.pct === 20)?.laborCost).toBe(500000);
+      expect(results.find((r) => r.pct === 25)?.laborCost).toBe(625000);
+      expect(results.find((r) => r.pct === 30)?.laborCost).toBe(750000);
+      expect(results.find((r) => r.pct === 35)?.laborCost).toBe(875000);
+      expect(results.find((r) => r.pct === 40)?.laborCost).toBe(1000000);
+    });
+
+    it('validates default statutory labor words description structure', () => {
+      expect(DEFAULT_POW_LABOR_DESCRIPTION).toContain('Logistic, Delivery, Labor, Installation');
+      expect(DEFAULT_POW_LABOR_DESCRIPTION).toContain('Cable Pulling, Rough-ins');
+      expect(DEFAULT_POW_LABOR_DESCRIPTION).toContain('Commissioning');
+      expect(DEFAULT_POW_LABOR_DESCRIPTION).toContain('(35% of Materials Cost)');
+      expect(DEFAULT_POW_LABOR_DESCRIPTION).toContain('All kinds of taxes included');
+    });
+
+    it('validates preset descriptions mapping and percentage tags', () => {
+      expect(PRESET_LABOR_DESCRIPTIONS.length).toBeGreaterThanOrEqual(4);
+      const preset35 = PRESET_LABOR_DESCRIPTIONS.find((p) => p.pct === 35);
+      const preset30 = PRESET_LABOR_DESCRIPTIONS.find((p) => p.pct === 30);
+      const preset25 = PRESET_LABOR_DESCRIPTIONS.find((p) => p.pct === 25);
+      const preset15 = PRESET_LABOR_DESCRIPTIONS.find((p) => p.pct === 15);
+
+      expect(preset35?.text).toContain('35% of Materials Cost');
+      expect(preset30?.text).toContain('30% of Materials Cost');
+      expect(preset25?.text).toContain('25% of Materials Cost');
+      expect(preset15?.text).toContain('15% of Materials Cost');
+    });
+
+    it('calculates net labor take-home with statutory 5% Final VAT, 2% EWT, and 1% Retention', () => {
+      // Direct Labor Cost = 350,000 computed from 35% of 1,000,000
+      const laborCost = 350000;
+      const taxes = computeStatutoryTaxes(laborCost, 'VATABLE', 'INFRA', 1);
+
+      // Base = 350,000 / 1.12 = 312,500
+      expect(taxes.netBase).toBeCloseTo(312500, 2);
+      // 5% Final VAT = 312,500 * 0.05 = 15,625
+      expect(taxes.finalVat5).toBeCloseTo(15625, 2);
+      // 2% Infra EWT = 312,500 * 0.02 = 6,250
+      expect(taxes.ewtAmount).toBeCloseTo(6250, 2);
+      // 1% Retention = 350,000 * 0.01 = 3,500
+      expect(taxes.retentionAmount).toBeCloseTo(3500, 2);
+      // Total Deductions = 15,625 + 6,250 + 3,500 = 25,375
+      expect(taxes.totalDeductions).toBeCloseTo(25375, 2);
+      // Net Payable = 350,000 - 25,375 = 324,625
+      expect(taxes.netPayable).toBeCloseTo(324625, 2);
+    });
   });
 });
 

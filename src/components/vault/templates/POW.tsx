@@ -4,6 +4,7 @@ import {
   PhilGEPSOpportunity,
   ProcurementType,
   isApproverRole,
+  isAmoOrPresidentRole,
   getRoleDisplayName,
 } from "../../../types";
 import { useAuth } from "../../../context/AuthContext";
@@ -59,7 +60,36 @@ import {
   FileUp,
   Lock,
   Scale,
+  Percent,
+  SlidersHorizontal,
+  Copy,
 } from "lucide-react";
+
+export const DEFAULT_POW_LABOR_DESCRIPTION =
+  "Logistic, Delivery, Labor, Installation, Cable Pulling, Rough-ins, Cloud Service, Mobile Configuration and User Restriction, Commissioning (35% of Materials Cost) - All kinds of taxes included";
+
+export const PRESET_LABOR_DESCRIPTIONS = [
+  {
+    label: "Full Logistics, Labor & Commissioning (35%)",
+    pct: 35,
+    text: "Logistic, Delivery, Labor, Installation, Cable Pulling, Rough-ins, Cloud Service, Mobile Configuration and User Restriction, Commissioning (35% of Materials Cost) - All kinds of taxes included",
+  },
+  {
+    label: "Technical Labor & Cable Pulling (30%)",
+    pct: 30,
+    text: "Technical Labor, Cable Pulling, Termination, Rough-ins, Testing and Commissioning Services (30% of Materials Cost) - All statutory taxes included",
+  },
+  {
+    label: "Civil Works Skilled & Technical Labor (25%)",
+    pct: 25,
+    text: "Skilled & Semi-Skilled Construction Labor, Equipment Handling, Field Operations and Safety Supervision (25% of Materials Cost)",
+  },
+  {
+    label: "Engineering Supervision & Testing (15%)",
+    pct: 15,
+    text: "Professional Engineering Services, Technical Supervision, QA/QC Inspection, and Statutory Commissioning (15% of Materials Cost)",
+  },
+];
 
 export type PowDocumentMode = "POW" | "QUOTATION";
 export type TaxType = "VATABLE" | "NON_VAT";
@@ -538,17 +568,44 @@ export const POWModalContent: React.FC<PowModalProps> = ({
 
   const { currentUser } = useAuth();
 
+  // AMO / President is the highest authority of the system: auto-authorized and unblocked
+  const isUserAmo = isAmoOrPresidentRole(currentUser?.role);
+
+  // Dedicated Labor Cost & Percentage State (Editable % & Words Descriptions)
+  const [laborPercentage, setLaborPercentage] = useState<number>(35);
+  const [laborWordsDescription, setLaborWordsDescription] = useState<string>(
+    DEFAULT_POW_LABOR_DESCRIPTION,
+  );
+  const [laborCustomWordsAmount, setLaborCustomWordsAmount] = useState<string>("");
+  const [showLaborModal, setShowLaborModal] = useState<boolean>(false);
+
   // Approval Workflow State
   const [approvalStatus, setApprovalStatus] = useState<
     "DRAFT" | "PENDING_APPROVAL" | "APPROVED"
-  >("DRAFT");
+  >(() => (isAmoOrPresidentRole(currentUser?.role) ? "APPROVED" : "DRAFT"));
   const [submittedByUserName, setSubmittedByUserName] = useState<string>("");
   const [submittedByRole, setSubmittedByRole] = useState<string>("");
   const [submittedAt, setSubmittedAt] = useState<string>("");
-  const [approvedByUserName, setApprovedByUserName] = useState<string>("");
-  const [approvedByRole, setApprovedByRole] = useState<string>("");
-  const [approvedAt, setApprovedAt] = useState<string>("");
-  const [approvalNotes, setApprovalNotes] = useState<string>("");
+  const [approvedByUserName, setApprovedByUserName] = useState<string>(() =>
+    isAmoOrPresidentRole(currentUser?.role)
+      ? currentUser?.fullName || "AMO / President"
+      : "",
+  );
+  const [approvedByRole, setApprovedByRole] = useState<string>(() =>
+    isAmoOrPresidentRole(currentUser?.role)
+      ? "AMO / President / Company Owner"
+      : "",
+  );
+  const [approvedAt, setApprovedAt] = useState<string>(() =>
+    isAmoOrPresidentRole(currentUser?.role)
+      ? new Date().toLocaleDateString("en-PH")
+      : "",
+  );
+  const [approvalNotes, setApprovalNotes] = useState<string>(() =>
+    isAmoOrPresidentRole(currentUser?.role)
+      ? "Officially authorized and approved by AMO / President"
+      : "",
+  );
   const [showApprovalGateModal, setShowApprovalGateModal] =
     useState<boolean>(false);
   const [deliveryReceiptNo, setDeliveryReceiptNo] = useState<string>(
@@ -967,9 +1024,20 @@ export const POWModalContent: React.FC<PowModalProps> = ({
             }
           }
         }
+        if (parsed.laborPercentage !== undefined)
+          setLaborPercentage(Number(parsed.laborPercentage) || 35);
+        if (parsed.laborWordsDescription)
+          setLaborWordsDescription(parsed.laborWordsDescription);
+        if (parsed.laborCustomWordsAmount)
+          setLaborCustomWordsAmount(parsed.laborCustomWordsAmount);
+
         if (parsed.procurementPurpose)
           setProcurementPurpose(parsed.procurementPurpose);
-        if (parsed.approvalStatus) setApprovalStatus(parsed.approvalStatus);
+        if (isAmoOrPresidentRole(currentUser?.role)) {
+          setApprovalStatus("APPROVED");
+        } else if (parsed.approvalStatus) {
+          setApprovalStatus(parsed.approvalStatus);
+        }
         if (parsed.submittedByUserName)
           setSubmittedByUserName(parsed.submittedByUserName);
         if (parsed.submittedByRole) setSubmittedByRole(parsed.submittedByRole);
@@ -994,7 +1062,11 @@ export const POWModalContent: React.FC<PowModalProps> = ({
           trackingNumber;
         const appRec = getDocumentApproval(tenantId, activeTrack);
         if (appRec) {
-          setApprovalStatus(appRec.status);
+          if (isAmoOrPresidentRole(currentUser?.role)) {
+            setApprovalStatus("APPROVED");
+          } else {
+            setApprovalStatus(appRec.status);
+          }
           if (appRec.submittedBy) setSubmittedByUserName(appRec.submittedBy);
           if (appRec.submittedByRole)
             setSubmittedByRole(appRec.submittedByRole);
@@ -1078,11 +1150,28 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       projectTaxCategory?: ProjectTaxCategory;
       retentionRate?: number;
     },
+    customLabor?: {
+      laborPercentage?: number;
+      laborWordsDescription?: string;
+      laborCustomWordsAmount?: string;
+    },
   ) => {
     const tenantId = tenant?.id || "default";
     const storageKey = `bidocs_pow_${tenantId}_${projectScopeKey}`;
     const payload = {
       docMode: overrideMode || docMode,
+      laborPercentage:
+        customLabor?.laborPercentage !== undefined
+          ? customLabor.laborPercentage
+          : laborPercentage,
+      laborWordsDescription:
+        customLabor?.laborWordsDescription !== undefined
+          ? customLabor.laborWordsDescription
+          : laborWordsDescription,
+      laborCustomWordsAmount:
+        customLabor?.laborCustomWordsAmount !== undefined
+          ? customLabor.laborCustomWordsAmount
+          : laborCustomWordsAmount,
       taxType: customTax?.taxType !== undefined ? customTax.taxType : taxType,
       projectTaxCategory:
         customTax?.projectTaxCategory !== undefined
@@ -1377,6 +1466,16 @@ export const POWModalContent: React.FC<PowModalProps> = ({
   };
 
   const handleSubmitForApproval = () => {
+    // If the active user is the AMO / President, they are the highest authority of the system:
+    // Auto-approve immediately without pending approval barrier
+    if (
+      isAmoOrPresidentRole(currentUser?.role) ||
+      isApproverRole(currentUser?.role)
+    ) {
+      handleApproveAndSync("Officially authorized and approved by AMO / President");
+      return;
+    }
+
     const tenantKey = tenant?.id || "default";
     const nowStr = new Date().toLocaleString("en-PH");
     const subName =
@@ -1408,7 +1507,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
     });
 
     setSyncNotification(
-      `📩 Submitted for Approval! Tracking ID [${trackingNumber}] has been sent to Company Owner / Higher Manager.`,
+      `📩 Submitted for Approval! Tracking ID [${trackingNumber}] has been sent to AMO / President for review.`,
     );
   };
 
@@ -1430,10 +1529,13 @@ export const POWModalContent: React.FC<PowModalProps> = ({
   const handleApproveAndSync = (customNotes?: string) => {
     const tenantKey = tenant?.id || "default";
     const nowStr = new Date().toLocaleString("en-PH");
-    const appName = currentUser?.fullName || approvedByName || "Company Owner";
+    const appName =
+      currentUser?.fullName ||
+      approvedByName ||
+      "Authorized Managing Officer (AMO) / President";
     const appRole = currentUser?.role
       ? getRoleDisplayName(currentUser.role)
-      : "Company Owner";
+      : "AMO / President / Company Owner";
 
     setApprovalStatus("APPROVED");
     setApprovedAt(nowStr);
@@ -1995,6 +2097,100 @@ export const POWModalContent: React.FC<PowModalProps> = ({
     handleSaveState(updated);
   };
 
+  const computedLaborByPercentage = Math.round(
+    (totals.totalMaterial || 0) * ((laborPercentage || 0) / 100),
+  );
+  const defaultLaborWords =
+    computedLaborByPercentage > 0
+      ? numberToWords(computedLaborByPercentage)
+      : totals.totalLabor > 0
+        ? numberToWords(totals.totalLabor)
+        : "Zero Pesos Only";
+  const activeLaborWords =
+    laborCustomWordsAmount.trim() || defaultLaborWords;
+
+  const handleAddLaborCostItem = (customPct?: number, customDesc?: string) => {
+    const pct = customPct !== undefined ? customPct : laborPercentage;
+    const desc =
+      customDesc ||
+      laborWordsDescription ||
+      `Logistic, Delivery, Labor, Installation, Cable Pulling, Rough-ins, Commissioning (${pct}% of Materials Cost) - All kinds of taxes included`;
+    const computedAmt =
+      Math.round((totals.totalMaterial || 0) * (pct / 100)) || 15000;
+    const newItem: PowItem = {
+      id: `pow-labor-${Date.now()}`,
+      itemNo: `Item ${items.length + 1} (Labor)`,
+      part:
+        docMode === "POW"
+          ? "PART B: OTHER GENERAL REQUIREMENTS"
+          : "SERVICES & LABOR",
+      description: desc,
+      brandModel:
+        docMode === "QUOTATION" ? "Technical Labor & Engineering Services" : "",
+      quantity: 1.0,
+      unit: docMode === "POW" ? "l.s." : "lot",
+      materialCost: 0,
+      laborCost: computedAmt,
+      equipmentCost: 0,
+      ocmRate: docMode === "POW" ? 8 : 4,
+      taxRate: 5,
+      profitRate: projectTaxCategory === "INFRA" ? 2 : 1,
+      vatRate: 5,
+      statementOfCompliance: "COMPLY",
+    };
+    const updated = [...items, newItem];
+    setItems(updated);
+    handleSaveState(updated);
+    setSyncNotification(
+      `✅ Added Labor Cost item: ₱${fmtPeso(computedAmt)} (${pct}% of Materials Cost)`,
+    );
+  };
+
+  const handleApplyLaborPercentageToAll = (pct: number) => {
+    const updated = items.map((it) => {
+      const mat = it.materialCost || 0;
+      const calc = Math.round(mat * (pct / 100));
+      return {
+        ...it,
+        laborCost: calc,
+        ...(it.customUnitCost !== undefined ? { customUnitCost: undefined } : {}),
+      };
+    });
+    setItems(updated);
+    handleSaveState(updated);
+    setSyncNotification(
+      `⚡ Applied ${pct}% labor rate across all ${items.length} items.`,
+    );
+  };
+
+  const handleApplyLaborPercentageToRow = (rowId: string, pct: number) => {
+    const updated = items.map((it) => {
+      if (it.id === rowId) {
+        const mat = it.materialCost || 0;
+        const calc = Math.round(mat * (pct / 100));
+        return {
+          ...it,
+          laborCost: calc,
+          ...(it.customUnitCost !== undefined ? { customUnitCost: undefined } : {}),
+        };
+      }
+      return it;
+    });
+    setItems(updated);
+    handleSaveState(updated);
+  };
+
+  const handleResetAllLabor = () => {
+    const updated = items.map((it) => ({
+      ...it,
+      laborCost: 0,
+      ...(it.customUnitCost !== undefined ? { customUnitCost: undefined } : {}),
+    }));
+    setItems(updated);
+    handleSaveState(updated);
+    setSyncNotification(`🔄 Reset all items' labor cost to ₱0.00.`);
+  };
+
   const generatePowPdfDataUrl = async (): Promise<string | null> => {
     const printArea = document.getElementById("pow-print-sheet");
     if (!printArea) return null;
@@ -2074,7 +2270,18 @@ export const POWModalContent: React.FC<PowModalProps> = ({
   };
 
   const handleDownloadPdf = async () => {
-    if (approvalStatus !== "APPROVED") {
+    // If the active user is the AMO / President, they are the highest authority:
+    // Auto-approve immediately without blocking
+    if (
+      isAmoOrPresidentRole(currentUser?.role) ||
+      isApproverRole(currentUser?.role)
+    ) {
+      if (approvalStatus !== "APPROVED") {
+        handleApproveAndSync(
+          "Officially authorized and approved by AMO / President",
+        );
+      }
+    } else if (approvalStatus !== "APPROVED") {
       setShowApprovalGateModal(true);
       return;
     }
@@ -2100,7 +2307,16 @@ export const POWModalContent: React.FC<PowModalProps> = ({
   };
 
   const handleDownloadDrPdf = async () => {
-    if (approvalStatus !== "APPROVED") {
+    if (
+      isAmoOrPresidentRole(currentUser?.role) ||
+      isApproverRole(currentUser?.role)
+    ) {
+      if (approvalStatus !== "APPROVED") {
+        handleApproveAndSync(
+          "Officially authorized and approved by AMO / President",
+        );
+      }
+    } else if (approvalStatus !== "APPROVED") {
       setShowApprovalGateModal(true);
       return;
     }
@@ -2764,17 +2980,17 @@ export const POWModalContent: React.FC<PowModalProps> = ({
             onClick={handleDownloadPdf}
             disabled={isExporting}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition disabled:opacity-50 ${
-              approvalStatus === "APPROVED"
+              approvalStatus === "APPROVED" || isAmoOrPresidentRole(currentUser?.role)
                 ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
                 : "bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 border border-amber-500/40"
             }`}
             title={
-              approvalStatus === "APPROVED"
+              approvalStatus === "APPROVED" || isAmoOrPresidentRole(currentUser?.role)
                 ? "Download Legal PDF"
                 : "Executive Approval Required to Print / Download"
             }
           >
-            {approvalStatus === "APPROVED" ? (
+            {approvalStatus === "APPROVED" || isAmoOrPresidentRole(currentUser?.role) ? (
               <Download className="w-4 h-4 text-emerald-400" />
             ) : (
               <Lock className="w-4 h-4 text-amber-400" />
@@ -2782,7 +2998,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
             <span>
               {isExporting
                 ? "Compiling..."
-                : approvalStatus === "APPROVED"
+                : approvalStatus === "APPROVED" || isAmoOrPresidentRole(currentUser?.role)
                   ? "Download PDF"
                   : "Download PDF 🔒"}
             </span>
@@ -2879,17 +3095,19 @@ export const POWModalContent: React.FC<PowModalProps> = ({
             </span>
             <span
               className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1.5 ${
-                approvalStatus === "APPROVED"
+                approvalStatus === "APPROVED" || isAmoOrPresidentRole(currentUser?.role)
                   ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
                   : approvalStatus === "PENDING_APPROVAL"
                     ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
                     : "bg-amber-500/20 text-amber-300 border-amber-500/30"
               }`}
             >
-              {approvalStatus === "APPROVED" ? (
+              {approvalStatus === "APPROVED" || isAmoOrPresidentRole(currentUser?.role) ? (
                 <>
                   <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                  <span>APPROVED ({approvedByUserName || "Owner"})</span>
+                  <span>
+                    APPROVED ({approvedByUserName || currentUser?.fullName || "AMO / President"})
+                  </span>
                 </>
               ) : approvalStatus === "PENDING_APPROVAL" ? (
                 <>
@@ -2906,7 +3124,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
           </div>
 
           {/* Role-Adaptive Approval Controls */}
-          {isApproverRole(currentUser?.role) ? (
+          {isAmoOrPresidentRole(currentUser?.role) || isApproverRole(currentUser?.role) ? (
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
@@ -2916,13 +3134,13 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     ? "bg-emerald-700 hover:bg-emerald-600 shadow-emerald-700/20"
                     : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30 ring-1 ring-emerald-400/50"
                 }`}
-                title="Authorize and officially approve document for print & export"
+                title="AMO / President Direct System Executive Authorization"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>
                   {approvalStatus === "APPROVED"
-                    ? "Re-Sync Approval ✓"
-                    : "Approve & Authorize Print ✓"}
+                    ? "AMO / President Approved ✓"
+                    : "Authorize & Approve Print ✓"}
                 </span>
               </button>
               {approvalStatus === "APPROVED" && (
@@ -3451,7 +3669,27 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => handleAddLaborCostItem()}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 flex items-center gap-1.5 cursor-pointer shadow border border-blue-400/40 transition"
+                  title={`Add dedicated Labor Cost item computed as ${laborPercentage}% of materials with words description`}
+                >
+                  <Briefcase className="w-3.5 h-3.5 text-blue-200" />
+                  <span>+ Add Labor Cost Item ({laborPercentage}%)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowLaborModal(true)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-300 bg-slate-800 hover:bg-slate-700 border border-blue-500/40 hover:border-blue-400 flex items-center gap-1.5 cursor-pointer transition shadow"
+                  title="Configure Labor Cost percentage (e.g. 10%, 25%, 35%) and editable words descriptions"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                  <span>⚡ Labor Cost (% &amp; Words)</span>
+                </button>
+
                 <button
                   onClick={handleAddItem}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 cursor-pointer shadow ${
@@ -3808,19 +4046,35 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                                 />
                               </div>
 
-                              <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800">
-                                <label className="text-[11px] font-semibold text-slate-400">👷 Labor:</label>
-                                <span className="text-slate-500 text-xs">₱</span>
-                                <input
-                                  type="number"
-                                  value={row.laborCost}
-                                  onChange={(e) => {
-                                    handleUpdateItem(row.id, "laborCost", parseFloat(e.target.value) || 0);
-                                    if (row.customUnitCost !== undefined) handleUpdateItem(row.id, "customUnitCost", undefined);
-                                  }}
-                                  className="w-28 bg-transparent text-xs text-right font-mono text-white focus:outline-none"
-                                  title="Labor Cost for this item (feeds Labor Total in Section A and Labor Taxes in Section D)"
-                                />
+                              <div className="flex flex-col gap-1 bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800">
+                                <div className="flex items-center gap-1.5">
+                                  <label className="text-[11px] font-semibold text-slate-400">👷 Labor:</label>
+                                  <span className="text-slate-500 text-xs">₱</span>
+                                  <input
+                                    type="number"
+                                    value={row.laborCost}
+                                    onChange={(e) => {
+                                      handleUpdateItem(row.id, "laborCost", parseFloat(e.target.value) || 0);
+                                      if (row.customUnitCost !== undefined) handleUpdateItem(row.id, "customUnitCost", undefined);
+                                    }}
+                                    className="w-28 bg-transparent text-xs text-right font-mono text-white focus:outline-none"
+                                    title="Labor Cost for this item (feeds Labor Total in Section A and Labor Taxes in Section D)"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1 pt-0.5 border-t border-slate-800/80">
+                                  <span className="text-[9px] text-slate-500 font-semibold uppercase">Set % of Mat:</span>
+                                  {[10, 20, 25, 30, 35].map((pct) => (
+                                    <button
+                                      key={`row-pct-${row.id}-${pct}`}
+                                      type="button"
+                                      onClick={() => handleApplyLaborPercentageToRow(row.id, pct)}
+                                      className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition cursor-pointer"
+                                      title={`Set labor to ${pct}% of material cost (₱${fmtPeso(Math.round((row.materialCost || 0) * (pct / 100)))})`}
+                                    >
+                                      {pct}%
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
 
                               <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800">
@@ -4029,9 +4283,9 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                 </div>
               </div>
 
-              {/* Dedicated Direct Labor Cost Schedule at Bottom */}
-              <div className="p-4 rounded-xl bg-linear-to-r from-blue-950/40 via-slate-950 to-slate-950 border border-blue-500/30 text-xs">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2.5">
+              {/* Dedicated Direct Labor Cost Schedule at Bottom with Editable Percentage & Words Descriptions */}
+              <div className="p-4 rounded-xl bg-linear-to-r from-blue-950/40 via-slate-950 to-slate-950 border border-blue-500/30 text-xs space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse" />
                     <span className="font-bold text-white uppercase text-[11px] tracking-wide">
@@ -4041,12 +4295,200 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                       Symmetric Taxes on Labor Component
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-400">
-                    Direct Labor Aggregated from Scope Items
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowLaborModal(true)}
+                      className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold flex items-center gap-1.5 cursor-pointer shadow transition"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Configure Labor (% &amp; Words)</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-[11px]">
+                {/* Interactive Labor Rate & Actions Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 p-3 rounded-lg border border-slate-800">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
+                      <Percent className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Labor Rate:</span>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {[10, 15, 20, 25, 30, 35, 40].map((pct) => (
+                        <button
+                          key={`bottom-pct-${pct}`}
+                          type="button"
+                          onClick={() => {
+                            setLaborPercentage(pct);
+                            const updatedDesc = laborWordsDescription.replace(
+                              /\(\d+% of Materials Cost\)/i,
+                              `(${pct}% of Materials Cost)`,
+                            );
+                            setLaborWordsDescription(updatedDesc);
+                            handleSaveState(
+                              undefined,
+                              undefined,
+                              undefined,
+                              undefined,
+                              undefined,
+                              undefined,
+                              {
+                                laborPercentage: pct,
+                                laborWordsDescription: updatedDesc,
+                              },
+                            );
+                          }}
+                          className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold cursor-pointer transition ${
+                            laborPercentage === pct
+                              ? "bg-blue-600 text-white shadow"
+                              : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                          }`}
+                        >
+                          {pct}%
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded border border-slate-700 ml-1">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={laborPercentage}
+                        onChange={(e) => {
+                          const val = Math.max(
+                            0,
+                            Math.min(100, parseFloat(e.target.value) || 0),
+                          );
+                          setLaborPercentage(val);
+                          handleSaveState(
+                            undefined,
+                            undefined,
+                            undefined,
+                            undefined,
+                            undefined,
+                            undefined,
+                            { laborPercentage: val },
+                          );
+                        }}
+                        className="w-12 bg-transparent text-right font-mono font-bold text-white text-xs focus:outline-none"
+                      />
+                      <span className="text-slate-400 font-bold text-xs">%</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => handleAddLaborCostItem()}
+                      className="px-2.5 py-1 rounded bg-blue-700 hover:bg-blue-600 text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition shadow"
+                      title="Add a separate Labor Cost row item to the matrix"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>+ Add Labor Item ({laborPercentage}%)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleApplyLaborPercentageToAll(laborPercentage)
+                      }
+                      className="px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition shadow"
+                      title="Set every row's labor cost to this percentage of its material cost"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Apply % to All Rows</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetAllLabor}
+                      className="px-2 py-1 rounded bg-slate-800 hover:bg-red-950/60 text-slate-400 hover:text-red-300 text-[10px] font-semibold cursor-pointer transition border border-slate-700"
+                      title="Reset all rows' labor cost to 0"
+                    >
+                      Reset Labor
+                    </button>
+                  </div>
+                </div>
+
+                {/* Editable Words Description & Amount in Words */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                        <FileText className="w-3 h-3 text-blue-400" />
+                        <span>Labor Scope / Words Description (Editable):</span>
+                      </label>
+                      <span className="text-[9px] text-slate-500 font-mono">
+                        Included in Quotation &amp; Section D
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      value={laborWordsDescription}
+                      onChange={(e) => {
+                        setLaborWordsDescription(e.target.value);
+                        handleSaveState(
+                          undefined,
+                          undefined,
+                          undefined,
+                          undefined,
+                          undefined,
+                          undefined,
+                          { laborWordsDescription: e.target.value },
+                        );
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-blue-500"
+                      placeholder="e.g. Logistic, Delivery, Labor, Installation, Commissioning..."
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                        <DollarSign className="w-3 h-3 text-emerald-400" />
+                        <span>Labor Amount in Words (Editable):</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLaborCustomWordsAmount(defaultLaborWords);
+                          handleSaveState(
+                            undefined,
+                            undefined,
+                            undefined,
+                            undefined,
+                            undefined,
+                            undefined,
+                            { laborCustomWordsAmount: defaultLaborWords },
+                          );
+                        }}
+                        className="text-[9px] text-blue-400 hover:text-blue-300 underline cursor-pointer"
+                        title="Auto-regenerate words from total labor cost"
+                      >
+                        Auto-Sync
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={activeLaborWords}
+                      onChange={(e) => {
+                        setLaborCustomWordsAmount(e.target.value);
+                        handleSaveState(
+                          undefined,
+                          undefined,
+                          undefined,
+                          undefined,
+                          undefined,
+                          undefined,
+                          { laborCustomWordsAmount: e.target.value },
+                        );
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-amber-300 font-medium text-xs focus:outline-none focus:border-emerald-500"
+                      placeholder="e.g. FIFTY-TWO THOUSAND FIVE HUNDRED PESOS ONLY"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-[11px] pt-1">
                   <div>
                     <span className="text-slate-400 block text-[10px]">
                       Total Labor Cost:
@@ -4449,9 +4891,43 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     (At Bottom)
                   </h3>
                 </div>
-                <span className="text-[11px] font-mono text-blue-300 bg-blue-950 px-2.5 py-0.5 rounded border border-blue-500/30">
-                  Labor Aggregated from Detailed Item Estimates
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowLaborModal(true)}
+                    className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow transition"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Configure Labor (% &amp; Words)</span>
+                  </button>
+                  <span className="text-[11px] font-mono text-blue-300 bg-blue-950 px-2.5 py-0.5 rounded border border-blue-500/30">
+                    {laborPercentage}% Labor Rate
+                  </span>
+                </div>
+              </div>
+
+              {/* Labor Scope Description & Amount in Words Card */}
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-bold text-slate-300 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Labor Scope Specification:</span>
+                  </span>
+                  <span className="text-[10px] text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-500/30 font-mono">
+                    {laborPercentage}% of Materials
+                  </span>
+                </div>
+                <p className="text-slate-300 italic text-[11px] leading-relaxed bg-slate-900/60 p-2 rounded border border-slate-800/80">
+                  "{laborWordsDescription}"
+                </p>
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+                  <span className="text-slate-400 text-[10px] font-semibold">
+                    Amount in Words:
+                  </span>
+                  <span className="text-amber-300 font-medium text-[11px] font-mono">
+                    {activeLaborWords}
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
@@ -5220,9 +5696,15 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                       </div>
 
                       <div className="pt-2 border-t border-black">
-                        <p className="font-bold underline mb-1">
+                        <p className="font-bold underline mb-0.5">
                           D. DIRECT LABOR COST &amp; LABOR TAXES (AT BOTTOM):
                         </p>
+                        <div className="text-[6.8pt] text-slate-700 italic mb-0.5 leading-tight">
+                          Scope Specification: {laborWordsDescription}
+                        </div>
+                        <div className="text-[6.8pt] text-slate-900 font-semibold mb-1">
+                          Labor Amount in Words: {activeLaborWords}
+                        </div>
                         <div className="flex justify-between py-0.5">
                           <span>Total Direct Labor Component:</span>
                           <span className="font-mono font-semibold">
@@ -5605,9 +6087,15 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                       </div>
 
                       <div>
-                        <p className="font-bold underline mb-1">
+                        <p className="font-bold underline mb-0.5">
                           DIRECT LABOR COST &amp; LABOR TAXES (AT BOTTOM):
                         </p>
+                        <div className="text-[6.8pt] text-slate-700 italic mb-0.5 leading-tight">
+                          Scope Specification: {laborWordsDescription}
+                        </div>
+                        <div className="text-[6.8pt] text-slate-900 font-semibold mb-1">
+                          Labor Amount in Words: {activeLaborWords}
+                        </div>
                         <div className="flex justify-between py-0.5">
                           <span>Total Labor Component:</span>
                           <span className="font-mono font-semibold">
@@ -6181,6 +6669,302 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ⚡ INTERACTIVE LABOR COST & WORDS DESCRIPTION MANAGER MODAL */}
+      {showLaborModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-scaleIn">
+            {/* Header */}
+            <div className="px-6 py-4 bg-linear-to-r from-blue-950 via-slate-900 to-slate-950 border-b border-blue-500/30 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/40 text-blue-400 flex items-center justify-center shrink-0">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <span>Labor Cost &amp; Specification Manager</span>
+                    <span className="text-[10px] bg-blue-950 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded font-mono">
+                      {laborPercentage}% Rate
+                    </span>
+                  </h3>
+                  <p className="text-xs text-blue-300/80">
+                    Statutory direct labor estimation, percentage allocation &amp; words description
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLaborModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto space-y-5 text-xs">
+              {/* 1. Percentage Configuration */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                    <Percent className="w-4 h-4 text-blue-400" />
+                    <span>Labor Cost Rate (% of Materials Cost):</span>
+                  </label>
+                  <span className="text-[11px] font-mono text-emerald-400 font-bold">
+                    Calculated Labor: ₱{fmtPeso(computedLaborByPercentage)}
+                  </span>
+                </div>
+
+                {/* Preset Pills */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {[10, 15, 20, 25, 30, 35, 40].map((pct) => (
+                    <button
+                      key={`modal-pct-${pct}`}
+                      type="button"
+                      onClick={() => {
+                        setLaborPercentage(pct);
+                        const updatedDesc = laborWordsDescription.replace(
+                          /\(\d+% of Materials Cost\)/i,
+                          `(${pct}% of Materials Cost)`,
+                        );
+                        setLaborWordsDescription(updatedDesc);
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-mono font-bold cursor-pointer transition ${
+                        laborPercentage === pct
+                          ? "bg-blue-600 text-white shadow-lg shadow-blue-600/30 scale-105"
+                          : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      }`}
+                    >
+                      {pct}%
+                    </button>
+                  ))}
+                  <div className="flex items-center gap-1 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700 ml-auto">
+                    <span className="text-slate-400 text-xs">Custom:</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={laborPercentage}
+                      onChange={(e) => {
+                        const val = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
+                        setLaborPercentage(val);
+                      }}
+                      className="w-14 bg-transparent text-right font-mono font-bold text-white text-xs focus:outline-none"
+                    />
+                    <span className="text-slate-400 font-bold text-xs">%</span>
+                  </div>
+                </div>
+
+                {/* Range Slider */}
+                <div className="pt-1">
+                  <input
+                    type="range"
+                    min={0}
+                    max={50}
+                    step={1}
+                    value={laborPercentage}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setLaborPercentage(val);
+                    }}
+                    className="w-full accent-blue-500 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                    <span>0% (Materials Only)</span>
+                    <span>15% (Supervision)</span>
+                    <span>25% (Civil Labor)</span>
+                    <span>35% (Full Turnkey)</span>
+                    <span>50% (Max Rate)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Editable Words Description */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-blue-400" />
+                    <span>Statutory Scope &amp; Words Description:</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400">
+                    Customizable line description
+                  </span>
+                </div>
+
+                {/* Preset description buttons */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">
+                    Quick Preset Scopes:
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {PRESET_LABOR_DESCRIPTIONS.map((preset, pIdx) => (
+                      <button
+                        key={`preset-desc-${pIdx}`}
+                        type="button"
+                        onClick={() => {
+                          setLaborPercentage(preset.pct);
+                          setLaborWordsDescription(preset.text);
+                        }}
+                        className="p-2 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-blue-500/50 text-left cursor-pointer transition text-[11px] text-slate-300"
+                      >
+                        <span className="font-semibold text-blue-400 block truncate">
+                          {preset.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Textarea */}
+                <div className="space-y-1">
+                  <textarea
+                    rows={3}
+                    value={laborWordsDescription}
+                    onChange={(e) => setLaborWordsDescription(e.target.value)}
+                    className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-blue-500 font-mono leading-relaxed"
+                    placeholder="Enter formal statutory words description for the labor component..."
+                  />
+                </div>
+              </div>
+
+              {/* 3. Editable Amount in Words */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                    <DollarSign className="w-4 h-4 text-emerald-400" />
+                    <span>Statutory Amount in Words (Editable):</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setLaborCustomWordsAmount(defaultLaborWords)}
+                    className="text-[10px] text-blue-400 hover:text-blue-300 underline cursor-pointer"
+                  >
+                    Reset to Auto-Generated Words
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={activeLaborWords}
+                  onChange={(e) => setLaborCustomWordsAmount(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-amber-300 font-mono text-xs font-semibold focus:outline-none focus:border-emerald-500"
+                  placeholder="e.g. FIFTY-TWO THOUSAND FIVE HUNDRED PESOS ONLY"
+                />
+              </div>
+
+              {/* 4. Live Statutory Deductions Summary Card */}
+              <div className="p-4 rounded-xl bg-linear-to-br from-blue-950/40 via-slate-950 to-slate-950 border border-blue-500/30 text-xs space-y-2">
+                <span className="font-bold text-white uppercase text-[10px] tracking-wider block">
+                  Statutory Deductions Preview on {laborPercentage}% Labor (₱{fmtPeso(computedLaborByPercentage)}):
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                  <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                    <span className="text-slate-400 block text-[10px]">Net Base (÷1.12):</span>
+                    <span className="font-mono font-bold text-slate-200">
+                      ₱{fmtPeso(totals.isVatable ? computedLaborByPercentage / 1.12 : computedLaborByPercentage)}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                    <span className="text-slate-400 block text-[10px]">5% VAT:</span>
+                    <span className="font-mono font-bold text-red-400">
+                      -₱{fmtPeso(totals.isVatable ? (computedLaborByPercentage / 1.12) * 0.05 : 0)}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                    <span className="text-slate-400 block text-[10px]">{totals.ewtRate}% EWT:</span>
+                    <span className="font-mono font-bold text-red-400">
+                      -₱{fmtPeso((totals.isVatable ? computedLaborByPercentage / 1.12 : computedLaborByPercentage) * (totals.ewtRate / 100))}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                    <span className="text-slate-400 block text-[10px]">1% Retention:</span>
+                    <span className="font-mono font-bold text-amber-400">
+                      -₱{fmtPeso(computedLaborByPercentage * 0.01)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="px-6 py-3.5 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  handleSaveState(
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    undefined,
+                    {
+                      laborPercentage,
+                      laborWordsDescription,
+                      laborCustomWordsAmount: activeLaborWords,
+                    },
+                  );
+                  setShowLaborModal(false);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 cursor-pointer transition"
+              >
+                Save Settings
+              </button>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleApplyLaborPercentageToAll(laborPercentage);
+                    handleSaveState(
+                      undefined,
+                      undefined,
+                      undefined,
+                      undefined,
+                      undefined,
+                      undefined,
+                      {
+                        laborPercentage,
+                        laborWordsDescription,
+                        laborCustomWordsAmount: activeLaborWords,
+                      },
+                    );
+                    setShowLaborModal(false);
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/30 flex items-center gap-1.5 cursor-pointer transition"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Apply {laborPercentage}% to All Rows</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleAddLaborCostItem(laborPercentage, laborWordsDescription);
+                    handleSaveState(
+                      undefined,
+                      undefined,
+                      undefined,
+                      undefined,
+                      undefined,
+                      undefined,
+                      {
+                        laborPercentage,
+                        laborWordsDescription,
+                        laborCustomWordsAmount: activeLaborWords,
+                      },
+                    );
+                    setShowLaborModal(false);
+                  }}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-md shadow-blue-600/30 flex items-center gap-1.5 cursor-pointer transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Add as Labor Line Item</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

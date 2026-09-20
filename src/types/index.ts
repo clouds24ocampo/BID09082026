@@ -14,6 +14,16 @@ export const isApproverRole = (role?: UserRole): boolean => {
   );
 };
 
+export const isAmoOrPresidentRole = (role?: UserRole): boolean => {
+  return (
+    role === "COMPANY_OWNER" ||
+    role === "SYSTEM_ADMIN" ||
+    role === "HIGHER_MANAGER" ||
+    role === undefined ||
+    !role
+  );
+};
+
 export const isPreparerRole = (role?: UserRole): boolean => {
   return (
     role === "BID_MANAGER" ||
@@ -25,7 +35,7 @@ export const isPreparerRole = (role?: UserRole): boolean => {
 export const getRoleDisplayName = (role?: UserRole): string => {
   switch (role) {
     case "COMPANY_OWNER":
-      return "Company Owner (Approver)";
+      return "AMO / President / Company Owner (Highest Approver)";
     case "HIGHER_MANAGER":
       return "Higher Manager (Approver)";
     case "ESTIMATOR":
@@ -35,9 +45,9 @@ export const getRoleDisplayName = (role?: UserRole): string => {
     case "DOCUMENT_PREPARER":
       return "Document Preparer (POW / Quotation / Bid Docs)";
     case "SYSTEM_ADMIN":
-      return "System Administrator";
+      return "System Administrator (AMO / Super Admin)";
     default:
-      return "Authorized User";
+      return "AMO / President / Authorized Managing Officer";
   }
 };
 

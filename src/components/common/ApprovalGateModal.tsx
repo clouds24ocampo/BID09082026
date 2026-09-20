@@ -132,7 +132,7 @@ export const ApprovalGateModal: React.FC<ApprovalGateModalProps> = ({
                 RA 12009 (NGPA), technical estimates, price quotations, and
                 bidding packages prepared by <strong>Estimators</strong> or{" "}
                 <strong>Bid Managers</strong> must be formally verified and
-                approved by the <strong>Company Owner</strong> or{" "}
+                approved by the <strong>AMO / President / Company Owner</strong> or{" "}
                 <strong>Higher Manager</strong> before official release and
                 printing.
               </p>
@@ -207,14 +207,14 @@ export const ApprovalGateModal: React.FC<ApprovalGateModalProps> = ({
                   className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 cursor-pointer transition text-xs"
                 >
                   <ArrowRight className="w-4 h-4" />
-                  <span>Submit to Company Owner for Approval ➔</span>
+                  <span>Submit to AMO / President for Approval ➔</span>
                 </button>
               ) : (
                 <div className="p-3 rounded-xl bg-blue-950/40 border border-blue-500/30 flex items-center gap-2.5 text-blue-300 text-[11px]">
                   <Clock className="w-4 h-4 text-blue-400 shrink-0" />
                   <span>
                     This document has been submitted and is currently awaiting
-                    review by the <strong>Company Owner</strong> or{" "}
+                    review by the <strong>AMO / President</strong> or{" "}
                     <strong>Higher Manager</strong>.
                   </span>
                 </div>
