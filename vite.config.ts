@@ -59,6 +59,9 @@ export default defineConfig({
             if (normalized.includes('lucide-react')) {
               return 'lucide-icons';
             }
+            if (normalized.includes('three')) {
+              return 'three-engine-vendor';
+            }
             if (normalized.includes('react/') || normalized.includes('react-dom/')) {
               return 'react-core-vendor';
             }
@@ -112,6 +115,12 @@ export default defineConfig({
     hmr: {
       overlay: true,
       port: 3001
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true
+      }
     },
     watch: {
       usePolling: true,

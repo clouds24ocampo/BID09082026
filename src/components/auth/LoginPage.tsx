@@ -20,9 +20,10 @@ import {
 
 interface LoginPageProps {
   onSwitchToRegister: () => void;
+  onBackToLanding?: () => void;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBackToLanding }) => {
   const { login, resetUserPassword, resetAllData, tenants } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -178,6 +179,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister }) => {
           transition={{ duration: 0.7 }}
           className="lg:col-span-6 space-y-6 pr-0 lg:pr-6"
         >
+          {onBackToLanding && (
+            <div>
+              <button
+                onClick={onBackToLanding}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 shadow-sm transition-all cursor-pointer"
+              >
+                <span>← Back to 3D Showcase &amp; Portal</span>
+              </button>
+            </div>
+          )}
+
           {/* Artemis Space Telemetry Badge */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-cyan-500/40 text-xs font-mono font-medium text-cyan-300 backdrop-blur-md shadow-[0_0_20px_rgba(6,182,212,0.2)]">
             <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />

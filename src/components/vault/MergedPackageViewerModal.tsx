@@ -16,6 +16,7 @@ import {
   saveDocumentApproval, 
   DocumentApprovalRecord 
 } from '../../utils/opportunityProjects';
+import { saveProjectMergedPackage } from '../../utils/mergedBidPackages';
 import ApprovalGateModal from '../common/ApprovalGateModal';
 import { PDFDocument } from 'pdf-lib';
 import { 
@@ -496,6 +497,22 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
           copiesCount: 3,
           completedBy: tenant.authorizedSignatory?.name || 'BiDOCS 3-Copy Engine'
         });
+
+        const packageId = `merged_${tenant.id}_${targetProjectRef.replace(/[^a-zA-Z0-9_-]/g, '_')}_${folderCopy}_${activeEnvelope}`;
+        saveProjectMergedPackage(tenant.id, targetProjectRef, {
+          id: packageId,
+          tenantId: tenant.id,
+          projectRefNo: targetProjectRef,
+          projectTitle: projectTitle || activeProject?.title || 'Target Procurement Project',
+          envelope: activeEnvelope,
+          folderCopy: folderCopy,
+          fileName: outputFileName,
+          fileSizeBytes: Math.round((dataUrl.length * 3) / 4),
+          pageCount: units.length,
+          mergedAt: new Date().toISOString(),
+          documentCount: items.length,
+          scope: 'CURRENT_FOLDER'
+        }, dataUrl).catch(e => console.error('[MergedPackageViewerModal] Failed saving merged package record:', e));
       }
 
       return dataUrl;

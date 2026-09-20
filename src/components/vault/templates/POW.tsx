@@ -52,6 +52,8 @@ import {
   UserCheck,
   Truck,
   RefreshCw,
+  RotateCcw,
+  ChevronDown,
   ArrowRight,
   FolderPlus,
   FileUp,
@@ -148,9 +150,12 @@ export interface PowItem {
   laborCost: number;
   equipmentCost: number;
   ocmRate: number; // % Overhead, Contingency, Misc (standard: 8% - 12%)
-  profitRate: number; // % Contractor Profit (standard: 8% - 10%)
+  taxRate?: number; // % Withholding Tax (standard: 5%)
+  profitRate: number; // % EW.TAX (standard: 2% infra, 1% goods)
   vatRate: number; // % Value Added Tax (standard: 5% - 12%)
   directUnitPrice?: number; // Direct quotation unit price override if desired
+  unitCost?: number; // Custom modified unit cost override
+  customUnitCost?: number; // Custom modified unit cost override
   statementOfCompliance?: string; // e.g. "COMPLY" / "BIDDER COMPLIED"
 }
 
@@ -241,7 +246,8 @@ const PRESET_ROAD_DRAINAGE: PowItem[] = [
     laborCost: 0,
     equipmentCost: 125000,
     ocmRate: 8,
-    profitRate: 8,
+    taxRate: 5,
+    profitRate: 2,
     vatRate: 5,
     statementOfCompliance: "COMPLY",
   },
@@ -258,7 +264,8 @@ const PRESET_ROAD_DRAINAGE: PowItem[] = [
     laborCost: 4500,
     equipmentCost: 1500,
     ocmRate: 8,
-    profitRate: 8,
+    taxRate: 5,
+    profitRate: 2,
     vatRate: 5,
     statementOfCompliance: "COMPLY",
   },
@@ -275,7 +282,8 @@ const PRESET_ROAD_DRAINAGE: PowItem[] = [
     laborCost: 45000,
     equipmentCost: 10000,
     ocmRate: 8,
-    profitRate: 8,
+    taxRate: 5,
+    profitRate: 2,
     vatRate: 5,
     statementOfCompliance: "COMPLY",
   },
@@ -292,7 +300,8 @@ const PRESET_ROAD_DRAINAGE: PowItem[] = [
     laborCost: 48000,
     equipmentCost: 128000,
     ocmRate: 9,
-    profitRate: 8,
+    taxRate: 5,
+    profitRate: 2,
     vatRate: 5,
     statementOfCompliance: "COMPLY",
   },
@@ -309,7 +318,8 @@ const PRESET_ROAD_DRAINAGE: PowItem[] = [
     laborCost: 89600,
     equipmentCost: 179200,
     ocmRate: 8,
-    profitRate: 8,
+    taxRate: 5,
+    profitRate: 2,
     vatRate: 5,
     statementOfCompliance: "COMPLY",
   },
@@ -326,7 +336,8 @@ const PRESET_ROAD_DRAINAGE: PowItem[] = [
     laborCost: 384000,
     equipmentCost: 512000,
     ocmRate: 7,
-    profitRate: 8,
+    taxRate: 5,
+    profitRate: 2,
     vatRate: 5,
     statementOfCompliance: "COMPLY",
   },
@@ -346,7 +357,8 @@ const PRESET_GOODS_QUOTATION: PowItem[] = [
     laborCost: 15000,
     equipmentCost: 0,
     ocmRate: 4,
-    profitRate: 8,
+    taxRate: 5,
+    profitRate: 1,
     vatRate: 5,
     statementOfCompliance: "COMPLY",
   },
@@ -363,7 +375,8 @@ const PRESET_GOODS_QUOTATION: PowItem[] = [
     laborCost: 8000,
     equipmentCost: 0,
     ocmRate: 4,
-    profitRate: 8,
+    taxRate: 5,
+    profitRate: 1,
     vatRate: 5,
     statementOfCompliance: "COMPLY",
   },
@@ -380,7 +393,8 @@ const PRESET_GOODS_QUOTATION: PowItem[] = [
     laborCost: 5000,
     equipmentCost: 0,
     ocmRate: 4,
-    profitRate: 8,
+    taxRate: 5,
+    profitRate: 1,
     vatRate: 5,
     statementOfCompliance: "COMPLY",
   },
@@ -397,7 +411,8 @@ const PRESET_GOODS_QUOTATION: PowItem[] = [
     laborCost: 35000,
     equipmentCost: 5000,
     ocmRate: 4,
-    profitRate: 8,
+    taxRate: 5,
+    profitRate: 1,
     vatRate: 5,
     statementOfCompliance: "COMPLY",
   },
@@ -585,6 +600,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
 
   // Items
   const [items, setItems] = useState<PowItem[]>(PRESET_ROAD_DRAINAGE);
+  const [expandedCostId, setExpandedCostId] = useState<string | null>(null);
 
   // Active View Tab: 'matrix' | 'summary' | 'signatories' | 'tor' | 'dr' | 'print'
   const [activeTab, setActiveTab] = useState<PowTabType>(
@@ -678,17 +694,54 @@ export const POWModalContent: React.FC<PowModalProps> = ({
   const calculatedRows = useMemo(() => {
     const isVatable = taxType === "VATABLE";
     return items.map((it) => {
-      const directCost =
+      const rawDirectCost =
         (it.materialCost || 0) + (it.laborCost || 0) + (it.equipmentCost || 0);
-      const ocmCost = directCost * ((it.ocmRate || 0) / 100);
-      const profitCost = directCost * ((it.profitRate || 0) / 100);
-      // Effective VAT: 0% if Non-VAT; configured rate if VATable
+      const ocmRate = it.ocmRate ?? (docMode === "POW" ? 8 : 4);
+      const taxRate = it.taxRate !== undefined ? it.taxRate : 5; // 5% Withholding Tax standard
+      const defaultProfit = projectTaxCategory === "INFRA" ? 2 : 1;
+      const profitRate =
+        it.profitRate !== undefined ? it.profitRate : defaultProfit;
       const effectiveVatRate = isVatable ? (it.vatRate ?? 5) : 0;
-      const vatCost =
-        (directCost + ocmCost + profitCost) * (effectiveVatRate / 100);
-      const indirectCost = ocmCost + profitCost + vatCost;
-      const totalCost = directCost + indirectCost;
-      const unitCost = it.quantity > 0 ? totalCost / it.quantity : totalCost;
+
+      // User modified unit cost override
+      const numCustom =
+        typeof it.customUnitCost === "number" && !isNaN(it.customUnitCost)
+          ? it.customUnitCost
+          : typeof it.unitCost === "number" && !isNaN(it.unitCost)
+          ? it.unitCost
+          : undefined;
+      const isCustomUnitCost =
+        numCustom !== undefined && numCustom > 0;
+
+      // VAT should be /1.12 from direct cost: (directCost / 1.12) * (effectiveVatRate / 100)
+      const vatMultiplierOnDirect = (effectiveVatRate / 100) / 1.12;
+      const markupMultiplier =
+        1 + (ocmRate / 100) + (taxRate / 100) + (profitRate / 100) + vatMultiplierOnDirect;
+
+      let directCost = rawDirectCost;
+      let totalCost = 0;
+      let unitCost = 0;
+
+      if (isCustomUnitCost && numCustom !== undefined) {
+        unitCost = numCustom;
+        totalCost = unitCost * (it.quantity || 1);
+        directCost =
+          markupMultiplier > 0 ? totalCost / markupMultiplier : totalCost;
+      } else {
+        const ocmCost = directCost * (ocmRate / 100);
+        const taxCost = directCost * (taxRate / 100);
+        const profitCost = directCost * (profitRate / 100);
+        const vatCost = (directCost / 1.12) * (effectiveVatRate / 100);
+        const indirectCost = ocmCost + taxCost + profitCost + vatCost;
+        totalCost = directCost + indirectCost;
+        unitCost = it.quantity > 0 ? totalCost / it.quantity : totalCost;
+      }
+
+      const ocmCost = directCost * (ocmRate / 100);
+      const taxCost = directCost * (taxRate / 100);
+      const profitCost = directCost * (profitRate / 100);
+      const vatCost = (directCost / 1.12) * (effectiveVatRate / 100);
+      const indirectCost = ocmCost + taxCost + profitCost + vatCost;
 
       // Item Statutory Tax Calculation
       const itemTax = computeStatutoryTaxes(
@@ -706,18 +759,22 @@ export const POWModalContent: React.FC<PowModalProps> = ({
 
       return {
         ...it,
+        taxRate,
+        profitRate,
         directCost,
         ocmCost,
+        taxCost,
         profitCost,
         vatCost,
         indirectCost,
         totalCost,
         unitCost,
+        isCustomUnitCost,
         itemTax,
         laborTax,
       };
     });
-  }, [items, taxType, projectTaxCategory, retentionRate]);
+  }, [items, taxType, projectTaxCategory, retentionRate, docMode]);
 
   const totals = useMemo(() => {
     let totalMaterial = 0;
@@ -725,6 +782,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
     let totalEquipment = 0;
     let totalDirect = 0;
     let totalOcm = 0;
+    let totalTax = 0;
     let totalProfit = 0;
     let totalVat = 0;
     let totalIndirect = 0;
@@ -736,6 +794,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       totalEquipment += r.equipmentCost || 0;
       totalDirect += r.directCost;
       totalOcm += r.ocmCost;
+      totalTax += r.taxCost;
       totalProfit += r.profitCost;
       totalVat += r.vatCost;
       totalIndirect += r.indirectCost;
@@ -769,6 +828,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       totalEquipment,
       totalDirect,
       totalOcm,
+      totalTax,
       totalProfit,
       totalVat,
       totalIndirect,
@@ -1471,7 +1531,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       if (totals.totalIndirect > 0) {
         const svcJson = JSON.stringify({
           description:
-            "Labor, Indirect Costs, Overhead, Contingencies, Profit & Taxes",
+            "Labor, Indirect Costs, Overhead, Contingencies, EW.TAX & Taxes",
           percentage:
             totals.grandTotal > 0
               ? (totals.totalIndirect / totals.grandTotal) * 100
@@ -1757,7 +1817,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       if (totals.totalIndirect > 0) {
         const svcJson = JSON.stringify({
           description:
-            "Labor, Indirect Costs, Overhead, Contingencies, Profit & Taxes",
+            "Labor, Indirect Costs, Overhead, Contingencies, EW.TAX & Taxes",
           percentage:
             totals.grandTotal > 0
               ? (totals.totalIndirect / totals.grandTotal) * 100
@@ -1911,7 +1971,8 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       laborCost: 15000,
       equipmentCost: 5000,
       ocmRate: docMode === "POW" ? 8 : 4,
-      profitRate: 8,
+      taxRate: 5,
+      profitRate: projectTaxCategory === "INFRA" ? 2 : 1,
       vatRate: 5,
       statementOfCompliance: "COMPLY",
     };
@@ -2990,8 +3051,14 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                 type="button"
                 onClick={() => {
                   setProjectTaxCategory("GOODS");
+                  const updatedItems = items.map((it) => ({
+                    ...it,
+                    profitRate: it.profitRate === 2 || it.profitRate === 8 ? 1 : it.profitRate,
+                    taxRate: it.taxRate ?? 5,
+                  }));
+                  setItems(updatedItems);
                   handleSaveState(
-                    undefined,
+                    updatedItems,
                     undefined,
                     undefined,
                     undefined,
@@ -3004,16 +3071,22 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     ? "bg-purple-600 text-white shadow"
                     : "text-slate-400 hover:text-white"
                 }`}
-                title="Goods & Supply: 5% Final VAT + 1% EWT + 1% Retention"
+                title="Goods & Supply: 5% Final VAT + 1% EW.TAX + 5% W.Tax"
               >
-                <span>📦 Goods (5% VAT + 1% EWT)</span>
+                <span>📦 Goods (1% EW.TAX + 5% W.Tax)</span>
               </button>
               <button
                 type="button"
                 onClick={() => {
                   setProjectTaxCategory("INFRA");
+                  const updatedItems = items.map((it) => ({
+                    ...it,
+                    profitRate: it.profitRate === 1 || it.profitRate === 8 ? 2 : it.profitRate,
+                    taxRate: it.taxRate ?? 5,
+                  }));
+                  setItems(updatedItems);
                   handleSaveState(
-                    undefined,
+                    updatedItems,
                     undefined,
                     undefined,
                     undefined,
@@ -3415,9 +3488,15 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     <th className="p-2.5 w-16 text-center">Unit</th>
                     {docMode === "POW" ? (
                       <>
-                        <th className="p-2.5 text-right w-24">Direct Cost</th>
+                        <th
+                          className="p-2.5 text-right w-28 cursor-pointer hover:text-white"
+                          title="Click any row's Direct Cost to expand Material, Labor & Equipment editor"
+                        >
+                          Direct Cost ▾
+                        </th>
                         <th className="p-2.5 text-right w-16">OCM%</th>
-                        <th className="p-2.5 text-right w-16">Profit%</th>
+                        <th className="p-2.5 text-right w-16">W.Tax%</th>
+                        <th className="p-2.5 text-right w-16">EW.TAX%</th>
                         <th className="p-2.5 text-right w-16">VAT%</th>
                       </>
                     ) : (
@@ -3438,10 +3517,8 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                   {totals.rowsWithWeight.map((row) => (
-                    <tr
-                      key={row.id}
-                      className="hover:bg-slate-800/40 transition"
-                    >
+                    <React.Fragment key={row.id}>
+                      <tr className="hover:bg-slate-800/40 transition">
                       <td className="p-2">
                         <input
                           type="text"
@@ -3510,8 +3587,30 @@ export const POWModalContent: React.FC<PowModalProps> = ({
 
                       {docMode === "POW" ? (
                         <>
-                          <td className="p-2 text-right font-mono font-medium text-slate-200">
-                            ₱{fmtPeso(row.directCost)}
+                          <td className="p-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedCostId(
+                                  expandedCostId === row.id ? null : row.id,
+                                )
+                              }
+                              className={`font-mono font-medium text-xs px-1.5 py-0.5 rounded cursor-pointer transition flex items-center justify-end gap-1 ml-auto border ${
+                                expandedCostId === row.id
+                                  ? "bg-blue-600/30 text-blue-300 border-blue-500/50 ring-1 ring-blue-500/30"
+                                  : "text-slate-200 border-transparent hover:text-white hover:bg-slate-800 hover:border-slate-700"
+                              }`}
+                              title="Click to view and edit Materials, Labor, and Equipment breakdown"
+                            >
+                              <span>₱{fmtPeso(row.directCost)}</span>
+                              <ChevronDown
+                                className={`w-3 h-3 transition-transform ${
+                                  expandedCostId === row.id
+                                    ? "rotate-180 text-blue-400"
+                                    : "text-slate-400"
+                                }`}
+                              />
+                            </button>
                           </td>
                           <td className="p-2 text-right">
                             <input
@@ -3530,6 +3629,21 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                           <td className="p-2 text-right">
                             <input
                               type="number"
+                              value={row.taxRate ?? 5}
+                              onChange={(e) =>
+                                handleUpdateItem(
+                                  row.id,
+                                  "taxRate",
+                                  parseFloat(e.target.value) || 0,
+                                )
+                              }
+                              className="w-12 bg-slate-950 border border-slate-800 rounded px-1 py-1 text-xs text-right text-slate-300 font-mono"
+                              title="Withholding Tax (5%)"
+                            />
+                          </td>
+                          <td className="p-2 text-right">
+                            <input
+                              type="number"
                               value={row.profitRate}
                               onChange={(e) =>
                                 handleUpdateItem(
@@ -3539,6 +3653,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                                 )
                               }
                               className="w-12 bg-slate-950 border border-slate-800 rounded px-1 py-1 text-xs text-right text-slate-300 font-mono"
+                              title={`EW.TAX % (${projectTaxCategory === "INFRA" ? "2% Infra" : "1% Goods"})`}
                             />
                           </td>
                           <td className="p-2 text-right">
@@ -3553,13 +3668,44 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                                 )
                               }
                               className="w-12 bg-slate-950 border border-slate-800 rounded px-1 py-1 text-xs text-right text-slate-300 font-mono"
+                              title="VAT % (derived from Direct Cost ÷ 1.12)"
                             />
                           </td>
                         </>
                       ) : (
                         <>
-                          <td className="p-2 text-right font-mono font-bold text-emerald-400">
-                            ₱{fmtPeso(row.unitCost)}
+                          <td className="p-2 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <input
+                                type="number"
+                                step="any"
+                                value={
+                                  row.customUnitCost !== undefined && row.customUnitCost !== null
+                                    ? row.customUnitCost
+                                    : Number(row.unitCost.toFixed(2))
+                                }
+                                onChange={(e) => {
+                                  const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                                  handleUpdateItem(row.id, "customUnitCost", val);
+                                }}
+                                className={`w-24 bg-slate-950 border rounded px-1.5 py-1 text-xs text-right font-mono font-bold transition ${
+                                  row.customUnitCost !== undefined && row.customUnitCost !== null
+                                    ? "border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/30"
+                                    : "border-slate-800 text-emerald-400 focus:border-emerald-500"
+                                }`}
+                                title="Modify unit quotation price"
+                              />
+                              {row.customUnitCost !== undefined && row.customUnitCost !== null && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateItem(row.id, "customUnitCost", undefined)}
+                                  className="text-slate-500 hover:text-amber-400 p-0.5 rounded cursor-pointer"
+                                  title="Reset to calculated price"
+                                >
+                                  <RotateCcw className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
                           </td>
                           <td className="p-2 text-center">
                             <input
@@ -3582,8 +3728,42 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                         ₱{fmtPeso(row.totalCost)}
                       </td>
                       {docMode === "POW" && (
-                        <td className="p-2 text-right font-mono text-slate-300">
-                          ₱{fmtPeso(row.unitCost)}
+                        <td className="p-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <input
+                              type="number"
+                              step="any"
+                              value={
+                                row.customUnitCost !== undefined && row.customUnitCost !== null
+                                  ? row.customUnitCost
+                                  : Number(row.unitCost.toFixed(2))
+                              }
+                              onChange={(e) => {
+                                const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                                handleUpdateItem(row.id, "customUnitCost", val);
+                              }}
+                              className={`w-24 bg-slate-950 border rounded px-1.5 py-1 text-xs text-right font-mono font-bold transition ${
+                                row.customUnitCost !== undefined && row.customUnitCost !== null
+                                  ? "border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/30"
+                                  : "border-slate-800 text-slate-200 focus:border-blue-500"
+                              }`}
+                              title={
+                                row.customUnitCost !== undefined
+                                  ? "Modified Unit Cost (click reset to revert to formula)"
+                                  : "Calculated Unit Cost (modify here directly)"
+                              }
+                            />
+                            {row.customUnitCost !== undefined && row.customUnitCost !== null && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateItem(row.id, "customUnitCost", undefined)}
+                                className="text-slate-500 hover:text-amber-400 p-0.5 rounded cursor-pointer"
+                                title="Reset to auto-calculated unit cost"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       )}
                       <td className="p-2 text-center font-mono text-[11px] text-blue-400">
@@ -3599,7 +3779,89 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                         </button>
                       </td>
                     </tr>
-                  ))}
+
+                    {/* Collapsible Direct Cost Breakdown Editor (Materials, Labor, Equipment) */}
+                    {expandedCostId === row.id && docMode === "POW" && (
+                      <tr className="bg-slate-950/90 border-b border-blue-500/40">
+                        <td colSpan={13} className="p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/90 p-3 rounded-xl border border-slate-800 shadow-inner">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse" />
+                              <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wide">
+                                Item {row.itemNo} Direct Cost Breakdown:
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-4">
+                              <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800">
+                                <label className="text-[11px] font-semibold text-slate-400">🧱 Materials:</label>
+                                <span className="text-slate-500 text-xs">₱</span>
+                                <input
+                                  type="number"
+                                  value={row.materialCost}
+                                  onChange={(e) => {
+                                    handleUpdateItem(row.id, "materialCost", parseFloat(e.target.value) || 0);
+                                    if (row.customUnitCost !== undefined) handleUpdateItem(row.id, "customUnitCost", undefined);
+                                  }}
+                                  className="w-28 bg-transparent text-xs text-right font-mono text-white focus:outline-none"
+                                  title="Material Cost for this item (feeds Materials Total in Section A)"
+                                />
+                              </div>
+
+                              <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800">
+                                <label className="text-[11px] font-semibold text-slate-400">👷 Labor:</label>
+                                <span className="text-slate-500 text-xs">₱</span>
+                                <input
+                                  type="number"
+                                  value={row.laborCost}
+                                  onChange={(e) => {
+                                    handleUpdateItem(row.id, "laborCost", parseFloat(e.target.value) || 0);
+                                    if (row.customUnitCost !== undefined) handleUpdateItem(row.id, "customUnitCost", undefined);
+                                  }}
+                                  className="w-28 bg-transparent text-xs text-right font-mono text-white focus:outline-none"
+                                  title="Labor Cost for this item (feeds Labor Total in Section A and Labor Taxes in Section D)"
+                                />
+                              </div>
+
+                              <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800">
+                                <label className="text-[11px] font-semibold text-slate-400">🚜 Equipment:</label>
+                                <span className="text-slate-500 text-xs">₱</span>
+                                <input
+                                  type="number"
+                                  value={row.equipmentCost}
+                                  onChange={(e) => {
+                                    handleUpdateItem(row.id, "equipmentCost", parseFloat(e.target.value) || 0);
+                                    if (row.customUnitCost !== undefined) handleUpdateItem(row.id, "customUnitCost", undefined);
+                                  }}
+                                  className="w-28 bg-transparent text-xs text-right font-mono text-white focus:outline-none"
+                                  title="Equipment Rental & Operating Cost (feeds Equipment Total in Section A)"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <span className="text-[10px] text-slate-400 block uppercase font-semibold">
+                                  Item Direct Cost (EDC)
+                                </span>
+                                <span className="font-mono text-xs font-bold text-emerald-400">
+                                  ₱{fmtPeso(row.directCost)}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setExpandedCostId(null)}
+                                className="px-2.5 py-1 text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg cursor-pointer transition border border-slate-700"
+                              >
+                                Close
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
                 </tbody>
                 <tfoot>
                   <tr className="bg-slate-900 font-bold border-t-2 border-slate-700 text-xs">
@@ -3617,7 +3879,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                           ₱{fmtPeso(totals.totalDirect)}
                         </td>
                         <td
-                          colSpan={3}
+                          colSpan={4}
                           className="p-3 text-right font-mono text-amber-400"
                         >
                           ₱{fmtPeso(totals.totalIndirect)}
@@ -3927,7 +4189,15 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-800/60">
                       <span className="text-slate-400">
-                        2. Contractor&apos;s Profit Margin (CP):
+                        2. Withholding Tax (W.Tax 5%):
+                      </span>
+                      <span className="font-mono font-semibold text-white">
+                        ₱{fmtPeso(totals.totalTax)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-800/60">
+                      <span className="text-slate-400">
+                        3. Expanded Withholding Tax (EW.TAX - {projectTaxCategory === "INFRA" ? "2% Infra" : "1% Goods"}):
                       </span>
                       <span className="font-mono font-semibold text-white">
                         ₱{fmtPeso(totals.totalProfit)}
@@ -3935,7 +4205,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-800/60">
                       <span className="text-slate-400">
-                        3. Value-Added Tax / Gov Withholding Tax (VAT):
+                        4. Value-Added Tax (VAT - Direct Cost ÷ 1.12):
                       </span>
                       <span className="font-mono font-semibold text-white">
                         ₱{fmtPeso(totals.totalVat)}
@@ -4738,8 +5008,9 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                             Direct Cost
                           </th>
                           <th className="border border-black p-1 w-12">OCM</th>
+                          <th className="border border-black p-1 w-12">W.Tax</th>
                           <th className="border border-black p-1 w-12">
-                            Profit
+                            EW.TAX
                           </th>
                           <th className="border border-black p-1 w-12">VAT</th>
                           <th className="border border-black p-1 w-24">
@@ -4773,6 +5044,9 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                               {it.ocmRate}%
                             </td>
                             <td className="border border-black p-1 text-right font-mono">
+                              {it.taxRate ?? 5}%
+                            </td>
+                            <td className="border border-black p-1 text-right font-mono">
                               {it.profitRate}%
                             </td>
                             <td className="border border-black p-1 text-right font-mono">
@@ -4802,7 +5076,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                             ₱{fmtPeso(totals.totalDirect)}
                           </td>
                           <td
-                            colSpan={3}
+                            colSpan={4}
                             className="border border-black p-1.5 text-right font-mono"
                           >
                             ₱{fmtPeso(totals.totalIndirect)}
@@ -4864,15 +5138,22 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                           </span>
                         </div>
                         <div className="flex justify-between py-0.5">
-                          <span>Contractor&apos;s Profit Margin (CP):</span>
+                          <span>Withholding Tax (W.Tax 5%):</span>
+                          <span className="font-mono font-semibold">
+                            ₱{fmtPeso(totals.totalTax)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-0.5">
+                          <span>
+                            Expanded Withholding Tax (EW.TAX - {projectTaxCategory === "INFRA" ? "2% Infra" : "1% Goods"}):
+                          </span>
                           <span className="font-mono font-semibold">
                             ₱{fmtPeso(totals.totalProfit)}
                           </span>
                         </div>
                         <div className="flex justify-between py-0.5">
                           <span>
-                            Output VAT Component (
-                            {totals.isVatable ? "12% VAT" : "0% Non-VAT"}):
+                            Output VAT Component (Direct Cost ÷ 1.12):
                           </span>
                           <span className="font-mono font-semibold">
                             ₱{fmtPeso(totals.totalVat)}

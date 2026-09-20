@@ -22,6 +22,7 @@ import { ShinyText } from '../common/ShinyText';
 
 interface RegisterPageProps {
   onSwitchToLogin: () => void;
+  onBackToLanding?: () => void;
 }
 
 const PRESET_COLORS = [
@@ -33,7 +34,7 @@ const PRESET_COLORS = [
   { name: 'Solar Amber', hex: '#d97706', glow: 'rgba(217, 119, 6, 0.4)' },
 ];
 
-export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) => {
+export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onBackToLanding }) => {
   const { registerTenantAndUser } = useAuth();
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
 
@@ -190,6 +191,18 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin }) =
         {/* ─── LEFT PANEL: 3D HOLOGRAPHIC COMMAND DECK (HorizonX Style) ─── */}
         <div className="lg:col-span-5 flex flex-col justify-between space-y-5">
           
+          {onBackToLanding && (
+            <div>
+              <button
+                type="button"
+                onClick={onBackToLanding}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 shadow-sm transition-all cursor-pointer"
+              >
+                <span>← Back to 3D Showcase &amp; Portal</span>
+              </button>
+            </div>
+          )}
+
           {/* Top Brand */}
           <div className="flex items-center gap-2">
             <div 

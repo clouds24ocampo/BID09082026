@@ -25,6 +25,7 @@ import {
   Briefcase,
   FileSpreadsheet,
   Users,
+  Sparkles,
 } from "lucide-react";
 
 import { AuroraBackground } from "../common/AuroraBackground";
@@ -147,6 +148,12 @@ export const AppShell: React.FC<AppShellProps> = ({
       badge: "Legal",
     },
     {
+      id: "3d-showcase",
+      label: "3D Bidding Vault & Radar",
+      icon: Sparkles,
+      badge: "3D WebGL",
+    },
+    {
       id: "profile",
       label: "Company Profile",
       icon: Building2,
@@ -264,6 +271,20 @@ export const AppShell: React.FC<AppShellProps> = ({
 
         {/* Right Header Actions */}
         <div className="flex items-center gap-3">
+          {/* Quick 3D Bidding Core Launcher */}
+          <button
+            onClick={() => setActiveTab("3d-showcase")}
+            title="Open 3D Bidding Vault & PhilGEPS Radar"
+            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
+              activeTab === "3d-showcase"
+                ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-[0_0_12px_rgba(0,240,255,0.3)]"
+                : "bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:border-cyan-500/30"
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+            <span>3D Vault</span>
+          </button>
+
           {/* Expiry Notifications Alert */}
           <div className="relative">
             <button

@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginPage } from "./components/auth/LoginPage";
 import { RegisterPage } from "./components/auth/RegisterPage";
+import { LandingWebsiteView } from "./components/landing/LandingWebsiteView";
+import { FrontEnd3DShowcaseView } from "./components/3d/FrontEnd3DShowcaseView";
 import { AppShell } from "./components/layout/AppShell";
 import { DashboardView } from "./components/dashboard/DashboardView";
 import { DocumentVaultView } from "./components/vault/DocumentVaultView";
@@ -18,16 +20,33 @@ import VaultErrorBoundary from "./components/common/VaultErrorBoundary";
 
 const MainApp: React.FC = () => {
   const { currentUser, currentTenant, tenants } = useAuth();
-  const [authMode, setAuthMode] = useState<"login" | "register">(() => {
-    return tenants.length === 0 ? "register" : "login";
-  });
+  const [authMode, setAuthMode] = useState<"landing" | "login" | "register">("landing");
   const [activeTab, setActiveTab] = useState("dashboard");
 
   if (!currentUser || !currentTenant || tenants.length === 0) {
-    if (authMode === "register" || tenants.length === 0) {
-      return <RegisterPage onSwitchToLogin={() => setAuthMode("login")} />;
+    if (authMode === "landing") {
+      return (
+        <LandingWebsiteView
+          onEnterApp={() => setAuthMode(tenants.length === 0 ? "register" : "login")}
+          onLogin={() => setAuthMode("login")}
+          onRegister={() => setAuthMode("register")}
+        />
+      );
     }
-    return <LoginPage onSwitchToRegister={() => setAuthMode("register")} />;
+    if (authMode === "register" || tenants.length === 0) {
+      return (
+        <RegisterPage
+          onSwitchToLogin={() => setAuthMode("login")}
+          onBackToLanding={() => setAuthMode("landing")}
+        />
+      );
+    }
+    return (
+      <LoginPage
+        onSwitchToRegister={() => setAuthMode("register")}
+        onBackToLanding={() => setAuthMode("landing")}
+      />
+    );
   }
 
   return (
@@ -36,6 +55,9 @@ const MainApp: React.FC = () => {
         key={activeTab}
         fallbackTitle={`${activeTab.replace("-", " ").toUpperCase()} Module View`}
       >
+        {activeTab === "3d-showcase" && (
+          <FrontEnd3DShowcaseView onNavigateTab={setActiveTab} />
+        )}
         {activeTab === "dashboard" && (
           <DashboardView setActiveTab={setActiveTab} />
         )}

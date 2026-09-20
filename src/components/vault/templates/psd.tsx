@@ -73,8 +73,8 @@ export const PsdModalContent: React.FC<PsdModalProps> = ({
   // Jurat & Execution Details
   const [executionCity, setExecutionCity] = useState('');
   const [executionDay, setExecutionDay] = useState(today.getDate().toString());
-  const [executionMonth, setExecutionMonth] = useState(today.toLocaleDateString('en-PH', { month: 'long' }));
-  const [executionYear, setExecutionYear] = useState(currentYear);
+  const [executionMonthYear, setExecutionMonthYear] = useState(`${today.toLocaleDateString('en-PH', { month: 'long' })} ${currentYear}`);
+  const executionYear = executionMonthYear.trim().split(/\s+/).pop() || currentYear;
   const [govIdType, setGovIdType] = useState('');
   const [govIdNumber, setGovIdNumber] = useState('');
   const [idDateIssued, setIdDateIssued] = useState('');
@@ -528,12 +528,9 @@ export const PsdModalContent: React.FC<PsdModalProps> = ({
                 <label className="text-[10px] font-semibold text-slate-400 uppercase">Month & Year</label>
                 <input
                   type="text"
-                  value={`${executionMonth} ${executionYear}`}
-                  onChange={(e) => {
-                    const parts = e.target.value.split(' ');
-                    if (parts[0]) setExecutionMonth(parts[0]);
-                    if (parts[1]) setExecutionYear(parts[1]);
-                  }}
+                  value={executionMonthYear}
+                  onChange={(e) => setExecutionMonthYear(e.target.value)}
+                  placeholder="e.g. September 2026"
                   className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
                 />
               </div>
@@ -542,81 +539,10 @@ export const PsdModalContent: React.FC<PsdModalProps> = ({
 
           {/* Notary Public Details */}
           <div className="bg-slate-900 border border-slate-800 p-3.5 rounded-xl space-y-3">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Notary Public Information</h3>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase">Name of Notary Public</label>
-                <input
-                  type="text"
-                  value={notaryName}
-                  onChange={(e) => setNotaryName(e.target.value)}
-                  placeholder="NAME OF NOTARY PUBLIC"
-                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase">Serial No. of Commission</label>
-                <input
-                  type="text"
-                  value={notaryCommissionNo}
-                  onChange={(e) => setNotaryCommissionNo(e.target.value)}
-                  placeholder="e.g. Comm. No. 2026-089"
-                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase">Notary Public For & Until</label>
-                <input
-                  type="text"
-                  value={notaryJurisdiction ? `${notaryJurisdiction} until ${notaryUntil}` : ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    const parts = val.split(' until ');
-                    setNotaryJurisdiction(parts[0] || '');
-                    setNotaryUntil(parts[1] || `December 31, ${currentYear}`);
-                  }}
-                  placeholder="e.g. Manila until Dec 31, 2026"
-                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase">Roll of Attorneys No.</label>
-                <input
-                  type="text"
-                  value={notaryRollNo}
-                  onChange={(e) => setNotaryRollNo(e.target.value)}
-                  placeholder="e.g. 78910"
-                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase">PTR No., Date & Place</label>
-                <input
-                  type="text"
-                  value={notaryPtr}
-                  onChange={(e) => setNotaryPtr(e.target.value)}
-                  placeholder="PTR No. __, [date], [place]"
-                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono text-[11px]"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase">IBP No., Date & Place</label>
-                <input
-                  type="text"
-                  value={notaryIbp}
-                  onChange={(e) => setNotaryIbp(e.target.value)}
-                  placeholder="IBP No. __, [date], [place]"
-                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono text-[11px]"
-                />
-              </div>
-            </div>
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Notarial Registry (Docket)</h3>
+            <p className="text-[11px] text-slate-400">
+              Notarial block prints standard <span className="text-white font-semibold">Notary Public</span> title. Official stamp and commission details will be applied by the commissioned notary.
+            </p>
 
             <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-800">
               <div>
@@ -758,7 +684,7 @@ export const PsdModalContent: React.FC<PsdModalProps> = ({
                 </div>
 
                 <p className="pt-3">
-                  IN WITNESS WHEREOF, I/We have hereunto set my/our hand/s this {executionDay ? <u>{executionDay}</u> : '_____'} day of {executionMonth ? <u>{executionMonth}</u> : '[month]'} {executionYear ? <u>{executionYear}</u> : '[year]'} at {executionCity ? <u>{executionCity}</u> : '[place of execution]'}.
+                  IN WITNESS WHEREOF, I/We have hereunto set my/our hand/s this {executionDay ? <u>{executionDay}</u> : '_____'} day of {executionMonthYear.trim() ? <u>{executionMonthYear.trim()}</u> : '[month, year]'} at {executionCity ? <u>{executionCity}</u> : '[place of execution]'}.
                 </p>
               </div>
 
@@ -790,7 +716,7 @@ export const PsdModalContent: React.FC<PsdModalProps> = ({
               {/* Jurat Notarial Section */}
               <div className="pt-3 font-sans text-[11px] space-y-3 text-justify leading-relaxed text-slate-900">
                 <p>
-                  SUBSCRIBED AND SWORN to before me this {executionDay ? <u>{executionDay}</u> : '___'} day of {executionMonth ? <u>{executionMonth}</u> : <i>[month]</i>} {executionYear ? <u>{executionYear}</u> : <i>[year]</i>} at {executionCity ? <u>{executionCity}</u> : <i>[place of execution]</i>}, Philippines. Affiant/s is/are personally known to me and was/were identified by me through competent evidence of identity as defined in the 2004 Rules on Notarial Practice (A.M. No. 02-8-13-SC). Affiant/s exhibited to me his/her {govIdType ? <u>{govIdType}</u> : <i>[insert type of government identification card used]</i>}, with his/her photograph and signature appearing thereon, with no. {govIdNumber ? <u>{govIdNumber}</u> : '_______'} issued on {idDateIssued ? <u>{idDateIssued}</u> : '__________'} at {idPlaceIssued ? <u>{idPlaceIssued}</u> : '_____________'}.
+                  SUBSCRIBED AND SWORN to before me this {executionDay ? <u>{executionDay}</u> : '___'} day of {executionMonthYear.trim() ? <u>{executionMonthYear.trim()}</u> : <i>[month, year]</i>} at {executionCity ? <u>{executionCity}</u> : <i>[place of execution]</i>}, Philippines. Affiant/s is/are personally known to me and was/were identified by me through competent evidence of identity as defined in the 2004 Rules on Notarial Practice (A.M. No. 02-8-13-SC). Affiant/s exhibited to me his/her {govIdType ? <u>{govIdType}</u> : <i>[insert type of government identification card used]</i>}, with his/her photograph and signature appearing thereon, with no. {govIdNumber ? <u>{govIdNumber}</u> : '_______'} issued on {idDateIssued ? <u>{idDateIssued}</u> : '__________'} at {idPlaceIssued ? <u>{idPlaceIssued}</u> : '_____________'}.
                 </p>
 
                 {/* Notary and Docket 2-Column Layout */}
@@ -805,23 +731,8 @@ export const PsdModalContent: React.FC<PsdModalProps> = ({
 
                   {/* Right Notary Public Column */}
                   <div className="text-left w-72 space-y-0.5 text-[11px] text-slate-900 font-sans">
-                    <p className="font-bold uppercase text-slate-950">
-                      {notaryName || 'NAME OF NOTARY PUBLIC'}
-                    </p>
-                    <p>
-                      Serial No. of Commission {notaryCommissionNo ? <u>{notaryCommissionNo}</u> : '___________'}
-                    </p>
-                    <p>
-                      Notary Public for {notaryJurisdiction ? <u>{notaryJurisdiction}</u> : '_______'} until {notaryUntil ? <u>{notaryUntil}</u> : '________'}
-                    </p>
-                    <p>
-                      Roll of Attorneys No. {notaryRollNo ? <u>{notaryRollNo}</u> : '________'}
-                    </p>
-                    <p>
-                      PTR No. {notaryPtr ? <u>{notaryPtr}</u> : <span>__, <i>[date issued]</i>, <i>[place issued]</i></span>}
-                    </p>
-                    <p>
-                      IBP No. {notaryIbp ? <u>{notaryIbp}</u> : <span>__, <i>[date issued]</i>, <i>[place issued]</i></span>}
+                    <p className="font-bold text-slate-950">
+                      Notary Public
                     </p>
                   </div>
                 </div>

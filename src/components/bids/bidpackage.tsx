@@ -46,6 +46,14 @@ import {
 } from 'lucide-react';
 import { BorderBeam } from '../common/BorderBeam';
 import { ShinyText } from '../common/ShinyText';
+import { 
+  MergedBidPackageRecord, 
+  getProjectMergedPackages, 
+  saveProjectMergedPackage, 
+  deleteProjectMergedPackage, 
+  loadMergedPackagePdf 
+} from '../../utils/mergedBidPackages';
+import { formatBytes } from '../../utils/storageScalability';
 
 
 export type FolderCopyType = 'ORIGINAL' | 'COPY_1' | 'COPY_2';
@@ -127,6 +135,12 @@ export const BidPackageBuilderView: React.FC = () => {
   const [isMergingAll, setIsMergingAll] = useState(false);
   const [mergeStatusText, setMergeStatusText] = useState('');
 
+  // Compiled Merged Packages State
+  const [mergedPackages, setMergedPackages] = useState<MergedBidPackageRecord[]>([]);
+  const [activeViewMode, setActiveViewMode] = useState<'CHECKLIST' | 'MERGED_PACKAGES'>('CHECKLIST');
+  const [isOpeningMergedPreview, setIsOpeningMergedPreview] = useState<string | null>(null);
+  const [mergedPackagesFilter, setMergedPackagesFilter] = useState<'ALL' | 'ORIGINAL' | 'COPY_1' | 'COPY_2' | 'COMPLETE'>('ALL');
+
   const pdfDataCache = useRef<Record<string, string>>({});
 
   useEffect(() => {
@@ -143,6 +157,112 @@ export const BidPackageBuilderView: React.FC = () => {
   const submissionDeadline = activeProject?.dateTimeSubmitted || 'March 19, 2026';
   const projectCategory = (activeProject?.category || 'Infrastructure').toLowerCase();
   const projectScopeKey = (projectRefNo || '').trim();
+
+  // Load project-scoped merged packages from localStorage / IndexedDB and subscribe to live updates
+  useEffect(() => {
+    if (!tenantId || !projectScopeKey) {
+      setMergedPackages([]);
+      return;
+    }
+    const list = getProjectMergedPackages(tenantId, projectScopeKey);
+    setMergedPackages(list);
+
+    const handleUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail?.tenantId === tenantId) {
+        const updated = getProjectMergedPackages(tenantId, projectScopeKey);
+        setMergedPackages(updated);
+      }
+    };
+
+    window.addEventListener('bidocs:merged_packages_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('bidocs:merged_packages_updated', handleUpdate);
+    };
+  }, [tenantId, projectScopeKey]);
+
+  // Current folder copy compiled package
+  const activeFolderMergedPkg = React.useMemo(() => {
+    return mergedPackages.find(p => 
+      p.folderCopy === activeFolderCopy && 
+      (p.envelope === activeEnvelope || p.envelope === 'ALL_ENVELOPES')
+    ) || null;
+  }, [mergedPackages, activeFolderCopy, activeEnvelope]);
+
+  const handlePreviewMergedPackage = async (pkg: MergedBidPackageRecord) => {
+    setIsOpeningMergedPreview(pkg.id);
+    try {
+      let dataUrl: string | undefined = pdfDataCache.current[pkg.id];
+      if (!dataUrl) {
+        dataUrl = await loadMergedPackagePdf(pkg.id);
+        if (dataUrl) {
+          pdfDataCache.current[pkg.id] = dataUrl;
+        }
+      }
+
+      if (!dataUrl) {
+        alert('Could not load PDF data from storage. Please re-compile this package.');
+        return;
+      }
+
+      setPreviewDocItem({
+        id: pkg.id,
+        tenantId: tenantId,
+        documentName: pkg.fileName,
+        category: pkg.envelope === 'ENVELOPE_2' ? 'FINANCIAL' : 'TECHNICAL',
+        documentCode: pkg.envelope,
+        fileDataUrl: dataUrl,
+        fileName: pkg.fileName,
+        fileSizeBytes: pkg.fileSizeBytes,
+        versionNumber: 1,
+        fileHash: '',
+        uploadedByName: currentTenant?.authorizedSignatory?.name || 'Authorized Signatory',
+        isOptional: false,
+        requiresIssueDate: false,
+        requiresExpiryDate: false,
+        legalBasisReference: 'RA 9184 / RA 12009',
+        procurementApplicability: ['INFRASTRUCTURE', 'GOODS'],
+        projectTitle: projectTitle,
+        philgepsRefNo: projectRefNo,
+        status: 'ACTIVE'
+      });
+    } catch (err) {
+      console.error('Failed to preview merged package:', err);
+      alert('Failed to preview merged package.');
+    } finally {
+      setIsOpeningMergedPreview(null);
+    }
+  };
+
+  const handleDownloadMergedPackage = async (pkg: MergedBidPackageRecord) => {
+    try {
+      let dataUrl: string | undefined = pdfDataCache.current[pkg.id];
+      if (!dataUrl) {
+        dataUrl = await loadMergedPackagePdf(pkg.id);
+      }
+      if (!dataUrl) {
+        alert('PDF data not found in cache. Please re-compile this package.');
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = pkg.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Failed to download merged package:', err);
+    }
+  };
+
+  const handleDeleteMergedPackage = async (pkgId: string) => {
+    if (!confirm('Are you sure you want to remove this compiled package?')) return;
+    const targetProjectRef = projectRefNo || activeProject?.refNo || projectScopeKey;
+    await deleteProjectMergedPackage(tenantId, targetProjectRef, pkgId);
+    delete pdfDataCache.current[pkgId];
+    const updated = getProjectMergedPackages(tenantId, targetProjectRef);
+    setMergedPackages(updated);
+  };
 
   const isInfraProject = React.useMemo(() => {
     // 1. Primary Authority: Project's explicit category from PhilGEPS / Opportunity Setup
@@ -1480,7 +1600,7 @@ export const BidPackageBuilderView: React.FC = () => {
         : activeEnvelope === 'ENVELOPE_1' ? 'TECHNICAL_LEGAL' : 'FINANCIAL';
       const fileName = `${cleanRef}_${activeFolderCopy}_${envTag}.pdf`;
 
-      await exportMergedThreeLayerPdf(units, fileName, (prog) => {
+      const dataUrl = await buildMergedThreeLayerPdfDataUrl(units, fileName, (prog) => {
         setMergeStatusText(`${prog.status} (${prog.percent}%)`);
       }, {
         folderCopy: activeFolderCopy,
@@ -1491,7 +1611,52 @@ export const BidPackageBuilderView: React.FC = () => {
         projectRefNo: projectRefNo || activeProject?.refNo || 'PhilGEPS-2026',
         projectTitle: projectTitle || activeProject?.title || 'Target Procurement Project'
       });
-      setMergeStatusText('Merged Package Successfully Downloaded!');
+
+      // 1. Direct browser download
+      if (typeof document !== 'undefined') {
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      // 2. Persist compiled package record & PDF blob in IndexedDB
+      const targetProjectRef = projectRefNo || activeProject?.refNo || cleanRef;
+      const packageId = `merged_${tenantId}_${targetProjectRef.replace(/[^a-zA-Z0-9_-]/g, '_')}_${activeFolderCopy}_${envTag}`;
+      const fileSizeBytes = Math.round((dataUrl.length * 3) / 4);
+
+      const newRecord: MergedBidPackageRecord = {
+        id: packageId,
+        tenantId,
+        projectRefNo: targetProjectRef,
+        projectTitle: projectTitle || activeProject?.title || 'Target Procurement Project',
+        envelope: scope === 'ALL_ENVELOPES' ? 'ALL_ENVELOPES' : activeEnvelope,
+        folderCopy: activeFolderCopy,
+        fileName,
+        fileSizeBytes,
+        pageCount: units.length,
+        mergedAt: new Date().toISOString(),
+        documentCount: docsToMerge.length,
+        scope
+      };
+
+      await saveProjectMergedPackage(tenantId, targetProjectRef, newRecord, dataUrl);
+      pdfDataCache.current[packageId] = dataUrl;
+
+      // 3. Mark project bid merge done
+      markProjectBidMergeDone(tenantId, targetProjectRef, {
+        fileName,
+        copiesCount: 3,
+        completedBy: currentTenant?.authorizedSignatory?.name || 'BiDOCS Merge Engine'
+      });
+
+      // 4. Update state directly
+      const updatedList = getProjectMergedPackages(tenantId, targetProjectRef);
+      setMergedPackages(updatedList);
+
+      setMergeStatusText('Merged Package Downloaded & Saved to Bid Package Tab!');
       setTimeout(() => {
         setIsMergingAll(false);
         setMergeStatusText('');
@@ -1698,28 +1863,31 @@ export const BidPackageBuilderView: React.FC = () => {
         </div>
       ) : (
         <>
-      {/* 2. Envelope 1 & Envelope 2 Tabs Container */}
+      {/* 2. Envelope 1, Envelope 2 & Compiled Merged Packages Tabs Container */}
       <div className="w-full">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           
           {/* Envelope 1 Tab Card */}
           <button
             type="button"
-            onClick={() => setActiveEnvelope('ENVELOPE_1')}
+            onClick={() => {
+              setActiveEnvelope('ENVELOPE_1');
+              setActiveViewMode('CHECKLIST');
+            }}
             className={`group relative p-5 rounded-2xl border text-left transition-all duration-300 cursor-pointer overflow-hidden ${
-              activeEnvelope === 'ENVELOPE_1'
+              activeViewMode === 'CHECKLIST' && activeEnvelope === 'ENVELOPE_1'
                 ? 'bg-linear-to-br from-[#0c1938] to-[#081026] border-blue-500 shadow-xl shadow-blue-950/40 ring-1 ring-blue-500/60'
                 : 'bg-[#080d1a]/80 border-slate-800/90 hover:border-slate-700 hover:bg-[#0c1426]/60'
             }`}
           >
-            {activeEnvelope === 'ENVELOPE_1' && (
+            {activeViewMode === 'CHECKLIST' && activeEnvelope === 'ENVELOPE_1' && (
               <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-blue-600 via-blue-400 to-indigo-500" />
             )}
 
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className={`p-3 rounded-xl border transition-colors ${
-                  activeEnvelope === 'ENVELOPE_1'
+                  activeViewMode === 'CHECKLIST' && activeEnvelope === 'ENVELOPE_1'
                     ? 'bg-blue-600/20 text-blue-300 border-blue-500/40 shadow-inner'
                     : 'bg-slate-900/80 text-slate-400 border-slate-800 group-hover:text-slate-300'
                 }`}>
@@ -1727,7 +1895,7 @@ export const BidPackageBuilderView: React.FC = () => {
                 </div>
                 <div>
                   <h3 className={`text-base font-extrabold transition-colors ${
-                    activeEnvelope === 'ENVELOPE_1' ? 'text-white' : 'text-slate-300 group-hover:text-white'
+                    activeViewMode === 'CHECKLIST' && activeEnvelope === 'ENVELOPE_1' ? 'text-white' : 'text-slate-300 group-hover:text-white'
                   }`}>
                     Envelope 1
                   </h3>
@@ -1738,7 +1906,7 @@ export const BidPackageBuilderView: React.FC = () => {
               </div>
 
               <span className={`px-3 py-1 rounded-full text-[11px] font-mono font-bold border transition-colors ${
-                activeEnvelope === 'ENVELOPE_1'
+                activeViewMode === 'CHECKLIST' && activeEnvelope === 'ENVELOPE_1'
                   ? 'bg-blue-500/20 text-blue-300 border-blue-500/50'
                   : 'bg-slate-900 text-slate-400 border-slate-800'
               }`}>
@@ -1754,21 +1922,24 @@ export const BidPackageBuilderView: React.FC = () => {
           {/* Envelope 2 Tab Card */}
           <button
             type="button"
-            onClick={() => setActiveEnvelope('ENVELOPE_2')}
+            onClick={() => {
+              setActiveEnvelope('ENVELOPE_2');
+              setActiveViewMode('CHECKLIST');
+            }}
             className={`group relative p-5 rounded-2xl border text-left transition-all duration-300 cursor-pointer overflow-hidden ${
-              activeEnvelope === 'ENVELOPE_2'
+              activeViewMode === 'CHECKLIST' && activeEnvelope === 'ENVELOPE_2'
                 ? 'bg-linear-to-br from-[#0c2e22] to-[#081f18] border-emerald-500 shadow-xl shadow-emerald-950/40 ring-1 ring-emerald-500/60'
                 : 'bg-[#080d1a]/80 border-slate-800/90 hover:border-slate-700 hover:bg-[#0c1426]/60'
             }`}
           >
-            {activeEnvelope === 'ENVELOPE_2' && (
+            {activeViewMode === 'CHECKLIST' && activeEnvelope === 'ENVELOPE_2' && (
               <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-emerald-600 via-emerald-400 to-teal-500" />
             )}
 
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className={`p-3 rounded-xl border transition-colors ${
-                  activeEnvelope === 'ENVELOPE_2'
+                  activeViewMode === 'CHECKLIST' && activeEnvelope === 'ENVELOPE_2'
                     ? 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40 shadow-inner'
                     : 'bg-slate-900/80 text-slate-400 border-slate-800 group-hover:text-slate-300'
                 }`}>
@@ -1776,7 +1947,7 @@ export const BidPackageBuilderView: React.FC = () => {
                 </div>
                 <div>
                   <h3 className={`text-base font-extrabold transition-colors ${
-                    activeEnvelope === 'ENVELOPE_2' ? 'text-white' : 'text-slate-300 group-hover:text-white'
+                    activeViewMode === 'CHECKLIST' && activeEnvelope === 'ENVELOPE_2' ? 'text-white' : 'text-slate-300 group-hover:text-white'
                   }`}>
                     Envelope 2
                   </h3>
@@ -1787,7 +1958,7 @@ export const BidPackageBuilderView: React.FC = () => {
               </div>
 
               <span className={`px-3 py-1 rounded-full text-[11px] font-mono font-bold border transition-colors ${
-                activeEnvelope === 'ENVELOPE_2'
+                activeViewMode === 'CHECKLIST' && activeEnvelope === 'ENVELOPE_2'
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
                   : 'bg-slate-900 text-slate-400 border-slate-800'
               }`}>
@@ -1800,10 +1971,282 @@ export const BidPackageBuilderView: React.FC = () => {
             </p>
           </button>
 
+          {/* Compiled Merged Packages Tab Card */}
+          <button
+            type="button"
+            onClick={() => setActiveViewMode('MERGED_PACKAGES')}
+            className={`group relative p-5 rounded-2xl border text-left transition-all duration-300 cursor-pointer overflow-hidden ${
+              activeViewMode === 'MERGED_PACKAGES'
+                ? 'bg-linear-to-br from-[#1e0f38] to-[#120824] border-purple-500 shadow-xl shadow-purple-950/40 ring-1 ring-purple-500/60'
+                : 'bg-[#080d1a]/80 border-slate-800/90 hover:border-slate-700 hover:bg-[#150c26]/60'
+            }`}
+          >
+            {activeViewMode === 'MERGED_PACKAGES' && (
+              <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-purple-600 via-pink-500 to-indigo-500" />
+            )}
+
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className={`p-3 rounded-xl border transition-colors ${
+                  activeViewMode === 'MERGED_PACKAGES'
+                    ? 'bg-purple-600/20 text-purple-300 border-purple-500/40 shadow-inner'
+                    : 'bg-slate-900/80 text-slate-400 border-slate-800 group-hover:text-slate-300'
+                }`}>
+                  <FileStack className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className={`text-base font-extrabold transition-colors ${
+                    activeViewMode === 'MERGED_PACKAGES' ? 'text-white' : 'text-slate-300 group-hover:text-white'
+                  }`}>
+                    Merged Packages
+                  </h3>
+                  <p className="text-xs font-semibold text-purple-400">
+                    Compiled Sealed Packages
+                  </p>
+                </div>
+              </div>
+
+              <span className={`px-3 py-1 rounded-full text-[11px] font-mono font-bold border transition-colors ${
+                mergedPackages.length > 0
+                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/50 shadow-sm shadow-purple-500/20'
+                  : 'bg-slate-900 text-slate-400 border-slate-800'
+              }`}>
+                {mergedPackages.length} {mergedPackages.length === 1 ? 'Package' : 'Packages'} Ready
+              </span>
+            </div>
+
+            <p className="mt-3 text-xs text-slate-400 leading-relaxed">
+              Official 3-copy sealed PDF packages with "Page X of Y" pagination, Certified True Copy stamps, and separator covers.
+            </p>
+          </button>
+
         </div>
       </div>
 
-      {/* 3. Inside Envelope: 3 Folder Copies (Original, Copy 1, Copy 2) */}
+      {/* 3. View Switcher: Compiled Merged Packages View OR Document Folders Checklist */}
+      {activeViewMode === 'MERGED_PACKAGES' ? (
+        <div className="w-full bg-[#080d1a]/95 border border-purple-900/50 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-6">
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  <FileStack className="w-5 h-5" />
+                </span>
+                <h3 className="text-base font-extrabold text-white">
+                  Compiled Merged Bid Packages
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-mono font-bold">
+                  {mergedPackages.length} Available
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Official Philippine RA 9184 / RA 12009 sealed PDF submissions for <span className="text-purple-300 font-bold">{projectTitle || projectRefNo}</span>.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setActiveViewMode('CHECKLIST')}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5 cursor-pointer shadow"
+              >
+                <span>← Back to Documents Checklist</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMergeAllDocuments('ALL_ENVELOPES')}
+                disabled={isMergingAll || packageItems.length === 0}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-linear-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-cyan-950/40 cursor-pointer disabled:opacity-50 border border-cyan-400/40"
+              >
+                <FileStack className="w-3.5 h-3.5 text-cyan-200" />
+                <span>+ Merge All Envelopes ({activeFolderCopy})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowMergedPackageViewerModal(true)}
+                disabled={packageItemsForMerge.length === 0}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-purple-950/40 cursor-pointer disabled:opacity-50 border border-purple-400/40"
+              >
+                <FileStack className="w-3.5 h-3.5 text-purple-200" />
+                <span>3-Copy Packages Folder</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            <span className="text-slate-500 font-semibold mr-1">Filter Copies:</span>
+            {(['ALL', 'ORIGINAL', 'COPY_1', 'COPY_2', 'COMPLETE'] as const).map((filter) => {
+              const count = filter === 'ALL'
+                ? mergedPackages.length
+                : filter === 'COMPLETE'
+                  ? mergedPackages.filter(p => p.scope === 'ALL_ENVELOPES').length
+                  : mergedPackages.filter(p => p.folderCopy === filter).length;
+              const isSelected = mergedPackagesFilter === filter;
+              return (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setMergedPackagesFilter(filter)}
+                  className={`px-3 py-1 rounded-lg font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-purple-600 text-white shadow-md shadow-purple-950/50'
+                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <span>{filter.replace('_', ' ')}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    isSelected ? 'bg-purple-900/60 text-purple-200' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Packages Grid or Empty State */}
+          {mergedPackages.length === 0 ? (
+            <div className="py-14 px-6 text-center border-2 border-dashed border-slate-800 rounded-2xl bg-slate-950/40 space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto border border-purple-500/20">
+                <FileStack className="w-7 h-7" />
+              </div>
+              <div className="max-w-md mx-auto space-y-1">
+                <h4 className="text-sm font-bold text-white">No Merged Packages Compiled Yet</h4>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Compile your documents into an official sealed bidding package. Stamped with "Page X of Y" pagination, Certified True Copy seals, and official cover separators.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3 pt-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => handleMergeAllDocuments('CURRENT_FOLDER')}
+                  disabled={isMergingAll}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-950/40"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Merge {activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1' : 'Envelope 2'} ({activeFolderCopy})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMergeAllDocuments('ALL_ENVELOPES')}
+                  disabled={isMergingAll}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white transition flex items-center gap-2 cursor-pointer shadow-lg shadow-teal-950/40"
+                >
+                  <FileStack className="w-4 h-4" />
+                  <span>Merge All Envelopes ({activeFolderCopy})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowMergedPackageViewerModal(true)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition flex items-center gap-2 cursor-pointer shadow-lg shadow-purple-950/40"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>Open 3-Copy Merged Packages Folder</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {mergedPackages
+                .filter(pkg => {
+                  if (mergedPackagesFilter === 'ALL') return true;
+                  if (mergedPackagesFilter === 'COMPLETE') return pkg.scope === 'ALL_ENVELOPES';
+                  return pkg.folderCopy === mergedPackagesFilter;
+                })
+                .map((pkg) => {
+                  const copyBadgeColor = pkg.folderCopy === 'ORIGINAL'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : pkg.folderCopy === 'COPY_1'
+                      ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                      : 'bg-purple-500/20 text-purple-300 border-purple-500/40';
+
+                  const envLabel = pkg.scope === 'ALL_ENVELOPES'
+                    ? 'Complete Bid Dossier (All Envelopes)'
+                    : pkg.envelope === 'ENVELOPE_1'
+                      ? 'Envelope 1 (Technical & Legal)'
+                      : 'Envelope 2 (Financial Proposal)';
+
+                  return (
+                    <div
+                      key={pkg.id}
+                      className="group p-5 rounded-2xl border border-slate-800 hover:border-purple-500/60 bg-linear-to-b from-[#0c1426] to-[#070c18] transition-all duration-200 shadow-xl space-y-4 flex flex-col justify-between"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-extrabold border ${copyBadgeColor}`}>
+                            {pkg.folderCopy === 'ORIGINAL' ? '👑 ORIGINAL' : pkg.folderCopy}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            ✓ Ready
+                          </span>
+                        </div>
+
+                        <div>
+                          <p className="text-[11px] font-semibold text-slate-400">{envLabel}</p>
+                          <h4 className="text-xs font-bold font-mono text-white break-all group-hover:text-purple-300 transition-colors mt-0.5">
+                            {pkg.fileName}
+                          </h4>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-2 text-[11px] text-slate-400 font-mono">
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">DOCUMENTS</span>
+                            <span className="text-slate-200 font-semibold">{pkg.documentCount} items</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-[10px]">FILE SIZE</span>
+                            <span className="text-slate-200 font-semibold">{formatBytes(pkg.fileSizeBytes)}</span>
+                          </div>
+                          <div className="col-span-2 text-[10px] text-slate-500">
+                            Compiled {new Date(pkg.mergedAt).toLocaleDateString()} at {new Date(pkg.mergedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-800/80 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handlePreviewMergedPackage(pkg)}
+                          disabled={isOpeningMergedPreview === pkg.id}
+                          className="flex-1 px-3 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-purple-950/40"
+                          title="Preview merged PDF in viewer"
+                        >
+                          {isOpeningMergedPreview === pkg.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Eye className="w-3.5 h-3.5" />
+                          )}
+                          <span>Preview PDF</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadMergedPackage(pkg)}
+                          className="p-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center justify-center cursor-pointer"
+                          title="Download merged PDF"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMergedPackage(pkg.id)}
+                          className="p-2 rounded-xl text-xs font-semibold bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 transition flex items-center justify-center cursor-pointer"
+                          title="Remove compiled package"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      ) : (
+      /* 3. Inside Envelope: 3 Folder Copies (Original, Copy 1, Copy 2) */
       <div className="w-full bg-[#080d1a]/95 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-6">
         
         {/* Envelope & Folder Navigation Bar */}
@@ -1964,6 +2407,64 @@ export const BidPackageBuilderView: React.FC = () => {
         {/* 4. Inside Folder Documents List & Actions Bar */}
         <div className="space-y-4 pt-2">
           
+          {/* Active Folder Compiled Merged Package Notification & Preview Banner */}
+          {activeFolderMergedPkg && (
+            <div className="p-4 rounded-xl border border-purple-500/40 bg-linear-to-r from-purple-950/40 via-indigo-950/30 to-slate-900/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-purple-950/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">
+                  <FileStack className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-white truncate max-w-md">{activeFolderMergedPkg.fileName}</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      ✓ Merged & Stamped
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      {activeFolderMergedPkg.folderCopy}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {activeFolderMergedPkg.documentCount} Documents • {formatBytes(activeFolderMergedPkg.fileSizeBytes)} • Compiled {new Date(activeFolderMergedPkg.mergedAt).toLocaleDateString()} {new Date(activeFolderMergedPkg.mergedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handlePreviewMergedPackage(activeFolderMergedPkg)}
+                  disabled={isOpeningMergedPreview === activeFolderMergedPkg.id}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-purple-950/30"
+                  title="View merged PDF in viewer"
+                >
+                  {isOpeningMergedPreview === activeFolderMergedPkg.id ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Eye className="w-3.5 h-3.5" />
+                  )}
+                  <span>View Merged PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadMergedPackage(activeFolderMergedPkg)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5 cursor-pointer shadow"
+                  title="Download merged PDF"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveViewMode('MERGED_PACKAGES')}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-purple-300 hover:text-white hover:bg-purple-600/20 transition flex items-center gap-1 cursor-pointer"
+                  title="Open all compiled merged packages"
+                >
+                  <span>All Merged ({mergedPackages.length}) →</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Header Controls Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#050b17] border border-slate-800 rounded-xl p-3 sm:p-4">
             <div className="flex items-center gap-3">
@@ -2280,6 +2781,7 @@ export const BidPackageBuilderView: React.FC = () => {
         </div>
 
       </div>
+      )}
         </>
       )}
 

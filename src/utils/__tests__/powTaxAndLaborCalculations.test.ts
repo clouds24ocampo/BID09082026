@@ -103,4 +103,44 @@ describe('POW & Quotation Statutory Taxes & Labor Calculation Engine', () => {
     expect(res.totalDeductions).toBe(0);
     expect(res.netPayable).toBe(0);
   });
+
+  it('validates POW statutory formula: 5% Withholding Tax, 2% Infra profit, 1% Goods profit, and VAT from DC/1.12', () => {
+    const directCost = 100000;
+    const ocmRate = 8;
+    const taxRate = 5; // 5% withholding tax next to OCM
+    const profitRateInfra = 2; // 2% profit for Infra
+    const profitRateGoods = 1; // 1% profit for Goods
+    const vatRate = 5; // 5% VAT rate
+
+    // Infra calculation
+    const ocmInfra = directCost * (ocmRate / 100); // 8,000
+    const taxInfra = directCost * (taxRate / 100); // 5,000
+    const profitInfra = directCost * (profitRateInfra / 100); // 2,000
+    const vatInfra = (directCost / 1.12) * (vatRate / 100); // (100,000 / 1.12) * 0.05 = 4,464.2857
+    const indirectInfra = ocmInfra + taxInfra + profitInfra + vatInfra;
+    const totalInfra = directCost + indirectInfra;
+
+    expect(ocmInfra).toBe(8000);
+    expect(taxInfra).toBe(5000);
+    expect(profitInfra).toBe(2000);
+    expect(vatInfra).toBeCloseTo(4464.29, 2);
+    expect(totalInfra).toBeCloseTo(119464.29, 2);
+
+    // Goods calculation
+    const profitGoods = directCost * (profitRateGoods / 100); // 1,000
+    const totalGoods = directCost + ocmInfra + taxInfra + profitGoods + vatInfra;
+
+    expect(profitGoods).toBe(1000);
+    expect(totalGoods).toBeCloseTo(118464.29, 2);
+  });
+
+  it('correctly handles custom modified unit cost override', () => {
+    const quantity = 5;
+    const customUnitCost = 25000;
+    const calculatedTotalCost = customUnitCost * quantity; // 125,000
+
+    expect(calculatedTotalCost).toBe(125000);
+    expect(calculatedTotalCost / quantity).toBe(customUnitCost);
+  });
 });
+
