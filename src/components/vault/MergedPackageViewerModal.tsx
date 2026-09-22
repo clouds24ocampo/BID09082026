@@ -9,6 +9,7 @@ import {
   StampColor
 } from '../../utils/pdfExportEngine';
 import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
+import { resolveBidEnvelope } from '../../utils/envelopeClassification';
 import { loadPdfData } from '../../utils/vaultIndexedDB';
 import { 
   markProjectBidMergeDone, 
@@ -172,12 +173,24 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
     ? 'TECHNICAL_LEGAL'
     : 'FINANCIAL';
 
+  // STRICT statutory envelope isolation.
+  // Financial proposal documents must NEVER appear inside the TECHNICAL/eligibility folder,
+  // and technical documents must NEVER appear inside the FINANCIAL folder.
+  const inferEnvelope = (it: PackageItem): 'ENVELOPE_1' | 'ENVELOPE_2' => {
+    return resolveBidEnvelope(
+      ((it.code || it.id || '') as string),
+      it.documentName || '',
+      (it as any).envelope
+    );
+  };
+
   const currentItems = React.useMemo(() => {
     if (selectedEnvelope === 'ALL') {
       return items;
     }
-    const filtered = items.filter(it => it.envelope === selectedEnvelope);
-    return filtered.length > 0 ? filtered : items;
+    // Never fall back to the complete item list here: that fallback is what allowed
+    // technical (ENVELOPE_1) documents to leak into the FINANCIAL (ENVELOPE_2) merge.
+    return items.filter(it => inferEnvelope(it) === selectedEnvelope);
   }, [items, selectedEnvelope]);
 
   // Reset compiled PDFs whenever envelope filter changes
@@ -1266,7 +1279,7 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
                       }}
                       tenant={tenant}
                       folderCopy={fCopy}
-                      envelopeName={doc.envelope === 'ENVELOPE_1' ? 'ENVELOPE 1: TECHNICAL & ELIGIBILITY COMPONENT' : 'ENVELOPE 2: FINANCIAL BID PROPOSAL'}
+                      envelopeName={inferEnvelope(doc) === 'ENVELOPE_1' ? 'ENVELOPE 1: TECHNICAL & ELIGIBILITY COMPONENT' : 'ENVELOPE 2: FINANCIAL BID PROPOSAL'}
                       incrementNumber={idx + 1}
                     />
                   </div>

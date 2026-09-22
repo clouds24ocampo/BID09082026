@@ -10,6 +10,7 @@ import { loadVaultItems, loadPdfData, savePdfData, deleteVaultItem, deletePdfDat
 import { getOpportunityProjects, OpportunityProjectOption, markProjectBidMergeDone } from '../../utils/opportunityProjects';
 import { generateAndDownloadThreeLayerPdf, exportMergedThreeLayerPdf, buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit } from '../../utils/pdfExportEngine';
 import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
+import { resolveBidEnvelope } from '../../utils/envelopeClassification';
 import { 
   ChevronDown, 
   Briefcase, 
@@ -999,7 +1000,19 @@ export const BidPackageBuilderView: React.FC = () => {
         }
       }
 
-      return item;
+      // ENVELOPE NORMALIZATION: classify by identity, never trust a stale stored envelope.
+      const defEnvelope = statutoryDocsList.find(
+        d => d.id === (item as any).statutoryId || d.code === (item as any).code
+      )?.envelope;
+
+      const normalizedEnvelope = resolveBidEnvelope(
+        codeOrId,
+        name,
+        item.envelope as string,
+        defEnvelope
+      );
+
+      return { ...item, envelope: normalizedEnvelope };
     });
 
     const fullySynced = syncOriginalToCopies(sanitizedItems);

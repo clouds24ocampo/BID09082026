@@ -3,6 +3,7 @@ import { PDFDocument } from 'pdf-lib';
 import { resolveDocumentPdfAttachment, DocResolveContext } from '../systemDocumentPdfGenerator';
 import { formatQrCodePayload } from '../qrCodeGenerator';
 import { buildMergedThreeLayerPdfBytes } from '../pdfExportEngine';
+import { resolveBidEnvelope, isFinancialEnvelopeDoc, isMajorEquipmentDoc } from '../envelopeClassification';
 
 describe('PDF System Refinements & Bug Fixes', () => {
   const dummyCtx: DocResolveContext = {
@@ -98,6 +99,34 @@ describe('PDF System Refinements & Bug Fixes', () => {
 
     // Should NOT match Key Personnel file
     expect(resolved).not.toBe('data:application/pdf;base64,JVBERi0xLjQK');
+  });
+
+  it('Form L Detailed Estimates must not resolve as Major Equipment even though the title contains Equipment', async () => {
+    const formLDoc = {
+      id: 'DETAILED_ESTIMATES_FORM_L',
+      documentName: '(Form L) Detailed Estimates (Direct Labor, Logistics & Equipment)',
+      code: 'DETAILED_ESTIMATES_FORM_L'
+    };
+    const equipmentDoc = {
+      id: 'MAJOR_EQUIPMENT',
+      documentName: 'List of Major Equipment Owned / Leased',
+      code: 'MAJOR_EQUIPMENT'
+    };
+
+    const formLResolved = await resolveDocumentPdfAttachment(formLDoc, dummyCtx);
+    const equipmentResolved = await resolveDocumentPdfAttachment(equipmentDoc, dummyCtx);
+
+    expect(formLResolved).toBeTruthy();
+    expect(equipmentResolved).toBeTruthy();
+    expect(formLResolved).not.toBe(equipmentResolved);
+    expect(formLResolved?.startsWith('data:application/pdf;base64,')).toBe(true);
+
+    const formLName = '(Form L) Detailed Estimates (Direct Labor, Logistics & Equipment)';
+    expect(isFinancialEnvelopeDoc('DETAILED_ESTIMATES_FORM_L', formLName)).toBe(true);
+    expect(isMajorEquipmentDoc('DETAILED_ESTIMATES_FORM_L', formLName)).toBe(false);
+    expect(resolveBidEnvelope('DETAILED_ESTIMATES_FORM_L', formLName, 'ENVELOPE_1')).toBe('ENVELOPE_2');
+    expect(resolveBidEnvelope('MAJOR_EQUIPMENT', 'List of Major Equipment', 'ENVELOPE_2')).toBe('ENVELOPE_1');
+    expect(resolveBidEnvelope('SF-INFR-15', 'Statement of Ongoing Contracts', 'ENVELOPE_2')).toBe('ENVELOPE_1');
   });
 
   it('QR payload must format exact 4 lines: Company Name, Project Title, Date of Submission, Document Name', () => {

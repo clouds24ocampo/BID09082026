@@ -492,42 +492,42 @@ export async function buildMergedThreeLayerPdfBytes(
             });
             debugLog('pdfExportEngine.ts:attach', `Appended ${pageIndices.length} pristine UNTOUCHED PhilGEPS pages (QR preserved)`, { docTitle }, 'C');
           } else {
-            copiedPages.forEach((copiedPage) => {
+            const titleBlob = `${docTitle} ${unit.documentCode || ''} ${unit.fileName || ''} ${unit.documentName || ''}`.toLowerCase();
+            const isLicenseScan = /pcab|mayor|business permit|tax clearance|license|bir|2303/.test(titleBlob);
+
+            for (const copiedPage of copiedPages) {
               const origW = copiedPage.getWidth();
               const origH = copiedPage.getHeight();
-              const origRot = copiedPage.getRotation().angle;
-
-              // Normalize page rotation so all pages in the binder are uniformly upright (0 deg)
-              if (origRot !== 0) {
-                copiedPage.setRotation(degrees(0));
-              }
-
-              // Determine visual orientation:
-              const isLandscape = (origRot === 90 || origRot === 270)
-                ? origH > origW
-                : origW > origH;
-
-              // Use true orientation: LEGAL_LANDSCAPE [936, 612] for landscape uploads (including PCAB licenses),
-              // and LEGAL_PORTRAIT [612, 936] for portrait uploads.
-              const targetSize: [number, number] = isLandscape
-                ? LEGAL_LANDSCAPE
-                : LEGAL_PORTRAIT;
+              const origRot = ((copiedPage.getRotation().angle % 360) + 360) % 360;
+              const visW = origRot === 90 || origRot === 270 ? origH : origW;
+              const visH = origRot === 90 || origRot === 270 ? origW : origH;
+              const isLandscape = visW >= visH;
+              const targetSize: [number, number] = isLandscape ? LEGAL_LANDSCAPE : LEGAL_PORTRAIT;
               const targetW = targetSize[0];
               const targetH = targetSize[1];
+              const sourceAspect = visW / visH;
+              const targetAspect = targetW / targetH;
+              const aspectDelta = Math.abs(sourceAspect - targetAspect) / targetAspect;
 
-              const scale = Math.min(targetW / origW, targetH / origH);
-              const scaledW = origW * scale;
-              const scaledH = origH * scale;
-              const dx = (targetW - scaledW) / 2;
-              const dy = (targetH - scaledH) / 2;
+              // PCAB / permits: fill the Legal sheet like other Class A scans.
+              const sx = origW > 0 ? targetW / origW : 1;
+              const sy = origH > 0 ? targetH / origH : 1;
+              const fillScale = isLicenseScan || aspectDelta <= 0.35
+                ? Math.max(sx, sy)
+                : Math.min(sx, sy);
 
-              copiedPage.scaleContent(scale, scale);
-              if (scale > 0) {
-                copiedPage.translateContent(dx / scale, dy / scale);
+              copiedPage.scaleContent(fillScale, fillScale);
+              if (fillScale > 0) {
+                const scaledW = origW * fillScale;
+                const scaledH = origH * fillScale;
+                copiedPage.translateContent(
+                  (targetW - scaledW) / 2 / fillScale,
+                  (targetH - scaledH) / 2 / fillScale
+                );
               }
               copiedPage.setSize(targetW, targetH);
               pdfDoc.addPage(copiedPage);
-            });
+            }
             debugLog('pdfExportEngine.ts:attach', `Appended ${pageIndices.length} standardized Legal PDF pages`, { docTitle }, 'C');
           }
         } catch (_pdfLoadErr) {
@@ -551,7 +551,17 @@ export async function buildMergedThreeLayerPdfBytes(
               const targetW = imgPageSize[0];
               const targetH = imgPageSize[1];
 
-              const scale = Math.min(targetW / embeddedImage.width, targetH / embeddedImage.height);
+              // Same near-legal fill policy as PDF attachments: avoid tiny centered islands
+              // for scans whose aspect ratio is close to the Legal sheet aspect.
+              const imgContainScale = Math.min(targetW / embeddedImage.width, targetH / embeddedImage.height);
+              const imgCoverScale = Math.max(targetW / embeddedImage.width, targetH / embeddedImage.height);
+              const imgSrcAspect = embeddedImage.width / embeddedImage.height;
+              const imgTargetAspect = targetW / targetH;
+              const imgAspectDelta = Math.abs(imgSrcAspect - imgTargetAspect) / imgTargetAspect;
+
+              const imgTitleBlob = `${docTitle} ${unit.documentCode || ''} ${unit.fileName || ''}`.toLowerCase();
+              const isLicenseImg = /pcab|mayor|business permit|tax clearance|license|bir|2303/.test(imgTitleBlob);
+              const scale = isLicenseImg || imgAspectDelta <= 0.35 ? imgCoverScale : imgContainScale;
               const drawW = embeddedImage.width * scale;
               const drawH = embeddedImage.height * scale;
               const drawX = (targetW - drawW) / 2;

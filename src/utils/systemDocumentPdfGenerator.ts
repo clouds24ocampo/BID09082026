@@ -2,6 +2,7 @@ import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from 'pdf-lib';
 import { Tenant, DocumentVaultItem } from '../types';
 import { loadPdfData, loadVaultItems } from './vaultIndexedDB';
 import { generateQrCodeDataUrl } from './qrCodeGenerator';
+import { isFormLDetailedEstimates, isMajorEquipmentDoc } from './envelopeClassification';
 import { numberToWords } from './numberToWords';
 
 // Standard Dimensions in Points (72 dpi)
@@ -333,7 +334,10 @@ const drawOfficialFooter = async (
     !dLower.includes('nfcc') &&
     !dLower.includes('ongoing') &&
     !dLower.includes('slcc') &&
-    !dLower.includes('single largest')
+    !dLower.includes('single largest') &&
+    !dLower.includes('key personnel') &&
+    !dLower.includes('personnel') &&
+    !dLower.includes('manpower')
   ) {
     try {
       const qrDataUrl = await generateQrCodeDataUrl({
@@ -4131,14 +4135,14 @@ export async function resolveDocumentPdfAttachment(
   const projId = ctx.activeProject?.id || '';
 
   const isTechSpecs = docIdUpper.includes('SECTION_VII') || docIdUpper.includes('SEC_VII') || docIdUpper.includes('TECH_SPECS') || dName.includes('section vii') || dName.includes('technical spec');
-  const isEquipment = docIdUpper.includes('MAJOR_EQUIPMENT') || docIdUpper.includes('EQUIPMENT') || dName.includes('equipment');
+  const isEquipment = isMajorEquipmentDoc(`${docIdUpper} ${dCode}`, dName);
   const isKeyPersonnel = docIdUpper.includes('KEY_PERSONNEL') || docIdUpper.includes('PERSONNEL') || dName.includes('key personnel') || dName.includes('manpower');
   const isOrgChart = docIdUpper.includes('ORGANIZATIONAL_CHART') || docIdUpper.includes('ORG_CHART') || dName.includes('org chart') || dName.includes('organizational chart');
   const isOngoing = docIdUpper.includes('ONGOING') || dName.includes('ongoing');
   const isSlcc = docIdUpper.includes('SLCC') || dName.includes('slcc') || dName.includes('single largest');
   const isBoq = docIdUpper.includes('BILL_OF_QUANTITIES') || docIdUpper.includes('BOQ') || dName.includes('bill of quantities') || dName.includes('boq');
   const isBidForm = docIdUpper.includes('BID_FORM') || docIdUpper.includes('BIDFORM') || dName.includes('bid form');
-  const isDetailedEstimates = docIdUpper.includes('DETAILED_ESTIMATES') || docIdUpper.includes('ESTIMATES') || docIdUpper.includes('FORM_L') || dName.includes('detailed estimate') || dName.includes('form l') || dName.includes('form (l)');
+  const isDetailedEstimates = isFormLDetailedEstimates(`${docIdUpper} ${dCode}`, dName);
   const isPriceSched = docIdUpper.includes('PRICE_SCHEDULE') || docIdUpper.includes('PRICESCHED') || dName.includes('price schedule');
   const isFal = docIdUpper.includes('FRAMEWORK') || docIdUpper.includes('FAL') || dName.includes('framework agreement') || dName.includes('fal');
 
@@ -4151,6 +4155,10 @@ export async function resolveDocumentPdfAttachment(
   if (rawProjRef || projId) {
     if (isTechSpecs) {
       addKeys('tech_specs');
+    } else if (isDetailedEstimates) {
+      addKeys('detailed_estimates_pdf');
+      addKeys('bidocs_detailed_estimates_pdf');
+      addKeys('estimates_pdf');
     } else if (isEquipment) {
       addKeys('equipment_pdf');
     } else if (isKeyPersonnel) {
@@ -4168,9 +4176,6 @@ export async function resolveDocumentPdfAttachment(
       addKeys('bidform');
       addKeys('bidform_infra');
       addKeys('bidform_pdf');
-    } else if (isDetailedEstimates) {
-      addKeys('detailed_estimates_pdf');
-      addKeys('estimates_pdf');
     } else if (isPriceSched) {
       addKeys('priceschedule');
       addKeys('pricesched');
@@ -4246,7 +4251,10 @@ export async function resolveDocumentPdfAttachment(
   if (docIdUpper.includes('KEY_PERSONNEL') || docIdUpper.includes('PERSONNEL') || dName.includes('key personnel') || dName.includes('manpower')) {
     return await generateKeyPersonnelPdf(ctx);
   }
-  if (docIdUpper.includes('MAJOR_EQUIPMENT') || docIdUpper.includes('EQUIPMENT') || dName.includes('equipment')) {
+  if (isFormLDetailedEstimates(`${docIdUpper} ${dCode}`, dName)) {
+    return await generateDetailedEstimatesPdf(ctx);
+  }
+  if (isMajorEquipmentDoc(`${docIdUpper} ${dCode}`, dName)) {
     return await generateMajorEquipmentPdf(ctx);
   }
   if (docIdUpper.includes('AFTERSALES') || docIdUpper.includes('WARRANTY') || dName.includes('after-sale') || dName.includes('aftersales') || dName.includes('warranty')) {

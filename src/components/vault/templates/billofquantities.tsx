@@ -313,13 +313,15 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
 
     return autoFitPageChunks(
       allRows,
-      (row) => calculateRowHeight(row.description || '', 80, 13, 8, 22),
+      (row) => calculateRowHeight(row.description || '', 92, 12, 4, 18),
       {
         orientation: 'landscape',
-        columnCharWidth: 80,
-        headerHeightPx: 110,
-        footerHeightPx: 180,
-        runningFooterPx: 30
+        columnCharWidth: 92,
+        headerHeightPx: 88,
+        footerHeightPx: 58,
+        runningFooterPx: 20,
+        safetyBufferPx: 6,
+        strategy: 'greedy'
       }
     );
   }, [boqRows, includeLumpSumsInTable, laborLumpSum, logisticsLumpSum, equipmentLumpSum]);
@@ -612,7 +614,7 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
               return (
                 <div
                   key={`boq-page-${pageIdx}`}
-                  className="boq-paper single-page-paper print-document-sheet w-[13in] min-w-[13in] max-w-[13in] min-h-[8.5in] bg-white text-slate-950 p-[0.4in] shadow-2xl font-sans text-[8.5pt] leading-normal flex flex-col justify-between mx-auto border-2 border-slate-950 box-border shrink-0"
+                  className="boq-paper single-page-paper print-document-sheet w-[13in] min-w-[13in] max-w-[13in] h-[8.5in] max-h-[8.5in] bg-white text-slate-950 p-[0.28in] shadow-2xl font-sans text-[8.5pt] leading-snug flex flex-col justify-start mx-auto border-2 border-slate-950 box-border shrink-0 overflow-hidden"
                 >
                   <div className="space-y-0">
                     

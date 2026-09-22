@@ -3,7 +3,6 @@ import { Tenant } from '../../../types';
 import { PDFDocument } from 'pdf-lib';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import { savePdfData, loadPdfData, deletePdfData } from '../../../utils/vaultIndexedDB';
-import DocumentQrCode from '../../common/DocumentQrCode';
 import html2canvas from 'html2canvas';
 import {
   X,
@@ -2384,30 +2383,7 @@ export const KeyPersonnelModal: React.FC<KeyPersonnelModalProps> = ({
                   <p>Notes: Minimum qualification requirement :</p>
                 </div>
 
-                <div className="flex items-end justify-between font-serif text-slate-950 pt-1">
-                  {/* QR Code */}
-                  <div className="flex items-center gap-2">
-                    <DocumentQrCode
-                      details={{
-                        companyName: companyName,
-                        documentName: `Item ${item.code} — KEY PERSONNEL (Page 1 of 2)`,
-                        documentNumber: `EXHIBIT-${item.code.replace(/[^a-zA-Z0-9]/g, '')}-${projectRefNo || '2026-901283'}`,
-                        projectTitle: projectTitle,
-                        projectRefNo: projectRefNo,
-                        procuringEntity: procuringEntity,
-                        dateTimeSubmitted: dateTimeSubmitted || todayStr,
-                        documentCategory: 'Technical Eligibility',
-                        generatedBy: companyName
-                      }}
-                      size={38}
-                      showCaption={false}
-                    />
-                    <div className="text-[7.5px] leading-tight">
-                      <p className="font-bold">Official GPPB Exhibit</p>
-                      <p className="font-mono text-slate-600">Scan QR to verify</p>
-                    </div>
-                  </div>
-
+                <div className="flex items-end justify-end font-serif text-slate-950 pt-1">
                   {/* Authorized Signature Block */}
                   <div className="text-center space-y-0.5 font-serif text-slate-950 min-w-[280px]">
                     <div className="border-b border-slate-900 pb-0.5 mb-0.5 max-w-[260px] mx-auto">
@@ -2882,30 +2858,7 @@ export const KeyPersonnelModal: React.FC<KeyPersonnelModalProps> = ({
 
               {/* Page 2 Footer Signature Block */}
               <div className="pt-1.5 pb-0 space-y-0.5">
-                <div className="flex items-end justify-between font-serif text-slate-950 pt-1">
-                  {/* QR Code */}
-                  <div className="flex items-center gap-2">
-                    <DocumentQrCode
-                      details={{
-                        companyName: companyName,
-                        documentName: `Item ${item.code} — KEY PERSONNEL (Page 2 of 2)`,
-                        documentNumber: `EXHIBIT-${item.code.replace(/[^a-zA-Z0-9]/g, '')}-${projectRefNo || '2026-901283'}`,
-                        projectTitle: projectTitle,
-                        projectRefNo: projectRefNo,
-                        procuringEntity: procuringEntity,
-                        dateTimeSubmitted: dateTimeSubmitted || todayStr,
-                        documentCategory: 'Technical Eligibility',
-                        generatedBy: companyName
-                      }}
-                      size={38}
-                      showCaption={false}
-                    />
-                    <div className="text-[7.5px] leading-tight">
-                      <p className="font-bold">Official GPPB Exhibit</p>
-                      <p className="font-mono text-slate-600">Scan QR to verify</p>
-                    </div>
-                  </div>
-
+                <div className="flex items-end justify-end font-serif text-slate-950 pt-1">
                   {/* Authorized Signature Block */}
                   <div className="text-center space-y-0.5 font-serif text-slate-950 min-w-[280px]">
                     <div className="border-b border-slate-900 pb-0.5 mb-0.5 max-w-[260px] mx-auto">
