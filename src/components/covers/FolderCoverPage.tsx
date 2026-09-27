@@ -28,22 +28,22 @@ export const FolderCoverPage: React.FC<FolderCoverPageProps> = ({
   companyAddress,
   tin,
   philgepsPlatinumNo,
-  procuringEntity = 'THE BIDS AND AWARDS COMMITTEE (BAC)',
-  projectTitle = 'SUPPLY, DELIVERY, INSTALLATION, TESTING, AND CONFIGURATION OF ICT EQUIPMENT, PERIPHERALS, SYSTEMS AND SOFTWARE',
-  projectRefNo = '12795242',
-  solicitationNo = 'SOL-2026-001',
-  abc = '₱12,500,000.00',
+  procuringEntity = '',
+  projectTitle = '',
+  projectRefNo = '',
+  solicitationNo = '',
+  abc = '',
   folderCopy = 'ORIGINAL',
   envelopeChoice = 'ENVELOPE_1',
-  submissionDeadline = 'September 30, 2026 at 10:00 AM',
+  submissionDeadline = '',
   signatoryName,
   signatoryTitle
 }) => {
-  const effectiveCompanyName = companyName || tenant?.companyName || 'QUANTUM CLOUD CORPORATION';
-  const effectiveAddress = companyAddress || tenant?.address || 'La Trinidad, Benguet, Cordillera Administrative Region, Philippines';
-  const effectiveTin = tin || tenant?.tin || '000-000-000-000';
-  const effectivePhilgeps = philgepsPlatinumNo || tenant?.philgepsPlatinumNo || '202106-237062-883905538';
-  const effectiveSignatory = signatoryName || tenant?.authorizedSignatory?.name || 'Mark-Vin F. Ocampo';
+  const effectiveCompanyName = companyName || tenant?.companyName || '';
+  const effectiveAddress = companyAddress || tenant?.address || '';
+  const effectiveTin = tin || tenant?.tin || '';
+  const effectivePhilgeps = philgepsPlatinumNo || tenant?.philgepsPlatinumNo || '';
+  const effectiveSignatory = signatoryName || tenant?.authorizedSignatory?.name || '';
   
   const effectiveTitle = (() => {
     const raw = signatoryTitle || tenant?.authorizedSignatory?.title || '';

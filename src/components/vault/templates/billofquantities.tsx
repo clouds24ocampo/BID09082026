@@ -584,7 +584,7 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="e.g. QUANTUM CLOUD CORPORATION"
+                  placeholder="e.g. ENTERPRISE / CONTRACTOR NAME"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-bold uppercase"
                 />
               </div>
@@ -655,7 +655,7 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
                               <tr>
                                 <td colSpan={4} className="border border-slate-950 p-1.5 text-left text-[9pt]">
                                   <span className="font-semibold">Name of Bidder: </span>
-                                  <span className="font-bold uppercase">{companyName || 'Quantum Cloud Corporation'}</span>
+                                  <span className="font-bold uppercase">{companyName || ''}</span>
                                 </td>
                                 <td colSpan={2} className="border border-slate-950 p-1.5 text-left text-[9pt]">
                                   <span className="font-medium">Project ID No. </span>

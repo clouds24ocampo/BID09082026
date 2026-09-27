@@ -11,6 +11,7 @@ import {
 import {
   invalidateOpportunityProjectsCache,
   isProjectBidMergeDone,
+  markProjectBidMergeDone,
 } from "../../utils/opportunityProjects";
 import {
   savePdfData,
@@ -2293,6 +2294,15 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
         JSON.stringify(updatedList),
       );
       localStorage.setItem("bidocs_opportunities", JSON.stringify(updatedList));
+      markProjectBidMergeDone(
+        tenantId,
+        updatedItem.projectReferenceNumber || updatedItem.philgepsRefNo,
+        {
+          fileName: `${updatedItem.philgepsRefNo}_MERGED_PACKAGE.pdf`,
+          copiesCount: 3,
+          completedBy: currentTenant?.authorizedSignatory?.name || "Authorized Managing Officer",
+        },
+      );
       invalidateOpportunityProjectsCache();
     } catch (err) {}
 
@@ -2322,6 +2332,15 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
         JSON.stringify(updatedList),
       );
       localStorage.setItem("bidocs_opportunities", JSON.stringify(updatedList));
+      markProjectBidMergeDone(
+        tenantId,
+        cloned.projectReferenceNumber || cloned.philgepsRefNo,
+        {
+          fileName: `${cloned.philgepsRefNo}_MERGED_PACKAGE.pdf`,
+          copiesCount: 3,
+          completedBy: currentTenant?.authorizedSignatory?.name || "Authorized Managing Officer",
+        },
+      );
       invalidateOpportunityProjectsCache();
     } catch (e) {}
 

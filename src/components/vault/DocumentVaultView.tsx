@@ -2521,19 +2521,6 @@ export const DocumentVaultView: React.FC = () => {
           {selectedCategory !== "ELIGIBILITY_CLASS_A" &&
             selectedCategory !== "TECHNICAL" && (
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => toggleSelectAll(filteredGridItems)}
-                  className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-xs font-semibold hover:text-white transition flex items-center gap-1.5"
-                >
-                  {selectedItemIds.length === filteredGridItems.length &&
-                  filteredGridItems.length > 0 ? (
-                    <CheckSquare className="w-4 h-4 text-blue-400" />
-                  ) : (
-                    <Square className="w-4 h-4 text-slate-500" />
-                  )}
-                  <span>Select All</span>
-                </button>
-
                 <div className="relative min-w-55">
                   <input
                     type="text"

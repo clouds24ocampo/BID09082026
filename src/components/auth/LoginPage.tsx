@@ -35,9 +35,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBack
   const [isLoading, setIsLoading] = useState(false);
 
   const activeTenantPreview = tenants.find((t) => t.id === selectedTenantId) || tenants[0] || {
-    brandCode: 'ARTEMIS',
+    brandCode: 'BIDOCS',
     brandColor: '#0284c7',
-    companyName: 'Lunar Command Base'
+    companyName: 'BiDOCS Enterprise'
   };
 
   const handleForgotPasswordReset = () => {
@@ -190,7 +190,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBack
                 onClick={onBackToLanding}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 shadow-sm transition-all cursor-pointer"
               >
-                <span>← Back to 3D Showcase &amp; Portal</span>
+                <span>← Back to Portal Home</span>
               </button>
             </div>
           )}

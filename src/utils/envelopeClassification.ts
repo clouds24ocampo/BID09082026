@@ -2,7 +2,7 @@
 
 export type BidEnvelope = 'ENVELOPE_1' | 'ENVELOPE_2';
 
-const FINANCIAL_CODE_KEYS = [
+export const FINANCIAL_CODE_KEYS = [
   'FINANCIAL_BID_FORM',
   'GPPB-BIDFORM',
   'BILL_OF_QUANTITIES',
@@ -15,7 +15,7 @@ const FINANCIAL_CODE_KEYS = [
   'SF-INFR-56'
 ] as const;
 
-const TECHNICAL_CODE_KEYS = [
+export const TECHNICAL_CODE_KEYS = [
   'ONGOING_CONTRACTS',
   'SLCC_STATEMENT',
   'SECTION_VI',

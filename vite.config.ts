@@ -59,9 +59,6 @@ export default defineConfig({
             if (normalized.includes('lucide-react')) {
               return 'lucide-icons';
             }
-            if (normalized.includes('three')) {
-              return 'three-engine-vendor';
-            }
             if (normalized.includes('react/') || normalized.includes('react-dom/')) {
               return 'react-core-vendor';
             }

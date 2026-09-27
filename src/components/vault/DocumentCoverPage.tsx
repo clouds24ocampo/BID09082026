@@ -130,11 +130,23 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
     }
   }
 
-  // Format Approved Budget cleanly from string or number
+  // Format Approved Budget cleanly from string or number with proper en-US comma formatting
   const rawAbc = item.approvedBudget || (item as any).abc;
-  const formattedAbc = typeof rawAbc === 'number'
-    ? `₱${rawAbc.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    : (rawAbc ? (String(rawAbc).startsWith('₱') ? String(rawAbc) : `₱${rawAbc}`) : '₱12,500,000.00');
+  const formattedAbc = (() => {
+    if (typeof rawAbc === 'number') {
+      return `₱${rawAbc.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+    if (typeof rawAbc === 'string' && rawAbc.trim()) {
+      // Strip any stray spacing or repeated spaces e.g. "4, 438, 000. 00"
+      const cleanDigits = rawAbc.replace(/[₱,\s]/g, '');
+      const parsed = parseFloat(cleanDigits);
+      if (!isNaN(parsed) && isFinite(parsed)) {
+        return `₱${parsed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      }
+      return rawAbc.startsWith('₱') ? rawAbc.replace(/\s+/g, ' ').trim() : `₱${rawAbc.trim()}`;
+    }
+    return '₱12,500,000.00';
+  })();
 
   const formatDeadlineDisplay = (raw?: string): string => {
     if (!raw) return 'August 30, 2026 at 02:00 PM';
@@ -168,7 +180,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
 
   return (
     <div 
-      className="print-document-sheet portrait w-full bg-white text-black font-sans px-4 pb-6 pt-10 sm:px-6 sm:pb-8 sm:pt-12 border-4 border-black rounded-2xl shadow-2xl max-w-[800px] aspect-[8.5/13] mx-auto my-2 text-left relative flex flex-col justify-between print:m-0 print:border-4 print:border-black print:shadow-none print:break-inside-avoid print:page-break-inside-avoid overflow-hidden"
+      className="print-document-sheet portrait w-full bg-white text-black font-sans px-4 pb-6 pt-8 sm:px-6 sm:pb-8 sm:pt-10 border-4 border-black rounded-2xl shadow-2xl max-w-[800px] aspect-[8.5/13] mx-auto my-2 text-left relative flex flex-col justify-between print:m-0 print:border-4 print:border-black print:shadow-none print:break-inside-avoid print:page-break-inside-avoid overflow-hidden"
       style={{ 
         boxSizing: 'border-box',
         width: '100%',
@@ -196,7 +208,7 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
             height: 13in !important;
             max-height: 13in !important;
             margin: 0 !important;
-            padding: 0.85in 0.4in 0.35in 0.4in !important;
+            padding: 0.75in 0.45in 0.35in 0.45in !important;
             border: 4px solid #000000 !important;
             border-radius: 0 !important;
             box-shadow: none !important;
@@ -215,102 +227,102 @@ export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({
       <div className="absolute inset-2 border-2 border-black rounded-xl pointer-events-none print:inset-2" />
 
       {/* TOP & MIDDLE SECTIONS */}
-      <div className="space-y-4 relative z-10 pt-2 sm:pt-3">
+      <div className="space-y-4 relative z-10 pt-1 sm:pt-2">
         
-        {/* 1. Envelope & Section Banner (Lowered for Punch Hole Clearance) */}
-        <div className="flex items-center justify-between gap-2 bg-white text-black px-3.5 py-2.5 rounded-xl border-2 border-black shadow-sm">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-black" />
-              <span className="text-xs font-black tracking-wider uppercase text-black">
+        {/* 1. Envelope & Section Banner (Lowered for Punch Hole Clearance, 15% Bigger) */}
+        <div className="flex items-center justify-between gap-3 bg-white text-black px-4 py-3 sm:px-5 sm:py-3.5 rounded-xl border-2 border-black shadow-sm">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-black shrink-0" />
+              <span className="text-[14px] sm:text-[15px] font-sans font-black tracking-wide uppercase text-black leading-tight">
                 {envelopeName || officialEnvelopeName}
               </span>
             </div>
-            <p className="text-[9.5px] font-mono text-neutral-700 font-semibold tracking-wide pl-3.5">
-              SECTION: <strong className="text-black uppercase">{categoryTag}</strong>
+            <p className="text-[11px] sm:text-[12px] font-sans text-neutral-800 font-bold tracking-wide pl-4.5">
+              SECTION: <strong className="text-black uppercase font-black">{categoryTag}</strong>
             </p>
           </div>
 
-          <span className="px-3 py-1 rounded-lg font-mono font-black text-xs uppercase tracking-widest bg-neutral-100 text-black border-2 border-black shrink-0">
+          <span className="px-3.5 py-1.5 rounded-lg font-sans font-black text-[13.5px] sm:text-[14.5px] uppercase tracking-wider bg-neutral-100 text-black border-2 border-black shrink-0">
             {copyDisplay}
           </span>
         </div>
 
-        {/* 2. DOCUMENT INFORMATION BLOCK (Centerpiece - 30% Bigger Title) */}
-        <div className="text-center bg-neutral-50 border-2 border-black p-4 sm:p-5 rounded-xl space-y-2.5 shadow-sm">
+        {/* 2. DOCUMENT INFORMATION BLOCK (Centerpiece - 15% Bigger Title & Crisp Typography) */}
+        <div className="text-center bg-neutral-50 border-2 border-black p-4 sm:p-5 md:p-6 rounded-xl space-y-3 shadow-sm">
           <div className="flex items-center justify-center gap-2">
-            <span className="text-xs sm:text-[13px] font-mono font-black uppercase tracking-wider px-4 py-1 rounded-full border-2 border-black bg-white text-black shadow-sm">
+            <span className="text-[13.5px] sm:text-[15px] font-sans font-black uppercase tracking-wider px-5 py-1.5 rounded-full border-2 border-black bg-white text-black shadow-sm">
               {categoryTag}
             </span>
           </div>
 
-          <h2 className="text-2xl sm:text-3xl md:text-[34px] font-black text-black leading-tight uppercase tracking-tight px-2">
+          <h2 className="text-[28px] sm:text-[34px] md:text-[39px] font-black text-black leading-tight uppercase tracking-tight px-2">
             {resolvedDocName}
           </h2>
         </div>
 
-        {/* 3. PROJECT & PROCUREMENT INFORMATION BLOCK (30% Bigger Text) */}
-        <div className="p-3.5 sm:p-4 rounded-xl bg-neutral-50 border-2 border-black space-y-2 text-xs sm:text-[12.5px] md:text-[13px]">
-          <div className="flex items-center gap-1.5 border-b border-black pb-1.5 text-black font-black uppercase text-xs sm:text-[13.5px] tracking-wide">
-            <Award className="w-4 h-4 text-black" />
+        {/* 3. PROJECT & PROCUREMENT INFORMATION BLOCK (15% Bigger Text & High Contrast Readability) */}
+        <div className="p-4 sm:p-5 rounded-xl bg-neutral-50 border-2 border-black space-y-2.5 text-[14px] sm:text-[14.5px] md:text-[15px]">
+          <div className="flex items-center gap-2 border-b-2 border-black pb-2 text-black font-black uppercase text-[14px] sm:text-[15.5px] tracking-wide">
+            <Award className="w-5 h-5 text-black shrink-0" />
             <span>Project & Procurement Information</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2 text-black leading-snug">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 text-black leading-snug">
             <p>
-              <span className="font-bold text-neutral-700">Project Title:</span>{' '}
-              <span className="font-semibold text-black">{item.projectTitle || 'Target Bidding Project'}</span>
+              <span className="font-bold text-neutral-900">Project Title:</span>{' '}
+              <span className="font-extrabold text-black">{item.projectTitle || 'Target Bidding Project'}</span>
             </p>
             <p>
-              <span className="font-bold text-neutral-700">PhilGEPS Ref No:</span>{' '}
-              <span className="font-mono font-black text-black">{item.philgepsRefNo || 'PhilGEPS-13200679'}</span>
+              <span className="font-bold text-neutral-900">PhilGEPS Ref No:</span>{' '}
+              <span className="font-sans font-black text-black tracking-normal tabular-nums">{item.philgepsRefNo ? String(item.philgepsRefNo).trim() : 'PhilGEPS-13200679'}</span>
             </p>
             <p>
-              <span className="font-bold text-neutral-700">Procuring Entity:</span>{' '}
-              <span className="font-semibold text-black">{item.procuringEntity || 'Procuring Agency'}</span>
+              <span className="font-bold text-neutral-900">Procuring Entity:</span>{' '}
+              <span className="font-extrabold text-black">{item.procuringEntity || 'Procuring Agency'}</span>
             </p>
             <p>
-              <span className="font-bold text-neutral-700">Approved Budget (ABC):</span>{' '}
-              <span className="font-mono font-black text-black">{formattedAbc}</span>
+              <span className="font-bold text-neutral-900">Approved Budget (ABC):</span>{' '}
+              <span className="font-sans font-black text-black tracking-normal tabular-nums">{formattedAbc}</span>
             </p>
             <p>
-              <span className="font-bold text-neutral-700">Pre-Bid Conference:</span>{' '}
-              <span className="font-medium text-black">{item.preBidConferenceDate || 'August 15, 2026 at 10:00 AM'}</span>
+              <span className="font-bold text-neutral-900">Pre-Bid Conference:</span>{' '}
+              <span className="font-semibold text-black">{item.preBidConferenceDate || 'N/A'}</span>
             </p>
             <p>
-              <span className="font-bold text-neutral-700">Submission Deadline:</span>{' '}
-              <span className="font-medium text-black">{formatDeadlineDisplay(item.submissionDeadline)}</span>
+              <span className="font-bold text-neutral-900">Submission Deadline:</span>{' '}
+              <span className="font-semibold text-black">{formatDeadlineDisplay(item.submissionDeadline)}</span>
             </p>
             <p>
-              <span className="font-bold text-neutral-700">Bidding Company:</span>{' '}
-              <span className="font-semibold text-black">{tenant?.companyName || 'Quantum Cloud Corporation'}</span>
+              <span className="font-bold text-neutral-900">Bidding Company:</span>{' '}
+              <span className="font-extrabold text-black">{tenant?.companyName || ''}</span>
             </p>
             <p>
-              <span className="font-bold text-neutral-700">PhilGEPS Platinum No:</span>{' '}
-              <span className="font-mono font-black text-black">{tenant?.philgepsPlatinumNo || '202106-237062-883905538'}</span>
+              <span className="font-bold text-neutral-900">PhilGEPS Platinum No:</span>{' '}
+              <span className="font-sans font-black text-black tracking-normal tabular-nums">{tenant?.philgepsPlatinumNo ? String(tenant.philgepsPlatinumNo).trim() : ''}</span>
             </p>
           </div>
         </div>
 
-        {/* 4. AUTHORIZED SIGNATORY ATTESTATION (10% Lower with copyDisplay appended) */}
-        <div className="mt-8 sm:mt-10 md:mt-12 p-3.5 sm:p-4 rounded-xl bg-white border-2 border-black flex items-center justify-between gap-4 shadow-sm relative z-10">
-          <div className="space-y-1 text-left text-black">
-            <span className="text-xs sm:text-[13px] font-mono font-black uppercase text-black block tracking-wider">
+        {/* 4. AUTHORIZED SIGNATORY ATTESTATION (15% Bigger Font & Crisp Readability) */}
+        <div className="mt-6 sm:mt-8 p-4 sm:p-4.5 rounded-xl bg-white border-2 border-black flex items-center justify-between gap-4 shadow-sm relative z-10">
+          <div className="space-y-1.5 text-left text-black">
+            <span className="text-[13.5px] sm:text-[15px] font-sans font-black uppercase text-black block tracking-wide">
               CERTIFIED TRUE COPY — <span className="underline">{copyDisplay}</span>
             </span>
-            <p className="text-xs font-sans text-neutral-800">
-              <span className="font-mono text-neutral-600 font-bold uppercase text-[10px]">Submitted by:</span>{' '}
-              <span className="font-black uppercase text-black">{tenant?.companyName || 'Quantum Cloud Corporation'}</span>
+            <p className="text-[13px] sm:text-[14px] font-sans text-neutral-800">
+              <span className="font-sans text-neutral-700 font-bold uppercase text-[11px] sm:text-[11.5px] tracking-wide">Submitted by:</span>{' '}
+              <span className="font-black uppercase text-black">{tenant?.companyName || ''}</span>
             </p>
           </div>
           <div className="text-right shrink-0 space-y-0.5">
-            <span className="text-[10px] font-mono text-neutral-600 font-bold uppercase block">
+            <span className="text-[11px] sm:text-[11.5px] font-sans text-neutral-700 font-bold uppercase tracking-wider block">
               Signed by:
             </span>
-            <p className="text-xs sm:text-sm font-black uppercase underline tracking-wide text-black">
-              {tenant?.authorizedSignatory?.name || 'Mark-Vin Ocampo'}
+            <p className="text-[14.5px] sm:text-[16px] font-sans font-black uppercase underline tracking-wide text-black">
+              {tenant?.authorizedSignatory?.name || ''}
             </p>
-            <p className="text-[10px] sm:text-[10.5px] text-neutral-700 font-bold">
+            <p className="text-[11.5px] sm:text-[12.5px] text-neutral-800 font-bold leading-normal">
               {signatoryTitleDisplay}
             </p>
           </div>

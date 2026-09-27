@@ -84,7 +84,6 @@ export const PsdModalContent: React.FC<PsdModalProps> = ({
   const [notaryName, setNotaryName] = useState('');
   const [notaryCommissionNo, setNotaryCommissionNo] = useState('');
   const [notaryJurisdiction, setNotaryJurisdiction] = useState('');
-  const [notaryUntil, setNotaryUntil] = useState(`December 31, ${currentYear}`);
   const [notaryRollNo, setNotaryRollNo] = useState('');
   const [notaryPtr, setNotaryPtr] = useState('');
   const [notaryIbp, setNotaryIbp] = useState('');

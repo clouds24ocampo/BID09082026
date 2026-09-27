@@ -148,31 +148,30 @@ export const NfccModalContent: React.FC<NfccModalProps> = ({
 
   // Signatory & Company Info
   const [companyName, setCompanyName] = useState<string>(
-    tenant?.companyName || 'QUANTUM CLOUD CORPORATION'
+    tenant?.companyName || ''
   );
   const [signatoryName, setSignatoryName] = useState<string>(
-    tenant?.authorizedSignatory?.name || 'Mark-Vin F. Ocampo'
+    tenant?.authorizedSignatory?.name || ''
   );
   const [signatoryTitle, setSignatoryTitle] = useState<string>(
-    tenant?.authorizedSignatory?.title || 'President'
+    tenant?.authorizedSignatory?.title || 'Authorized Managing Officer'
   );
   const [signatoryDate, setSignatoryDate] = useState<string>(
-    formatCleanDateString(propDateTimeSubmitted) || 'Mar. 19, 2026'
+    formatCleanDateString(propDateTimeSubmitted) || ''
   );
 
   // Document Metadata Fields
   const [procuringEntityLocation, setProcuringEntityLocation] = useState<string>(
-    activeProcuringEntity ? activeProcuringEntity.toUpperCase() : 'MUNICIPALITY OF LA TRINIDAD'
+    activeProcuringEntity ? activeProcuringEntity.toUpperCase() : ''
   );
-  const [projectRefNo, setProjectRefNo] = useState<string>(activeProjectRefNo || '12795242');
+  const [projectRefNo, setProjectRefNo] = useState<string>(activeProjectRefNo || '');
   const [projectTitle, setProjectTitle] = useState<string>(
-    activeProjectTitle ||
-    'SUPPLY, DELIVERY, INSTALLATION, TESTING, AND CONFIGURATION OF ICT EQUIPMENT, PERIPHERALS, SYSTEMS AND SOFTWARE FOR THE LA TRINIDAD COMMUNICATION, INFORMATION & NETWORK HUB'
+    activeProjectTitle || ''
   );
   const [projectLocation, setProjectLocation] = useState<string>(
-    activeProcuringEntity ? activeProcuringEntity.toUpperCase() : 'MUNICIPALITY OF LA TRINIDAD'
+    activeProcuringEntity ? activeProcuringEntity.toUpperCase() : ''
   );
-  const [standardFormNo, setStandardFormNo] = useState<string>(propSolicitationNumber || '2025-12-4162-MO');
+  const [standardFormNo, setStandardFormNo] = useState<string>(propSolicitationNumber || 'SF-INFRA-19');
   const [submissionDateTime, setSubmissionDateTime] = useState<string>(
     formatCleanDateTimeWithTime(propDateTimeSubmitted)
   );

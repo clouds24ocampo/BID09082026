@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginPage } from "./components/auth/LoginPage";
 import { RegisterPage } from "./components/auth/RegisterPage";
 import { LandingWebsiteView } from "./components/landing/LandingWebsiteView";
-import { FrontEnd3DShowcaseView } from "./components/3d/FrontEnd3DShowcaseView";
 import { AppShell } from "./components/layout/AppShell";
 import { DashboardView } from "./components/dashboard/DashboardView";
 import { DocumentVaultView } from "./components/vault/DocumentVaultView";
@@ -55,9 +54,6 @@ const MainApp: React.FC = () => {
         key={activeTab}
         fallbackTitle={`${activeTab.replace("-", " ").toUpperCase()} Module View`}
       >
-        {activeTab === "3d-showcase" && (
-          <FrontEnd3DShowcaseView onNavigateTab={setActiveTab} />
-        )}
         {activeTab === "dashboard" && (
           <DashboardView setActiveTab={setActiveTab} />
         )}

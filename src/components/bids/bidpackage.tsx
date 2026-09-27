@@ -8,7 +8,7 @@ import { PdfPreviewModal } from '../vault/PdfPreviewModal';
 import DocumentQrCode from '../common/DocumentQrCode';
 import { loadVaultItems, loadPdfData, savePdfData, deleteVaultItem, deletePdfData } from '../../utils/vaultIndexedDB';
 import { getOpportunityProjects, OpportunityProjectOption, markProjectBidMergeDone } from '../../utils/opportunityProjects';
-import { generateAndDownloadThreeLayerPdf, exportMergedThreeLayerPdf, buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit } from '../../utils/pdfExportEngine';
+import { generateAndDownloadThreeLayerPdf, buildMergedThreeLayerPdfDataUrl, ExportDocumentUnit } from '../../utils/pdfExportEngine';
 import { resolveDocumentPdfAttachment } from '../../utils/systemDocumentPdfGenerator';
 import { resolveBidEnvelope } from '../../utils/envelopeClassification';
 import { 

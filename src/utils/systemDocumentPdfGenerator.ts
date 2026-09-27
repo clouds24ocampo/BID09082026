@@ -3968,7 +3968,6 @@ export async function resolveDocumentPdfAttachment(
   const tenantId = ctx.tenant?.id || ctx.tenantId || 'default';
   const currentRef = (ctx.projectRefNo || '').trim().toLowerCase();
   const currentRefDigits = currentRef.replace(/[^0-9]/g, '');
-  const scopeKey = ctx.projectRefNo || ctx.activeProject?.id || 'default';
 
   // User Requirement: Bid Securing Declaration / Surety Bond and Omnibus Sworn Statement
   // must ONLY contain the official statutory cover page separator (0 attached pages)

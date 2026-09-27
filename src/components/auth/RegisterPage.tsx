@@ -198,7 +198,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
                 onClick={onBackToLanding}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/40 shadow-sm transition-all cursor-pointer"
               >
-                <span>← Back to 3D Showcase &amp; Portal</span>
+                <span>← Back to Portal Home</span>
               </button>
             </div>
           )}
@@ -263,7 +263,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
           {/* HorizonX System Specs Pill */}
           <div className="hidden sm:flex items-center justify-between text-[11px] font-mono text-slate-500 px-1">
             <span className="flex items-center gap-1">
-              <Cpu className="w-3.5 h-3.5 text-emerald-400" /> WebAssembly 3D Engine
+              <Cpu className="w-3.5 h-3.5 text-emerald-400" /> Statutory Bidding Engine
             </span>
             <span className="flex items-center gap-1">
               <Lock className="w-3.5 h-3.5 text-blue-400" /> 256-Bit Vault Storage
@@ -511,7 +511,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
                         <label className="block text-xs font-bold text-slate-200">
                           Select Brand Theme Accent (<span className="font-mono text-purple-400">{brandColor}</span>)
                         </label>
-                        <span className="text-[10px] text-slate-400 font-mono">Updates 3D Hologram Live</span>
+                        <span className="text-[10px] text-slate-400 font-mono">Live Theme Preview</span>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2.5">

@@ -649,7 +649,7 @@ export const CashFlowByQuarterModal: React.FC<CashFlowByQuarterModalProps> = ({
                       <tr>
                         <td className="border border-slate-950 p-1.5 text-left w-2/3">
                           <span className="font-semibold">Name of Bidder: </span>
-                          <span className="font-bold uppercase text-slate-950">{companyName || 'Quantum Cloud Corporation'}</span>
+                          <span className="font-bold uppercase text-slate-950">{companyName || ''}</span>
                         </td>
                         <td className="border border-slate-950 p-1.5 text-left w-1/3">
                           <span className="font-semibold">Project ID / Ref No: </span>

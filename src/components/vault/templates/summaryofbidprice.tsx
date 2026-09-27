@@ -51,9 +51,9 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
   // Form Fields
-  const [projectTitle, setProjectTitle] = useState(activeProjectTitle || 'Procurement of High-Capacity Network Switches & Firewall Security');
-  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '2026-FIN-009');
-  const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity || 'Department of Information and Communications Technology');
+  const [projectTitle, setProjectTitle] = useState(activeProjectTitle || '');
+  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '');
+  const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity || '');
   
   // Signatory & Enterprise
   const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || '');
@@ -607,7 +607,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                   type="text"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="e.g. QUANTUM CLOUD CORPORATION"
+                  placeholder="e.g. ENTERPRISE / BIDDER NAME"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-bold uppercase"
                 />
               </div>
@@ -815,7 +815,7 @@ export const SummaryOfBidPriceModal: React.FC<SummaryOfBidPriceModalProps> = ({
                         <div className="flex items-baseline gap-2 pt-0.5">
                           <span className="font-bold text-black shrink-0">Duly authorized to sign the Bid for and behalf of:</span>
                           <span className="font-bold uppercase text-black">
-                            {companyName || 'QUANTUM CLOUD CORPORATION'}
+                            {companyName || ''}
                           </span>
                         </div>
                       </div>

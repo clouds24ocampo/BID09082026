@@ -70,8 +70,8 @@ export const BidFormForGoodsModalContent: React.FC<BidFormForGoodsModalProps> = 
 
   // Corporate Entity & Signatory (Company Name is strictly locked to Tenant Registration Name)
   const companyName = tenant?.companyName || '';
-  const [signatoryName] = useState(tenant?.authorizedSignatory?.name || 'Mark-Vin F. Ocampo');
-  const [signatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'President');
+  const [signatoryName] = useState(tenant?.authorizedSignatory?.name || '');
+  const [signatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'Authorized Managing Officer');
   const [writtenAuthority] = useState("Board Resolution & Secretary's Certificate");
 
   // Category Auto-Detection State ('Goods' = Blue, 'Infrastructure' = Yellow/Amber, 'Consulting' = Green/Emerald)

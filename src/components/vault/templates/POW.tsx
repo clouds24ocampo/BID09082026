@@ -21,7 +21,6 @@ import {
 import {
   savePdfData,
   loadPdfData,
-  deletePdfData,
 } from "../../../utils/vaultIndexedDB";
 import {
   buildMergedThreeLayerPdfDataUrl,
@@ -44,7 +43,6 @@ import {
   Layers,
   Calculator,
   Eye,
-  Upload,
   FileText,
   ShieldCheck,
   Sparkles,
@@ -59,10 +57,7 @@ import {
   FolderPlus,
   FileUp,
   Lock,
-  Scale,
   Percent,
-  SlidersHorizontal,
-  Copy,
 } from "lucide-react";
 
 export const DEFAULT_POW_LABOR_DESCRIPTION =
@@ -105,7 +100,7 @@ export interface TaxCalculationResult {
   finalVat5: number;
   ewtRate: number; // 1% for Goods, 2% for Infra
   ewtAmount: number;
-  retentionRate: number; // 1% statutory retention
+  retentionRate: number; // Statutory retention (standard: 0% - 5%, RA 9184 & RA 12009)
   retentionAmount: number;
   totalDeductions: number;
   netPayable: number;
@@ -116,7 +111,7 @@ export interface TaxCalculationResult {
  * - When VATable: Net base = Direct Cost / 1.12; 5% Final Withholding VAT applies.
  * - When Non-VAT: Net base = Direct Cost; 0% VAT applies.
  * - EWT (Income Withholding Tax): 1% if Goods & Supply; 2% if Infrastructure & Civil Works.
- * - Retention Money: 1% statutory retention for both Goods and Infra.
+ * - Retention Money: Statutory retention (typically 1% up to 5% pursuant to RA 9184 & RA 12009).
  * Also applied symmetrically to Labor Cost at the bottom.
  */
 export function computeStatutoryTaxes(
@@ -130,7 +125,10 @@ export function computeStatutoryTaxes(
   const isInfra = projectCategory === "INFRA";
   const ewtRate = isInfra ? 2 : 1; // 1% Goods, 2% Infra
   const finalVatRate = isVatable ? 5 : 0;
-  const retentionRate = retentionPercent > 0 ? retentionPercent : 1;
+  const retentionRate =
+    typeof retentionPercent === "number" && !isNaN(retentionPercent) && retentionPercent >= 0
+      ? retentionPercent
+      : 1;
 
   // Direct / Labor Cost Base: direct cost / 1.12 if VATable
   const netBase = isVatable ? grossAmount / 1.12 : grossAmount;
@@ -142,7 +140,7 @@ export function computeStatutoryTaxes(
   // Expanded Withholding Tax (EWT: 1% Goods, 2% Infra on net base)
   const ewtAmount = netBase * (ewtRate / 100);
 
-  // 1% Statutory Retention Money (1% of gross amount)
+  // Statutory Retention Money (% of gross amount, typically 1% up to 5% pursuant to RA 9184 & RA 12009)
   const retentionAmount = grossAmount * (retentionRate / 100);
 
   // Total Statutory Deductions
@@ -183,6 +181,8 @@ export interface PowItem {
   taxRate?: number; // % Withholding Tax (standard: 5%)
   profitRate: number; // % EW.TAX (standard: 2% infra, 1% goods)
   vatRate: number; // % Value Added Tax (standard: 5% - 12%)
+  retentionRate?: number; // % Statutory Retention (standard: 0% - 5%, RA 9184 & RA 12009)
+  warrantyRate?: number; // % Warranty Mark Up (W.M)
   directUnitPrice?: number; // Direct quotation unit price override if desired
   unitCost?: number; // Custom modified unit cost override
   customUnitCost?: number; // Custom modified unit cost override
@@ -223,6 +223,110 @@ const fmtPeso = (val: number): string => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+};
+
+interface UnitCostInputProps {
+  calculatedValue: number;
+  customValue?: number;
+  onChange: (val: number | undefined) => void;
+  isQuotation?: boolean;
+}
+
+const UnitCostInput: React.FC<UnitCostInputProps> = ({
+  calculatedValue,
+  customValue,
+  onChange,
+  isQuotation = false,
+}) => {
+  const isCustom = customValue !== undefined && customValue !== null;
+  const activeValue = isCustom ? customValue : calculatedValue;
+
+  const formatWithCommas = (val: number) => {
+    if (val === 0 || isNaN(val) || !isFinite(val)) return "0.00";
+    return val.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  const [isFocused, setIsFocused] = useState(false);
+  const [textValue, setTextValue] = useState("");
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    setTextValue(
+      activeValue !== undefined && !isNaN(activeValue)
+        ? String(Number(activeValue.toFixed(2)))
+        : ""
+    );
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const cleaned = textValue.replace(/,/g, "").trim();
+    if (cleaned === "") {
+      onChange(undefined);
+      return;
+    }
+    const parsed = parseFloat(cleaned);
+    if (!isNaN(parsed) && parsed >= 0) {
+      const currentCalculatedRounded = Number(calculatedValue.toFixed(2));
+      if (isCustom || Math.abs(parsed - currentCalculatedRounded) > 0.001) {
+        onChange(parsed);
+      }
+    } else {
+      setTextValue(String(Number(activeValue.toFixed(2))));
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    } else if (e.key === "Escape") {
+      setIsFocused(false);
+      setTextValue(String(Number(activeValue.toFixed(2))));
+    }
+  };
+
+  const displayString = isFocused ? textValue : formatWithCommas(activeValue);
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <input
+        type="text"
+        inputMode="decimal"
+        value={displayString}
+        onFocus={handleFocus}
+        onChange={(e) => setTextValue(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        className={`w-28 bg-slate-950 border rounded px-1.5 py-1 text-xs text-right font-mono font-bold transition ${
+          isCustom
+            ? "border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/30"
+            : isQuotation
+            ? "border-slate-800 text-emerald-400 focus:border-emerald-500"
+            : "border-slate-800 text-slate-200 focus:border-blue-500"
+        }`}
+        title={
+          isCustom
+            ? "Modified Unit Cost (click reset to revert to formula)"
+            : isQuotation
+            ? "Modify unit quotation price"
+            : "Calculated Unit Cost (modify here directly)"
+        }
+      />
+      {isCustom && (
+        <button
+          type="button"
+          onClick={() => onChange(undefined)}
+          className="text-slate-500 hover:text-amber-400 p-0.5 rounded cursor-pointer transition"
+          title="Reset to auto-calculated unit cost"
+        >
+          <RotateCcw className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  );
 };
 
 /**
@@ -279,6 +383,8 @@ const PRESET_ROAD_DRAINAGE: PowItem[] = [
     taxRate: 5,
     profitRate: 2,
     vatRate: 5,
+    retentionRate: 0,
+    warrantyRate: 0,
     statementOfCompliance: "COMPLY",
   },
   {
@@ -297,6 +403,8 @@ const PRESET_ROAD_DRAINAGE: PowItem[] = [
     taxRate: 5,
     profitRate: 2,
     vatRate: 5,
+    retentionRate: 0,
+    warrantyRate: 0,
     statementOfCompliance: "COMPLY",
   },
   {
@@ -315,6 +423,8 @@ const PRESET_ROAD_DRAINAGE: PowItem[] = [
     taxRate: 5,
     profitRate: 2,
     vatRate: 5,
+    retentionRate: 0,
+    warrantyRate: 0,
     statementOfCompliance: "COMPLY",
   },
   {
@@ -333,6 +443,8 @@ const PRESET_ROAD_DRAINAGE: PowItem[] = [
     taxRate: 5,
     profitRate: 2,
     vatRate: 5,
+    retentionRate: 0,
+    warrantyRate: 0,
     statementOfCompliance: "COMPLY",
   },
   {
@@ -351,6 +463,8 @@ const PRESET_ROAD_DRAINAGE: PowItem[] = [
     taxRate: 5,
     profitRate: 2,
     vatRate: 5,
+    retentionRate: 0,
+    warrantyRate: 0,
     statementOfCompliance: "COMPLY",
   },
   {
@@ -369,6 +483,8 @@ const PRESET_ROAD_DRAINAGE: PowItem[] = [
     taxRate: 5,
     profitRate: 2,
     vatRate: 5,
+    retentionRate: 0,
+    warrantyRate: 0,
     statementOfCompliance: "COMPLY",
   },
 ];
@@ -390,6 +506,8 @@ const PRESET_GOODS_QUOTATION: PowItem[] = [
     taxRate: 5,
     profitRate: 1,
     vatRate: 5,
+    retentionRate: 0,
+    warrantyRate: 0,
     statementOfCompliance: "COMPLY",
   },
   {
@@ -408,6 +526,8 @@ const PRESET_GOODS_QUOTATION: PowItem[] = [
     taxRate: 5,
     profitRate: 1,
     vatRate: 5,
+    retentionRate: 0,
+    warrantyRate: 0,
     statementOfCompliance: "COMPLY",
   },
   {
@@ -426,6 +546,8 @@ const PRESET_GOODS_QUOTATION: PowItem[] = [
     taxRate: 5,
     profitRate: 1,
     vatRate: 5,
+    retentionRate: 0,
+    warrantyRate: 0,
     statementOfCompliance: "COMPLY",
   },
   {
@@ -444,6 +566,8 @@ const PRESET_GOODS_QUOTATION: PowItem[] = [
     taxRate: 5,
     profitRate: 1,
     vatRate: 5,
+    retentionRate: 0,
+    warrantyRate: 0,
     statementOfCompliance: "COMPLY",
   },
 ];
@@ -515,21 +639,21 @@ export const POWModalContent: React.FC<PowModalProps> = ({
   const [targetCompletionDate, setTargetCompletionDate] =
     useState<string>("150 Days after NTP");
   const [contractorName, setContractorName] = useState<string>(
-    tenant?.companyName || "Apex Cloud & Infrastructure Builders Corp.",
+    tenant?.companyName || "",
   );
   const [contractorAddress, setContractorAddress] = useState<string>(
-    tenant?.address || "Ortigas Center, Pasig City, Metro Manila",
+    tenant?.address || "",
   );
   const [contractorTin, setContractorTin] = useState<string>(
-    tenant?.tin || "008-991-234-000",
+    tenant?.tin || "",
   );
   const [contractorPhilgeps, setContractorPhilgeps] = useState<string>(
-    tenant?.philgepsPlatinumNo || "PLATINUM-2026-009841",
+    tenant?.philgepsPlatinumNo || "",
   );
 
   // Quotation Specific Fields
   const [rfqNumber, setRfqNumber] = useState<string>(
-    activeProjectRefNo ? `RFQ-${activeProjectRefNo}` : "RFQ-2026-09-0042",
+    activeProjectRefNo ? `RFQ-${activeProjectRefNo}` : "",
   );
   const [canvassDate] = useState<string>(todayStr);
   const [priceValidity, setPriceValidity] =
@@ -560,16 +684,13 @@ export const POWModalContent: React.FC<PowModalProps> = ({
   // Statutory Tax Regime & Government Deductions (BIR / RA 9184 / RA 12009)
   // VATable (Base = Direct Cost / 1.12) vs Non-VAT (Base = Direct Cost)
   const [taxType, setTaxType] = useState<TaxType>("VATABLE");
-  // Goods (5% VAT + 1% EWT + 1% Retention) vs Infra (5% VAT + 2% EWT + 1% Retention)
+  // Goods (5% VAT + 1% EWT + Retention) vs Infra (5% VAT + 2% EWT + Retention)
   const [projectTaxCategory, setProjectTaxCategory] =
     useState<ProjectTaxCategory>(initialMode === "POW" ? "INFRA" : "GOODS");
-  // Statutory 1% Retention Money
+  // Statutory Retention Money (standard: 0% to 5%, RA 9184 & RA 12009)
   const [retentionRate, setRetentionRate] = useState<number>(1);
 
   const { currentUser } = useAuth();
-
-  // AMO / President is the highest authority of the system: auto-authorized and unblocked
-  const isUserAmo = isAmoOrPresidentRole(currentUser?.role);
 
   // Dedicated Labor Cost & Percentage State (Editable % & Words Descriptions)
   const [laborPercentage, setLaborPercentage] = useState<number>(35);
@@ -577,6 +698,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
     DEFAULT_POW_LABOR_DESCRIPTION,
   );
   const [laborCustomWordsAmount, setLaborCustomWordsAmount] = useState<string>("");
+  const [autoSyncLaborWithMaterials, setAutoSyncLaborWithMaterials] = useState<boolean>(true);
   const [showLaborModal, setShowLaborModal] = useState<boolean>(false);
 
   // Approval Workflow State
@@ -675,10 +797,9 @@ export const POWModalContent: React.FC<PowModalProps> = ({
   const [torPdfFileName, setTorPdfFileName] = useState<string>("");
   const [torPdfFileSize, setTorPdfFileSize] = useState<string>("");
   const [torPdfUploadDate, setTorPdfUploadDate] = useState<string>("");
-  const [appendTorToPdf, setAppendTorToPdf] = useState<boolean>(true);
+  const appendTorToPdf = true;
   const [showTorPreviewModal, setShowTorPreviewModal] =
     useState<boolean>(false);
-  const [torMode, setTorMode] = useState<"GENERATE" | "UPLOAD">("GENERATE");
 
   // Signatories (POW Standard 4-Tier Hierarchy)
   const [preparedByName, setPreparedByName] = useState<string>(
@@ -726,7 +847,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
     procuringEntity || "Procuring Entity",
   );
   const [signatoryName, setSignatoryName] = useState<string>(
-    tenant?.authorizedSignatory?.name || "Engr. Ferdinand R. Valenzuela",
+    tenant?.authorizedSignatory?.name || "",
   );
   const [signatoryTitle, setSignatoryTitle] = useState<string>(
     tenant?.authorizedSignatory?.title ||
@@ -739,7 +860,6 @@ export const POWModalContent: React.FC<PowModalProps> = ({
     "landscape" | "portrait"
   >("landscape");
 
-  const torInputRef = useRef<HTMLInputElement>(null);
   const projectScopeKey = (
     projectRefNo ||
     selectedOppId ||
@@ -759,6 +879,10 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       const profitRate =
         it.profitRate !== undefined ? it.profitRate : defaultProfit;
       const effectiveVatRate = isVatable ? (it.vatRate ?? 5) : 0;
+      const rowRetentionRate =
+        it.retentionRate !== undefined ? it.retentionRate : 0;
+      const rowWarrantyRate =
+        it.warrantyRate !== undefined ? it.warrantyRate : 0;
 
       // User modified unit cost override
       const numCustom =
@@ -773,7 +897,13 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       // VAT should be /1.12 from direct cost: (directCost / 1.12) * (effectiveVatRate / 100)
       const vatMultiplierOnDirect = (effectiveVatRate / 100) / 1.12;
       const markupMultiplier =
-        1 + (ocmRate / 100) + (taxRate / 100) + (profitRate / 100) + vatMultiplierOnDirect;
+        1 +
+        (ocmRate / 100) +
+        (taxRate / 100) +
+        (profitRate / 100) +
+        vatMultiplierOnDirect +
+        (rowRetentionRate / 100) +
+        (rowWarrantyRate / 100);
 
       let directCost = rawDirectCost;
       let totalCost = 0;
@@ -789,7 +919,10 @@ export const POWModalContent: React.FC<PowModalProps> = ({
         const taxCost = directCost * (taxRate / 100);
         const profitCost = directCost * (profitRate / 100);
         const vatCost = (directCost / 1.12) * (effectiveVatRate / 100);
-        const indirectCost = ocmCost + taxCost + profitCost + vatCost;
+        const retentionCost = directCost * (rowRetentionRate / 100);
+        const warrantyCost = directCost * (rowWarrantyRate / 100);
+        const indirectCost =
+          ocmCost + taxCost + profitCost + vatCost + retentionCost + warrantyCost;
         totalCost = directCost + indirectCost;
         unitCost = it.quantity > 0 ? totalCost / it.quantity : totalCost;
       }
@@ -798,7 +931,10 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       const taxCost = directCost * (taxRate / 100);
       const profitCost = directCost * (profitRate / 100);
       const vatCost = (directCost / 1.12) * (effectiveVatRate / 100);
-      const indirectCost = ocmCost + taxCost + profitCost + vatCost;
+      const retentionCost = directCost * (rowRetentionRate / 100);
+      const warrantyCost = directCost * (rowWarrantyRate / 100);
+      const indirectCost =
+        ocmCost + taxCost + profitCost + vatCost + retentionCost + warrantyCost;
 
       // Item Statutory Tax Calculation
       const itemTax = computeStatutoryTaxes(
@@ -807,10 +943,16 @@ export const POWModalContent: React.FC<PowModalProps> = ({
         projectTaxCategory,
         retentionRate,
       );
+      const materialTax = computeStatutoryTaxes(
+        it.materialCost || 0,
+        taxType,
+        "GOODS",
+        retentionRate,
+      );
       const laborTax = computeStatutoryTaxes(
         it.laborCost || 0,
         taxType,
-        projectTaxCategory,
+        projectTaxCategory === "INFRA" ? "INFRA" : "GOODS",
         retentionRate,
       );
 
@@ -818,16 +960,21 @@ export const POWModalContent: React.FC<PowModalProps> = ({
         ...it,
         taxRate,
         profitRate,
+        retentionRate: rowRetentionRate,
+        warrantyRate: rowWarrantyRate,
         directCost,
         ocmCost,
         taxCost,
         profitCost,
         vatCost,
+        retentionCost,
+        warrantyCost,
         indirectCost,
         totalCost,
         unitCost,
         isCustomUnitCost,
         itemTax,
+        materialTax,
         laborTax,
       };
     });
@@ -842,6 +989,8 @@ export const POWModalContent: React.FC<PowModalProps> = ({
     let totalTax = 0;
     let totalProfit = 0;
     let totalVat = 0;
+    let totalRetention = 0;
+    let totalWarranty = 0;
     let totalIndirect = 0;
     let grandTotal = 0;
 
@@ -854,6 +1003,8 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       totalTax += r.taxCost;
       totalProfit += r.profitCost;
       totalVat += r.vatCost;
+      totalRetention += r.retentionCost;
+      totalWarranty += r.warrantyCost;
       totalIndirect += r.indirectCost;
       grandTotal += r.totalCost;
     }
@@ -866,11 +1017,19 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       retentionRate,
     );
 
-    // Comprehensive Labor Cost Specific Tax Schedule (Labor Cost at the bottom with same tax)
+    // Comprehensive Materials Specific Tax Schedule (Goods: 1% EWT, 5% VAT, Retention)
+    const materialsTax = computeStatutoryTaxes(
+      totalMaterial,
+      taxType,
+      "GOODS",
+      retentionRate,
+    );
+
+    // Comprehensive Labor Cost Specific Tax Schedule (Services derived from Materials)
     const laborTax = computeStatutoryTaxes(
       totalLabor,
       taxType,
-      projectTaxCategory,
+      projectTaxCategory === "INFRA" ? "INFRA" : "GOODS",
       retentionRate,
     );
 
@@ -888,9 +1047,19 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       totalTax,
       totalProfit,
       totalVat,
+      totalRetention,
+      totalWarranty,
       totalIndirect,
       grandTotal,
       rowsWithWeight,
+      // Materials Tax & Retention
+      materialsTax,
+      materialsNetBase: materialsTax.netBase,
+      materialsFinalVat5: materialsTax.finalVat5,
+      materialsEwt: materialsTax.ewtAmount,
+      materialsRetention: materialsTax.retentionAmount,
+      materialsTotalDeductions: materialsTax.totalDeductions,
+      netMaterialsPayable: materialsTax.netPayable,
       // Direct Cost Tax & Retention
       directCostTax,
       // Labor Cost Tax & Retention
@@ -933,11 +1102,16 @@ export const POWModalContent: React.FC<PowModalProps> = ({
     if (tenant?.authorizedSignatory?.title)
       setSignatoryTitle(tenant.authorizedSignatory.title);
 
+    let loadedOppId: string | undefined = undefined;
     const storageKey = `bidocs_pow_${tenantId}_${projectScopeKey}`;
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
+        if (parsed.selectedOppId !== undefined) {
+          loadedOppId = parsed.selectedOppId;
+          setSelectedOppId(parsed.selectedOppId);
+        }
         if (parsed.docMode) setDocMode(parsed.docMode);
         if (parsed.procuringEntity) setProcuringEntity(parsed.procuringEntity);
         if (parsed.implementingOffice)
@@ -1030,6 +1204,8 @@ export const POWModalContent: React.FC<PowModalProps> = ({
           setLaborWordsDescription(parsed.laborWordsDescription);
         if (parsed.laborCustomWordsAmount)
           setLaborCustomWordsAmount(parsed.laborCustomWordsAmount);
+        if (parsed.autoSyncLaborWithMaterials !== undefined)
+          setAutoSyncLaborWithMaterials(Boolean(parsed.autoSyncLaborWithMaterials));
 
         if (parsed.procurementPurpose)
           setProcurementPurpose(parsed.procurementPurpose);
@@ -1089,20 +1265,23 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       })
       .catch(console.error);
 
-    // Link Opportunity if found
-    if (list.length > 0 && !selectedOppId) {
-      const match = activeProjectRefNo
-        ? list.find((p) => p.refNo === activeProjectRefNo)
-        : null;
-      const target = match || list[0];
-      if (target) {
-        setSelectedOppId(target.id);
-        setProjectTitle(target.title);
-        setProjectRefNo(target.refNo);
-        setRfqNumber(`RFQ-${target.refNo}`);
-        setProcuringEntity(target.procuringEntity);
+    // Link Opportunity ONLY if an explicit activeProjectRefNo is provided from project context,
+    // and no existing selection or explicit unlinked state was loaded
+    if (
+      list.length > 0 &&
+      loadedOppId === undefined &&
+      !selectedOppId &&
+      activeProjectRefNo
+    ) {
+      const match = list.find((p) => p.refNo === activeProjectRefNo);
+      if (match) {
+        setSelectedOppId(match.id);
+        setProjectTitle(match.title);
+        setProjectRefNo(match.refNo);
+        setRfqNumber(`RFQ-${match.refNo}`);
+        setProcuringEntity(match.procuringEntity);
         const amt = Number(
-          (target as any).abc || (target as any).contractAmount || 0,
+          (match as any).abc || (match as any).contractAmount || 0,
         );
         if (amt > 0) setAppropriationAmount(amt * 1.05);
       }
@@ -1144,6 +1323,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       approvedAt?: string;
       approvalNotes?: string;
       deliveryReceiptNo?: string;
+      selectedOppId?: string;
     },
     customTax?: {
       taxType?: TaxType;
@@ -1154,6 +1334,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       laborPercentage?: number;
       laborWordsDescription?: string;
       laborCustomWordsAmount?: string;
+      autoSyncLaborWithMaterials?: boolean;
     },
   ) => {
     const tenantId = tenant?.id || "default";
@@ -1172,6 +1353,10 @@ export const POWModalContent: React.FC<PowModalProps> = ({
         customLabor?.laborCustomWordsAmount !== undefined
           ? customLabor.laborCustomWordsAmount
           : laborCustomWordsAmount,
+      autoSyncLaborWithMaterials:
+        customLabor?.autoSyncLaborWithMaterials !== undefined
+          ? customLabor.autoSyncLaborWithMaterials
+          : autoSyncLaborWithMaterials,
       taxType: customTax?.taxType !== undefined ? customTax.taxType : taxType,
       projectTaxCategory:
         customTax?.projectTaxCategory !== undefined
@@ -1245,6 +1430,10 @@ export const POWModalContent: React.FC<PowModalProps> = ({
         customTracking?.deliveryReceiptNo !== undefined
           ? customTracking.deliveryReceiptNo
           : deliveryReceiptNo,
+      selectedOppId:
+        customTracking?.selectedOppId !== undefined
+          ? customTracking.selectedOppId
+          : selectedOppId,
       canvasserName:
         customSignatories?.canvasserName !== undefined
           ? customSignatories.canvasserName
@@ -1988,72 +2177,9 @@ export const POWModalContent: React.FC<PowModalProps> = ({
     }
   };
 
-  const handleTorUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const sizeFormatted = (file.size / (1024 * 1024)).toFixed(2) + " MB";
-    const nowStr = new Date().toLocaleString("en-PH");
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const dataUrl = event.target?.result as string;
-      setTorPdfDataUrl(dataUrl);
-      setTorPdfFileName(file.name);
-      setTorPdfFileSize(sizeFormatted);
-      setTorPdfUploadDate(nowStr);
-
-      const tenantId = tenant?.id || "default";
-      const torDbKey = `proj_pow_tor_pdf_${tenantId}_${projectScopeKey}`;
-      await savePdfData(torDbKey, dataUrl);
-      handleSaveState(undefined, file.name);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
-  const handleTorDelete = async () => {
-    if (
-      !confirm(
-        "Are you sure you want to remove the uploaded Terms of Reference (TOR) PDF?",
-      )
-    )
-      return;
-    setTorPdfDataUrl("");
-    setTorPdfFileName("");
-    setTorPdfFileSize("");
-    setTorPdfUploadDate("");
-
-    const tenantId = tenant?.id || "default";
-    const torDbKey = `proj_pow_tor_pdf_${tenantId}_${projectScopeKey}`;
-    await deletePdfData(torDbKey);
-    handleSaveState(undefined, "");
-  };
-
-  const handleTorGenerated = async (dataUrl: string, docName: string) => {
-    const sizeFormatted =
-      ((dataUrl.length * 0.75) / (1024 * 1024)).toFixed(2) + " MB";
-    const nowStr = new Date().toLocaleString("en-PH");
-    const fileName = `${projectRefNo}_STATUTORY_TOR.pdf`;
-
-    setTorPdfDataUrl(dataUrl);
-    setTorPdfFileName(fileName);
-    setTorPdfFileSize(sizeFormatted);
-    setTorPdfUploadDate(nowStr);
-    setAppendTorToPdf(true);
-    setActiveTab("matrix");
-    setShowTorPreviewModal(true);
-
-    const tenantId = tenant?.id || "default";
-    const torDbKey = `proj_pow_tor_pdf_${tenantId}_${projectScopeKey}`;
-    await savePdfData(torDbKey, dataUrl);
-    handleSaveState(undefined, fileName);
-    alert(
-      `✅ Statutory Terms of Reference successfully generated, saved alongside the ${docMode === "POW" ? "Program of Work (POW)" : "Formal Price Quotation"} in project records, and linked to the final package.`,
-    );
-  };
-
   const handleAddItem = () => {
+    const defaultMat = 50000;
+    const defaultLab = Math.round(defaultMat * (laborPercentage / 100));
     const newItem: PowItem = {
       id: `pow-item-${Date.now()}`,
       itemNo: `Item ${items.length + 1}`,
@@ -2069,13 +2195,15 @@ export const POWModalContent: React.FC<PowModalProps> = ({
         docMode === "QUOTATION" ? "Standard OEM / Compliant Model" : "",
       quantity: 1.0,
       unit: docMode === "POW" ? "l.s." : "units",
-      materialCost: 50000,
-      laborCost: 15000,
+      materialCost: defaultMat,
+      laborCost: defaultLab,
       equipmentCost: 5000,
       ocmRate: docMode === "POW" ? 8 : 4,
       taxRate: 5,
       profitRate: projectTaxCategory === "INFRA" ? 2 : 1,
       vatRate: 5,
+      retentionRate: retentionRate !== undefined ? retentionRate : 0,
+      warrantyRate: 0,
       statementOfCompliance: "COMPLY",
     };
     const updated = [...items, newItem];
@@ -2095,6 +2223,91 @@ export const POWModalContent: React.FC<PowModalProps> = ({
     );
     setItems(updated);
     handleSaveState(updated);
+  };
+
+  const handleUpdateItemMultiple = (id: string, updates: Partial<PowItem>) => {
+    const updated = items.map((it) =>
+      it.id === id ? { ...it, ...updates } : it,
+    );
+    setItems(updated);
+    handleSaveState(updated);
+  };
+
+  const handleLaborRateChange = (pct: number, autoApplyToAll = false) => {
+    setLaborPercentage(pct);
+    const updatedDesc = laborWordsDescription.replace(
+      /\(\d+% of Materials Cost\)/i,
+      `(${pct}% of Materials Cost)`,
+    );
+    setLaborWordsDescription(updatedDesc);
+    if (autoSyncLaborWithMaterials || autoApplyToAll) {
+      const updated = items.map((it) => {
+        const mat = it.materialCost || 0;
+        return {
+          ...it,
+          laborCost: Math.round(mat * (pct / 100)),
+          ...(it.customUnitCost !== undefined ? { customUnitCost: undefined } : {}),
+        };
+      });
+      setItems(updated);
+      handleSaveState(
+        updated,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        {
+          laborPercentage: pct,
+          laborWordsDescription: updatedDesc,
+          autoSyncLaborWithMaterials,
+        },
+      );
+    } else {
+      handleSaveState(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        {
+          laborPercentage: pct,
+          laborWordsDescription: updatedDesc,
+          autoSyncLaborWithMaterials,
+        },
+      );
+    }
+  };
+
+  const handleRetentionRateChange = (pct: number, autoApplyToAll = false) => {
+    const clamped = Math.max(0, Math.min(10, Math.round(pct * 10) / 10));
+    setRetentionRate(clamped);
+    if (autoApplyToAll) {
+      const updated = items.map((it) => ({
+        ...it,
+        retentionRate: clamped,
+        ...(it.customUnitCost !== undefined ? { customUnitCost: undefined } : {}),
+      }));
+      setItems(updated);
+      handleSaveState(
+        updated,
+        undefined,
+        undefined,
+        undefined,
+        selectedOppId !== undefined ? { selectedOppId } : undefined,
+        { retentionRate: clamped },
+      );
+    } else {
+      handleSaveState(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        selectedOppId !== undefined ? { selectedOppId } : undefined,
+        { retentionRate: clamped },
+      );
+    }
   };
 
   const computedLaborByPercentage = Math.round(
@@ -2136,6 +2349,8 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       taxRate: 5,
       profitRate: projectTaxCategory === "INFRA" ? 2 : 1,
       vatRate: 5,
+      retentionRate: 0,
+      warrantyRate: 0,
       statementOfCompliance: "COMPLY",
     };
     const updated = [...items, newItem];
@@ -2270,21 +2485,6 @@ export const POWModalContent: React.FC<PowModalProps> = ({
   };
 
   const handleDownloadPdf = async () => {
-    // If the active user is the AMO / President, they are the highest authority:
-    // Auto-approve immediately without blocking
-    if (
-      isAmoOrPresidentRole(currentUser?.role) ||
-      isApproverRole(currentUser?.role)
-    ) {
-      if (approvalStatus !== "APPROVED") {
-        handleApproveAndSync(
-          "Officially authorized and approved by AMO / President",
-        );
-      }
-    } else if (approvalStatus !== "APPROVED") {
-      setShowApprovalGateModal(true);
-      return;
-    }
     setIsExporting(true);
     try {
       const dataUrl = await generatePowPdfDataUrl();
@@ -2307,19 +2507,6 @@ export const POWModalContent: React.FC<PowModalProps> = ({
   };
 
   const handleDownloadDrPdf = async () => {
-    if (
-      isAmoOrPresidentRole(currentUser?.role) ||
-      isApproverRole(currentUser?.role)
-    ) {
-      if (approvalStatus !== "APPROVED") {
-        handleApproveAndSync(
-          "Officially authorized and approved by AMO / President",
-        );
-      }
-    } else if (approvalStatus !== "APPROVED") {
-      setShowApprovalGateModal(true);
-      return;
-    }
     setIsExportingDr(true);
     try {
       const printArea = document.getElementById("dr-print-sheet");
@@ -2979,28 +3166,12 @@ export const POWModalContent: React.FC<PowModalProps> = ({
           <button
             onClick={handleDownloadPdf}
             disabled={isExporting}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition disabled:opacity-50 ${
-              approvalStatus === "APPROVED" || isAmoOrPresidentRole(currentUser?.role)
-                ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
-                : "bg-amber-950/40 hover:bg-amber-900/50 text-amber-300 border border-amber-500/40"
-            }`}
-            title={
-              approvalStatus === "APPROVED" || isAmoOrPresidentRole(currentUser?.role)
-                ? "Download Legal PDF"
-                : "Executive Approval Required to Print / Download"
-            }
+            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer transition disabled:opacity-50 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 shadow-sm"
+            title="Download Legal PDF"
           >
-            {approvalStatus === "APPROVED" || isAmoOrPresidentRole(currentUser?.role) ? (
-              <Download className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <Lock className="w-4 h-4 text-amber-400" />
-            )}
+            <Download className="w-4 h-4 text-emerald-400" />
             <span>
-              {isExporting
-                ? "Compiling..."
-                : approvalStatus === "APPROVED" || isAmoOrPresidentRole(currentUser?.role)
-                  ? "Download PDF"
-                  : "Download PDF 🔒"}
+              {isExporting ? "Compiling..." : "Download PDF"}
             </span>
           </button>
 
@@ -3317,20 +3488,57 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     ? "bg-indigo-600 text-white shadow"
                     : "text-slate-400 hover:text-white"
                 }`}
-                title="Infrastructure & Civil Works: 5% Final VAT + 2% EWT + 1% Retention"
+                title="Infrastructure & Civil Works: 5% Final VAT + 2% EWT + Retention"
               >
                 <span>🏗️ Infra (5% VAT + 2% EWT)</span>
               </button>
             </div>
           </div>
 
-          {/* 1% Mandatory Retention Badge */}
-          <div
-            className="flex items-center gap-1 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] text-amber-300 font-semibold"
-            title="1% Statutory Retention Money deducted per billing milestone until final acceptance (RA 9184 & RA 12009)"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-            <span>1% Retention Active</span>
+          {/* Statutory Retention Control (Can be 1% up to 5%, RA 9184 & RA 12009) */}
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
+            <div
+              className="flex items-center gap-1 px-1.5 text-amber-300 font-semibold"
+              title="Statutory Retention Money (RA 9184 & RA 12009: typically 1% up to 5% held until warranty/acceptance)"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="text-[10px] font-bold uppercase">RET:</span>
+            </div>
+            <div className="flex items-center gap-1">
+              {[0, 1, 2, 3, 5].map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => handleRetentionRateChange(pct, true)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition cursor-pointer ${
+                    retentionRate === pct
+                      ? "bg-amber-500 text-black shadow-sm font-black"
+                      : "text-slate-400 hover:text-white hover:bg-slate-800"
+                  }`}
+                  title={`Set Retention Money to ${pct}% (RA 9184 / RA 12009) and apply to all rows`}
+                >
+                  {pct}%
+                </button>
+              ))}
+              <div className="flex items-center pl-1 border-l border-slate-800">
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.5"
+                  value={retentionRate}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val)) {
+                      handleRetentionRateChange(val, false);
+                    }
+                  }}
+                  className="w-10 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-[10px] text-amber-300 text-right font-mono font-bold focus:border-amber-400 focus:outline-none"
+                  title="Custom Retention % (standard: 1% up to 5% pursuant to RA 9184 & RA 12009)"
+                />
+                <span className="text-[10px] text-slate-400 pl-0.5 pr-1">%</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -3352,7 +3560,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
             <strong className="text-purple-400">
               {projectTaxCategory === "INFRA" ? "2% EWT" : "1% EWT"}
             </strong>{" "}
-            + <strong className="text-amber-400">1% Ret</strong>
+            + <strong className="text-amber-400">{retentionRate}% Ret</strong>
           </span>
           <span className="text-slate-600">•</span>
           <span>
@@ -3468,12 +3676,17 @@ export const POWModalContent: React.FC<PowModalProps> = ({
         {/* Project Quick Selector */}
         {oppProjects.length > 0 && (
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-slate-400">Linked Project:</span>
+            <span className="text-[11px] text-slate-400 font-medium">Linked Project:</span>
             <select
               value={selectedOppId}
               onChange={(e) => {
                 const id = e.target.value;
                 setSelectedOppId(id);
+                if (!id) {
+                  // User selected not to link / standalone
+                  handleSaveState(undefined, undefined, undefined, undefined, { selectedOppId: "" });
+                  return;
+                }
                 const found = oppProjects.find((p) => p.id === id);
                 if (found) {
                   setProjectTitle(found.title);
@@ -3484,16 +3697,44 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     (found as any).abc || (found as any).contractAmount || 0,
                   );
                   if (amt > 0) setAppropriationAmount(amt * 1.05);
+                  handleSaveState(undefined, undefined, undefined, undefined, { selectedOppId: id });
                 }
               }}
-              className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white max-w-xs truncate"
+              className={`border rounded-lg px-2.5 py-1 text-xs max-w-xs truncate transition font-medium cursor-pointer ${
+                selectedOppId
+                  ? "bg-slate-950 border-emerald-500/50 text-emerald-300 ring-1 ring-emerald-500/20"
+                  : "bg-slate-950 border-slate-700 text-slate-300"
+              }`}
+              title={
+                selectedOppId
+                  ? "Linked to Bidding Opportunity (click to change or choose not to link)"
+                  : "Standalone document not linked to any project (select a project to link)"
+              }
             >
+              <option value="">-- Do Not Link / Standalone (Unlinked) --</option>
               {oppProjects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.refNo} - {p.title}
                 </option>
               ))}
             </select>
+            {selectedOppId ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedOppId("");
+                  handleSaveState(undefined, undefined, undefined, undefined, { selectedOppId: "" });
+                }}
+                className="px-2 py-1 rounded-md text-[11px] font-medium text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 cursor-pointer transition flex items-center gap-1"
+                title="Unlink this project (switch to standalone)"
+              >
+                <span>✕ Unlink</span>
+              </button>
+            ) : (
+              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-mono">
+                Standalone
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -3670,6 +3911,27 @@ export const POWModalContent: React.FC<PowModalProps> = ({
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
+                <label
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-xs text-slate-300 cursor-pointer select-none hover:bg-slate-700/80 transition"
+                  title="When checked, row Labor Cost is automatically calculated from Material Cost using the active labor percentage"
+                >
+                  <input
+                    type="checkbox"
+                    checked={autoSyncLaborWithMaterials}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setAutoSyncLaborWithMaterials(checked);
+                      if (checked) {
+                        handleApplyLaborPercentageToAll(laborPercentage);
+                      }
+                    }}
+                    className="rounded border-slate-600 text-blue-500 focus:ring-0 w-3.5 h-3.5"
+                  />
+                  <span className="text-[11px] font-medium flex items-center gap-1">
+                    <span>Auto-derive Labor ({laborPercentage}%)</span>
+                  </span>
+                </label>
+
                 <button
                   type="button"
                   onClick={() => handleAddLaborCostItem()}
@@ -3727,15 +3989,30 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     {docMode === "POW" ? (
                       <>
                         <th
-                          className="p-2.5 text-right w-28 cursor-pointer hover:text-white"
-                          title="Click any row's Direct Cost to expand Material, Labor & Equipment editor"
+                          className="p-2.5 text-right w-36 cursor-pointer hover:text-white"
+                          title="Direct Cost (EDC) = Material (Base) + Labor + Equipment. Click any row to expand breakdown editor."
                         >
-                          Direct Cost ▾
+                          <div>Direct Cost ▾</div>
+                          <div className="text-[8px] font-normal text-blue-300 normal-case">
+                            Mat + Lab ({laborPercentage}%)
+                          </div>
                         </th>
                         <th className="p-2.5 text-right w-16">OCM%</th>
                         <th className="p-2.5 text-right w-16">W.Tax%</th>
                         <th className="p-2.5 text-right w-16">EW.TAX%</th>
                         <th className="p-2.5 text-right w-16">VAT%</th>
+                        <th
+                          className="p-2.5 text-right w-16"
+                          title="Statutory Retention Money % (standard: 0% - 5% pursuant to RA 9184 & RA 12009)"
+                        >
+                          RET%
+                        </th>
+                        <th
+                          className="p-2.5 text-right w-16"
+                          title="Warranty Mark Up % (W.M)"
+                        >
+                          W.M%
+                        </th>
                       </>
                     ) : (
                       <>
@@ -3747,7 +4024,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     )}
                     <th className="p-2.5 text-right w-28">Total Cost</th>
                     {docMode === "POW" && (
-                      <th className="p-2.5 text-right w-24">Unit Cost</th>
+                      <th className="p-2.5 text-right w-28">Unit Cost</th>
                     )}
                     <th className="p-2.5 text-center w-16">% Wt</th>
                     <th className="p-2.5 text-center w-12">Action</th>
@@ -3833,21 +4110,26 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                                   expandedCostId === row.id ? null : row.id,
                                 )
                               }
-                              className={`font-mono font-medium text-xs px-1.5 py-0.5 rounded cursor-pointer transition flex items-center justify-end gap-1 ml-auto border ${
+                              className={`font-mono font-medium text-xs px-2 py-1 rounded cursor-pointer transition flex flex-col items-end gap-0.5 ml-auto border ${
                                 expandedCostId === row.id
                                   ? "bg-blue-600/30 text-blue-300 border-blue-500/50 ring-1 ring-blue-500/30"
                                   : "text-slate-200 border-transparent hover:text-white hover:bg-slate-800 hover:border-slate-700"
                               }`}
-                              title="Click to view and edit Materials, Labor, and Equipment breakdown"
+                              title="Click to view and edit Materials (Base), Labor, and Equipment breakdown"
                             >
-                              <span>₱{fmtPeso(row.directCost)}</span>
-                              <ChevronDown
-                                className={`w-3 h-3 transition-transform ${
-                                  expandedCostId === row.id
-                                    ? "rotate-180 text-blue-400"
-                                    : "text-slate-400"
-                                }`}
-                              />
+                              <div className="flex items-center gap-1">
+                                <span className="font-bold">₱{fmtPeso(row.directCost)}</span>
+                                <ChevronDown
+                                  className={`w-3 h-3 transition-transform ${
+                                    expandedCostId === row.id
+                                      ? "rotate-180 text-blue-400"
+                                      : "text-slate-400"
+                                  }`}
+                                />
+                              </div>
+                              <span className="text-[9px] text-slate-400 font-mono">
+                                Mat: ₱{fmtPeso(row.materialCost)} | Lab: ₱{fmtPeso(row.laborCost)}
+                              </span>
                             </button>
                           </td>
                           <td className="p-2 text-right">
@@ -3909,41 +4191,51 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                               title="VAT % (derived from Direct Cost ÷ 1.12)"
                             />
                           </td>
+                          <td className="p-2 text-right">
+                            <input
+                              type="number"
+                              min="0"
+                              max="10"
+                              step="0.5"
+                              value={row.retentionRate !== undefined ? row.retentionRate : 0}
+                              onChange={(e) =>
+                                handleUpdateItem(
+                                  row.id,
+                                  "retentionRate",
+                                  parseFloat(e.target.value) || 0,
+                                )
+                              }
+                              className="w-12 bg-slate-950 border border-slate-800 rounded px-1 py-1 text-xs text-right text-slate-300 font-mono"
+                              title="Retention Money % (standard: 0% - 5% pursuant to RA 9184 & RA 12009)"
+                            />
+                          </td>
+                          <td className="p-2 text-right">
+                            <input
+                              type="number"
+                              value={row.warrantyRate !== undefined ? row.warrantyRate : 0}
+                              onChange={(e) =>
+                                handleUpdateItem(
+                                  row.id,
+                                  "warrantyRate",
+                                  parseFloat(e.target.value) || 0,
+                                )
+                              }
+                              className="w-12 bg-slate-950 border border-slate-800 rounded px-1 py-1 text-xs text-right text-slate-300 font-mono"
+                              title="Warranty Mark Up % (W.M)"
+                            />
+                          </td>
                         </>
                       ) : (
                         <>
                           <td className="p-2 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <input
-                                type="number"
-                                step="any"
-                                value={
-                                  row.customUnitCost !== undefined && row.customUnitCost !== null
-                                    ? row.customUnitCost
-                                    : Number(row.unitCost.toFixed(2))
-                                }
-                                onChange={(e) => {
-                                  const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
-                                  handleUpdateItem(row.id, "customUnitCost", val);
-                                }}
-                                className={`w-24 bg-slate-950 border rounded px-1.5 py-1 text-xs text-right font-mono font-bold transition ${
-                                  row.customUnitCost !== undefined && row.customUnitCost !== null
-                                    ? "border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/30"
-                                    : "border-slate-800 text-emerald-400 focus:border-emerald-500"
-                                }`}
-                                title="Modify unit quotation price"
-                              />
-                              {row.customUnitCost !== undefined && row.customUnitCost !== null && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateItem(row.id, "customUnitCost", undefined)}
-                                  className="text-slate-500 hover:text-amber-400 p-0.5 rounded cursor-pointer"
-                                  title="Reset to calculated price"
-                                >
-                                  <RotateCcw className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
+                            <UnitCostInput
+                              calculatedValue={row.unitCost}
+                              customValue={row.customUnitCost}
+                              onChange={(val) =>
+                                handleUpdateItem(row.id, "customUnitCost", val)
+                              }
+                              isQuotation={true}
+                            />
                           </td>
                           <td className="p-2 text-center">
                             <input
@@ -3967,41 +4259,14 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                       </td>
                       {docMode === "POW" && (
                         <td className="p-2 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <input
-                              type="number"
-                              step="any"
-                              value={
-                                row.customUnitCost !== undefined && row.customUnitCost !== null
-                                  ? row.customUnitCost
-                                  : Number(row.unitCost.toFixed(2))
-                              }
-                              onChange={(e) => {
-                                const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
-                                handleUpdateItem(row.id, "customUnitCost", val);
-                              }}
-                              className={`w-24 bg-slate-950 border rounded px-1.5 py-1 text-xs text-right font-mono font-bold transition ${
-                                row.customUnitCost !== undefined && row.customUnitCost !== null
-                                  ? "border-emerald-500 text-emerald-300 ring-1 ring-emerald-500/30"
-                                  : "border-slate-800 text-slate-200 focus:border-blue-500"
-                              }`}
-                              title={
-                                row.customUnitCost !== undefined
-                                  ? "Modified Unit Cost (click reset to revert to formula)"
-                                  : "Calculated Unit Cost (modify here directly)"
-                              }
-                            />
-                            {row.customUnitCost !== undefined && row.customUnitCost !== null && (
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateItem(row.id, "customUnitCost", undefined)}
-                                className="text-slate-500 hover:text-amber-400 p-0.5 rounded cursor-pointer"
-                                title="Reset to auto-calculated unit cost"
-                              >
-                                <RotateCcw className="w-3 h-3" />
-                              </button>
-                            )}
-                          </div>
+                          <UnitCostInput
+                            calculatedValue={row.unitCost}
+                            customValue={row.customUnitCost}
+                            onChange={(val) =>
+                              handleUpdateItem(row.id, "customUnitCost", val)
+                            }
+                            isQuotation={false}
+                          />
                         </td>
                       )}
                       <td className="p-2 text-center font-mono text-[11px] text-blue-400">
@@ -4021,54 +4286,80 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     {/* Collapsible Direct Cost Breakdown Editor (Materials, Labor, Equipment) */}
                     {expandedCostId === row.id && docMode === "POW" && (
                       <tr className="bg-slate-950/90 border-b border-blue-500/40">
-                        <td colSpan={13} className="p-3">
+                        <td colSpan={15} className="p-3">
                           <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/90 p-3 rounded-xl border border-slate-800 shadow-inner">
                             <div className="flex items-center gap-2">
                               <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse" />
-                              <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wide">
-                                Item {row.itemNo} Direct Cost Breakdown:
-                              </span>
+                              <div className="flex flex-col">
+                                <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wide">
+                                  Item {row.itemNo} Direct Cost Breakdown:
+                                </span>
+                                <span className="text-[9px] text-slate-400">
+                                  Total Materials is the base for Labor ({laborPercentage}%) &amp; statutory taxes
+                                </span>
+                              </div>
                             </div>
 
                             <div className="flex flex-wrap items-center gap-4">
-                              <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800">
-                                <label className="text-[11px] font-semibold text-slate-400">🧱 Materials:</label>
-                                <span className="text-slate-500 text-xs">₱</span>
-                                <input
-                                  type="number"
-                                  value={row.materialCost}
-                                  onChange={(e) => {
-                                    handleUpdateItem(row.id, "materialCost", parseFloat(e.target.value) || 0);
-                                    if (row.customUnitCost !== undefined) handleUpdateItem(row.id, "customUnitCost", undefined);
-                                  }}
-                                  className="w-28 bg-transparent text-xs text-right font-mono text-white focus:outline-none"
-                                  title="Material Cost for this item (feeds Materials Total in Section A)"
-                                />
+                              <div className="flex flex-col gap-1 bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800">
+                                <div className="flex items-center gap-1.5">
+                                  <label className="text-[11px] font-bold text-blue-300">🧱 Materials (Base):</label>
+                                  <span className="text-slate-500 text-xs">₱</span>
+                                  <input
+                                    type="number"
+                                    value={row.materialCost}
+                                    onChange={(e) => {
+                                      const newMat = parseFloat(e.target.value) || 0;
+                                      const updates: Partial<PowItem> = {
+                                        materialCost: newMat,
+                                        ...(row.customUnitCost !== undefined ? { customUnitCost: undefined } : {}),
+                                      };
+                                      if (autoSyncLaborWithMaterials) {
+                                        updates.laborCost = Math.round(newMat * (laborPercentage / 100));
+                                      }
+                                      handleUpdateItemMultiple(row.id, updates);
+                                    }}
+                                    className="w-28 bg-transparent text-xs text-right font-mono text-white focus:outline-none"
+                                    title="Material Cost for this item (Primary base for Labor and Taxes)"
+                                  />
+                                </div>
+                                <span className="text-[9px] text-slate-500">
+                                  Primary Goods Base
+                                </span>
                               </div>
 
                               <div className="flex flex-col gap-1 bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800">
                                 <div className="flex items-center gap-1.5">
-                                  <label className="text-[11px] font-semibold text-slate-400">👷 Labor:</label>
+                                  <label className="text-[11px] font-bold text-emerald-300">
+                                    👷 Labor ({row.materialCost > 0 ? Math.round(((row.laborCost || 0) / row.materialCost) * 100) : 0}% of Mat):
+                                  </label>
                                   <span className="text-slate-500 text-xs">₱</span>
                                   <input
                                     type="number"
                                     value={row.laborCost}
                                     onChange={(e) => {
-                                      handleUpdateItem(row.id, "laborCost", parseFloat(e.target.value) || 0);
-                                      if (row.customUnitCost !== undefined) handleUpdateItem(row.id, "customUnitCost", undefined);
+                                      const newLabor = parseFloat(e.target.value) || 0;
+                                      handleUpdateItemMultiple(row.id, {
+                                        laborCost: newLabor,
+                                        ...(row.customUnitCost !== undefined ? { customUnitCost: undefined } : {}),
+                                      });
                                     }}
                                     className="w-28 bg-transparent text-xs text-right font-mono text-white focus:outline-none"
-                                    title="Labor Cost for this item (feeds Labor Total in Section A and Labor Taxes in Section D)"
+                                    title="Labor Cost for this item (Derived from Materials)"
                                   />
                                 </div>
                                 <div className="flex items-center gap-1 pt-0.5 border-t border-slate-800/80">
                                   <span className="text-[9px] text-slate-500 font-semibold uppercase">Set % of Mat:</span>
-                                  {[10, 20, 25, 30, 35].map((pct) => (
+                                  {[10, 15, 20, 25, 30, 35, 40].map((pct) => (
                                     <button
                                       key={`row-pct-${row.id}-${pct}`}
                                       type="button"
                                       onClick={() => handleApplyLaborPercentageToRow(row.id, pct)}
-                                      className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition cursor-pointer"
+                                      className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold transition cursor-pointer ${
+                                        row.materialCost > 0 && Math.round(((row.laborCost || 0) / row.materialCost) * 100) === pct
+                                          ? "bg-blue-600 text-white shadow"
+                                          : "bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white"
+                                      }`}
                                       title={`Set labor to ${pct}% of material cost (₱${fmtPeso(Math.round((row.materialCost || 0) * (pct / 100)))})`}
                                     >
                                       {pct}%
@@ -4084,8 +4375,10 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                                   type="number"
                                   value={row.equipmentCost}
                                   onChange={(e) => {
-                                    handleUpdateItem(row.id, "equipmentCost", parseFloat(e.target.value) || 0);
-                                    if (row.customUnitCost !== undefined) handleUpdateItem(row.id, "customUnitCost", undefined);
+                                    handleUpdateItemMultiple(row.id, {
+                                      equipmentCost: parseFloat(e.target.value) || 0,
+                                      ...(row.customUnitCost !== undefined ? { customUnitCost: undefined } : {}),
+                                    });
                                   }}
                                   className="w-28 bg-transparent text-xs text-right font-mono text-white focus:outline-none"
                                   title="Equipment Rental & Operating Cost (feeds Equipment Total in Section A)"
@@ -4133,7 +4426,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                           ₱{fmtPeso(totals.totalDirect)}
                         </td>
                         <td
-                          colSpan={4}
+                          colSpan={6}
                           className="p-3 text-right font-mono text-amber-400"
                         >
                           ₱{fmtPeso(totals.totalIndirect)}
@@ -4160,19 +4453,35 @@ export const POWModalContent: React.FC<PowModalProps> = ({
               <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-6">
                   <div>
-                    <span className="text-[10px] uppercase text-slate-400 block font-semibold">
-                      Total Materials
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase text-blue-400 block font-bold tracking-wider">
+                        Total Materials (Base)
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                        Goods Base
+                      </span>
+                    </div>
                     <span className="font-mono text-sm font-bold text-white">
                       ₱{fmtPeso(totals.totalMaterial)}
                     </span>
+                    <span className="text-[9px] text-slate-400 block">
+                      Primary origin for labor &amp; taxes
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase text-slate-400 block font-semibold">
-                      Total Labor
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase text-emerald-400 block font-bold tracking-wider">
+                        Total Labor
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        {laborPercentage}% of Mat
+                      </span>
+                    </div>
                     <span className="font-mono text-sm font-bold text-white">
                       ₱{fmtPeso(totals.totalLabor)}
+                    </span>
+                    <span className="text-[9px] text-slate-400 block font-mono">
+                      ₱{fmtPeso(totals.totalMaterial)} × {laborPercentage}%
                     </span>
                   </div>
                   <div>
@@ -4205,14 +4514,13 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                 </div>
               </div>
 
-              {/* Statutory Government Taxes & Retention Schedule (Direct Cost) */}
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2.5">
+              {/* Statutory Government Taxes & Retention Schedule (Direct Cost, Materials & Labor) */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                   <div className="flex items-center gap-2">
                     <DollarSign className="w-4 h-4 text-emerald-400" />
                     <span className="font-bold text-white uppercase text-[11px] tracking-wide">
-                      Government Statutory Tax &amp; Retention Schedule (Direct
-                      Cost)
+                      Government Statutory Tax &amp; Retention Schedule
                     </span>
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
                       {totals.isVatable
@@ -4226,14 +4534,102 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     </span>
                   </div>
                   <span className="text-[10px] font-mono text-slate-400">
-                    RA 9184 &amp; RA 12009 Statutory Deductions
+                    RA 9184, RA 12009 &amp; BIR Statutory Deductions
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-[11px]">
+                {/* Dual schedules: Materials Base Taxes & Labor Taxes side by side */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+                  {/* Materials Tax schedule */}
+                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1.5">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-1">
+                      <span className="font-bold text-blue-300 uppercase text-[10px]">
+                        🧱 Statutory Taxes on Materials (Goods)
+                      </span>
+                      <span className="font-mono font-bold text-slate-300 text-[10px]">
+                        Base: ₱{fmtPeso(totals.totalMaterial)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-slate-400">
+                      <span>Net Base ({totals.isVatable ? "÷ 1.12" : "Full"}):</span>
+                      <span className="font-mono font-semibold text-slate-200">
+                        ₱{fmtPeso(totals.materialsNetBase)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-red-400">
+                      <span>5% Final VAT on Materials:</span>
+                      <span className="font-mono font-bold">
+                        - ₱{fmtPeso(totals.materialsFinalVat5)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-red-400">
+                      <span>1% EWT (Goods &amp; Supply):</span>
+                      <span className="font-mono font-bold">
+                        - ₱{fmtPeso(totals.materialsEwt)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-amber-400">
+                      <span>{totals.retentionRate}% Retention on Materials:</span>
+                      <span className="font-mono font-bold">
+                        - ₱{fmtPeso(totals.materialsRetention)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-slate-800 text-emerald-400 font-bold">
+                      <span>Net Materials Payable:</span>
+                      <span className="font-mono">
+                        ₱{fmtPeso(totals.netMaterialsPayable)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Labor Tax schedule */}
+                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1.5">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-1">
+                      <span className="font-bold text-emerald-300 uppercase text-[10px]">
+                        👷 Statutory Taxes on Labor ({laborPercentage}% of Mat)
+                      </span>
+                      <span className="font-mono font-bold text-slate-300 text-[10px]">
+                        Base: ₱{fmtPeso(totals.totalLabor)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-slate-400">
+                      <span>Labor Base ({totals.isVatable ? "÷ 1.12" : "Full"}):</span>
+                      <span className="font-mono font-semibold text-slate-200">
+                        ₱{fmtPeso(totals.laborNetBase)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-red-400">
+                      <span>5% Final VAT on Labor:</span>
+                      <span className="font-mono font-bold">
+                        - ₱{fmtPeso(totals.laborFinalVat5)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-red-400">
+                      <span>{totals.ewtRate}% EWT (Labor &amp; Services):</span>
+                      <span className="font-mono font-bold">
+                        - ₱{fmtPeso(totals.laborEwt)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-amber-400">
+                      <span>{totals.retentionRate}% Retention on Labor:</span>
+                      <span className="font-mono font-bold">
+                        - ₱{fmtPeso(totals.laborRetention)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-slate-800 text-emerald-400 font-bold">
+                      <span>Net Take-Home Labor:</span>
+                      <span className="font-mono">
+                        ₱{fmtPeso(totals.netLaborPayable)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Combined Direct Cost Summary Bar */}
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-3 pt-1 border-t border-slate-800 text-[11px]">
                   <div>
                     <span className="text-slate-400 block text-[10px]">
-                      Net Base ({totals.isVatable ? "÷ 1.12" : "Full"}):
+                      Total Direct Base:
                     </span>
                     <span className="font-mono font-bold text-slate-200">
                       ₱{fmtPeso(totals.directCostNetBase)}
@@ -4241,7 +4637,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">
-                      5% Final VAT ({totals.isVatable ? "5% of Net" : "0%"}):
+                      5% Total VAT:
                     </span>
                     <span className="font-mono font-bold text-red-400">
                       - ₱{fmtPeso(totals.directCostFinalVat5)}
@@ -4249,8 +4645,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">
-                      {totals.ewtRate}% EWT (
-                      {totals.isInfra ? "Infra" : "Goods"}):
+                      {totals.ewtRate}% Total EWT:
                     </span>
                     <span className="font-mono font-bold text-red-400">
                       - ₱{fmtPeso(totals.directCostEwt)}
@@ -4258,7 +4653,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">
-                      1% Retention Money:
+                      {totals.retentionRate}% Total Retention:
                     </span>
                     <span className="font-mono font-bold text-amber-400">
                       - ₱{fmtPeso(totals.directCostRetention)}
@@ -4291,8 +4686,8 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     <span className="font-bold text-white uppercase text-[11px] tracking-wide">
                       Direct Labor Cost &amp; Statutory Labor Taxes (At Bottom)
                     </span>
-                    <span className="text-[10px] text-blue-300 bg-blue-950 px-2 py-0.5 rounded border border-blue-500/30">
-                      Symmetric Taxes on Labor Component
+                    <span className="text-[10px] text-blue-300 bg-blue-950 px-2 py-0.5 rounded border border-blue-500/30 font-mono">
+                      Derived from Materials (₱{fmtPeso(totals.totalMaterial)})
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -4312,33 +4707,14 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
                       <Percent className="w-3.5 h-3.5 text-blue-400" />
-                      <span>Labor Rate:</span>
+                      <span>Labor Rate (% of Materials):</span>
                     </span>
                     <div className="flex items-center gap-1">
                       {[10, 15, 20, 25, 30, 35, 40].map((pct) => (
                         <button
                           key={`bottom-pct-${pct}`}
                           type="button"
-                          onClick={() => {
-                            setLaborPercentage(pct);
-                            const updatedDesc = laborWordsDescription.replace(
-                              /\(\d+% of Materials Cost\)/i,
-                              `(${pct}% of Materials Cost)`,
-                            );
-                            setLaborWordsDescription(updatedDesc);
-                            handleSaveState(
-                              undefined,
-                              undefined,
-                              undefined,
-                              undefined,
-                              undefined,
-                              undefined,
-                              {
-                                laborPercentage: pct,
-                                laborWordsDescription: updatedDesc,
-                              },
-                            );
-                          }}
+                          onClick={() => handleLaborRateChange(pct, true)}
                           className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold cursor-pointer transition ${
                             laborPercentage === pct
                               ? "bg-blue-600 text-white shadow"
@@ -4360,16 +4736,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                             0,
                             Math.min(100, parseFloat(e.target.value) || 0),
                           );
-                          setLaborPercentage(val);
-                          handleSaveState(
-                            undefined,
-                            undefined,
-                            undefined,
-                            undefined,
-                            undefined,
-                            undefined,
-                            { laborPercentage: val },
-                          );
+                          handleLaborRateChange(val);
                         }}
                         className="w-12 bg-transparent text-right font-mono font-bold text-white text-xs focus:outline-none"
                       />
@@ -4378,6 +4745,24 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
+                    <label
+                      className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-950 border border-slate-700 text-[11px] text-slate-300 cursor-pointer select-none"
+                      title="When active, row Labor Cost updates automatically whenever Material Cost is modified"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={autoSyncLaborWithMaterials}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setAutoSyncLaborWithMaterials(checked);
+                          if (checked) {
+                            handleApplyLaborPercentageToAll(laborPercentage);
+                          }
+                        }}
+                        className="rounded border-slate-600 text-blue-500 focus:ring-0 w-3.5 h-3.5"
+                      />
+                      <span>Auto-derive from Materials</span>
+                    </label>
                     <button
                       type="button"
                       onClick={() => handleAddLaborCostItem()}
@@ -4491,18 +4876,18 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-[11px] pt-1">
                   <div>
                     <span className="text-slate-400 block text-[10px]">
-                      Total Labor Cost:
+                      Materials Base:
                     </span>
-                    <span className="font-mono font-bold text-white">
-                      ₱{fmtPeso(totals.totalLabor)}
+                    <span className="font-mono font-bold text-blue-300">
+                      ₱{fmtPeso(totals.totalMaterial)}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">
-                      Labor Base ({totals.isVatable ? "÷ 1.12" : "Full"}):
+                      Labor ({laborPercentage}% of Mat):
                     </span>
-                    <span className="font-mono font-bold text-slate-300">
-                      ₱{fmtPeso(totals.laborNetBase)}
+                    <span className="font-mono font-bold text-white">
+                      ₱{fmtPeso(totals.totalLabor)}
                     </span>
                   </div>
                   <div>
@@ -4523,7 +4908,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px]">
-                      1% Labor Retention:
+                      {totals.retentionRate}% Labor Retention:
                     </span>
                     <span className="font-mono font-bold text-amber-400">
                       - ₱{fmtPeso(totals.laborRetention)}
@@ -4569,18 +4954,28 @@ export const POWModalContent: React.FC<PowModalProps> = ({
 
                   <div className="space-y-3 text-xs">
                     <div className="flex justify-between py-1.5 border-b border-slate-800/60">
-                      <span className="text-slate-400">
-                        1. Total Material Cost:
-                      </span>
-                      <span className="font-mono font-semibold text-white">
+                      <div>
+                        <span className="text-slate-200 font-semibold block">
+                          1. Total Material Cost (Base):
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          Primary origin where labor cost &amp; taxes are derived
+                        </span>
+                      </div>
+                      <span className="font-mono font-bold text-white text-sm">
                         ₱{fmtPeso(totals.totalMaterial)}
                       </span>
                     </div>
                     <div className="flex justify-between py-1.5 border-b border-slate-800/60">
-                      <span className="text-slate-400">
-                        2. Total Labor Cost:
-                      </span>
-                      <span className="font-mono font-semibold text-white">
+                      <div>
+                        <span className="text-slate-200 font-semibold block">
+                          2. Total Labor Cost ({laborPercentage}% of Mat):
+                        </span>
+                        <span className="text-[10px] text-blue-400 font-mono">
+                          ₱{fmtPeso(totals.totalMaterial)} × {laborPercentage}%
+                        </span>
+                      </div>
+                      <span className="font-mono font-bold text-white text-sm">
                         ₱{fmtPeso(totals.totalLabor)}
                       </span>
                     </div>
@@ -4651,6 +5046,22 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                       </span>
                       <span className="font-mono font-semibold text-white">
                         ₱{fmtPeso(totals.totalVat)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-800/60">
+                      <span className="text-slate-400">
+                        5. Retention Money (RET):
+                      </span>
+                      <span className="font-mono font-semibold text-white">
+                        ₱{fmtPeso(totals.totalRetention)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-slate-800/60">
+                      <span className="text-slate-400">
+                        6. Warranty Mark Up (W.M):
+                      </span>
+                      <span className="font-mono font-semibold text-white">
+                        ₱{fmtPeso(totals.totalWarranty)}
                       </span>
                     </div>
                     <div className="flex justify-between pt-2 text-sm font-bold text-amber-300">
@@ -4829,7 +5240,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-800/80 text-amber-400">
                     <span>
-                      3. 1% Mandatory Retention Money (RA 9184 &amp; RA 12009):
+                      3. {totals.retentionRate}% Mandatory Retention Money (RA 9184 &amp; RA 12009):
                     </span>
                     <span className="font-mono font-bold">
                       - ₱{fmtPeso(totals.directCostRetention)}
@@ -4855,7 +5266,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                       This represents the net government payment released to the
                       contractor after BIR mandatory tax withholdings (
                       {totals.isVatable ? "5% VAT + " : ""}
-                      {totals.ewtRate}% EWT) and 1% statutory retention money
+                      {totals.ewtRate}% EWT) and {totals.retentionRate}% statutory retention money
                       pursuant to RA 9184 &amp; RA 12009.
                     </p>
                   </div>
@@ -4902,6 +5313,29 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                   </button>
                   <span className="text-[11px] font-mono text-blue-300 bg-blue-950 px-2.5 py-0.5 rounded border border-blue-500/30">
                     {laborPercentage}% Labor Rate
+                  </span>
+                </div>
+              </div>
+
+              {/* Formula Connection Banner */}
+              <div className="p-3 rounded-xl bg-blue-950/40 border border-blue-500/30 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-blue-400" />
+                  <span className="text-slate-200 font-semibold">
+                    Derivation from Materials:
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 font-mono text-[11px]">
+                  <span className="text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">
+                    Materials: ₱{fmtPeso(totals.totalMaterial)}
+                  </span>
+                  <span className="text-blue-400 font-bold">×</span>
+                  <span className="text-blue-300 bg-blue-950 px-2 py-0.5 rounded border border-blue-500/40 font-bold">
+                    {laborPercentage}% Labor Rate
+                  </span>
+                  <span className="text-emerald-400 font-bold">=</span>
+                  <span className="text-emerald-300 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-500/40 font-bold">
+                    Labor: ₱{fmtPeso(totals.totalLabor)}
                   </span>
                 </div>
               </div>
@@ -4968,7 +5402,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     </span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-800/80 text-amber-400">
-                    <span>3. 1% Labor Retention Money:</span>
+                    <span>3. {totals.retentionRate}% Labor Retention Money:</span>
                     <span className="font-mono font-bold">
                       - ₱{fmtPeso(totals.laborRetention)}
                     </span>
@@ -4993,7 +5427,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                       Symmetric government tax computation applied specifically
                       to the project labor force and technical service component
                       ({totals.isVatable ? "5% VAT + " : ""}
-                      {totals.ewtRate}% EWT + 1% Retention).
+                      {totals.ewtRate}% EWT + {totals.retentionRate}% Retention).
                     </p>
                   </div>
                   <div className="pt-4 border-t border-slate-800/80 mt-4 text-[11px] text-slate-300 flex justify-between">
@@ -5332,92 +5766,14 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                         {implementingOffice}
                       </p>
                       <p className="text-[9pt] italic">{projectLocation}</p>
-                      <div className="pt-2">
+                      <div className="pt-2 mb-3">
                         <h1 className="text-[14pt] font-black uppercase tracking-wider underline">
                           PROGRAM OF WORK (POW)
                         </h1>
                         <p className="text-[8.5pt] font-bold uppercase tracking-wider">
                           (DETAILED COST ESTIMATE &amp; SCOPE OF WORK BREAKDOWN)
                         </p>
-                        <div className="flex items-center justify-center gap-3 pt-1 text-[8pt] font-mono">
-                          <span className="font-bold text-blue-950">
-                            Tracking ID: {trackingNumber}
-                          </span>
-                          <span>•</span>
-                          <span
-                            className={
-                              approvalStatus === "APPROVED"
-                                ? "text-emerald-700 font-bold"
-                                : approvalStatus === "PENDING_APPROVAL"
-                                  ? "text-blue-700 font-bold"
-                                  : "text-amber-700 font-bold"
-                            }
-                          >
-                            Status:{" "}
-                            {approvalStatus === "APPROVED"
-                              ? `OFFICIALLY APPROVED (${approvedAt || todayStr})`
-                              : approvalStatus === "PENDING_APPROVAL"
-                                ? "PENDING OWNER REVIEW"
-                                : "DRAFT ESTIMATE (UNAPPROVED)"}
-                          </span>
-                        </div>
                       </div>
-
-                      {/* Official Approval Stamp / Clearance Block */}
-                      {approvalStatus === "APPROVED" ? (
-                        <div className="mt-2.5 mx-auto max-w-lg border-2 border-emerald-700 bg-emerald-50/90 p-2 rounded text-emerald-950 text-[7.5pt] flex items-center justify-between font-sans">
-                          <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-emerald-700 text-white font-black flex items-center justify-center text-[10px]">
-                              ✓
-                            </span>
-                            <div className="text-left">
-                              <p className="font-black uppercase tracking-wider text-[8pt] text-emerald-900 leading-tight">
-                                OFFICIALLY APPROVED &amp; AUTHORIZED FOR
-                                PROCUREMENT
-                              </p>
-                              <p className="text-[6.5pt] text-emerald-800">
-                                Approved by:{" "}
-                                <strong>
-                                  {approvedByUserName || approvedByName}
-                                </strong>{" "}
-                                ({approvedByRole || "Company Owner"}) • Verified
-                                on: {approvedAt || todayStr}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="font-mono text-[7pt] font-bold text-emerald-900 border border-emerald-600 px-2 py-0.5 rounded bg-emerald-100 uppercase">
-                            OFFICIAL RELEASE
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="mt-2.5 mx-auto max-w-lg border-2 border-dashed border-amber-600 bg-amber-50/90 p-2 rounded text-amber-950 text-[7.5pt] flex items-center justify-between font-sans">
-                          <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-amber-600 text-white font-black flex items-center justify-center text-[10px]">
-                              !
-                            </span>
-                            <div className="text-left">
-                              <p className="font-black uppercase tracking-wider text-[8pt] text-amber-900 leading-tight">
-                                {approvalStatus === "PENDING_APPROVAL"
-                                  ? "PENDING HIGHER MANAGEMENT REVIEW & APPROVAL"
-                                  : "DRAFT ESTIMATE — NOT VALID FOR OFFICIAL SUBMISSION"}
-                              </p>
-                              <p className="text-[6.5pt] text-amber-800">
-                                Prepared by:{" "}
-                                <strong>
-                                  {submittedByUserName || preparedByName}
-                                </strong>{" "}
-                                • Official printing and BAC submission gated
-                                until Owner / Manager sign-off.
-                              </p>
-                            </div>
-                          </div>
-                          <span className="font-mono text-[7pt] font-bold text-amber-900 border border-amber-600 px-2 py-0.5 rounded bg-amber-100 uppercase">
-                            {approvalStatus === "PENDING_APPROVAL"
-                              ? "REVIEW PENDING"
-                              : "DRAFT"}
-                          </span>
-                        </div>
-                      )}
                     </div>
 
                     <table className="w-full text-[8.5pt] mb-4 border-collapse">
@@ -5489,6 +5845,8 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                             EW.TAX
                           </th>
                           <th className="border border-black p-1 w-12">VAT</th>
+                          <th className="border border-black p-1 w-12">RET</th>
+                          <th className="border border-black p-1 w-12">W.M</th>
                           <th className="border border-black p-1 w-24">
                             Total Cost
                           </th>
@@ -5528,6 +5886,12 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                             <td className="border border-black p-1 text-right font-mono">
                               {it.vatRate}%
                             </td>
+                            <td className="border border-black p-1 text-right font-mono">
+                              {it.retentionRate ?? 0}%
+                            </td>
+                            <td className="border border-black p-1 text-right font-mono">
+                              {it.warrantyRate ?? 0}%
+                            </td>
                             <td className="border border-black p-1 text-right font-mono font-bold">
                               ₱{fmtPeso(it.totalCost)}
                             </td>
@@ -5552,7 +5916,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                             ₱{fmtPeso(totals.totalDirect)}
                           </td>
                           <td
-                            colSpan={4}
+                            colSpan={6}
                             className="border border-black p-1.5 text-right font-mono"
                           >
                             ₱{fmtPeso(totals.totalIndirect)}
@@ -5573,16 +5937,16 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                     <div className="grid grid-cols-2 gap-4 text-[8pt] border border-black p-2.5 mb-5 bg-slate-50">
                       <div>
                         <p className="font-bold underline mb-1">
-                          A. DIRECT COST BREAKDOWN:
+                          A. DIRECT COST BREAKDOWN (MATERIALS BASELINE):
                         </p>
                         <div className="flex justify-between py-0.5">
-                          <span>Materials Total:</span>
-                          <span className="font-mono font-semibold">
+                          <span>Materials Total (Foundation Base):</span>
+                          <span className="font-mono font-bold text-blue-950">
                             ₱{fmtPeso(totals.totalMaterial)}
                           </span>
                         </div>
                         <div className="flex justify-between py-0.5">
-                          <span>Labor Total:</span>
+                          <span>Labor Total ({laborPercentage}% of Materials Base):</span>
                           <span className="font-mono font-semibold">
                             ₱{fmtPeso(totals.totalLabor)}
                           </span>
@@ -5635,6 +5999,18 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                             ₱{fmtPeso(totals.totalVat)}
                           </span>
                         </div>
+                        <div className="flex justify-between py-0.5">
+                          <span>Statutory Retention Money (RET):</span>
+                          <span className="font-mono font-semibold">
+                            ₱{fmtPeso(totals.totalRetention)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-0.5">
+                          <span>Warranty Mark Up (W.M):</span>
+                          <span className="font-mono font-semibold">
+                            ₱{fmtPeso(totals.totalWarranty)}
+                          </span>
+                        </div>
                         <div className="flex justify-between pt-1 border-t border-black font-bold">
                           <span>Total Program of Work (Grand Total):</span>
                           <span className="font-mono text-[9pt]">
@@ -5653,7 +6029,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                         </p>
                         <div className="flex justify-between py-0.5">
                           <span>
-                            Tax Base (
+                            Direct Cost Tax Base (
                             {totals.isVatable
                               ? "Direct Cost ÷ 1.12"
                               : "Full Base"}
@@ -5661,6 +6037,14 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                           </span>
                           <span className="font-mono font-semibold">
                             ₱{fmtPeso(totals.directCostNetBase)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-0.5 text-slate-700 text-[7pt]">
+                          <span>
+                            ↳ Materials Tax Base (Goods - 1% EWT Base):
+                          </span>
+                          <span className="font-mono">
+                            ₱{fmtPeso(totals.materialsNetBase)}
                           </span>
                         </div>
                         <div className="flex justify-between py-0.5 text-red-800">
@@ -5682,7 +6066,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                           </span>
                         </div>
                         <div className="flex justify-between py-0.5 text-red-800">
-                          <span>1% Mandatory Retention Money (RA 9184):</span>
+                          <span>{totals.retentionRate}% Mandatory Retention Money (RA 9184 &amp; RA 12009):</span>
                           <span className="font-mono font-semibold">
                             - ₱{fmtPeso(totals.directCostRetention)}
                           </span>
@@ -5697,8 +6081,11 @@ export const POWModalContent: React.FC<PowModalProps> = ({
 
                       <div className="pt-2 border-t border-black">
                         <p className="font-bold underline mb-0.5">
-                          D. DIRECT LABOR COST &amp; LABOR TAXES (AT BOTTOM):
+                          D. DIRECT LABOR COST &amp; LABOR TAXES (DERIVED FROM MATERIALS):
                         </p>
+                        <div className="text-[6.8pt] text-blue-900 font-bold bg-blue-50/80 px-1.5 py-0.5 rounded border border-blue-200 mb-1 leading-tight">
+                          Derivation: ₱{fmtPeso(totals.totalMaterial)} (Total Materials) × {laborPercentage}% = ₱{fmtPeso(totals.totalLabor)}
+                        </div>
                         <div className="text-[6.8pt] text-slate-700 italic mb-0.5 leading-tight">
                           Scope Specification: {laborWordsDescription}
                         </div>
@@ -5706,7 +6093,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                           Labor Amount in Words: {activeLaborWords}
                         </div>
                         <div className="flex justify-between py-0.5">
-                          <span>Total Direct Labor Component:</span>
+                          <span>Total Direct Labor Component ({laborPercentage}% of Materials):</span>
                           <span className="font-mono font-semibold">
                             ₱{fmtPeso(totals.totalLabor)}
                           </span>
@@ -5736,7 +6123,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                           </span>
                         </div>
                         <div className="flex justify-between py-0.5 text-red-800">
-                          <span>1% Labor Retention Money:</span>
+                          <span>{totals.retentionRate}% Labor Retention Money:</span>
                           <span className="font-mono font-semibold">
                             - ₱{fmtPeso(totals.laborRetention)}
                           </span>
@@ -5820,7 +6207,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                         TIN: {contractorTin} | PhilGEPS Registration No.:{" "}
                         {contractorPhilgeps}
                       </p>
-                      <div className="pt-2">
+                      <div className="pt-2 mb-3">
                         <h1 className="text-[13pt] font-black uppercase tracking-wider underline">
                           FORMAL PRICE QUOTATION &amp; CANVASS OFFER
                         </h1>
@@ -5828,85 +6215,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                           (Pursuant to Alternative Methods of Procurement under
                           RA 9184 &amp; RA 12009 NGPA)
                         </p>
-                        <div className="flex items-center justify-center gap-3 pt-1 text-[8pt] font-mono">
-                          <span className="font-bold text-blue-950">
-                            Tracking ID: {trackingNumber}
-                          </span>
-                          <span>•</span>
-                          <span
-                            className={
-                              approvalStatus === "APPROVED"
-                                ? "text-emerald-700 font-bold"
-                                : approvalStatus === "PENDING_APPROVAL"
-                                  ? "text-blue-700 font-bold"
-                                  : "text-amber-700 font-bold"
-                            }
-                          >
-                            Status:{" "}
-                            {approvalStatus === "APPROVED"
-                              ? `OFFICIALLY APPROVED (${approvedAt || todayStr})`
-                              : approvalStatus === "PENDING_APPROVAL"
-                                ? "PENDING OWNER REVIEW"
-                                : "DRAFT QUOTATION (UNAPPROVED)"}
-                          </span>
-                        </div>
                       </div>
-
-                      {/* Official Approval Stamp / Clearance Block */}
-                      {approvalStatus === "APPROVED" ? (
-                        <div className="mt-2.5 mx-auto max-w-lg border-2 border-emerald-700 bg-emerald-50/90 p-2 rounded text-emerald-950 text-[7.5pt] flex items-center justify-between font-sans">
-                          <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-emerald-700 text-white font-black flex items-center justify-center text-[10px]">
-                              ✓
-                            </span>
-                            <div className="text-left">
-                              <p className="font-black uppercase tracking-wider text-[8pt] text-emerald-900 leading-tight">
-                                OFFICIALLY APPROVED &amp; AUTHORIZED CANVASS
-                                OFFER
-                              </p>
-                              <p className="text-[6.5pt] text-emerald-800">
-                                Approved by:{" "}
-                                <strong>
-                                  {approvedByUserName || approvedByName}
-                                </strong>{" "}
-                                ({approvedByRole || "Company Owner"}) • Verified
-                                on: {approvedAt || todayStr}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="font-mono text-[7pt] font-bold text-emerald-900 border border-emerald-600 px-2 py-0.5 rounded bg-emerald-100 uppercase">
-                            OFFICIAL RELEASE
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="mt-2.5 mx-auto max-w-lg border-2 border-dashed border-amber-600 bg-amber-50/90 p-2 rounded text-amber-950 text-[7.5pt] flex items-center justify-between font-sans">
-                          <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-amber-600 text-white font-black flex items-center justify-center text-[10px]">
-                              !
-                            </span>
-                            <div className="text-left">
-                              <p className="font-black uppercase tracking-wider text-[8pt] text-amber-900 leading-tight">
-                                {approvalStatus === "PENDING_APPROVAL"
-                                  ? "PENDING HIGHER MANAGEMENT REVIEW & APPROVAL"
-                                  : "DRAFT QUOTATION — NOT VALID FOR OFFICIAL SUBMISSION"}
-                              </p>
-                              <p className="text-[6.5pt] text-amber-800">
-                                Prepared by:{" "}
-                                <strong>
-                                  {submittedByUserName || preparedByName}
-                                </strong>{" "}
-                                • Official printing and submission gated until
-                                Owner / Manager sign-off.
-                              </p>
-                            </div>
-                          </div>
-                          <span className="font-mono text-[7pt] font-bold text-amber-900 border border-amber-600 px-2 py-0.5 rounded bg-amber-100 uppercase">
-                            {approvalStatus === "PENDING_APPROVAL"
-                              ? "REVIEW PENDING"
-                              : "DRAFT"}
-                          </span>
-                        </div>
-                      )}
                     </div>
 
                     {/* Quotation Details Header */}
@@ -6034,6 +6343,9 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                             : "NON-VAT REGISTERED"}
                           ):
                         </p>
+                        <div className="text-[6.8pt] text-blue-900 bg-blue-50/80 px-1.5 py-0.5 rounded border border-blue-200 mb-1 leading-tight font-medium">
+                          Materials Base: ₱{fmtPeso(totals.totalMaterial)} | Labor ({laborPercentage}% of Mat): ₱{fmtPeso(totals.totalLabor)}
+                        </div>
                         <div className="flex justify-between py-0.5">
                           <span>Gross Quotation Amount:</span>
                           <span className="font-mono font-semibold">
@@ -6047,6 +6359,14 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                           </span>
                           <span className="font-mono font-semibold">
                             ₱{fmtPeso(totals.directCostNetBase)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-0.5 text-slate-700 text-[6.8pt]">
+                          <span>
+                            ↳ Materials Tax Base (Goods - 1% EWT Base):
+                          </span>
+                          <span className="font-mono">
+                            ₱{fmtPeso(totals.materialsNetBase)}
                           </span>
                         </div>
                         <div className="flex justify-between py-0.5 text-red-800">
@@ -6072,7 +6392,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                         </div>
                         <div className="flex justify-between py-0.5 text-red-800">
                           <span>
-                            Less: 1% Statutory Retention Money (RA 9184):
+                            Less: {totals.retentionRate}% Statutory Retention Money (RA 9184 &amp; RA 12009):
                           </span>
                           <span className="font-mono font-semibold">
                             - ₱{fmtPeso(totals.directCostRetention)}
@@ -6088,8 +6408,11 @@ export const POWModalContent: React.FC<PowModalProps> = ({
 
                       <div>
                         <p className="font-bold underline mb-0.5">
-                          DIRECT LABOR COST &amp; LABOR TAXES (AT BOTTOM):
+                          DIRECT LABOR COST &amp; LABOR TAXES (DERIVED FROM MATERIALS):
                         </p>
+                        <div className="text-[6.8pt] text-blue-900 font-bold bg-blue-50/80 px-1.5 py-0.5 rounded border border-blue-200 mb-1 leading-tight">
+                          Derivation: ₱{fmtPeso(totals.totalMaterial)} (Total Materials) × {laborPercentage}% = ₱{fmtPeso(totals.totalLabor)}
+                        </div>
                         <div className="text-[6.8pt] text-slate-700 italic mb-0.5 leading-tight">
                           Scope Specification: {laborWordsDescription}
                         </div>
@@ -6097,7 +6420,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                           Labor Amount in Words: {activeLaborWords}
                         </div>
                         <div className="flex justify-between py-0.5">
-                          <span>Total Labor Component:</span>
+                          <span>Total Labor Component ({laborPercentage}% of Materials):</span>
                           <span className="font-mono font-semibold">
                             ₱{fmtPeso(totals.totalLabor)}
                           </span>
@@ -6127,7 +6450,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                           </span>
                         </div>
                         <div className="flex justify-between py-0.5 text-red-800">
-                          <span>Less: 1% Labor Retention Money:</span>
+                          <span>Less: {totals.retentionRate}% Labor Retention Money:</span>
                           <span className="font-mono font-semibold">
                             - ₱{fmtPeso(totals.laborRetention)}
                           </span>
@@ -6706,6 +7029,49 @@ export const POWModalContent: React.FC<PowModalProps> = ({
 
             {/* Body */}
             <div className="p-6 overflow-y-auto space-y-5 text-xs">
+              {/* 0. Total Materials Foundation Baseline Card */}
+              <div className="p-4 rounded-xl bg-linear-to-r from-blue-950/60 via-slate-900 to-slate-900 border border-blue-500/40 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-blue-400" />
+                    <span className="font-bold text-white text-xs uppercase tracking-wide">
+                      Total Materials Baseline (Source for Labor &amp; Taxes)
+                    </span>
+                  </div>
+                  <span className="font-mono text-sm font-black text-blue-300">
+                    ₱{fmtPeso(totals.totalMaterial)}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  In Philippine government procurement estimation, Total Materials forms the foundational baseline from which Direct Labor Cost and statutory BIR tax schedules (Goods EWT 1%, Services EWT 2%, Final VAT 5%, and Retention {totals.retentionRate}%) are derived.
+                </p>
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800">
+                  <div className="flex items-center gap-2 font-mono text-xs">
+                    <span className="text-slate-400">Formula:</span>
+                    <span className="text-white font-bold">₱{fmtPeso(totals.totalMaterial)}</span>
+                    <span className="text-blue-400 font-bold">×</span>
+                    <span className="text-blue-300 font-bold">{laborPercentage}%</span>
+                    <span className="text-emerald-400 font-bold">=</span>
+                    <span className="text-emerald-400 font-bold">₱{fmtPeso(computedLaborByPercentage)}</span>
+                  </div>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={autoSyncLaborWithMaterials}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setAutoSyncLaborWithMaterials(checked);
+                        if (checked) {
+                          handleApplyLaborPercentageToAll(laborPercentage);
+                        }
+                      }}
+                      className="rounded border-slate-600 text-blue-500 focus:ring-0 w-3.5 h-3.5"
+                    />
+                    <span className="text-[11px] font-medium">Auto-sync row labor from materials</span>
+                  </label>
+                </div>
+              </div>
+
               {/* 1. Percentage Configuration */}
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
@@ -6854,35 +7220,68 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                 />
               </div>
 
-              {/* 4. Live Statutory Deductions Summary Card */}
-              <div className="p-4 rounded-xl bg-linear-to-br from-blue-950/40 via-slate-950 to-slate-950 border border-blue-500/30 text-xs space-y-2">
-                <span className="font-bold text-white uppercase text-[10px] tracking-wider block">
-                  Statutory Deductions Preview on {laborPercentage}% Labor (₱{fmtPeso(computedLaborByPercentage)}):
-                </span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                  <div className="p-2 rounded bg-slate-900 border border-slate-800">
-                    <span className="text-slate-400 block text-[10px]">Net Base (÷1.12):</span>
-                    <span className="font-mono font-bold text-slate-200">
-                      ₱{fmtPeso(totals.isVatable ? computedLaborByPercentage / 1.12 : computedLaborByPercentage)}
-                    </span>
+              {/* 4. Live Statutory Deductions Summary Card (Materials & Labor) */}
+              <div className="p-4 rounded-xl bg-linear-to-br from-blue-950/40 via-slate-950 to-slate-950 border border-blue-500/30 text-xs space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                  <span className="font-bold text-white uppercase text-[10px] tracking-wider block">
+                    Statutory Deductions Preview: Materials Base vs Derived Labor ({laborPercentage}%)
+                  </span>
+                  <span className="font-mono text-[10px] text-blue-300">
+                    RA 9184 / RA 12009 Statutory Deductions
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+                  {/* Materials Taxes */}
+                  <div className="p-2.5 rounded bg-slate-900 border border-slate-800 space-y-1">
+                    <div className="flex justify-between font-bold text-blue-300 border-b border-slate-800 pb-1 text-[10px]">
+                      <span>🧱 Materials Base (Goods)</span>
+                      <span className="font-mono">₱{fmtPeso(totals.totalMaterial)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-400 text-[10px]">
+                      <span>Net Base:</span>
+                      <span className="font-mono text-slate-200">₱{fmtPeso(totals.materialsNetBase)}</span>
+                    </div>
+                    <div className="flex justify-between text-red-400 text-[10px]">
+                      <span>5% VAT:</span>
+                      <span className="font-mono">-₱{fmtPeso(totals.materialsFinalVat5)}</span>
+                    </div>
+                    <div className="flex justify-between text-red-400 text-[10px]">
+                      <span>1% EWT (Goods):</span>
+                      <span className="font-mono">-₱{fmtPeso(totals.materialsEwt)}</span>
+                    </div>
+                    <div className="flex justify-between text-amber-400 text-[10px]">
+                      <span>{totals.retentionRate}% Retention:</span>
+                      <span className="font-mono">-₱{fmtPeso(totals.materialsRetention)}</span>
+                    </div>
                   </div>
-                  <div className="p-2 rounded bg-slate-900 border border-slate-800">
-                    <span className="text-slate-400 block text-[10px]">5% VAT:</span>
-                    <span className="font-mono font-bold text-red-400">
-                      -₱{fmtPeso(totals.isVatable ? (computedLaborByPercentage / 1.12) * 0.05 : 0)}
-                    </span>
-                  </div>
-                  <div className="p-2 rounded bg-slate-900 border border-slate-800">
-                    <span className="text-slate-400 block text-[10px]">{totals.ewtRate}% EWT:</span>
-                    <span className="font-mono font-bold text-red-400">
-                      -₱{fmtPeso((totals.isVatable ? computedLaborByPercentage / 1.12 : computedLaborByPercentage) * (totals.ewtRate / 100))}
-                    </span>
-                  </div>
-                  <div className="p-2 rounded bg-slate-900 border border-slate-800">
-                    <span className="text-slate-400 block text-[10px]">1% Retention:</span>
-                    <span className="font-mono font-bold text-amber-400">
-                      -₱{fmtPeso(computedLaborByPercentage * 0.01)}
-                    </span>
+
+                  {/* Labor Taxes */}
+                  <div className="p-2.5 rounded bg-slate-900 border border-slate-800 space-y-1">
+                    <div className="flex justify-between font-bold text-emerald-300 border-b border-slate-800 pb-1 text-[10px]">
+                      <span>👷 Derived Labor (Services)</span>
+                      <span className="font-mono">₱{fmtPeso(computedLaborByPercentage)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-400 text-[10px]">
+                      <span>Net Base:</span>
+                      <span className="font-mono text-slate-200">
+                        ₱{fmtPeso(totals.isVatable ? computedLaborByPercentage / 1.12 : computedLaborByPercentage)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-red-400 text-[10px]">
+                      <span>5% VAT:</span>
+                      <span className="font-mono">-₱{fmtPeso(totals.isVatable ? (computedLaborByPercentage / 1.12) * 0.05 : 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-red-400 text-[10px]">
+                      <span>{totals.ewtRate}% EWT (Services):</span>
+                      <span className="font-mono">
+                        -₱{fmtPeso((totals.isVatable ? computedLaborByPercentage / 1.12 : computedLaborByPercentage) * (totals.ewtRate / 100))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-amber-400 text-[10px]">
+                      <span>{totals.retentionRate}% Retention:</span>
+                      <span className="font-mono">-₱{fmtPeso(computedLaborByPercentage * (totals.retentionRate / 100))}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -6904,6 +7303,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                       laborPercentage,
                       laborWordsDescription,
                       laborCustomWordsAmount: activeLaborWords,
+                      autoSyncLaborWithMaterials,
                     },
                   );
                   setShowLaborModal(false);
@@ -6929,6 +7329,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                         laborPercentage,
                         laborWordsDescription,
                         laborCustomWordsAmount: activeLaborWords,
+                        autoSyncLaborWithMaterials,
                       },
                     );
                     setShowLaborModal(false);
@@ -6954,6 +7355,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
                         laborPercentage,
                         laborWordsDescription,
                         laborCustomWordsAmount: activeLaborWords,
+                        autoSyncLaborWithMaterials,
                       },
                     );
                     setShowLaborModal(false);

@@ -1,19 +1,12 @@
 import React from 'react';
-import { FrontEnd3DShowcaseView } from '../3d/FrontEnd3DShowcaseView';
 import {
   ShieldCheck,
-  FileCheck2,
   Cpu,
   Layers,
   Sparkles,
   ArrowRight,
-  Lock,
-  Globe2,
   Building2,
-  FileText,
   Boxes,
-  CheckCircle,
-  ExternalLink,
   Zap
 } from 'lucide-react';
 
@@ -44,12 +37,11 @@ export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({
                   v2026.1
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-mono">Quantum Cloud Corporation • Philippine Gov Bidding</p>
+              <p className="text-[11px] text-slate-400 font-mono">Enterprise Philippine Gov Procurement</p>
             </div>
           </div>
 
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-            <a href="#3d-showcase" className="hover:text-cyan-400 transition-colors">3D Front-End Engine</a>
             <a href="#statutory-features" className="hover:text-cyan-400 transition-colors">RA 12009 Compliance</a>
             <a href="#packaging-standard" className="hover:text-cyan-400 transition-colors">Three-Layer Packaging</a>
             <a href="#node-backend" className="hover:text-cyan-400 transition-colors">Node.js API</a>
@@ -82,11 +74,11 @@ export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({
           </div>
 
           <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight">
-            Immersive 3D Procurement &amp; Statutory Bidding Engine
+            Philippine Government Statutory Bidding Engine
           </h1>
 
           <p className="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-            Engineered for <span className="text-white font-semibold">Quantum Cloud Corporation</span> under Republic Act No. 12009 (NGPA) &amp; RA 9184. Automated Three-Layer packaging, PhilGEPS radar, and zero-defect legal PDF compliance.
+            Engineered under Republic Act No. 12009 (NGPA) &amp; RA 9184. Automated Three-Layer packaging, PhilGEPS opportunity tracking, and zero-defect legal PDF compliance.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
@@ -106,11 +98,6 @@ export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({
               <span>Onboard New Tenant Company</span>
             </button>
           </div>
-        </div>
-
-        {/* 3. 3D SHOWCASE VIEWPORT COMPONENT */}
-        <div id="3d-showcase" className="mt-14">
-          <FrontEnd3DShowcaseView isStandalone={true} />
         </div>
       </section>
 
@@ -208,7 +195,7 @@ export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({
             <div className="w-6 h-6 rounded bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
               <Boxes className="w-3.5 h-3.5" />
             </div>
-            <span>BiDOCS • Quantum Cloud Corporation • La Trinidad, Benguet, Philippines</span>
+            <span>BiDOCS Enterprise • Philippine Government Procurement Architecture (RA 9184 &amp; RA 12009)</span>
           </div>
           <div className="font-mono">
             Governing Law: RA 12009 (NGPA) / RA 9184 • GPPB Res. No. 02-2025

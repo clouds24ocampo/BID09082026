@@ -200,25 +200,25 @@ export const OrganizationalChartModal: React.FC<OrganizationalChartModalProps> =
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
   // Project Metadata
-  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '2026-901283');
+  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '');
   const [projectTitle, setProjectTitle] = useState(
-    activeProjectTitle || 'Proposed Construction of Regional ICT Hub & Enterprise Infrastructure Project'
+    activeProjectTitle || ''
   );
   const [procuringEntity, setProcuringEntity] = useState(
-    activeProcuringEntity || 'Department of Information and Communications Technology (DICT)'
+    activeProcuringEntity || ''
   );
-  const [, setSolicitationNumber] = useState(initialSolNo || 'SOL-DICT-2026-089');
+  const [, setSolicitationNumber] = useState(initialSolNo || '');
   const [, setDateTimeSubmitted] = useState(initialDateTime || '');
 
   // Signatory details
   const [signatoryName, setSignatoryName] = useState(
-    tenant?.authorizedSignatory?.name || 'CLOUD OCAMPO'
+    tenant?.authorizedSignatory?.name || ''
   );
   const [signatoryTitle, setSignatoryTitle] = useState(
     tenant?.authorizedSignatory?.title || 'President & Authorized Managing Officer'
   );
   const [companyName, setCompanyName] = useState(
-    tenant?.companyName || 'QUANTUM CLOUD CORPORATION'
+    tenant?.companyName || ''
   );
 
   // Nodes State

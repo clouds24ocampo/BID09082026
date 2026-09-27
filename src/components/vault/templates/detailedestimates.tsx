@@ -144,18 +144,18 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
 
 
   // Fixed Read-Only Statutory Header Metadata (Derived from Official Project Creation)
-  const [projectName, setProjectName] = useState(activeProjectTitle || 'PROCUREMENT AND INSTALLATION OF CCTV AT PUROK 1-6');
-  const [projectLocation, setProjectLocation] = useState('BARANGAY TUNTUNGAN PUTO, LOS BAÑOS, LAGUNA');
-  const [ownerName, setOwnerName] = useState(activeProcuringEntity || 'BARANGAY TUNTUNGAN PUTO, LOS BAÑOS, LAGUNA');
-  const [contractorName, setContractorName] = useState(tenant?.companyName || 'Quantum Cloud Corporation');
-  const [companyAddress, setCompanyAddress] = useState(tenant?.address || 'Los Baños, Laguna');
-  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '2026-DET-EST-01');
-  const [solicitationNumber, setSolicitationNumber] = useState('SOL-2026-001');
+  const [projectName, setProjectName] = useState(activeProjectTitle || '');
+  const [projectLocation, setProjectLocation] = useState(activeProcuringEntity || '');
+  const [ownerName, setOwnerName] = useState(activeProcuringEntity || '');
+  const [contractorName, setContractorName] = useState(tenant?.companyName || '');
+  const [companyAddress, setCompanyAddress] = useState(tenant?.address || '');
+  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '');
+  const [solicitationNumber, setSolicitationNumber] = useState('');
   const [estimateDate, setEstimateDate] = useState(todayStr);
 
   // Signatory & Conforme Parameters (100% Automated from Tenant Company Profile & Section VI/VII)
-  const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || 'MARK-VIN F. OCAMPO');
-  const [signatoryTitle, setSignatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'PRESIDENT');
+  const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || '');
+  const [signatoryTitle, setSignatoryTitle] = useState(tenant?.authorizedSignatory?.title || 'AUTHORIZED SIGNATORY');
   const [bidSecurityType, setBidSecurityType] = useState('BID SECURING DECLARATION');
   const [bidSecurityAmount, setBidSecurityAmount] = useState<number>(0);
   const [deliverySchedule, setDeliverySchedule] = useState('30 Calendar Days upon receipt of NTP');
@@ -1692,10 +1692,10 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
                             <div className="space-y-0.5">
                               <p className="font-bold">VERY TRULY YOURS,</p>
                               <p className="font-black text-[8.5pt] uppercase text-slate-950 inline-block pb-0.5 mt-2">
-                                {signatoryName || 'MARK-VIN F. OCAMPO'}
+                                {signatoryName || ''}
                               </p>
                               <p className="font-bold uppercase text-[7pt]">{signatoryTitle || 'AUTHORIZED REPRESENTATIVE'}</p>
-                              <p className="font-extrabold uppercase text-[7.5pt]">{contractorName || 'QUANTUM CLOUD CORPORATION'}</p>
+                              <p className="font-extrabold uppercase text-[7.5pt]">{contractorName || ''}</p>
                             </div>
                             <div className="text-right font-mono text-[7pt] text-slate-700">
                               <p>Submission Date:</p>

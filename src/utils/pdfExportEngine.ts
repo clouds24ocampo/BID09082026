@@ -731,9 +731,6 @@ export async function buildMergedThreeLayerPdfBytes(
               pdfDoc.addPage(copiedPage);
             });
           } else {
-            const titleBlob = `${docTitle} ${unit.documentCode || ''} ${unit.fileName || ''} ${unit.documentName || ''}`.toLowerCase();
-            const isLicenseScan = /pcab|mayor|business permit|tax clearance|license|bir|2303/.test(titleBlob);
-
             for (const copiedPage of copiedPages) {
               const origW = copiedPage.getWidth();
               const origH = copiedPage.getHeight();
@@ -744,9 +741,6 @@ export async function buildMergedThreeLayerPdfBytes(
               const targetSize: [number, number] = isLandscape ? LEGAL_LANDSCAPE : LEGAL_PORTRAIT;
               const targetW = targetSize[0];
               const targetH = targetSize[1];
-              const sourceAspect = visW / visH;
-              const targetAspect = targetW / targetH;
-              const aspectDelta = Math.abs(sourceAspect - targetAspect) / targetAspect;
 
               // Standard non-clipping scale: fit inside Legal sheet margins without truncating headers/footers
               const sx = origW > 0 ? targetW / origW : 1;

@@ -491,18 +491,18 @@ export const KeyPersonnelModal: React.FC<KeyPersonnelModalProps> = ({
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
   // Editable Document Metadata Fields
-  const [companyName, setCompanyName] = useState(tenant?.companyName || 'Quantum Cloud Corporation');
-  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || 'PhilGEPS-2026-001');
-  const [projectTitle, setProjectTitle] = useState(activeProjectTitle || 'PROPOSED INFRASTRUCTURE PROJECT');
-  const [procuringEntity, setProcuringEntity] = useState(activeProcuringEntity || 'Procuring Entity Name');
-  const [, setSolicitationNumber] = useState(propSolicitationNumber || 'SOL-2026-9901');
-  const [dateTimeSubmitted, setDateTimeSubmitted] = useState(propDateTimeSubmitted || todayStr);
+  const [companyName, setCompanyName] = useState(tenant?.companyName || '');
+  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '');
+  const [projectTitle, setProjectTitle] = useState(activeProjectTitle || '');
+  const [, setProcuringEntity] = useState(activeProcuringEntity || '');
+  const [, setSolicitationNumber] = useState(propSolicitationNumber || '');
+  const [, setDateTimeSubmitted] = useState(propDateTimeSubmitted || todayStr);
 
   const [signatoryName, setSignatoryName] = useState(
-    tenant?.authorizedSignatory?.name || (tenant as any)?.name || 'Authorized Signatory'
+    tenant?.authorizedSignatory?.name || (tenant as any)?.name || ''
   );
   const [signatoryTitle, setSignatoryTitle] = useState(
-    tenant?.authorizedSignatory?.title || 'President'
+    tenant?.authorizedSignatory?.title || 'Authorized Managing Officer'
   );
 
   // Sync with tenant whenever it updates

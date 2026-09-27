@@ -38,20 +38,32 @@ export const PackagingCoversView: React.FC = () => {
   const [selectedSeparatorCategory, setSelectedSeparatorCategory] = useState<'LEGAL' | 'TECHNICAL' | 'FINANCIAL'>('LEGAL');
 
   // Configuration Form State (Live Editable)
-  const [companyName, setCompanyName] = useState(currentTenant?.companyName || 'QUANTUM CLOUD CORPORATION');
-  const [companyAddress, setCompanyAddress] = useState(currentTenant?.address || 'La Trinidad, Benguet, Cordillera Administrative Region, Philippines');
-  const [tin, setTin] = useState(currentTenant?.tin || '000-000-000-000');
-  const [philgepsPlatinumNo, setPhilgepsPlatinumNo] = useState(currentTenant?.philgepsPlatinumNo || '202106-237062-883905538');
+  const [companyName, setCompanyName] = useState(currentTenant?.companyName || '');
+  const [companyAddress, setCompanyAddress] = useState(currentTenant?.address || '');
+  const [tin, setTin] = useState(currentTenant?.tin || '');
+  const [philgepsPlatinumNo, setPhilgepsPlatinumNo] = useState(currentTenant?.philgepsPlatinumNo || '');
   
-  const [procuringEntity, setProcuringEntity] = useState('MUNICIPALITY OF LA TRINIDAD');
-  const [projectTitle, setProjectTitle] = useState('SUPPLY, DELIVERY, INSTALLATION, TESTING, AND CONFIGURATION OF ICT EQUIPMENT, PERIPHERALS, SYSTEMS AND SOFTWARE FOR THE LA TRINIDAD COMMUNICATION, INFORMATION & NETWORK HUB');
-  const [projectRefNo, setProjectRefNo] = useState('12795242');
-  const [solicitationNo, setSolicitationNo] = useState('2025-12-4162-MO');
-  const [abc, setAbc] = useState('₱12,500,000.00');
-  const [submissionDeadline, setSubmissionDeadline] = useState('September 30, 2026 at 10:00 AM');
+  const [procuringEntity, setProcuringEntity] = useState('');
+  const [projectTitle, setProjectTitle] = useState('');
+  const [projectRefNo, setProjectRefNo] = useState('');
+  const [solicitationNo, setSolicitationNo] = useState('');
+  const [abc, setAbc] = useState('');
+  const [submissionDeadline, setSubmissionDeadline] = useState('');
   
-  const [signatoryName, setSignatoryName] = useState(currentTenant?.authorizedSignatory?.name || 'Mark-Vin F. Ocampo');
-  const [signatoryTitle, setSignatoryTitle] = useState('President & Authorized Managing Officer (AMO)');
+  const [signatoryName, setSignatoryName] = useState(currentTenant?.authorizedSignatory?.name || '');
+  const [signatoryTitle, setSignatoryTitle] = useState(currentTenant?.authorizedSignatory?.title || 'President & Authorized Managing Officer (AMO)');
+
+  // Sync tenant changes dynamically
+  useEffect(() => {
+    if (currentTenant) {
+      if (currentTenant.companyName) setCompanyName(currentTenant.companyName);
+      if (currentTenant.address) setCompanyAddress(currentTenant.address);
+      if (currentTenant.tin) setTin(currentTenant.tin);
+      if (currentTenant.philgepsPlatinumNo) setPhilgepsPlatinumNo(currentTenant.philgepsPlatinumNo);
+      if (currentTenant.authorizedSignatory?.name) setSignatoryName(currentTenant.authorizedSignatory.name);
+      if (currentTenant.authorizedSignatory?.title) setSignatoryTitle(currentTenant.authorizedSignatory.title);
+    }
+  }, [currentTenant]);
 
   // UI Drawer State
   const [showConfigDrawer, setShowConfigDrawer] = useState(false);

@@ -51,8 +51,8 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
 
   // Form State
   const todayStr = new Date().toISOString().split('T')[0];
-  const [projectTitle, setProjectTitle] = useState(activeProjectTitle || 'Procurement of High-Capacity Network Switches & Firewall Security');
-  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '01-INFRA-2026');
+  const [projectTitle, setProjectTitle] = useState(activeProjectTitle || '');
+  const [projectRefNo, setProjectRefNo] = useState(activeProjectRefNo || '');
   const [, setProcuringEntity] = useState(activeProcuringEntity || '');
   const [bidderName, setBidderName] = useState(tenant?.companyName || '');
   const [signatoryName, setSignatoryName] = useState(tenant?.authorizedSignatory?.name || '');
@@ -701,7 +701,7 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
                         type="text"
                         value={bidderName}
                         onChange={(e) => setBidderName(e.target.value)}
-                        placeholder="e.g. Quantum Cloud Corporation"
+                        placeholder="e.g. Enterprise / Bidder Name"
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-bold"
                       />
                     </div>
@@ -712,7 +712,7 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
                         type="text"
                         value={projectTitle}
                         onChange={(e) => setProjectTitle(e.target.value)}
-                        placeholder="e.g. Procurement and Installation of CCTV at Purok 1-6"
+                        placeholder="e.g. Project Title / Description"
                         className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-semibold"
                       />
                     </div>
@@ -883,11 +883,11 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
                               <div className="flex items-center gap-6">
                                 <div>
                                   <span className="font-bold">Name of Bidder : </span>
-                                  <span className="font-bold uppercase underline text-black">{bidderName || 'Quantum Cloud Corporation'}</span>
+                                  <span className="font-bold uppercase underline text-black">{bidderName || ''}</span>
                                 </div>
                                 <div>
                                   <span className="font-bold">Project ID No. : </span>
-                                  <span className="font-bold font-mono underline text-black">{projectRefNo || '01-INFRA-2026'}</span>
+                                  <span className="font-bold font-mono underline text-black">{projectRefNo || 'N/A'}</span>
                                 </div>
                                 <div>
                                   <span className="font-bold">Page </span>
@@ -1108,7 +1108,7 @@ export const PriceScheduleModal: React.FC<PriceScheduleModalProps> = ({
 
                                   <div>
                                     <p className="text-black text-[9pt] font-bold">Duly authorized to sign Bid for and on behalf of:</p>
-                                    <p className="font-extrabold text-[10pt] uppercase text-black">{bidderName || 'Quantum Cloud Corporation'}</p>
+                                    <p className="font-extrabold text-[10pt] uppercase text-black">{bidderName || ''}</p>
                                   </div>
 
                                   <div>
