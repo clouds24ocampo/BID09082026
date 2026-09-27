@@ -1,7 +1,7 @@
 import { PDFDocument, degrees, rgb, StandardFonts } from 'pdf-lib';
 import html2canvas from 'html2canvas';
-import { debugLog } from './debugLog';
 import { yieldToMain } from './storageScalability';
+import { isFinancialEnvelopeDoc } from './envelopeClassification';
 
 export type PdfAttachmentSource = string | ArrayBuffer | Uint8Array | Blob;
 
@@ -210,6 +210,7 @@ export interface PdfExportOptions {
   projectRefNo?: string;
   projectTitle?: string;
   stampColor?: StampColor;
+  includeCoverSeparators?: boolean;
 }
 
 // Standard Legal Size Dimensions in Points (72 dpi):
@@ -217,6 +218,244 @@ export interface PdfExportOptions {
 // Landscape Legal: 13" x 8.5" = 936pt x 612pt
 const LEGAL_LANDSCAPE: [number, number] = [936, 612];
 const LEGAL_PORTRAIT: [number, number] = [612, 936];
+
+async function drawVectorCoverSeparator(
+  pdfDoc: PDFDocument,
+  unit: ExportDocumentUnit,
+  index: number,
+  options?: PdfExportOptions
+) {
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  const coverPage = pdfDoc.addPage(LEGAL_PORTRAIT);
+  const pageW = 612;
+  const pageH = 936;
+
+  // Outer border
+  coverPage.drawRectangle({
+    x: 24,
+    y: 24,
+    width: pageW - 48,
+    height: pageH - 48,
+    borderWidth: 2,
+    borderColor: rgb(0.1, 0.15, 0.25),
+    color: rgb(0.99, 0.99, 1)
+  });
+
+  // Inner border
+  coverPage.drawRectangle({
+    x: 28,
+    y: 28,
+    width: pageW - 56,
+    height: pageH - 56,
+    borderWidth: 0.75,
+    borderColor: rgb(0.2, 0.25, 0.35)
+  });
+
+  const docCode = unit.documentCode || '';
+  const docTitle = unit.title || unit.documentName || `Document ${index}`;
+  const isFinancial = isFinancialEnvelopeDoc(docCode, docTitle);
+  const envelopeLabel = isFinancial
+    ? 'ENVELOPE 2: FINANCIAL BID PROPOSAL'
+    : 'ENVELOPE 1: TECHNICAL & ELIGIBILITY COMPONENT';
+  const folderCopyLabel = options?.folderCopy === 'ORIGINAL'
+    ? 'ORIGINAL BID COPY'
+    : options?.folderCopy === 'COPY_1'
+      ? 'COPY 1 (DUPLICATE)'
+      : options?.folderCopy === 'COPY_2'
+        ? 'COPY 2 (TRIPLICATE)'
+        : (options?.folderCopy || 'OFFICIAL COPY');
+
+  // Header: Republic of the Philippines
+  const repStr = 'REPUBLIC OF THE PHILIPPINES';
+  const repW = fontBold.widthOfTextAtSize(repStr, 9);
+  coverPage.drawText(repStr, {
+    x: (pageW - repW) / 2,
+    y: pageH - 70,
+    size: 9,
+    font: fontBold,
+    color: rgb(0.3, 0.35, 0.45)
+  });
+
+  const procStr = 'GOVERNMENT PROCUREMENT BIDDING SUBMISSION';
+  const procW = fontBold.widthOfTextAtSize(procStr, 11);
+  coverPage.drawText(procStr, {
+    x: (pageW - procW) / 2,
+    y: pageH - 88,
+    size: 11,
+    font: fontBold,
+    color: rgb(0.1, 0.15, 0.25)
+  });
+
+  const refStr = `PhilGEPS Ref. No.: ${options?.projectRefNo || 'DOC-2026'}`;
+  const refW = fontReg.widthOfTextAtSize(refStr, 9);
+  coverPage.drawText(refStr, {
+    x: (pageW - refW) / 2,
+    y: pageH - 105,
+    size: 9,
+    font: fontReg,
+    color: rgb(0.2, 0.25, 0.35)
+  });
+
+  // Envelope Badge Box
+  const badgeColor = isFinancial ? rgb(0.08, 0.35, 0.2) : rgb(0.1, 0.25, 0.5);
+  coverPage.drawRectangle({
+    x: 45,
+    y: pageH - 175,
+    width: pageW - 90,
+    height: 48,
+    color: badgeColor,
+    borderColor: rgb(0.9, 0.95, 1),
+    borderWidth: 1
+  });
+
+  const envW = fontBold.widthOfTextAtSize(envelopeLabel, 12);
+  coverPage.drawText(envelopeLabel, {
+    x: (pageW - envW) / 2,
+    y: pageH - 150,
+    size: 12,
+    font: fontBold,
+    color: rgb(1, 1, 1)
+  });
+
+  const fCopyW = fontBold.widthOfTextAtSize(`[ ${folderCopyLabel} ]`, 9);
+  coverPage.drawText(`[ ${folderCopyLabel} ]`, {
+    x: (pageW - fCopyW) / 2,
+    y: pageH - 166,
+    size: 9,
+    font: fontBold,
+    color: rgb(0.9, 0.95, 1)
+  });
+
+  // Document Number & Tab Banner
+  const tabStr = `DOCUMENT SEPARATOR #${index}`;
+  const tabW = fontBold.widthOfTextAtSize(tabStr, 10);
+  coverPage.drawText(tabStr, {
+    x: (pageW - tabW) / 2,
+    y: pageH - 240,
+    size: 10,
+    font: fontBold,
+    color: rgb(0.4, 0.45, 0.55)
+  });
+
+  // Main Document Title in decorative framed box
+  coverPage.drawRectangle({
+    x: 55,
+    y: pageH - 420,
+    width: pageW - 110,
+    height: 160,
+    color: rgb(1, 1, 1),
+    borderColor: rgb(0.7, 0.75, 0.85),
+    borderWidth: 1
+  });
+
+  // Multi-line Document Title wrapping
+  const words = docTitle.toUpperCase().split(' ');
+  const titleLines: string[] = [];
+  let currLine = '';
+  for (const w of words) {
+    const testLine = currLine ? `${currLine} ${w}` : w;
+    if (fontBold.widthOfTextAtSize(testLine, 14) > pageW - 140) {
+      if (currLine) titleLines.push(currLine);
+      currLine = w;
+    } else {
+      currLine = testLine;
+    }
+  }
+  if (currLine) titleLines.push(currLine);
+
+  let titleY = pageH - 330 + ((titleLines.length - 1) * 11);
+  titleLines.forEach(line => {
+    const lW = fontBold.widthOfTextAtSize(line, 14);
+    coverPage.drawText(line, {
+      x: (pageW - lW) / 2,
+      y: titleY,
+      size: 14,
+      font: fontBold,
+      color: rgb(0.08, 0.12, 0.22)
+    });
+    titleY -= 22;
+  });
+
+  const catStr = isFinancial
+    ? 'Standard Financial Bid Form / Pricing Schedule (RA 9184 & RA 12009 NGPA)'
+    : 'Mandatory Technical & Eligibility Document (RA 9184 & RA 12009 NGPA)';
+  const catW = fontReg.widthOfTextAtSize(catStr, 8);
+  coverPage.drawText(catStr, {
+    x: (pageW - catW) / 2,
+    y: pageH - 405,
+    size: 8,
+    font: fontReg,
+    color: rgb(0.35, 0.4, 0.5)
+  });
+
+  // Project Information Box
+  coverPage.drawRectangle({
+    x: 55,
+    y: pageH - 630,
+    width: pageW - 110,
+    height: 180,
+    color: rgb(0.97, 0.98, 0.99),
+    borderColor: rgb(0.8, 0.85, 0.9),
+    borderWidth: 0.75
+  });
+
+  const details = [
+    { label: 'PROJECT TITLE:', val: options?.projectTitle || 'Target Procurement Project' },
+    { label: 'PHILGEPS REF. NO.:', val: options?.projectRefNo || 'DOC-2026-001' },
+    { label: 'SUBMISSION DEADLINE:', val: options?.submissionDate || 'August 30, 2026 at 02:00 PM' },
+    { label: 'BIDDER ENTITY:', val: options?.companyName || 'Bidding Enterprise Corporation' },
+    { label: 'OFFICIAL COPY TYPE:', val: folderCopyLabel }
+  ];
+
+  let dY = pageH - 475;
+  details.forEach(d => {
+    coverPage.drawText(d.label, { x: 75, y: dY, size: 8, font: fontBold, color: rgb(0.15, 0.2, 0.3) });
+    const valText = d.val.length > 50 ? `${d.val.slice(0, 48)}...` : d.val;
+    coverPage.drawText(valText, { x: 215, y: dY, size: 8, font: fontReg, color: rgb(0.1, 0.15, 0.25) });
+    dY -= 30;
+  });
+
+  // Signatory Box at Bottom
+  const sigName = (options?.signatoryName || 'AUTHORIZED MANAGING OFFICER').toUpperCase();
+  const sigTitle = options?.signatoryTitle || 'President / Authorized Managing Officer';
+  const sW = fontBold.widthOfTextAtSize(sigName, 9.5);
+  const stW = fontReg.widthOfTextAtSize(sigTitle, 8);
+
+  coverPage.drawLine({
+    start: { x: (pageW - 240) / 2, y: 130 },
+    end: { x: (pageW + 240) / 2, y: 130 },
+    thickness: 1,
+    color: rgb(0.2, 0.25, 0.35)
+  });
+
+  coverPage.drawText(sigName, {
+    x: (pageW - sW) / 2,
+    y: 114,
+    size: 9.5,
+    font: fontBold,
+    color: rgb(0.1, 0.15, 0.25)
+  });
+
+  coverPage.drawText(sigTitle, {
+    x: (pageW - stW) / 2,
+    y: 100,
+    size: 8,
+    font: fontReg,
+    color: rgb(0.35, 0.4, 0.5)
+  });
+
+  const warnStr = 'OFFICIAL BID ENVELOPE SEPARATOR SHEET — MUST REMAIN IN PLACE DURING EVALUATION';
+  const warnW = fontBold.widthOfTextAtSize(warnStr, 6.5);
+  coverPage.drawText(warnStr, {
+    x: (pageW - warnW) / 2,
+    y: 50,
+    size: 6.5,
+    font: fontBold,
+    color: rgb(0.5, 0.55, 0.65)
+  });
+}
 
 /**
  * Senior PDF Rendering Engine
@@ -230,8 +469,6 @@ export async function buildMergedThreeLayerPdfBytes(
   onProgress?: (progress: PdfProgressInfo) => void,
   options?: PdfExportOptions
 ): Promise<Uint8Array> {
-  debugLog('pdfExportEngine.ts:start', 'PDF build starting', { unitCount: units.length, outputFileName }, 'C');
-
   const pdfDoc = await PDFDocument.create();
   const untouchedPhilgepsPageIndices = new Set<number>();
 
@@ -307,11 +544,14 @@ export async function buildMergedThreeLayerPdfBytes(
           width: pageSize[0],
           height: pageSize[1]
         });
-
-        debugLog('pdfExportEngine.ts:cover', `Cover page appended (${isPortrait ? 'Portrait' : 'Landscape'})`, { docTitle }, 'C');
       } catch (err) {
         console.error(`[PDF] Error generating cover page for ${unit.title}:`, err);
+        // Fallback to vector cover separator on error
+        await drawVectorCoverSeparator(pdfDoc, unit, index, options);
       }
+    } else if (options?.includeCoverSeparators && index > 0 && !docTitle.toLowerCase().includes('table of contents')) {
+      // Fallback vector statutory cover separator if DOM element is absent and separators are explicitly enabled
+      await drawVectorCoverSeparator(pdfDoc, unit, index, options);
     }
 
     // â”€â”€ FORM TEMPLATE PAGES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -490,7 +730,6 @@ export async function buildMergedThreeLayerPdfBytes(
               untouchedPhilgepsPageIndices.add(pageIdxInDoc);
               pdfDoc.addPage(copiedPage);
             });
-            debugLog('pdfExportEngine.ts:attach', `Appended ${pageIndices.length} pristine UNTOUCHED PhilGEPS pages (QR preserved)`, { docTitle }, 'C');
           } else {
             const titleBlob = `${docTitle} ${unit.documentCode || ''} ${unit.fileName || ''} ${unit.documentName || ''}`.toLowerCase();
             const isLicenseScan = /pcab|mayor|business permit|tax clearance|license|bir|2303/.test(titleBlob);
@@ -509,12 +748,10 @@ export async function buildMergedThreeLayerPdfBytes(
               const targetAspect = targetW / targetH;
               const aspectDelta = Math.abs(sourceAspect - targetAspect) / targetAspect;
 
-              // PCAB / permits: fill the Legal sheet like other Class A scans.
+              // Standard non-clipping scale: fit inside Legal sheet margins without truncating headers/footers
               const sx = origW > 0 ? targetW / origW : 1;
               const sy = origH > 0 ? targetH / origH : 1;
-              const fillScale = isLicenseScan || aspectDelta <= 0.35
-                ? Math.max(sx, sy)
-                : Math.min(sx, sy);
+              const fillScale = Math.min(sx, sy);
 
               copiedPage.scaleContent(fillScale, fillScale);
               if (fillScale > 0) {
@@ -525,10 +762,11 @@ export async function buildMergedThreeLayerPdfBytes(
                   (targetH - scaledH) / 2 / fillScale
                 );
               }
+              copiedPage.setMediaBox(0, 0, targetW, targetH);
+              copiedPage.setCropBox(0, 0, targetW, targetH);
               copiedPage.setSize(targetW, targetH);
               pdfDoc.addPage(copiedPage);
             }
-            debugLog('pdfExportEngine.ts:attach', `Appended ${pageIndices.length} standardized Legal PDF pages`, { docTitle }, 'C');
           }
         } catch (_pdfLoadErr) {
           // Not a PDF — try embedding as image
@@ -551,17 +789,9 @@ export async function buildMergedThreeLayerPdfBytes(
               const targetW = imgPageSize[0];
               const targetH = imgPageSize[1];
 
-              // Same near-legal fill policy as PDF attachments: avoid tiny centered islands
-              // for scans whose aspect ratio is close to the Legal sheet aspect.
-              const imgContainScale = Math.min(targetW / embeddedImage.width, targetH / embeddedImage.height);
-              const imgCoverScale = Math.max(targetW / embeddedImage.width, targetH / embeddedImage.height);
-              const imgSrcAspect = embeddedImage.width / embeddedImage.height;
-              const imgTargetAspect = targetW / targetH;
-              const imgAspectDelta = Math.abs(imgSrcAspect - imgTargetAspect) / imgTargetAspect;
-
-              const imgTitleBlob = `${docTitle} ${unit.documentCode || ''} ${unit.fileName || ''}`.toLowerCase();
-              const isLicenseImg = /pcab|mayor|business permit|tax clearance|license|bir|2303/.test(imgTitleBlob);
-              const scale = isLicenseImg || imgAspectDelta <= 0.35 ? imgCoverScale : imgContainScale;
+              // Proportional containment: ensures PCAB licenses and scanned certificates
+              // are 100% visible, centered, and look normal without any edge truncation.
+              const scale = Math.min(targetW / embeddedImage.width, targetH / embeddedImage.height);
               const drawW = embeddedImage.width * scale;
               const drawH = embeddedImage.height * scale;
               const drawX = (targetW - drawW) / 2;
@@ -741,11 +971,12 @@ export async function buildMergedThreeLayerPdfBytes(
         if (effectiveFolderCopy && rotationAngle === 0 && !isUntouchedPhilgeps) {
           const isOrig = effectiveFolderCopy === 'ORIGINAL';
           const isCopy1 = effectiveFolderCopy === 'COPY_1';
-          const stampW = 205;
-          const stampH = 54;
+          const scaleFactor = Math.max(1, width / 612);
+          const stampW = Math.round(210 * scaleFactor);
+          const stampH = Math.round(56 * scaleFactor);
           // Positioned directly at the top of the "Page X of Y" pagination pill
           const stampX = (width - stampW) / 2;
-          const stampY = 24;
+          const stampY = Math.round(24 * scaleFactor);
 
           const stampChosenColor = getStampColorRgb(options?.stampColor);
           const headerText = isOrig ? '* OFFICIAL ORIGINAL BID DOCUMENT *' : '* CERTIFIED TRUE COPY *';
@@ -755,6 +986,12 @@ export async function buildMergedThreeLayerPdfBytes(
             ? 'COPY 1 (FIRST CERTIFIED TRUE COPY)'
             : 'COPY 2 (SECOND CERTIFIED TRUE COPY)';
 
+          const headerFontSize = Math.round(7.8 * scaleFactor * 10) / 10;
+          const subTextFontSize = Math.round(6.4 * scaleFactor * 10) / 10;
+          const metaFontSize = Math.round(5.8 * scaleFactor * 10) / 10;
+          const refFontSize = Math.round(5.5 * scaleFactor * 10) / 10;
+          const padX = Math.round(8 * scaleFactor);
+
           // Transparent rubber stamp border (NO solid white backing to keep underlying text fully readable)
           page.drawRectangle({
             x: stampX,
@@ -762,62 +999,62 @@ export async function buildMergedThreeLayerPdfBytes(
             width: stampW,
             height: stampH,
             borderColor: stampChosenColor,
-            borderWidth: 1.4
+            borderWidth: 1.4 * scaleFactor
           });
 
           // Inner neat stamp border
           page.drawRectangle({
-            x: stampX + 2.5,
-            y: stampY + 2.5,
-            width: stampW - 5,
-            height: stampH - 5,
+            x: stampX + 2.5 * scaleFactor,
+            y: stampY + 2.5 * scaleFactor,
+            width: stampW - 5 * scaleFactor,
+            height: stampH - 5 * scaleFactor,
             borderColor: stampChosenColor,
-            borderWidth: 0.6
+            borderWidth: 0.6 * scaleFactor
           });
 
           // Line 1: Header (Centered)
-          const hW = helveticaBold.widthOfTextAtSize(headerText, 7.5);
+          const hW = helveticaBold.widthOfTextAtSize(headerText, headerFontSize);
           page.drawText(headerText, {
             x: stampX + (stampW - hW) / 2,
-            y: stampY + stampH - 12.5,
-            size: 7.5,
+            y: stampY + stampH - Math.round(13 * scaleFactor),
+            size: headerFontSize,
             font: helveticaBold,
             color: stampChosenColor
           });
 
           // Line 2: Copy Designation (Centered)
-          const sW = helveticaBold.widthOfTextAtSize(subText, 6.2);
+          const sW = helveticaBold.widthOfTextAtSize(subText, subTextFontSize);
           page.drawText(subText, {
             x: stampX + (stampW - sW) / 2,
-            y: stampY + stampH - 21.5,
-            size: 6.2,
+            y: stampY + stampH - Math.round(22 * scaleFactor),
+            size: subTextFontSize,
             font: helveticaBold,
             color: stampChosenColor
           });
 
           // Line 3: Date of Submission (Left padded)
           page.drawText(`Date of Submission: ${submissionDate}`, {
-            x: stampX + 8,
-            y: stampY + stampH - 31,
-            size: 5.8,
+            x: stampX + padX,
+            y: stampY + stampH - Math.round(32 * scaleFactor),
+            size: metaFontSize,
             font: helveticaFont,
             color: stampChosenColor
           });
 
           // Line 4: Authorized Signatory (Left padded)
           page.drawText(`Signed by: ${signatory.slice(0, 36)}`, {
-            x: stampX + 8,
-            y: stampY + stampH - 39.5,
-            size: 5.8,
+            x: stampX + padX,
+            y: stampY + stampH - Math.round(40.5 * scaleFactor),
+            size: metaFontSize,
             font: helveticaFont,
             color: stampChosenColor
           });
 
           // Line 5: Project Reference & BAC Compliance (Left padded)
           page.drawText(`Ref: ${refNo} • BAC COMPLIANT`, {
-            x: stampX + 8,
-            y: stampY + stampH - 48,
-            size: 5.5,
+            x: stampX + padX,
+            y: stampY + stampH - Math.round(49 * scaleFactor),
+            size: refFontSize,
             font: helveticaBold,
             color: stampChosenColor
           });
@@ -826,26 +1063,27 @@ export async function buildMergedThreeLayerPdfBytes(
         // 3. PAGE X OF Y PAGINATION (AT BOTTOM CENTER WITH TRANSPARENT PILL)
         // Strictly transparent so underlying text is never obscured
         if (!isUntouchedPhilgeps) {
+          const pageScale = Math.max(1, width / 612);
           const pageText = `Page ${pageIdx + 1} of ${totalPageCount}`;
-          const fontSize = 7.5;
+          const fontSize = Math.round(7.5 * pageScale * 10) / 10;
           const textWidth = helveticaFont.widthOfTextAtSize(pageText, fontSize);
-          const pillW = textWidth + 18;
-          const pillH = 14;
+          const pillW = Math.round(textWidth + 18 * pageScale);
+          const pillH = Math.round(14 * pageScale);
 
           if (rotationAngle === 0) {
             const pillX = (width - pillW) / 2;
-            const pillY = 7;
+            const pillY = Math.round(7 * pageScale);
             page.drawRectangle({
               x: pillX,
               y: pillY,
               width: pillW,
               height: pillH,
               borderColor: rgb(0.8, 0.82, 0.88),
-              borderWidth: 0.6
+              borderWidth: 0.6 * pageScale
             });
             page.drawText(pageText, {
               x: (width - textWidth) / 2,
-              y: pillY + 3.5,
+              y: pillY + Math.round(3.5 * pageScale),
               size: fontSize,
               font: helveticaBold,
               color: rgb(0.12, 0.16, 0.25)
@@ -931,13 +1169,6 @@ export async function buildMergedThreeLayerPdfBytes(
     totalDocs: units.length
   });
 
-  debugLog('pdfExportEngine.ts:complete', 'PDF export completed', {
-    outputFileName,
-    byteSize: pdfBytes.length,
-    unitCount: units.length,
-    pageCount: totalPageCount
-  }, 'C');
-
   return pdfBytes;
 }
 
@@ -1002,7 +1233,6 @@ export async function exportMergedThreeLayerPdf(
     }
   } catch (globalErr) {
     console.error('[PDF] FATAL ERROR IN PDF EXPORT ENGINE:', globalErr);
-    debugLog('pdfExportEngine.ts:fatal', 'PDF export fatal error', { error: String(globalErr) }, 'C');
     if (typeof window !== 'undefined') {
       window.print();
     }

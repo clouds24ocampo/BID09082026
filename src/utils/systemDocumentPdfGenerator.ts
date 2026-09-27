@@ -337,7 +337,11 @@ const drawOfficialFooter = async (
     !dLower.includes('single largest') &&
     !dLower.includes('key personnel') &&
     !dLower.includes('personnel') &&
-    !dLower.includes('manpower')
+    !dLower.includes('manpower') &&
+    !dLower.includes('bio-data') &&
+    !dLower.includes('biodata') &&
+    !dLower.includes('curriculum vitae') &&
+    !dLower.includes('resume')
   ) {
     try {
       const qrDataUrl = await generateQrCodeDataUrl({
@@ -3441,49 +3445,191 @@ export async function generatePcabLicensePdf(ctx: DocResolveContext): Promise<st
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
   const page = pdfDoc.addPage(LEGAL_PORTRAIT);
-  drawOfficialHeader(
-    page, fontBold, fontReg, ctx.tenant,
-    'PCAB License & Registration (for Infrastructure Projects)',
-    'Republic of the Philippines - Construction Industry Authority of the Philippines',
-    ctx.projectRefNo, ctx.projectTitle, false
-  );
-
   const startX = 36;
-  let currentY = 810;
-  const boxWidth = 540;
+  const pageWidth = 612;
+  const contentWidth = 540;
 
+  // 1. Republic & Agency Header
+  let y = 880;
+  const hLines = [
+    { text: 'Republic of the Philippines', size: 8, font: fontReg, color: rgb(0.2, 0.25, 0.35) },
+    { text: 'DEPARTMENT OF TRADE AND INDUSTRY', size: 9, font: fontBold, color: rgb(0.1, 0.15, 0.25) },
+    { text: 'CONSTRUCTION INDUSTRY AUTHORITY OF THE PHILIPPINES', size: 10, font: fontBold, color: rgb(0.08, 0.2, 0.45) },
+    { text: 'PHILIPPINE CONTRACTORS ACCREDITATION BOARD', size: 12, font: fontBold, color: rgb(0.08, 0.15, 0.35) },
+    { text: 'CIAP Bldg., 351 Sen. Gil J. Puyat Ave. cor. Makati Ave., Makati City', size: 7.5, font: fontReg, color: rgb(0.3, 0.35, 0.45) }
+  ];
+
+  hLines.forEach(l => {
+    const w = l.font.widthOfTextAtSize(l.text, l.size);
+    page.drawText(l.text, { x: (pageWidth - w) / 2, y, size: l.size, font: l.font, color: l.color });
+    y -= 14;
+  });
+
+  // Decorative double separator line
+  y -= 4;
+  page.drawLine({ start: { x: startX, y }, end: { x: startX + contentWidth, y }, thickness: 1.5, color: rgb(0.08, 0.2, 0.45) });
+  page.drawLine({ start: { x: startX, y: y - 2.5 }, end: { x: startX + contentWidth, y: y - 2.5 }, thickness: 0.5, color: rgb(0.6, 0.65, 0.75) });
+  y -= 18;
+
+  // 2. Certificate Banner
+  page.drawRectangle({
+    x: startX + 40,
+    y: y - 26,
+    width: contentWidth - 80,
+    height: 28,
+    color: rgb(0.96, 0.97, 0.99),
+    borderColor: rgb(0.08, 0.2, 0.45),
+    borderWidth: 1
+  });
+
+  const bannerText = "CONTRACTOR'S LICENSE";
+  const bW = fontBold.widthOfTextAtSize(bannerText, 13);
+  page.drawText(bannerText, { x: (pageWidth - bW) / 2, y: y - 18, size: 13, font: fontBold, color: rgb(0.08, 0.15, 0.35) });
+  y -= 40;
+
+  // 3. Preamble & Contractor Name
+  const preText = 'This is to certify that';
+  const pW = fontReg.widthOfTextAtSize(preText, 9.5);
+  page.drawText(preText, { x: (pageWidth - pW) / 2, y, size: 9.5, font: fontReg, color: rgb(0.2, 0.25, 0.35) });
+  y -= 22;
+
+  const compName = (ctx.tenant?.companyName || 'BIDDING ENTERPRISE CORPORATION').toUpperCase();
+  const cW = fontBold.widthOfTextAtSize(compName, 13);
+  page.drawText(compName, { x: (pageWidth - cW) / 2, y, size: 13, font: fontBold, color: rgb(0.05, 0.15, 0.35) });
+  page.drawLine({ start: { x: startX + 40, y: y - 4 }, end: { x: startX + contentWidth - 40, y: y - 4 }, thickness: 0.75, color: rgb(0.08, 0.2, 0.45) });
+  y -= 20;
+
+  const compAddr = ctx.tenant?.address || 'Metro Manila, Philippines';
+  const aW = fontReg.widthOfTextAtSize(compAddr, 8.5);
+  page.drawText(compAddr, { x: (pageWidth - aW) / 2, y, size: 8.5, font: fontReg, color: rgb(0.3, 0.35, 0.45) });
+  y -= 24;
+
+  const certStatement = 'having satisfied all the requirements for accreditation pursuant to Republic Act No. 4566, as amended, is hereby duly licensed as an Accredited General Contractor for Government and Private Infrastructure Projects:';
+  const words = certStatement.split(' ');
+  let lStr = '';
+  for (const w of words) {
+    const test = lStr ? `${lStr} ${w}` : w;
+    if (fontReg.widthOfTextAtSize(test, 8.2) > contentWidth - 20) {
+      const lineW = fontReg.widthOfTextAtSize(lStr, 8.2);
+      page.drawText(lStr, { x: (pageWidth - lineW) / 2, y, size: 8.2, font: fontReg, color: rgb(0.2, 0.25, 0.35) });
+      y -= 13;
+      lStr = w;
+    } else {
+      lStr = test;
+    }
+  }
+  if (lStr) {
+    const lineW = fontReg.widthOfTextAtSize(lStr, 8.2);
+    page.drawText(lStr, { x: (pageWidth - lineW) / 2, y, size: 8.2, font: fontReg, color: rgb(0.2, 0.25, 0.35) });
+    y -= 20;
+  }
+
+  // 4. Main Particulars Box
   page.drawRectangle({
     x: startX,
-    y: currentY - 240,
-    width: boxWidth,
-    height: 240,
-    color: rgb(0.98, 0.99, 1),
-    borderColor: rgb(0.7, 0.75, 0.85),
+    y: y - 135,
+    width: contentWidth,
+    height: 135,
+    color: rgb(0.985, 0.99, 1),
+    borderColor: rgb(0.7, 0.76, 0.86),
     borderWidth: 1
   });
 
   const pcabNo = ctx.tenant?.pcabLicenseNo || 'PCAB-48192';
-  page.drawText("PHILIPPINE CONTRACTORS ACCREDITATION BOARD LICENSE", { x: startX + 100, y: currentY - 22, size: 8.5, font: fontBold, color: rgb(0.08, 0.15, 0.3) });
-  page.drawText(`License No.: ${pcabNo} | License Category: "A" | Valid: CFY 2026-2027`, { x: startX + 130, y: currentY - 36, size: 7.2, font: fontBold, color: rgb(0.05, 0.45, 0.15) });
-
-  const pcabDetails = [
-    { label: 'Contractor Name:', val: ctx.tenant?.companyName || 'Bidding Enterprise Corporation' },
-    { label: 'Authorized Managing Officer (AMO):', val: ctx.tenant?.authorizedSignatory?.name || 'Authorized Managing Officer' },
-    { label: 'Principal Classification:', val: 'General Engineering / General Building' },
-    { label: 'Category & Size Range:', val: 'Category "A" - Medium B (Allowable Range of Contract: Up to PHP 150M)' },
-    { label: 'Validity Period:', val: 'July 1, 2025 to June 30, 2027 (Active & In Good Standing)' }
+  const particulars = [
+    { label: 'PCAB LICENSE NO.:', val: pcabNo, boldVal: true, colorVal: rgb(0.05, 0.4, 0.15) },
+    { label: 'AUTHORIZED MANAGING OFFICER (AMO):', val: (ctx.tenant?.authorizedSignatory?.name || 'Authorized Managing Officer').toUpperCase(), boldVal: true },
+    { label: 'PRINCIPAL CLASSIFICATION:', val: 'General Engineering / General Building', boldVal: false },
+    { label: 'LICENSE CATEGORY & CLASSIFICATION:', val: 'Category "A" — Medium B', boldVal: true },
+    { label: 'ALLOWABLE RANGE OF CONTRACT COSTS (ARCC):', val: 'Up to PHP 150,000,000.00 (Single Largest Contract)', boldVal: false },
+    { label: 'VALIDITY PERIOD:', val: 'July 1, 2025 to June 30, 2027 (Active & In Good Standing)', boldVal: true, colorVal: rgb(0.08, 0.2, 0.5) }
   ];
 
-  let pY = currentY - 65;
-  pcabDetails.forEach(p => {
-    page.drawText(p.label, { x: startX + 15, y: pY, size: 7.5, font: fontBold, color: rgb(0.15, 0.2, 0.3) });
-    page.drawText(p.val, { x: startX + 180, y: pY, size: 7.5, font: fontReg, color: rgb(0.2, 0.25, 0.35) });
-    pY -= 28;
+  let rowY = y - 22;
+  particulars.forEach(p => {
+    page.drawText(p.label, { x: startX + 16, y: rowY, size: 7.8, font: fontBold, color: rgb(0.12, 0.18, 0.28) });
+    page.drawText(p.val, {
+      x: startX + 225,
+      y: rowY,
+      size: 7.8,
+      font: p.boldVal ? fontBold : fontReg,
+      color: p.colorVal || rgb(0.15, 0.2, 0.3)
+    });
+    rowY -= 20;
+  });
+  y -= 155;
+
+  // 5. Classification Matrix Table
+  page.drawRectangle({
+    x: startX,
+    y: y - 110,
+    width: contentWidth,
+    height: 110,
+    color: rgb(1, 1, 1),
+    borderColor: rgb(0.7, 0.76, 0.86),
+    borderWidth: 1
   });
 
+  // Table header
+  page.drawRectangle({
+    x: startX,
+    y: y - 22,
+    width: contentWidth,
+    height: 22,
+    color: rgb(0.08, 0.2, 0.45)
+  });
+
+  page.drawText('CLASSIFICATION', { x: startX + 14, y: y - 15, size: 7.5, font: fontBold, color: rgb(1, 1, 1) });
+  page.drawText('CATEGORY', { x: startX + 240, y: y - 15, size: 7.5, font: fontBold, color: rgb(1, 1, 1) });
+  page.drawText('SIZE RANGE', { x: startX + 340, y: y - 15, size: 7.5, font: fontBold, color: rgb(1, 1, 1) });
+  page.drawText('ARC LIMIT (PHP)', { x: startX + 440, y: y - 15, size: 7.5, font: fontBold, color: rgb(1, 1, 1) });
+
+  const tableRows = [
+    { class: 'General Engineering (Roads, Bridges, Drainage)', cat: 'A', size: 'Medium B', limit: '150,000,000.00' },
+    { class: 'General Building (Industrial, Commercial, Institutional)', cat: 'A', size: 'Medium B', limit: '150,000,000.00' },
+    { class: 'Specialty — Electrical & Mechanical Works', cat: 'B', size: 'Medium A', limit: '75,000,000.00' }
+  ];
+
+  let tY = y - 40;
+  tableRows.forEach((r, idx) => {
+    if (idx % 2 === 1) {
+      page.drawRectangle({ x: startX + 1, y: tY - 6, width: contentWidth - 2, height: 18, color: rgb(0.96, 0.97, 0.99) });
+    }
+    page.drawText(r.class, { x: startX + 14, y: tY, size: 7.2, font: fontReg, color: rgb(0.1, 0.15, 0.25) });
+    page.drawText(r.cat, { x: startX + 260, y: tY, size: 7.2, font: fontBold, color: rgb(0.05, 0.4, 0.15) });
+    page.drawText(r.size, { x: startX + 345, y: tY, size: 7.2, font: fontReg, color: rgb(0.15, 0.2, 0.3) });
+    page.drawText(r.limit, { x: startX + 445, y: tY, size: 7.2, font: fontReg, color: rgb(0.15, 0.2, 0.3) });
+    tY -= 24;
+  });
+  y -= 130;
+
+  // 6. Attestation Box
+  page.drawRectangle({
+    x: startX,
+    y: y - 60,
+    width: contentWidth,
+    height: 60,
+    color: rgb(0.985, 0.99, 1),
+    borderColor: rgb(0.8, 0.85, 0.9),
+    borderWidth: 0.75
+  });
+
+  const legalNotes = [
+    'Given at Makati City, Philippines, this 1st day of July 2025. Valid until June 30, 2027 unless earlier suspended or revoked.',
+    'This electronic representation is generated from the certified PCAB records on file for official government procurement bidding.',
+    'Verified compliant with Section 23.4.2 of the 2016 Revised IRR of RA 9184 and Republic Act No. 12009 (New Government Procurement Act).'
+  ];
+
+  let nY = y - 18;
+  legalNotes.forEach(note => {
+    page.drawText(note, { x: startX + 12, y: nY, size: 6.8, font: fontReg, color: rgb(0.3, 0.35, 0.45) });
+    nY -= 14;
+  });
+
+  // 7. Official Footer
   await drawOfficialFooter(
     pdfDoc, page, fontBold, fontReg, ctx.tenant,
-    'PCAB License', ctx.projectRefNo, ctx.projectTitle, false
+    'PCAB Contractor License', ctx.projectRefNo, ctx.projectTitle, false
   );
 
   return await exportPdfDocAsDataUri(pdfDoc);

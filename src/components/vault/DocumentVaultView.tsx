@@ -34,7 +34,6 @@ import {
   getOpportunityProjects,
   OpportunityProjectOption,
 } from "../../utils/opportunityProjects";
-import { debugLog } from "../../utils/debugLog";
 import {
   FileCheck,
   Upload,
@@ -423,21 +422,6 @@ export const DocumentVaultView: React.FC = () => {
           // Instantaneous metadata mount: items are ready immediately (<10ms)
           // PDF binaries are hydrated on demand into the bounded LRU cache when viewed or compiled
           setVaultItems(items);
-
-          // #region agent log
-          debugLog(
-            "DocumentVaultView.tsx:loadFromDB",
-            "Vault load complete",
-            {
-              activeTenantId,
-              itemCount: items.length,
-              migratedCount: migrated.length,
-              dbReady: true,
-            },
-            "B",
-          );
-          // #endregion
-
           setDbReady(true);
         }
       } catch (e) {
@@ -445,17 +429,6 @@ export const DocumentVaultView: React.FC = () => {
           "[VaultDB] Failed to load from IndexedDB, falling back to localStorage:",
           e,
         );
-        // #region agent log
-        debugLog(
-          "DocumentVaultView.tsx:loadFromDB",
-          "Vault load failed, using localStorage fallback",
-          {
-            activeTenantId,
-            error: String(e),
-          },
-          "B",
-        );
-        // #endregion
         if (!cancelled) {
           try {
             const saved = localStorage.getItem(
@@ -506,18 +479,6 @@ export const DocumentVaultView: React.FC = () => {
   // ─── Persist vault item metadata to IndexedDB on every change (scoped by activeTenantId) ───
   React.useEffect(() => {
     if (!dbReady) return; // Don't write until initial load completes
-    // #region agent log
-    debugLog(
-      "DocumentVaultView.tsx:persist",
-      "Persisting vault items to IndexedDB",
-      {
-        activeTenantId,
-        itemCount: vaultItems.length,
-        dbReady,
-      },
-      "B",
-    );
-    // #endregion
     saveVaultItems(vaultItems, activeTenantId).catch((e) =>
       console.error("[VaultDB] Failed to persist vault items:", e),
     );

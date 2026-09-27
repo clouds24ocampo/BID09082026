@@ -52,10 +52,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBack
       setEmail(targetEmail);
     }
 
-    resetUserPassword(targetEmail);
+    const success = resetUserPassword(targetEmail);
+    if (!success) {
+      setError(`No registered account found with email address "${targetEmail}". Please register a corporate account first.`);
+      return;
+    }
+
     setPassword('BiDOCS#2026');
     setError('');
-    alert(`Password for account [${targetEmail}] has been reset to default: BiDOCS#2026.\n\nPlease log in first using BiDOCS#2026. You will be prompted to change your password immediately upon logging in.`);
+    alert(`Password for account [${targetEmail}] has been reset to temporary default: BiDOCS#2026.\n\nPlease log in using BiDOCS#2026. You will be prompted to change your password immediately upon logging in.`);
   };
 
   const handleSubmit = (e: React.FormEvent) => {

@@ -39,8 +39,10 @@ export function isFormLDetailedEstimates(code: string, name: string): boolean {
   return (
     c.includes('DETAILED_ESTIMATES') ||
     c.includes('FORM_L') ||
+    c.includes('FORM (L)') ||
     n.includes('detailed estimate') ||
     n.includes('form (l)') ||
+    n.includes('form l') ||
     /\bform l\b/.test(n)
   );
 }
@@ -48,34 +50,70 @@ export function isFormLDetailedEstimates(code: string, name: string): boolean {
 export function isFinancialEnvelopeDoc(code: string, name: string): boolean {
   const c = (code || '').toUpperCase();
   const n = (name || '').toLowerCase();
-  if (FINANCIAL_CODE_KEYS.some((k) => c.includes(k))) return true;
-  if (c.includes('BOQ') && !c.includes('BOOK')) return true;
+
+  // 1. STRICT EXCLUSIONS: Technical and Legal documents must NEVER be classified as Financial,
+  // even if their titles or codes contain "financial", "capacity", "statement", etc.
+  if (
+    c.includes('AUDITED') ||
+    c.includes('AFS') ||
+    n.includes('audited financial') ||
+    n.includes('audited fs') ||
+    n.includes('stamped received by bir') ||
+    n.includes('balance sheet') ||
+    n.includes('income statement')
+  ) {
+    return false; // Envelope 1 (Legal & Eligibility)
+  }
+
+  if (
+    c.includes('NFCC') ||
+    n.includes('net financial contracting capacity') ||
+    n.includes('contracting capacity') ||
+    n.includes('nfcc')
+  ) {
+    return false; // Envelope 1 (Technical & Eligibility)
+  }
+
+  if (
+    c.includes('KEY_PERSONNEL') || n.includes('key personnel') || n.includes('manpower') ||
+    (c.includes('EQUIPMENT') && !isFormLDetailedEstimates(c, n) && !c.includes('BILL_OF_QUANTITIES')) ||
+    (n.includes('equipment') && !isFormLDetailedEstimates(c, n) && !n.includes('bill of quantities')) ||
+    c.includes('ORG_CHART') || n.includes('organizational chart') ||
+    c.includes('SECTION_VI') || n.includes('section vi') || n.includes('schedule of requirements') ||
+    c.includes('SECTION_VII') || n.includes('section vii') || n.includes('technical specifications') ||
+    c.includes('OMNIBUS') || n.includes('omnibus') || n.includes('oss') ||
+    c.includes('BID_SECURING') || n.includes('bid securing') || n.includes('bsd') ||
+    c.includes('ONGOING') || n.includes('ongoing contracts') ||
+    c.includes('SLCC') || n.includes('slcc') || n.includes('single largest') ||
+    c.includes('MAYOR') || n.includes('mayor') ||
+    c.includes('PCAB') || n.includes('pcab') ||
+    c.includes('PHILGEPS') || n.includes('philgeps') ||
+    c.includes('TAX_CLEARANCE') || n.includes('tax clearance') ||
+    c.includes('SECRETARY') || n.includes('secretary') ||
+    c.includes('JVA') || n.includes('joint venture')
+  ) {
+    return false; // Envelope 1 (Technical & Legal)
+  }
+
+  // 2. EXCLUSIVE FINANCIAL DOCUMENTS (Envelope 2: Financial Proposal Component)
   if (isFormLDetailedEstimates(c, n)) return true;
-  if (n.includes('financial bid form')) return true;
-  if (n.includes('bill of quantities')) return true;
+  if (c.includes('FINANCIAL_BID_FORM') || c.includes('GPPB-BIDFORM')) return true;
+  if (c.includes('BILL_OF_QUANTITIES') || (c.includes('BOQ') && !c.includes('BOOK'))) return true;
+  if (c.includes('PRICE_SCHEDULE') || c.includes('PRICESCHED')) return true;
+  if (c.includes('SUMMARY_BID') || c.includes('SUMMARY_BID_PRICES')) return true;
+  if (c.includes('CASH_FLOW') || c.includes('CASHFLOW') || c.includes('SF-INFR-56')) return true;
+
+  if (n.includes('financial bid form') || n.includes('bid form (goods') || n.includes('bid form (infra') || n.includes('bid form (consult')) return true;
+  if (n.includes('bill of quantities') || n.includes('boq breakdown')) return true;
   if (n.includes('price schedule')) return true;
-  if (n.includes('summary of bid') || n.includes('summary bid')) return true;
-  if (n.includes('cash flow') || n.includes('sf-infr-56')) return true;
+  if (n.includes('summary of bid prices') || n.includes('summary bid')) return true;
+  if (n.includes('cash flow by quarter') || n.includes('payment schedule') || n.includes('sf-infr-56')) return true;
+
   return false;
 }
 
 export function isTechnicalEnvelopeDoc(code: string, name: string): boolean {
-  if (isFinancialEnvelopeDoc(code, name)) return false;
-  const c = (code || '').toUpperCase();
-  const n = (name || '').toLowerCase();
-  if (TECHNICAL_CODE_KEYS.some((k) => c.includes(k))) return true;
-  if (n.includes('ongoing') || n.includes('slcc') || n.includes('single largest')) return true;
-  if (n.includes('section vi') || n.includes('schedule of req')) return true;
-  if (n.includes('section vii') || n.includes('technical spec')) return true;
-  if (n.includes('framework agreement')) return true;
-  if (n.includes('org chart') || n.includes('organizational chart')) return true;
-  if (n.includes('key personnel') || n.includes('manpower')) return true;
-  if (n.includes('major equipment') || (n.includes('equipment') && !isFormLDetailedEstimates(c, n) && !n.includes('bill of quantities'))) {
-    return true;
-  }
-  if (n.includes('after-sale') || n.includes('aftersales') || n.includes('warranty')) return true;
-  if (n.includes('omnibus') || n.includes('nfcc') || n.includes('bid secur')) return true;
-  return false;
+  return !isFinancialEnvelopeDoc(code, name);
 }
 
 export function isMajorEquipmentDoc(code: string, name: string): boolean {
@@ -95,12 +133,21 @@ export function isMajorEquipmentDoc(code: string, name: string): boolean {
 export function resolveBidEnvelope(
   code: string,
   name: string,
-  declared?: string,
-  statutoryDefault?: BidEnvelope
+  _declared?: string,
+  _statutoryDefault?: BidEnvelope
 ): BidEnvelope {
-  if (isFinancialEnvelopeDoc(code, name)) return 'ENVELOPE_2';
-  if (isTechnicalEnvelopeDoc(code, name)) return 'ENVELOPE_1';
-  if (statutoryDefault === 'ENVELOPE_1' || statutoryDefault === 'ENVELOPE_2') return statutoryDefault;
-  if (declared === 'ENVELOPE_1' || declared === 'ENVELOPE_2') return declared;
+  // STRICT STATUTORY SEGREGATION (RA 9184 & RA 12009 NGPA):
+  // Financial envelope (Envelope 2) is EXCLUSIVELY for financial bid documents:
+  // 1. Financial Bid Form
+  // 2. Bill of Quantities (BOQ Breakdown)
+  // 3. Form L - Detailed Estimates
+  // 4. Detailed Price Schedule
+  // 5. Summary of Bid Prices
+  // 6. Cash Flow by Quarter / Payment Schedule (SF-INFR-56)
+  // ALL OTHER DOCUMENTS (Legal, Technical, Eligibility, AFS, NFCC, Key Personnel, Equipment, Org Chart, Sec VI, Sec VII)
+  // belong strictly and exclusively to ENVELOPE_1.
+  if (isFinancialEnvelopeDoc(code, name)) {
+    return 'ENVELOPE_2';
+  }
   return 'ENVELOPE_1';
 }

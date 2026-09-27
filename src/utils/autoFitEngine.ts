@@ -67,19 +67,19 @@ export function autoFitPageChunks<T>(
   const isPortrait = config.orientation === 'portrait';
   // Total printable height at 96 DPI (Legal portrait: 13" x 8.5" = 1248px, Legal landscape: 8.5" x 13" = 816px)
   const totalSheetHeight = isPortrait ? 1248 : 816;
-  const sheetPadding = 48; // Standard 24px top + 24px bottom
-  const usableHeight = totalSheetHeight - sheetPadding; // 1200px in portrait, 768px in landscape
+  const sheetPadding = isPortrait ? 40 : 28; // Tighter calibrated sheet padding
+  const usableHeight = totalSheetHeight - sheetPadding; // 1208px in portrait, 788px in landscape
 
-  const headerHeight = config.headerHeightPx ?? (isPortrait ? 170 : 110);
-  const theadHeight = isPortrait ? 32 : 28;
+  const headerHeight = config.headerHeightPx ?? (isPortrait ? 160 : 85);
+  const theadHeight = isPortrait ? 30 : 22;
   const continuationTheadHeight = config.continuationTheadHeightPx !== undefined
     ? config.continuationTheadHeightPx
     : theadHeight;
-  const summaryAndSignatoryHeight = config.footerHeightPx ?? (isPortrait ? 260 : 180);
-  const runningFooterHeight = config.runningFooterPx ?? (isPortrait ? 38 : 28);
-  const safetyBuffer = config.safetyBufferPx ?? (isPortrait ? 40 : 25);
+  const summaryAndSignatoryHeight = config.footerHeightPx ?? (isPortrait ? 220 : 45);
+  const runningFooterHeight = config.runningFooterPx ?? (isPortrait ? 30 : 16);
+  const safetyBuffer = config.safetyBufferPx ?? (isPortrait ? 15 : 2);
 
-  // Maximum items height capacity per page type (Calibrated to preserve safe footer room)
+  // Maximum items height capacity per page type (Calibrated to preserve safe footer room while maximizing sheet space)
   const page1ContinuationCapacity = usableHeight - headerHeight - theadHeight - runningFooterHeight - safetyBuffer;
   const continuationCapacity = usableHeight - continuationTheadHeight - runningFooterHeight - safetyBuffer;
 
@@ -89,8 +89,8 @@ export function autoFitPageChunks<T>(
   const rowHeights = items.map((it) => getRowHeightFn(it));
   const totalContentHeight = rowHeights.reduce((sum, h) => sum + h, 0);
 
-  // 1. Single Page Check: If all items + header + summary + signature fit on Page 1
-  if (totalContentHeight <= singlePageCapacity) {
+  // 1. Single Page Check: If all items + header + summary + signature fit on Page 1 (with 8% elasticity)
+  if (totalContentHeight <= singlePageCapacity * 1.08) {
     return [items];
   }
 
@@ -117,16 +117,16 @@ export function autoFitPageChunks<T>(
       const finalCap = isPage1 ? singlePageCapacity : finalContinuationCapacity;
       const contCap = isPage1 ? page1ContinuationCapacity : continuationCapacity;
 
-      // If everything left fits with final footer on this current page, pack it and done!
-      if (currentHeight + remainingHeight <= finalCap) {
+      // If everything left fits with final footer on this current page (allowing 6% tight flex), pack it and done!
+      if (currentHeight + remainingHeight <= finalCap * 1.06) {
         currentChunk.push(...items.slice(idx));
         pages.push(currentChunk);
         return pages;
       }
 
-      // If this is the last item, it can only join currentChunk if it fits in finalCap (reserving footer)
-      const isLastItem = idx === items.length - 1;
-      const effectiveCap = (isLastItem && currentChunk.length > 0) ? finalCap : contCap;
+      // If this is the last item or second-to-last item, prevent orphan overflow
+      const remainingCount = items.length - idx;
+      const effectiveCap = (remainingCount <= 2 && currentChunk.length > 0) ? finalCap * 1.05 : contCap;
 
       if (currentHeight + rHeight <= effectiveCap) {
         currentChunk.push(item);
@@ -154,7 +154,7 @@ export function autoFitPageChunks<T>(
     return pages;
   }
 
-  // 2. Balanced Minimum-Page Allocation Engine
+  // 3. Balanced Minimum-Page Allocation Engine
   // Eliminates giant empty spaces by discovering the minimum necessary page count
   // and distributing items proportionately so all pages are balanced and filled.
   const N = items.length;

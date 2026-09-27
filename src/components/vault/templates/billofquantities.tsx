@@ -313,14 +313,15 @@ export const BillOfQuantitiesModal: React.FC<BillOfQuantitiesModalProps> = ({
 
     return autoFitPageChunks(
       allRows,
-      (row) => calculateRowHeight(row.description || '', 92, 12, 4, 18),
+      (row) => calculateRowHeight(row.description || '', 120, 11, 2, 16),
       {
         orientation: 'landscape',
-        columnCharWidth: 92,
-        headerHeightPx: 88,
-        footerHeightPx: 58,
-        runningFooterPx: 20,
-        safetyBufferPx: 6,
+        columnCharWidth: 120,
+        headerHeightPx: 85,
+        continuationTheadHeightPx: 24,
+        footerHeightPx: 45,
+        runningFooterPx: 16,
+        safetyBufferPx: 2,
         strategy: 'greedy'
       }
     );

@@ -167,9 +167,7 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
     setStatusMessage('Package status reverted to DRAFT.');
   };
 
-  const envTag = selectedEnvelope === 'ALL'
-    ? 'COMPLETE_BID_PACKAGE'
-    : selectedEnvelope === 'ENVELOPE_1'
+  const envTag = selectedEnvelope === 'ENVELOPE_1'
     ? 'TECHNICAL_LEGAL'
     : 'FINANCIAL';
 
@@ -185,13 +183,105 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
   };
 
   const currentItems = React.useMemo(() => {
-    if (selectedEnvelope === 'ALL') {
-      return items;
+    if (selectedEnvelope === 'ENVELOPE_2') {
+      const finItems = items.filter(it => inferEnvelope(it) === 'ENVELOPE_2');
+      
+      // Ensure all 6 statutory financial documents are present in the Financial Merge:
+      // Form L, BOQ, Bid Form, Price Schedule, Summary, and Cash Flow
+      const requiredFinDocs: PackageItem[] = [
+        {
+          id: 'FINANCIAL_BID_FORM_GOODS',
+          code: 'GPPB-BIDFORM-GOODS',
+          documentName: 'Financial Bid Form (Goods)',
+          category: 'FINANCIAL',
+          envelope: 'ENVELOPE_2',
+          dateAdded: new Date().toISOString(),
+          folderCopy: activeFolder
+        },
+        {
+          id: 'BILL_OF_QUANTITIES',
+          code: 'BILL_OF_QUANTITIES',
+          documentName: 'Bill of Quantities (BOQ Breakdown)',
+          category: 'FINANCIAL',
+          envelope: 'ENVELOPE_2',
+          dateAdded: new Date().toISOString(),
+          folderCopy: activeFolder
+        },
+        {
+          id: 'DETAILED_ESTIMATES_FORM_L',
+          code: 'DETAILED_ESTIMATES_FORM_L',
+          documentName: '(Form L) Detailed Estimates (Direct Labor, Logistics & Equipment)',
+          category: 'FINANCIAL',
+          envelope: 'ENVELOPE_2',
+          dateAdded: new Date().toISOString(),
+          folderCopy: activeFolder
+        },
+        {
+          id: 'PRICE_SCHEDULE_GOODS',
+          code: 'PRICE_SCHEDULE_GOODS',
+          documentName: 'Detailed Price Schedule for Goods (Offered from Abroad / Within Philippines)',
+          category: 'FINANCIAL',
+          envelope: 'ENVELOPE_2',
+          dateAdded: new Date().toISOString(),
+          folderCopy: activeFolder
+        },
+        {
+          id: 'SUMMARY_BID_PRICES',
+          code: 'SUMMARY_BID_PRICES',
+          documentName: 'Summary of Bid Prices & Lump-Sum Breakdown',
+          category: 'FINANCIAL',
+          envelope: 'ENVELOPE_2',
+          dateAdded: new Date().toISOString(),
+          folderCopy: activeFolder
+        },
+        {
+          id: 'CASH_FLOW_BY_QUARTER',
+          code: 'CASH_FLOW_BY_QUARTER',
+          documentName: 'Cash Flow by Quarter and Payment Schedule (SF-INFR-56)',
+          category: 'FINANCIAL',
+          envelope: 'ENVELOPE_2',
+          dateAdded: new Date().toISOString(),
+          folderCopy: activeFolder
+        }
+      ];
+
+      const mergedFinList: PackageItem[] = [...finItems];
+      for (const req of requiredFinDocs) {
+        const alreadyExists = mergedFinList.some(item => {
+          const itemCode = (item.code || item.id || '').toUpperCase();
+          const itemName = (item.documentName || '').toLowerCase();
+          if (req.id === 'DETAILED_ESTIMATES_FORM_L') {
+            return itemCode.includes('DETAILED_ESTIMATE') || itemCode.includes('FORM_L') || itemName.includes('form l') || itemName.includes('detailed estimate');
+          }
+          if (req.id === 'BILL_OF_QUANTITIES') {
+            return itemCode.includes('BOQ') || itemCode.includes('QUANTITIES') || itemName.includes('quantities') || itemName.includes('boq');
+          }
+          if (req.id?.includes('BID_FORM')) {
+            return itemCode.includes('BIDFORM') || itemCode.includes('BID_FORM') || (itemName.includes('bid form') && !itemName.includes('securing'));
+          }
+          if (req.id === 'PRICE_SCHEDULE_GOODS') {
+            return itemCode.includes('PRICE_SCHEDULE') || itemName.includes('price schedule');
+          }
+          if (req.id === 'SUMMARY_BID_PRICES') {
+            return itemCode.includes('SUMMARY_BID') || itemName.includes('summary of bid');
+          }
+          if (req.id === 'CASH_FLOW_BY_QUARTER') {
+            return itemCode.includes('CASH_FLOW') || itemName.includes('cash flow');
+          }
+          return false;
+        });
+
+        if (!alreadyExists) {
+          mergedFinList.push(req as PackageItem);
+        }
+      }
+      return mergedFinList;
     }
-    // Never fall back to the complete item list here: that fallback is what allowed
-    // technical (ENVELOPE_1) documents to leak into the FINANCIAL (ENVELOPE_2) merge.
-    return items.filter(it => inferEnvelope(it) === selectedEnvelope);
-  }, [items, selectedEnvelope]);
+
+    // STRICT TECHNICAL & ELIGIBILITY ENVELOPE:
+    // Only return documents that are strictly Envelope 1. Zero financial docs!
+    return items.filter(it => inferEnvelope(it) === 'ENVELOPE_1');
+  }, [items, selectedEnvelope, activeFolder]);
 
   // Reset compiled PDFs whenever envelope filter changes
   useEffect(() => {
@@ -623,36 +713,27 @@ export const MergedPackageViewerModal: React.FC<MergedPackageViewerModalProps> =
                 <div className="inline-flex items-center bg-slate-800 p-0.5 rounded-lg border border-slate-700">
                   <button
                     type="button"
-                    onClick={() => setSelectedEnvelope('ALL')}
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded transition cursor-pointer ${
-                      selectedEnvelope === 'ALL'
-                        ? 'bg-purple-600 text-white font-bold shadow'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    All Envelopes ({items.length})
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setSelectedEnvelope('ENVELOPE_1')}
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded transition cursor-pointer ${
+                    className={`text-[10px] font-mono px-3 py-1 rounded transition cursor-pointer flex items-center gap-1.5 ${
                       selectedEnvelope === 'ENVELOPE_1'
                         ? 'bg-blue-600 text-white font-bold shadow'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Envelope 1 ({items.filter(i => i.envelope === 'ENVELOPE_1').length})
+                    <span>Envelope 1 (Technical & Legal)</span>
+                    <span className="opacity-75">({items.filter(i => inferEnvelope(i) === 'ENVELOPE_1').length})</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setSelectedEnvelope('ENVELOPE_2')}
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded transition cursor-pointer ${
+                    className={`text-[10px] font-mono px-3 py-1 rounded transition cursor-pointer flex items-center gap-1.5 ${
                       selectedEnvelope === 'ENVELOPE_2'
                         ? 'bg-emerald-600 text-white font-bold shadow'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Envelope 2 ({items.filter(i => i.envelope === 'ENVELOPE_2').length})
+                    <span>Envelope 2 (Financial Proposal)</span>
+                    <span className="opacity-75">({currentItems.length})</span>
                   </button>
                 </div>
               </div>

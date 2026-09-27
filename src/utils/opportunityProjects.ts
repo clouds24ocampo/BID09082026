@@ -1,5 +1,3 @@
-import { debugLog } from "./debugLog";
-
 export interface OpportunityProjectOption {
   id: string;
   refNo: string;
@@ -241,19 +239,6 @@ export const getOpportunityProjects = (
         }
       }
 
-      // #region agent log
-      debugLog(
-        "opportunityProjects.ts:getOpportunityProjects",
-        "Project list resolved",
-        {
-          tenantId: tenantId || null,
-          projectCount: uniqueProjects.length,
-          rawItemCount: rawItems.length,
-        },
-        "E",
-      );
-      // #endregion
-
       oppCache = {
         tenantId,
         data: uniqueProjects,
@@ -264,19 +249,6 @@ export const getOpportunityProjects = (
   } catch (e) {
     console.error("[OpportunityProjects] Error reading storage:", e);
   }
-
-  // #region agent log
-  debugLog(
-    "opportunityProjects.ts:getOpportunityProjects",
-    "Project list resolved",
-    {
-      tenantId: tenantId || null,
-      projectCount: 0,
-      scannedAllTenants: !tenantId,
-    },
-    "E",
-  );
-  // #endregion
 
   return [];
 };

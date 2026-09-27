@@ -25,7 +25,7 @@ const PRESET_COLORS = [
 ];
 
 export const CompanyProfileView: React.FC = () => {
-  const { currentTenant, currentUser, updateTenantSettings, resetUserPassword } = useAuth();
+  const { currentTenant, currentUser, updateTenantSettings, resetUserPassword, updateUserPassword } = useAuth();
 
   const tenantKey = currentTenant?.id || currentUser?.id || 'default';
 
@@ -128,6 +128,10 @@ export const CompanyProfileView: React.FC = () => {
 
     localStorage.setItem(`bidocs_system_username_${tenantKey}`, systemUsername);
     localStorage.setItem(`bidocs_system_password_${tenantKey}`, systemPassword);
+
+    if (currentUser?.id && systemPassword) {
+      updateUserPassword(currentUser.id, systemPassword);
+    }
 
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2500);

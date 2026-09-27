@@ -57,8 +57,12 @@ export const DocumentSeparatorCover: React.FC<DocumentSeparatorCoverProps> = ({
                       nameLower.includes('bill of quantities') || 
                       nameLower.includes('boq') || 
                       nameLower.includes('detailed estimate') || 
-                      nameLower.includes('summary of bid price') || 
-                      nameLower.includes('cash flow');
+                      nameLower.includes('form l') ||
+                      nameLower.includes('form (l)') ||
+                      nameLower.includes('summary of bid') ||
+                      nameLower.includes('summary bid') ||
+                      nameLower.includes('cash flow') ||
+                      nameLower.includes('sf-infr-56');
 
   const isLegal = !isFinancial && (
     rawCategory === 'LEGAL' || 

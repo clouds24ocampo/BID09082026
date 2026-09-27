@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { generateQrCodeDataUrl, formatQrPayload, getCachedQrCodeDataUrl, QrCodeDetails } from '../../utils/qrCodeGenerator';
-import { debugLog } from '../../utils/debugLog';
 
 export interface DocumentQrCodeProps {
   details: QrCodeDetails;
@@ -27,13 +26,6 @@ export const DocumentQrCode: React.FC<DocumentQrCodeProps> = ({
     generateQrCodeDataUrl(details).then((url) => {
       if (isMounted) {
         setDataUrl(url);
-        // #region agent log
-        debugLog('DocumentQrCode.tsx:effect', 'QR code generated', {
-          documentNumber: details.documentNumber,
-          hasDataUrl: !!url,
-          dataUrlLength: url.length
-        }, 'C');
-        // #endregion
       }
     });
 

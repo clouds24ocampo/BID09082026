@@ -1551,16 +1551,22 @@ export const BidPackageBuilderView: React.FC = () => {
   };
 
   // ─── ONE-CLICK MERGE ALL DOCUMENTS WITH "PAGE X OF Y" PAGINATION ───
-  const handleMergeAllDocuments = async (scope: 'CURRENT_FOLDER' | 'ALL_ENVELOPES' = 'CURRENT_FOLDER') => {
-    let docsToMerge = scope === 'ALL_ENVELOPES'
-      ? packageItems.filter(item => item.folderCopy === activeFolderCopy)
-      : currentFolderItems;
+  const handleMergeAllDocuments = async (targetEnvelope: 'ENVELOPE_1' | 'ENVELOPE_2' = activeEnvelope) => {
+    // STRICT STATUTORY ENVELOPE SEPARATION (RA 9184 & RA 12009 NGPA):
+    // Envelope 1 is 100% Technical & Legal. Envelope 2 is 100% Financial Proposal.
+    // They are separate sealed bid packages and must NEVER be merged together.
+    const isFin = targetEnvelope === 'ENVELOPE_2';
+    let docsToMerge = packageItems.filter(item => {
+      const env = resolveBidEnvelope(item.code || item.id || '', item.documentName || '', item.envelope);
+      return env === targetEnvelope && (item.folderCopy === activeFolderCopy || !item.folderCopy);
+    });
 
     // Fallback: If COPY_1 or COPY_2 is empty, automatically replicate from ORIGINAL so nothing is ever missing
     if (docsToMerge.length === 0 && (activeFolderCopy === 'COPY_1' || activeFolderCopy === 'COPY_2')) {
-      const originalFallback = scope === 'ALL_ENVELOPES'
-        ? packageItems.filter(item => item.folderCopy === 'ORIGINAL')
-        : packageItems.filter(item => item.envelope === activeEnvelope && item.folderCopy === 'ORIGINAL');
+      const originalFallback = packageItems.filter(item => {
+        const env = resolveBidEnvelope(item.code || item.id || '', item.documentName || '', item.envelope);
+        return env === targetEnvelope && item.folderCopy === 'ORIGINAL';
+      });
       if (originalFallback.length > 0) {
         docsToMerge = originalFallback.map(item => ({
           ...item,
@@ -1569,8 +1575,41 @@ export const BidPackageBuilderView: React.FC = () => {
       }
     }
 
+    if (isFin) {
+      // Guarantee Form L and all financial proposal documents in Envelope 2
+      const requiredFinDocs = [
+        { id: 'FINANCIAL_BID_FORM_GOODS', code: 'GPPB-BIDFORM-GOODS', documentName: 'Financial Bid Form (Goods)', category: 'FINANCIAL' as const, envelope: 'ENVELOPE_2' as const },
+        { id: 'BILL_OF_QUANTITIES', code: 'BILL_OF_QUANTITIES', documentName: 'Bill of Quantities (BOQ Breakdown)', category: 'FINANCIAL' as const, envelope: 'ENVELOPE_2' as const },
+        { id: 'DETAILED_ESTIMATES_FORM_L', code: 'DETAILED_ESTIMATES_FORM_L', documentName: '(Form L) Detailed Estimates (Direct Labor, Logistics & Equipment)', category: 'FINANCIAL' as const, envelope: 'ENVELOPE_2' as const },
+        { id: 'PRICE_SCHEDULE_GOODS', code: 'PRICE_SCHEDULE_GOODS', documentName: 'Detailed Price Schedule for Goods (Offered from Abroad / Within Philippines)', category: 'FINANCIAL' as const, envelope: 'ENVELOPE_2' as const },
+        { id: 'SUMMARY_BID_PRICES', code: 'SUMMARY_BID_PRICES', documentName: 'Summary of Bid Prices & Lump-Sum Breakdown', category: 'FINANCIAL' as const, envelope: 'ENVELOPE_2' as const },
+        { id: 'CASH_FLOW_BY_QUARTER', code: 'CASH_FLOW_BY_QUARTER', documentName: 'Cash Flow by Quarter and Payment Schedule (SF-INFR-56)', category: 'FINANCIAL' as const, envelope: 'ENVELOPE_2' as const }
+      ];
+
+      for (const req of requiredFinDocs) {
+        const already = docsToMerge.some(it => {
+          const c = (it.code || it.id || '').toUpperCase();
+          const n = (it.documentName || '').toLowerCase();
+          if (req.id === 'DETAILED_ESTIMATES_FORM_L') return c.includes('FORM_L') || c.includes('DETAILED_ESTIMATE') || n.includes('form l') || n.includes('detailed estimate');
+          if (req.id === 'BILL_OF_QUANTITIES') return c.includes('BOQ') || c.includes('QUANTITIES') || n.includes('boq') || n.includes('quantities');
+          if (req.id.includes('BID_FORM')) return c.includes('BIDFORM') || c.includes('BID_FORM') || (n.includes('bid form') && !n.includes('securing'));
+          if (req.id === 'PRICE_SCHEDULE_GOODS') return c.includes('PRICE_SCHEDULE') || n.includes('price schedule');
+          if (req.id === 'SUMMARY_BID_PRICES') return c.includes('SUMMARY_BID') || n.includes('summary of bid');
+          if (req.id === 'CASH_FLOW_BY_QUARTER') return c.includes('CASH_FLOW') || n.includes('cash flow');
+          return false;
+        });
+        if (!already) {
+          docsToMerge.push({
+            ...req,
+            folderCopy: activeFolderCopy,
+            dateAdded: new Date().toISOString()
+          } as PackageItem);
+        }
+      }
+    }
+
     if (docsToMerge.length === 0) {
-      alert(`No documents found in this ${activeFolderCopy} folder to merge.`);
+      alert(`No documents found in this ${activeFolderCopy} folder for ${targetEnvelope === 'ENVELOPE_1' ? 'Envelope 1' : 'Envelope 2'} to merge.`);
       return;
     }
 
@@ -1595,26 +1634,32 @@ export const BidPackageBuilderView: React.FC = () => {
           document.getElementById(`cover-page-render-${doc.id.replace(/^pkg-c[12]-/, '')}`)
         ) as HTMLElement | null;
 
+        // 3. Form element for template items (BOQ, Form L, OSS, BSD, etc.)
+        const formElem = (
+          document.getElementById(`form-template-render-${doc.id}`) ||
+          document.getElementById(`form-template-render-${doc.id.replace(/^pkg-c[12]-/, '')}`)
+        ) as HTMLElement | null;
+
         units.push({
           title: doc.documentName,
-          coverElement: coverElem || null,
-          fileDataUrl: fileDataUrl || null,
+          documentCode: doc.code,
           documentName: doc.documentName,
-          documentCode: doc.code || (doc as any).documentCode,
-          fileName: doc.fileName
+          fileName: doc.fileName,
+          isPristineAttachment: (doc as any).isPristineAttachment || (doc.category === 'LEGAL' && !formElem),
+          coverElement: coverElem,
+          formElement: formElem,
+          fileDataUrl: fileDataUrl || null
         });
       }
 
       setMergeStatusText(`Compiling & stamping "Page X of Y" pagination on ${units.length} documents...`);
 
-      const cleanRef = (activeProject?.refNo || projectRefNo || 'PRJ-2026').replace(/[^a-zA-Z0-9]/g, '_');
-      const envTag = scope === 'ALL_ENVELOPES'
-        ? 'COMPLETE_BID_PACKAGE_ALL_ENVELOPES'
-        : activeEnvelope === 'ENVELOPE_1' ? 'TECHNICAL_LEGAL' : 'FINANCIAL';
+      const cleanRef = (projectRefNo || activeProject?.refNo || 'DOC-2026').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const envTag = targetEnvelope === 'ENVELOPE_1' ? 'TECHNICAL_LEGAL' : 'FINANCIAL';
       const fileName = `${cleanRef}_${activeFolderCopy}_${envTag}.pdf`;
 
-      const dataUrl = await buildMergedThreeLayerPdfDataUrl(units, fileName, (prog) => {
-        setMergeStatusText(`${prog.status} (${prog.percent}%)`);
+      const dataUrl = await buildMergedThreeLayerPdfDataUrl(units, fileName, (info) => {
+        setMergeStatusText(`Merging [${info.currentDoc}/${info.totalDocs}]: ${info.status}`);
       }, {
         folderCopy: activeFolderCopy,
         submissionDate: activeProject?.dateTimeSubmitted || (activeProject as any)?.submissionDeadline || submissionDeadline || 'August 30, 2026',
@@ -1645,14 +1690,14 @@ export const BidPackageBuilderView: React.FC = () => {
         tenantId,
         projectRefNo: targetProjectRef,
         projectTitle: projectTitle || activeProject?.title || 'Target Procurement Project',
-        envelope: scope === 'ALL_ENVELOPES' ? 'ALL_ENVELOPES' : activeEnvelope,
+        envelope: targetEnvelope,
         folderCopy: activeFolderCopy,
         fileName,
         fileSizeBytes,
         pageCount: units.length,
         mergedAt: new Date().toISOString(),
         documentCount: docsToMerge.length,
-        scope
+        scope: 'CURRENT_FOLDER'
       };
 
       await saveProjectMergedPackage(tenantId, targetProjectRef, newRecord, dataUrl);
@@ -2068,12 +2113,12 @@ export const BidPackageBuilderView: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => handleMergeAllDocuments('ALL_ENVELOPES')}
+                onClick={() => handleMergeAllDocuments(activeEnvelope)}
                 disabled={isMergingAll || packageItems.length === 0}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-linear-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-cyan-950/40 cursor-pointer disabled:opacity-50 border border-cyan-400/40"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-emerald-950/40 cursor-pointer disabled:opacity-50 border border-emerald-400/40"
               >
-                <FileStack className="w-3.5 h-3.5 text-cyan-200" />
-                <span>+ Merge All Envelopes ({activeFolderCopy})</span>
+                <Download className="w-3.5 h-3.5 text-emerald-200" />
+                <span>+ Merge {activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1 (Technical)' : 'Envelope 2 (Financial)'} ({activeFolderCopy})</span>
               </button>
               <button
                 type="button"
@@ -2134,21 +2179,12 @@ export const BidPackageBuilderView: React.FC = () => {
               <div className="flex items-center justify-center gap-3 pt-2 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => handleMergeAllDocuments('CURRENT_FOLDER')}
+                  onClick={() => handleMergeAllDocuments(activeEnvelope)}
                   disabled={isMergingAll}
                   className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-950/40"
                 >
                   <Download className="w-4 h-4" />
                   <span>Merge {activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1' : 'Envelope 2'} ({activeFolderCopy})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleMergeAllDocuments('ALL_ENVELOPES')}
-                  disabled={isMergingAll}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white transition flex items-center gap-2 cursor-pointer shadow-lg shadow-teal-950/40"
-                >
-                  <FileStack className="w-4 h-4" />
-                  <span>Merge All Envelopes ({activeFolderCopy})</span>
                 </button>
                 <button
                   type="button"
@@ -2306,7 +2342,7 @@ export const BidPackageBuilderView: React.FC = () => {
 
             {/* Direct 1-Click Merge Current Envelope Button */}
             <button
-              onClick={() => handleMergeAllDocuments('CURRENT_FOLDER')}
+              onClick={() => handleMergeAllDocuments(activeEnvelope)}
               disabled={isMergingAll || (currentFolderItems.length === 0 && originalCount === 0)}
               className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-emerald-950/40 cursor-pointer disabled:opacity-50 border border-emerald-400/40"
               title={`Compile current envelope (${activeEnvelope === 'ENVELOPE_1' ? 'Envelope 1' : 'Envelope 2'}) in ${activeFolderCopy} and download merged PDF`}
@@ -2316,18 +2352,7 @@ export const BidPackageBuilderView: React.FC = () => {
               ) : (
                 <Download className="w-3.5 h-3.5 text-emerald-200" />
               )}
-              <span>Merge {activeEnvelope === 'ENVELOPE_1' ? 'Env 1' : 'Env 2'} ({activeFolderCopy})</span>
-            </button>
-
-            {/* Direct 1-Click Merge ALL Documents across Both Envelopes */}
-            <button
-              onClick={() => handleMergeAllDocuments('ALL_ENVELOPES')}
-              disabled={isMergingAll || packageItems.length === 0}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-linear-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-cyan-950/40 cursor-pointer disabled:opacity-50 border border-cyan-400/40"
-              title={`Compile ALL documents across BOTH Envelope 1 and Envelope 2 in ${activeFolderCopy} into one complete bid package`}
-            >
-              <FileStack className="w-3.5 h-3.5 text-cyan-200" />
-              <span>Merge All Envelopes ({activeFolderCopy})</span>
+              <span>Merge {activeEnvelope === 'ENVELOPE_1' ? 'Env 1 (Technical)' : 'Env 2 (Financial)'} ({activeFolderCopy})</span>
             </button>
 
             {/* Merged Bid Packages Folder (Preview & Download Original, Copy 1, Copy 2) */}
@@ -2516,7 +2541,7 @@ export const BidPackageBuilderView: React.FC = () => {
 
               {/* Direct 1-Click Merge & Download Button */}
               <button
-                onClick={() => handleMergeAllDocuments('CURRENT_FOLDER')}
+                onClick={() => handleMergeAllDocuments(activeEnvelope)}
                 disabled={isMergingAll || filteredItems.length === 0}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border border-emerald-400/30"
                 title={`Direct 1-click compile & download ${activeFolderCopy} package with live progress bar`}

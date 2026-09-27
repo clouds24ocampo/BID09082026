@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../../../types';
 import { generateAndDownloadThreeLayerPdf, generateThreeLayerPdfDataUrl } from '../../../utils/pdfExportEngine';
+import { savePdfData } from '../../../utils/vaultIndexedDB';
 import { autoFitPageChunks, calculateRowHeight } from '../../../utils/autoFitEngine';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import VaultErrorBoundary from '../../common/VaultErrorBoundary';
@@ -854,7 +855,10 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
         columnCharWidth: 65,
         headerHeightPx: 170,
         footerHeightPx: 520,
-        runningFooterPx: 30
+        runningFooterPx: 30,
+        // GREEDY: fill each Legal portrait page to full capacity before creating a new page,
+        // eliminating the large empty trailing whitespace left by balanced distribution.
+        strategy: 'greedy'
       }
     );
   }, [materials]);
@@ -862,6 +866,29 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
   const totalPages = materialPages.length;
 
   const [isSaving, setIsSaving] = useState(false);
+
+  /**
+   * Persists the generated Detailed Estimates PDF binary into IndexedDB under every key the
+   * merged-package resolver looks up, so the (Form L) attachment is never missing from the
+   * compiled FINANCIAL envelope.
+   */
+  const persistDetailedEstimatesPdf = async (dataUrl?: string) => {
+    if (!dataUrl) return;
+    const tenantKey = tenant?.id || 'default';
+    const keys = new Set<string>();
+    if (projectRefNo) keys.add(`detailed_estimates_pdf_${tenantKey}_${projectRefNo}`);
+    if (projectScopeKey) keys.add(`detailed_estimates_pdf_${tenantKey}_${projectScopeKey}`);
+    if (selectedOppId) keys.add(`detailed_estimates_pdf_${tenantKey}_${selectedOppId}`);
+    if (projectRefNo) keys.add(`estimates_pdf_${tenantKey}_${projectRefNo}`);
+    if (projectRefNo) keys.add(`bidocs_detailed_estimates_pdf_${tenantKey}_${projectRefNo}`);
+    for (const k of keys) {
+      try {
+        await savePdfData(k, dataUrl);
+      } catch (e) {
+        console.warn(`[DetailedEstimates] Could not persist PDF under key ${k}:`, e);
+      }
+    }
+  };
 
   const handleSaveToVault = async () => {
     setIsSaving(true);
@@ -871,6 +898,7 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
     if (containerElem) {
       try {
         const dataUrl = await generateThreeLayerPdfDataUrl(null, containerElem, undefined, fileName);
+        await persistDetailedEstimatesPdf(dataUrl);
         if (onSaveAndComplete) {
           onSaveAndComplete(dataUrl, `(L) Detailed Estimates - [${projectRefNo}]`, projectRefNo, projectName);
         }
@@ -893,6 +921,7 @@ export const DetailedEstimatesModalContent: React.FC<DetailedEstimatesModalProps
     if (containerElem) {
       try {
         const dataUrl = await generateThreeLayerPdfDataUrl(null, containerElem, undefined, fileName);
+        await persistDetailedEstimatesPdf(dataUrl);
         await generateAndDownloadThreeLayerPdf(null, containerElem, undefined, fileName);
         if (onSaveAndComplete) {
           onSaveAndComplete(dataUrl, `(L) Detailed Estimates - [${projectRefNo}]`, projectRefNo, projectName);

@@ -1374,24 +1374,28 @@ export const TechnicalExhibitTemplateModal: React.FC<TechnicalExhibitTemplateMod
 
               </div>
 
-              {/* Verification Footer Seal with Smartphone Scannable QR Code */}
+              {/* Verification Footer Seal (QR Code suppressed for Key Personnel per user request) */}
               <div className="pt-2 border-t border-slate-300 flex items-center justify-between text-[9px] font-mono text-slate-700 relative z-10 px-2 pb-1">
                 <div className="flex items-center gap-2.5">
-                  <DocumentQrCode
-                    details={{
-                      companyName: companyName,
-                      documentName: `Item ${item.code} — ${item.name}`,
-                      documentNumber: `EXHIBIT-${item.code.replace(/[^a-zA-Z0-9]/g, '')}-${projectRefNo || '2026-901283'}`,
-                      projectTitle: projectTitle,
-                      projectRefNo: projectRefNo,
-                      procuringEntity: procuringEntity,
-                      dateTimeSubmitted: dateTimeSubmitted || 'March 19, 2026',
-                      documentCategory: 'Technical Eligibility',
-                      generatedBy: companyName
-                    }}
-                    size={48}
-                    showCaption={false}
-                  />
+                  {!item.code?.toLowerCase().includes('f.b') &&
+                   !item.name?.toLowerCase().includes('personnel') &&
+                   !item.name?.toLowerCase().includes('manpower') && (
+                    <DocumentQrCode
+                      details={{
+                        companyName: companyName,
+                        documentName: `Item ${item.code} — ${item.name}`,
+                        documentNumber: `EXHIBIT-${item.code.replace(/[^a-zA-Z0-9]/g, '')}-${projectRefNo || '2026-901283'}`,
+                        projectTitle: projectTitle,
+                        projectRefNo: projectRefNo,
+                        procuringEntity: procuringEntity,
+                        dateTimeSubmitted: dateTimeSubmitted || 'March 19, 2026',
+                        documentCategory: 'Technical Eligibility',
+                        generatedBy: companyName
+                      }}
+                      size={48}
+                      showCaption={false}
+                    />
+                  )}
                   <div className="space-y-0.5 font-mono text-[8.5px] text-slate-800">
                     <p className="font-bold text-slate-950 uppercase">{companyName}</p>
                     <p>PROJECT: <strong>{projectTitle}</strong></p>

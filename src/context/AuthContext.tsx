@@ -3,7 +3,6 @@ import { Tenant, User, UserRole, isApproverRole } from "../types";
 import {
   purgeEntireApplicationStorage,
 } from "../utils/vaultIndexedDB";
-import { debugLog } from "../utils/debugLog";
 import {
   safeGetItem,
   safeSetItem,
@@ -15,29 +14,6 @@ import {
 const DEFAULT_TENANTS: Tenant[] = [];
 
 const DEFAULT_USERS: User[] = [];
-
-const FLUSH_KEY = "bidocs_live_clean_flush_v7_new_transaction";
-
-// Automatic one-time clean flush for pristine new transaction
-const purgeLegacyMockData = () => {
-  try {
-    if (typeof localStorage === "undefined") return;
-    const isFlushedForLive = safeGetItem(FLUSH_KEY);
-    if (!isFlushedForLive) {
-      purgeEntireApplicationStorage().catch((e) =>
-        console.error("[AuthContext] Error purging database:", e),
-      );
-      safeSetItem(FLUSH_KEY, "true");
-      console.log(
-        "[BiDOCS] Database and storage flushed clean for new transaction.",
-      );
-    }
-  } catch (e) {
-    console.error("[AuthContext] Error flushing legacy mock data:", e);
-  }
-};
-
-purgeLegacyMockData();
 
 const getSavedTenants = (): Tenant[] => {
   const parsed = safeGetJson<any[]>("bidocs_tenants", []);
@@ -176,17 +152,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       (u) => u.email.toLowerCase() === normalizedEmail,
     );
     if (!foundUser) {
-      // #region agent log
-      debugLog(
-        "AuthContext.tsx:login",
-        "Login rejected: user not found",
-        {
-          normalizedEmail,
-          userCount: users.length,
-        },
-        "D",
-      );
-      // #endregion
       return false; // Unknown email → reject login
     }
 
@@ -195,20 +160,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       safeGetItem(`bidocs_user_password_${normalizedEmail}`) ||
       foundUser.password;
     if (!storedPw || storedPw !== password) {
-      // #region agent log
-      debugLog(
-        "AuthContext.tsx:login",
-        "Login rejected: password mismatch",
-        {
-          normalizedEmail,
-          hasStoredPwKey: !!safeGetItem(
-            `bidocs_user_password_${normalizedEmail}`,
-          ),
-          hasUserObjectPw: !!foundUser.password,
-        },
-        "D",
-      );
-      // #endregion
       return false; // Wrong password → reject login
     }
 
@@ -235,18 +186,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setCurrentUser(userToSet);
     setCurrentTenant(tenant);
-    // #region agent log
-    debugLog(
-      "AuthContext.tsx:login",
-      "Login succeeded",
-      {
-        userId: userToSet.id,
-        tenantId: tenant.id,
-        mustChangePassword: isMustChange,
-      },
-      "D",
-    );
-    // #endregion
     return true;
   };
 
@@ -407,28 +346,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const targetEmail = email.trim().toLowerCase();
     if (!targetEmail) return false;
 
-    setUsers((prev) => {
-      const existing = prev.find((u) => u.email.toLowerCase() === targetEmail);
-      if (existing) {
-        return prev.map((u) =>
-          u.email.toLowerCase() === targetEmail
-            ? { ...u, password: "BiDOCS#2026", mustChangePassword: true }
-            : u,
-        );
-      } else {
-        const defaultTenantId = tenants[0]?.id || `tenant-${Date.now()}`;
-        const newUser: User = {
-          id: `user-${Date.now()}`,
-          tenantId: defaultTenantId,
-          email: email.trim(),
-          fullName: email.split("@")[0].toUpperCase(),
-          role: "COMPANY_OWNER",
-          password: "BiDOCS#2026",
-          mustChangePassword: true,
-        };
-        return [...prev, newUser];
-      }
-    });
+    const userExists = users.some((u) => u.email.toLowerCase() === targetEmail);
+    if (!userExists) {
+      return false; // Security: Never create accounts for unrecognized emails
+    }
+
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.email.toLowerCase() === targetEmail
+          ? { ...u, password: "BiDOCS#2026", mustChangePassword: true }
+          : u,
+      ),
+    );
 
     safeSetItem(`bidocs_user_password_${targetEmail}`, "BiDOCS#2026");
     safeSetItem(`bidocs_must_change_password_${targetEmail}`, "true");
@@ -480,9 +409,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     purgeEntireApplicationStorage().catch((e) =>
       console.error("[AuthContext] Failed to purge application storage:", e),
     );
-    try {
-      localStorage.setItem(FLUSH_KEY, "true");
-    } catch (_) {}
     setTenants([]);
     setUsers([]);
     setCurrentUser(null);
