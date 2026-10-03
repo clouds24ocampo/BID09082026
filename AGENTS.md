@@ -1,73 +1,47 @@
-# BiDOCS Multi-Agent System (Antigravity Orchestrator)
+# BiDOCS Agent Instructions
 
-Welcome to the **BiDOCS Agent Swarm**, powered by Google Antigravity and 79 specialized engineering skills + Context7 live MCP integration.
+Single source of truth for agent roles and non-negotiable rules. Other docs link here; do not copy rules elsewhere.
 
----
+## Routing
+Auto-route by intent. User never needs `@agent`. Handles are optional shortcuts for forcing a role (full list and example prompts: `.agent/AGENT-COMMANDS.md`). Multi-domain work runs: plan → design → implement → review+security → QA (`npx tsc --noEmit`, tests, evidence before "done").
 
-## 🎯 Autonomous Specialist Routing (Zero `@agent` Required)
+## Roles (21) and core skills
+Skills live in `.agents/skills/<name>/SKILL.md`. Load only the skill the task needs.
 
-> **Core Operating Directive**: The user **never needs to explicitly call `@agent` or tag any agent handle**.
-> The Antigravity Master Orchestrator **automatically analyzes what the user is saying**, assumes the appropriate specialist role, and directly executes and responds with complete domain expertise.
+| Handle | Role | Core skills |
+|:--|:--|:--|
+| `@agent-architect` | Planner | `planning-and-task-breakdown`, `spec-driven-development`, `idea-refine`, `writing-plans` |
+| `@agent-designer` | UI/UX | `ui-ux-pro-max`, `design`, `design-system`, `brand`, `ui-styling`, `banner-design`, `slides` |
+| `@agent-pdf-engineer` | PDF + procurement forms | `bidocs-pdf-system`, `api-and-interface-design`, `context7-mcp` |
+| `@agent-database` | Supabase / Postgres / IndexedDB | `supabase`, `supabase-postgres-best-practices`, `vault-local-storage` |
+| `@agent-qa` | Tests / browser | `playwright-skill`, `browser-testing-with-devtools`, `test-driven-development`, `verify-and-stop` |
+| `@agent-security` | Secrets | `scan-secrets`, `check-hmsl`, `install-hooks`, `security-and-hardening` |
+| `@agent-cybersecurity` | Hardening audit | `cybersecurity-guardian`, `scan-secrets`, `security-and-hardening` |
+| `@agent-reviewer` | Code review | `code-review-and-quality`, `qodo-get-rules`, `qodo-pr-resolver`, `doubt-driven-development` |
+| `@agent-devops` | CI / release | `shipping-and-launch`, `ci-cd-and-automation`, `git-workflow-and-versioning` |
+| `@agent-token-optimizer` | Terse + surgical fixes | `caveman`, `caveman-commit`, `investigate-first`, `surgical-patch` |
+| `@agent-compliance` | ADRs / audit | `documentation-and-adrs`, `interview-me`, `constraint-driven-development` |
+| `@agent-senior-fullstack` | Feature work | `senior-fullstack-engineer`, `frontend-ui-engineering`, `performance-optimization` |
+| `@agent-expert-fullstack` | Crash-proof features | `expert-fullstack-developer`, `senior-fullstack-engineer`, `vault-local-storage` |
+| `@agent-document-master` | Zero-whitespace layout | `zero-whitespace-pdf-master`, `bidocs-pdf-system` |
+| `@agent-performance-engineer` | Perf / bundle | `performance-optimization-master`, `safe-refactor` |
+| `@agent-api-architect` | Data contracts | `api-data-architect`, `api-and-interface-design` |
+| `@agent-system-debugger` | Root-cause debugging | `system-diagnostics-debugger`, `systematic-debugging` |
+| `@agent-procurement-specialist` | RA 9184 / RA 12009 | `philippine-procurement-statutory`, `bid-package-management` |
+| `@agent-vault-storage` | Local-first storage | `vault-local-storage`, `performance-optimization` |
+| `@agent-bid-manager` | Bid dossier | `bid-package-management`, `philippine-procurement-statutory`, `api-data-architect` |
+| `@agent-bidocs-pdf-guard` | PDF rule enforcer | `bidocs-pdf-guard`, `zero-whitespace-pdf-master`, `bidocs-pdf-system` |
 
-Explicit handles remain available for reference:
+Definitions: `.agents/agents/` (10 core), `.github/agents/*.agent.md` (23 Copilot-format). Add a role = add one file there plus one row here.
 
-| Agent Handle | Specialization | Core Skills | Typical Commands |
-|:---|:---|:---|:---|
-| `@agent-architect` | **System Architect & Planner** | `planning-and-task-breakdown`, `spec-driven-development`, `idea-refine`, `writing-plans` | "Plan the new feature X", "Decompose this project into phases" |
-| `@agent-designer` | **UI/UX & Design Systems Lead** | `ui-ux-pro-max`, `design`, `design-system`, `brand`, `ui-styling`, `banner-design`, `slides` | "Make this modal look premium", "Design the procurement dashboard" |
-| `@agent-pdf-engineer` | **BiDOCS PDF & Gov Procurement** | `bidocs-pdf-system`, `api-and-interface-design`, `context7-mcp` | "Fix the 3-copy sealed package", "Add statutory Form X", "Update page stamping" |
-| `@agent-database` | **Database & Supabase Engineer** | `supabase`, `supabase-postgres-best-practices`, `vaultIndexedDB` | "Add an index to documents table", "Create RLS policy for tenant isolation" |
-| `@agent-qa` | **QA & Browser Automation Engineer** | `playwright-skill`, `browser-testing-with-devtools`, `test-driven-development`, `verify-and-stop` | "Run Playwright test on merge flow", "Verify the off-screen canvas in DevTools" |
-| `@agent-security` | **Security & Secret Guard** | `scan-secrets`, `check-hmsl`, `install-hooks`, `security-and-hardening` | "Scan the repo for leaked tokens", "Set up pre-commit hook" |
-| `@agent-reviewer` | **Code Review & Standards Auditor** | `code-review-and-quality`, `qodo-get-rules`, `qodo-pr-resolver`, `doubt-driven-development` | "Review my uncommitted diff", "Simplify this complex function" |
-| `@agent-devops` | **DevOps & Release Commander** | `shipping-and-launch`, `ci-cd-and-automation`, `git-workflow-and-versioning` | "Prepare release v2.1.0", "Set up GitHub Actions CI" |
-| `@agent-token-optimizer` | **Caveman Token Optimizer** | `caveman`, `caveman-commit`, `caveman-compress`, `investigate-first`, `surgical-patch` | "/caveman", "Fix this bug with minimal tokens", "Investigate before editing" |
-| `@agent-compliance` | **Procurement Compliance Officer** | `documentation-and-adrs`, `interview-me`, `constraint-driven-development` | "Write ADR for PDF engine", "Audit PhilGEPS BAC requirements" |
-| `@agent-senior-fullstack` | **Senior Full-Stack Developer** | `senior-fullstack-engineer`, `frontend-ui-engineering`, `api-and-interface-design`, `supabase`, `performance-optimization` | "Architect full-stack feature", "Optimize state, queries & bundle chunks" |
-| `@agent-cybersecurity` | **Enterprise Cybersecurity Guardian** | `cybersecurity-guardian`, `scan-secrets`, `check-hmsl`, `install-hooks`, `security-and-hardening` | "Scan repo for leaked secrets", "Audit input sanitization & RLS policies" |
-| `@agent-document-master` | **Zero-Whitespace Document & PDF Master** | `zero-whitespace-pdf-master`, `bidocs-pdf-system`, `autoFitEngine`, `api-and-interface-design` | "Eliminate whitespace gaps in PDF", "Format statutory Legal procurement layout" |
-| `@agent-performance-engineer` | **Performance & Bundle Engineer** | `performance-optimization-master`, `performance-optimization`, `safe-refactor` | "Optimize chunk splitting", "Profile memory in 3-copy PDF compile" |
-| `@agent-api-architect` | **API & Data Contracts Architect** | `api-data-architect`, `api-and-interface-design`, `supabase` | "Design PhilGEPS sync schema", "Create type-safe contracts" |
-| `@agent-system-debugger` | **Diagnostics & System Debugger** | `system-diagnostics-debugger`, `systematic-debugging`, `debugging-and-error-recovery` | "Diagnose unhandled promise rejection", "Isolate memory leak" |
-| `@agent-expert-fullstack` | **Expert Full-Stack Developer** | `expert-fullstack-developer`, `senior-fullstack-engineer`, `frontend-ui-engineering`, `vault-local-storage` | "Engineer resilient full-stack feature", "Zero black-screen crash guarantee" |
-| `@agent-procurement-specialist` | **Philippine Procurement Statutory Specialist** | `philippine-procurement-statutory`, `bid-package-management`, `documentation-and-adrs` | "Audit bid compliance under RA 12009", "Verify SLCC / NFCC calculation" |
-| `@agent-vault-storage` | **Vault & Local-First Storage Architect** | `vault-local-storage`, `supabase-postgres-best-practices`, `performance-optimization` | "Optimize IndexedDB binary offloading", "Enforce zero-leak project isolation" |
-| `@agent-bid-manager` | **Bid Package & Opportunity Manager** | `bid-package-management`, `philippine-procurement-statutory`, `api-data-architect` | "Assemble 3-envelope bid dossier", "Track PhilGEPS opportunity lifecycle" |
-| `@agent-bidocs-pdf-guard` | **BiDOCS PDF Guard & Stability Enforcer** | `bidocs-pdf-guard`, `zero-whitespace-pdf-master`, `bidocs-pdf-system` | "Enforce Rules PDF-1 to PDF-7", "Verify base64 data URLs & legal sizing" |
+## Non-Negotiable Rules
+- **PDF-1**: `buildMergedThreeLayerPdfDataUrl` returns base64 via `blobToDataUrl`. No `URL.createObjectURL` in that path. Allowed only in `buildMergedThreeLayerPdfBlobUrl` and `exportMergedThreeLayerPdf` (download, revoked).
+- **PDF-2**: Module-scope `LEGAL_PORTRAIT` [612, 936], `LEGAL_LANDSCAPE` [936, 612]. Legal only, never A4/Letter.
+- **PDF-3**: No pre-jumping the progress bar; engine `onProgress` drives it.
+- **PDF-4**: Off-screen containers: `style={{ left: '-9999px', top: '0px', width: '816px', zIndex: -1 }}`.
+- **PDF-5**: Cover elements use ids `bundle-cover-${doc.id}`, `preview-cover-${folderCopy}-${doc.id}`.
+- **PDF-6**: Never remove `blobToDataUrl` from `src/utils/pdfExportEngine.ts`.
+- **PDF-7**: Tables use `autoFitEngine` (`calculateRowHeight`, `autoFitPageChunks`): full pages, no orphan rows. See `zero-whitespace-pdf-master`.
+- **T-1**: Run `npx tsc --noEmit` before and after code changes. `npm run validate` = tsc + PDF guard.
 
----
-
-## 🏛️ Autonomous Delegation Protocol
-
-When a request spans multiple disciplines, the agent operates in an autonomous pipeline:
-
-1. **Phase 1 — Discovery & Planning** (`@agent-architect`):
-   - Clarifies ambiguities and scopes the work without making premature edits (`investigate-first`).
-   - Produces an execution plan with testable gates.
-
-2. **Phase 2 — UI/UX Specification** (`@agent-designer`):
-   - Validates color harmonies, typography, component hierarchies, and interactive states.
-
-3. **Phase 3 — Implementation** (`@agent-pdf-engineer` / `@agent-database`):
-   - Executes changes incrementally.
-   - For PDF operations: Strictly enforces Legal paper dimensions (8.5" x 13"), base64 data URLs, and dedicated ID selectors.
-   - For Database operations: Strictly enforces multi-tenant RLS isolation.
-
-4. **Phase 4 — Code Audit & Security Check** (`@agent-reviewer` & `@agent-security`):
-   - Audits changes against repo standards (`qodo-get-rules`).
-   - Scans modified files for unintended secrets or tokens (`scan-secrets`).
-
-5. **Phase 5 — QA Verification & Sign-off** (`@agent-qa`):
-   - Runs `npx tsc --noEmit` to verify type safety.
-   - Verifies rendering and outputs evidence before declaring complete (`verification-before-completion`).
-
----
-
-## ⚡ Non-Negotiable System Rules
-- **Rule PDF-1**: `buildMergedThreeLayerPdfDataUrl` must return base64 Data URLs via `blobToDataUrl`. Never use `URL.createObjectURL`.
-- **Rule PDF-2**: Use top-level constants `LEGAL_PORTRAIT` [612, 936] and `LEGAL_LANDSCAPE` [936, 612].
-- **Rule PDF-3**: No pre-jumping the progress bar.
-- **Rule PDF-4**: Off-screen render containers must use `style={{ left: '-9999px', top: '0px', width: '816px', zIndex: -1 }}`.
-- **Rule PDF-5**: Cover page elements must use dedicated IDs (`bundle-cover-${doc.id}`, `preview-cover-${folderCopy}-${doc.id}`).
-- **Rule PDF-6**: Never remove `blobToDataUrl` helper in `src/utils/pdfExportEngine.ts`.
-- **Rule T-1**: Always run `npx tsc --noEmit` before and after making code changes.
+Details: `ARCHITECTURE.md`, `GEMINI.md`, `DEBUGGING.md`, `.agents/skills/bidocs-pdf-system/SKILL.md`.

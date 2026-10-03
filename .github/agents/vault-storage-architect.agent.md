@@ -15,7 +15,7 @@ Architect, safeguard, and optimize the client-side persistence and data isolatio
 
 ## 💾 Core Rules & Invariants
 
-1. **IndexedDB Offloading (`bidocs_vault_db`)**:
+1. **IndexedDB Offloading (`BiDOCS_VaultDB`)**:
    - Heavy binary strings (PDF base64 Data URLs, scanned permits, attachments) MUST be stored in IndexedDB via `vaultIndexedDB.ts` (`savePdfData(id, dataUrl)`).
    - Never store raw binary blobs inside `localStorage`.
 

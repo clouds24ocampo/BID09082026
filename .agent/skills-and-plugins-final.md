@@ -1,7 +1,7 @@
 # 🚀 My Antigravity AI Agent — Complete Skills & Plugins List
 
-> **79 skills + 1 MCP plugin** installed globally
-> Copy the install commands at the bottom to give your friend the same superpowers! ⚡
+> **79 third-party skills + 1 MCP plugin** (install-time count) + **12 BiDOCS project skills** + a few extras (`constraint-driven-development`, `context7-mcp`, `qodo-*`). Count on disk: `ls .agents/skills | wc -l`.
+> Install commands at the bottom.
 
 ---
 
@@ -297,15 +297,37 @@ npx -y skills add gitguardian/agent-skills -g
 | 🛠️ Debugging & Maintenance | 2 |
 | 📚 Documentation & Learning | 2 |
 | 🔧 Utilities | 1 |
-| **TOTAL SKILLS** | **79** |
-| **TOTAL WITH MCP** | **80** |
+| **THIRD-PARTY SKILLS (at install)** | **79** |
+| **BiDOCS PROJECT SKILLS** | **12** |
+| **MCP** | **1** |
+
+---
+
+## 🏗️ BiDOCS Project Skills (12, in repo `.agents/skills/`)
+
+| Skill | Use |
+|---|---|
+| `bidocs-pdf-system` | PDF engine reference, bugs fixed, patterns |
+| `bidocs-pdf-guard` | Run/enforce rules PDF-1..7 |
+| `zero-whitespace-pdf-master` | `autoFitEngine` pagination |
+| `vault-local-storage` | IndexedDB, SafeStorage, LRU, isolation |
+| `philippine-procurement-statutory` | RA 9184 / RA 12009, SLCC, NFCC |
+| `bid-package-management` | Opportunity → dossier → merged package |
+| `senior-fullstack-engineer` / `expert-fullstack-developer` | Feature work / crash-proof work |
+| `cybersecurity-guardian` | Security audit |
+| `performance-optimization-master` | Measured perf work |
+| `api-data-architect` | Types, `/api`, storage contracts |
+| `system-diagnostics-debugger` | Symptom → root cause |
+
+Roles that use them: `AGENTS.md`.
 
 ---
 
 ## 🗂️ Where Skills Are Stored
 
 ```
-~\.agents\skills\                       ← All 79 skills (auto-detected by Antigravity)
+<repo>\.agents\skills\                  ← Project + installed skills (tracked in git)
+~\.agents\skills\                       ← Global install (auto-detected by Antigravity)
 ~\.gemini\config\mcp_config.json        ← Context7 MCP server config
 ~\.gemini\GEMINI.md                     ← Context7 usage rules injected here
 ```

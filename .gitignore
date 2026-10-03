@@ -6,14 +6,12 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-.agents/*
-.claude/*
-.github/*
-!.github/
-!.github/agents/
-!.github/agents/*.agent.md
+# Agent config: tracked on purpose (skills, agents, rules). Machine-local dirs stay ignored.
 .gemini/*
 .cursor/*
+.claude/settings.local.json
+# Git worktrees
+bidocs.worktrees/
 
 
 # Node modules

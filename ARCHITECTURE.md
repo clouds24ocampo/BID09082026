@@ -43,7 +43,7 @@ graph TD
     end
 
     subgraph Storage_Layer ["5. Local-First Persistence Layer"]
-        IDB[("IndexedDB: bidocs_vault_db (Heavy PDF Blobs)")]
+        IDB[("IndexedDB: BiDOCS_VaultDB v2 (Heavy PDF Blobs)")]
         LocalStore[("LocalStorage: Safe Config & Metadata")]
         DriveBackup[("Google Drive / Local JSON Export")]
     end
@@ -63,7 +63,10 @@ graph TD
 * **`layout/AppShell.tsx`**: Host frame, navigation sidebar, company switcher, and global actions.
 * **`vault/DocumentVaultView.tsx`**: Digital repository for statutory documents (Mayor's Permit, Tax Clearance, DTI/SEC, PCAB License, Audited Financial Statements).
 * **`bids/bidpackage.tsx`**: Drag-and-drop dossier assembler. Organizes documents into Technical & Financial envelopes conforming to BAC bid submission checklists.
-* **`forms/FormsDirectoryView.tsx`**: Interactive forms library for 27 standard government procurement templates.
+* **`forms/FormsDirectoryView.tsx`**: Interactive forms library. 27 system-generated document types; about 45 template components in `vault/templates/` (forms + modals).
+* **`landing/LandingWebsiteView.tsx`**: Public landing page. **`profile/CompanyProfileView.tsx`**: Company profile.
+* **`common/`**: Error boundaries (`GlobalErrorBoundary`, `VaultErrorBoundary`), `ApprovalGateModal`, `DocumentQrCode`, visual effects (Aurora, BorderBeam, Spotlight, ShinyText, CyberBadge).
+* **`covers/`**: Envelope, mother-envelope, folder and document-separator covers, `PackagingCoversView`.
 * **`vault/MergedPackageViewerModal.tsx`**: 3-Copy synchronized compilation viewer (`ORIGINAL`, `COPY 1`, `COPY 2`) with real-time compilation progress feedback.
 
 ---
@@ -126,7 +129,7 @@ To avoid the 5MB browser `localStorage` cap, BiDOCS utilizes a split storage str
 
 | Data Type | Target Storage | Max Capacity | Purpose |
 |:---|:---|:---|:---|
-| **PDF Binaries & Scans** | IndexedDB (`bidocs_vault_db`) | 200MB - 1GB+ | Scanned permits, uploaded certificates, completed bid PDFs |
+| **PDF Binaries & Scans** | IndexedDB (`BiDOCS_VaultDB`, store `pdfBlobs`) | 200MB - 1GB+ | Scanned permits, uploaded certificates, completed bid PDFs |
 | **Document Metadata & Config** | IndexedDB + `localStorage` | Fast synchronous read | File names, categories, expiration dates, active tenant |
 | **Temporary Previews** | In-Memory `lruCache.ts` | Dynamic (RAM) | Active tab rendering without disk latency |
 | **System Backup & Export** | JSON / Drive File (`.bidocs`) | Unlimited | Manual or cloud sync to Google Drive |
@@ -149,7 +152,10 @@ bidocs/
 │   │   ├── bids/                    # Bid package compiler & dossier view
 │   │   ├── covers/                  # Official separator cover templates
 │   │   ├── dashboard/               # Metric cards & document status overview
-│   │   ├── forms/                   # 27 statutory government forms
+│   │   ├── common/                  # Error boundaries, approval gate, QR, effects
+│   │   ├── forms/                   # Forms directory (27 system doc types)
+│   │   ├── landing/                 # Public landing page
+│   │   ├── profile/                 # Company profile
 │   │   ├── layout/                  # Shell, sidebar, header
 │   │   ├── opportunities/           # PhilGEPS opportunity tracker
 │   │   ├── projects/                # Project profiles & SLCC records
@@ -162,11 +168,24 @@ bidocs/
 │   │   └── index.ts                 # Unified TypeScript interfaces
 │   └── utils/
 │       ├── autoFitEngine.ts         # Typography & table pagination auto-fit
+│       ├── envelopeClassification.ts # Envelope 1 (technical) / 2 (financial) split
 │       ├── lruCache.ts              # PDF RAM cache
+│       ├── mergedBidPackages.ts     # ORIGINAL / COPY_1 / COPY_2 package records
+│       ├── opportunityProjects.ts   # Projects, merge-done, approval records
 │       ├── pdfExportEngine.ts       # 3-layer PDF compilation engine
+│       ├── safeStorage.ts           # Quota-safe localStorage wrapper
+│       ├── storageScalability.ts    # Storage estimate, yieldToMain, perf timing
 │       ├── systemDocumentPdfGenerator.ts # Vector PDF generator for 27 forms
-│       └── vaultIndexedDB.ts        # IndexedDB storage layer
+│       ├── vectorPdfGenerator.ts    # Vector PDF primitives
+│       ├── vaultIndexedDB.ts        # IndexedDB storage layer
+│       └── __tests__/               # Vitest suites
+├── server.js                        # Express mock API (/api/health, opportunities, vault summary, regime, bids/verify)
+├── scripts/bidocs-pdf-guard.js      # PDF rules PDF-1..6 scanner (husky + npm run lint:pdf)
+├── eslint-plugin-bidocs-pdf/        # Same rules as ESLint plugin
+└── .agents/ .agent/ .github/agents/ # Agent skills, roles, rules (see AGENTS.md)
 ```
+
+Notes: Supabase and three.js are not used in `src/` today (three is an unused dependency). Auth/tenancy is local (`AuthContext`).
 
 ---
 
@@ -174,7 +193,7 @@ bidocs/
 
 ### Adding a New Document Template
 1. Create the visual component in `src/components/vault/templates/YourTemplate.tsx`.
-2. Ensure the root DOM element specifies a unique ID (e.g. `id="template-your-form"`).
+2. Give the root DOM element a unique ID (e.g. `id="template-your-form"`). Use `autoFitEngine` for tables (Rule PDF-7).
 3. If generating vector PDF without DOM rendering, add the generator function in `src/utils/systemDocumentPdfGenerator.ts`.
 4. Register the new form in `src/components/forms/FormsDirectoryView.tsx`.
 5. Run `npx tsc --noEmit` to verify type safety across the application.

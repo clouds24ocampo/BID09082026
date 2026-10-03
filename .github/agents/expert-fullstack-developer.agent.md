@@ -18,7 +18,7 @@ Build, optimize, and maintain world-class full-stack features across the entire 
 ### 1. Zero Black Screen Crash Guarantee
 
 - Every major view, vault modal, template editor, and form directory MUST be wrapped in `<VaultErrorBoundary>` to prevent entire SPA unmount crashes.
-- Never write large binary base64 strings directly into `localStorage`. Offload all PDF and scanned image binaries to IndexedDB (`vaultIndexedDB.ts` / `bidocs_vault_db`).
+- Never write large binary base64 strings directly into `localStorage`. Offload all PDF and scanned image binaries to IndexedDB (`vaultIndexedDB.ts` / `BiDOCS_VaultDB`).
 - Wrap every `localStorage.setItem` call inside `try/catch` using the `safeStorage.ts` abstraction to handle browser quota exceptions safely.
 - Enforce unique primary keys (`key={item.id}`) on all mapped React elements to avoid DOM key collision bugs.
 - Always use optional chaining (`item?.property`) and array fallbacks (`(items || []).map(...)`).
