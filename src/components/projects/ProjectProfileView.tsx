@@ -1313,13 +1313,29 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
   // Bid Doc Preview & Download Handlers
   const handlePreviewBidDoc = async (doc: StatutoryDocDefinition) => {
     setIsGeneratingDocPdf(doc.id);
+    const isDocForSelectedProject = (v: DocumentVaultItem): boolean => {
+      const pRef = (selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || '').trim().toLowerCase();
+      const pRefDigits = pRef.replace(/[^0-9]/g, '');
+      const vRef = (v.philgepsRefNo || '').trim().toLowerCase();
+      const vRefDigits = vRef.replace(/[^0-9]/g, '');
+      if (pRef && vRef && (vRef === pRef || (pRefDigits.length >= 6 && vRefDigits === pRefDigits))) return true;
+      if (selectedProject?.id && v.projectId && v.projectId === selectedProject.id) return true;
+      if (selectedProject?.title && v.projectTitle && (v.projectTitle === selectedProject.title || (selectedProject.title.length > 5 && v.projectTitle.includes(selectedProject.title)))) return true;
+      return false;
+    };
+
+    const isLegalDoc = doc.category === "LEGAL";
     const vaultMatch = vaultDocs.find(
-      (v) =>
-        (doc.vaultMatchCategory && v.category === doc.vaultMatchCategory) ||
-        (v.documentCode &&
-          v.documentCode.toUpperCase() === doc.code.toUpperCase()) ||
-        (v.documentName &&
-          v.documentName.toLowerCase().includes(doc.name.toLowerCase())),
+      (v) => {
+        if (!isLegalDoc && !isDocForSelectedProject(v)) return false;
+        return (
+          (doc.vaultMatchCategory && v.category === doc.vaultMatchCategory) ||
+          (v.documentCode &&
+            v.documentCode.toUpperCase() === doc.code.toUpperCase()) ||
+          (v.documentName &&
+            v.documentName.toLowerCase().includes(doc.name.toLowerCase()))
+        );
+      },
     );
 
     let dataUrl = vaultMatch?.fileDataUrl;
@@ -1337,6 +1353,15 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
           },
           {
             tenant: currentTenant,
+            activeProject: selectedProject
+              ? {
+                  id: selectedProject.id,
+                  title: selectedProject.title,
+                  refNo:
+                    selectedProject.projectReferenceNumber ||
+                    selectedProject.philgepsRefNo,
+                }
+              : undefined,
             projectRefNo:
               selectedProject?.projectReferenceNumber ||
               selectedProject?.philgepsRefNo ||
@@ -1393,13 +1418,29 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
 
   const handleDownloadBidDoc = async (doc: StatutoryDocDefinition) => {
     setIsGeneratingDocPdf(doc.id);
+    const isDocForSelectedProject = (v: DocumentVaultItem): boolean => {
+      const pRef = (selectedProject?.projectReferenceNumber || selectedProject?.philgepsRefNo || '').trim().toLowerCase();
+      const pRefDigits = pRef.replace(/[^0-9]/g, '');
+      const vRef = (v.philgepsRefNo || '').trim().toLowerCase();
+      const vRefDigits = vRef.replace(/[^0-9]/g, '');
+      if (pRef && vRef && (vRef === pRef || (pRefDigits.length >= 6 && vRefDigits === pRefDigits))) return true;
+      if (selectedProject?.id && v.projectId && v.projectId === selectedProject.id) return true;
+      if (selectedProject?.title && v.projectTitle && (v.projectTitle === selectedProject.title || (selectedProject.title.length > 5 && v.projectTitle.includes(selectedProject.title)))) return true;
+      return false;
+    };
+
+    const isLegalDoc = doc.category === "LEGAL";
     const vaultMatch = vaultDocs.find(
-      (v) =>
-        (doc.vaultMatchCategory && v.category === doc.vaultMatchCategory) ||
-        (v.documentCode &&
-          v.documentCode.toUpperCase() === doc.code.toUpperCase()) ||
-        (v.documentName &&
-          v.documentName.toLowerCase().includes(doc.name.toLowerCase())),
+      (v) => {
+        if (!isLegalDoc && !isDocForSelectedProject(v)) return false;
+        return (
+          (doc.vaultMatchCategory && v.category === doc.vaultMatchCategory) ||
+          (v.documentCode &&
+            v.documentCode.toUpperCase() === doc.code.toUpperCase()) ||
+          (v.documentName &&
+            v.documentName.toLowerCase().includes(doc.name.toLowerCase()))
+        );
+      },
     );
 
     let dataUrl = vaultMatch?.fileDataUrl;
@@ -1417,6 +1458,15 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
           },
           {
             tenant: currentTenant,
+            activeProject: selectedProject
+              ? {
+                  id: selectedProject.id,
+                  title: selectedProject.title,
+                  refNo:
+                    selectedProject.projectReferenceNumber ||
+                    selectedProject.philgepsRefNo,
+                }
+              : undefined,
             projectRefNo:
               selectedProject?.projectReferenceNumber ||
               selectedProject?.philgepsRefNo ||

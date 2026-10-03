@@ -1,207 +1,206 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import {
-  ShieldCheck,
-  Cpu,
-  Layers,
-  Sparkles,
-  ArrowRight,
-  Building2,
   Boxes,
-  Zap
+  LogIn,
+  Building2,
+  ArrowRight,
+  ShieldCheck,
+  Sparkles
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 interface LandingWebsiteViewProps {
-  onEnterApp: () => void;
+  onEnterApp?: () => void;
   onLogin: () => void;
   onRegister: () => void;
 }
 
 export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({
-  onEnterApp,
   onLogin,
   onRegister
 }) => {
+  const { tenants } = useAuth();
+  const hasRegisteredAccounts = Boolean(tenants && tenants.length > 0);
+
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 font-sans selection:bg-cyan-500 selection:text-slate-950">
-      {/* 1. TOP GLOBAL NAVIGATION */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-[#030712]/80 backdrop-blur-xl border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-linear-to-tr from-cyan-500 to-violet-600 flex items-center justify-center shadow-[0_0_20px_rgba(0,240,255,0.4)]">
-              <Boxes className="w-5 h-5 text-white" />
+    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col justify-between items-center p-4 sm:p-6 lg:p-8 relative overflow-hidden select-none font-sans">
+      {/* Subtle Ambient Glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[350px] bg-cyan-500/10 rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 translate-y-1/2 w-[450px] h-[300px] bg-blue-600/10 rounded-full blur-[140px] pointer-events-none" />
+
+      {/* Subtle Grid Backdrop */}
+      <div
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 1px 1px, #ffffff 1px, transparent 0)',
+          backgroundSize: '32px 32px'
+        }}
+      />
+
+      {/* Top Header / Brand Pill */}
+      <motion.div
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="pt-4 z-10"
+      >
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-white/10 text-[11px] font-mono font-medium text-slate-300 shadow-lg backdrop-blur-md">
+          <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+          <span>RA 12009 (NGPA) &amp; RA 9184 Statutory System</span>
+        </div>
+      </motion.div>
+
+      {/* Main Centered Gateway Section */}
+      <div className="w-full max-w-2xl my-auto py-8 z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center space-y-4 mb-8"
+        >
+          {/* Logo & Platform Name */}
+          <div className="inline-flex items-center justify-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-[0_0_25px_rgba(0,240,255,0.35)]">
+              <Boxes className="w-6 h-6 text-white" />
             </div>
-            <div>
+            <div className="text-left">
               <div className="flex items-center gap-2">
-                <span className="font-black text-xl tracking-tight text-white">BiDOCS</span>
+                <span className="font-black text-2xl tracking-tight text-white">BiDOCS</span>
                 <span className="px-2 py-0.5 text-[10px] font-mono font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 rounded-full">
                   v2026.1
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-mono">Enterprise Philippine Gov Procurement</p>
+              <p className="text-xs text-slate-400 font-mono">Philippine Public Bidding Engine</p>
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-            <a href="#statutory-features" className="hover:text-cyan-400 transition-colors">RA 12009 Compliance</a>
-            <a href="#packaging-standard" className="hover:text-cyan-400 transition-colors">Three-Layer Packaging</a>
-            <a href="#node-backend" className="hover:text-cyan-400 transition-colors">Node.js API</a>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onLogin}
-              className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white transition-colors"
-            >
-              Sign In
-            </button>
-            <button
-              onClick={onEnterApp}
-              className="px-5 py-2.5 text-xs font-bold rounded-xl bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-[0_0_20px_rgba(0,240,255,0.35)] transition-all flex items-center gap-1.5"
-            >
-              <span>Launch Bidding Portal</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* 2. HERO SECTION */}
-      <section className="relative pt-32 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="text-center max-w-3xl mx-auto space-y-6">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 text-xs font-mono font-medium shadow-[0_0_15px_rgba(0,240,255,0.15)]">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Next-Generation Philippine Public Procurement Architecture</span>
-          </div>
-
-          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight">
-            Philippine Government Statutory Bidding Engine
-          </h1>
-
-          <p className="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-            Engineered under Republic Act No. 12009 (NGPA) &amp; RA 9184. Automated Three-Layer packaging, PhilGEPS opportunity tracking, and zero-defect legal PDF compliance.
-          </p>
-
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-            <button
-              onClick={onEnterApp}
-              className="px-7 py-3.5 rounded-xl font-bold text-sm bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-[0_0_25px_rgba(0,240,255,0.4)] transition-all flex items-center gap-2"
-            >
-              <Zap className="w-4 h-4 fill-current" />
-              <span>Enter BiDOCS Enterprise Portal</span>
-            </button>
-
-            <button
-              onClick={onRegister}
-              className="px-7 py-3.5 rounded-xl font-semibold text-sm bg-slate-900/90 hover:bg-slate-800 text-white border border-white/15 transition-all flex items-center gap-2"
-            >
-              <Building2 className="w-4 h-4 text-cyan-400" />
-              <span>Onboard New Tenant Company</span>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. TELEMETRY STATS GRID */}
-      <section className="py-12 border-y border-white/10 bg-slate-950/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div className="text-center md:text-left">
-            <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-linear-to-r from-cyan-400 to-blue-500 font-mono">
-              ₱107.45M
-            </div>
-            <div className="text-xs text-slate-400 uppercase tracking-wider font-mono mt-1">
-              Active PhilGEPS ABC Tracked
-            </div>
-          </div>
-
-          <div className="text-center md:text-left">
-            <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-linear-to-r from-emerald-400 to-teal-500 font-mono">
-              100.0%
-            </div>
-            <div className="text-xs text-slate-400 uppercase tracking-wider font-mono mt-1">
-              RA 12009 Statutory Verification
-            </div>
-          </div>
-
-          <div className="text-center md:text-left">
-            <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-linear-to-r from-amber-400 to-orange-500 font-mono">
-              27 Forms
-            </div>
-            <div className="text-xs text-slate-400 uppercase tracking-wider font-mono mt-1">
-              GPPB Standard Form Templates
-            </div>
-          </div>
-
-          <div className="text-center md:text-left">
-            <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-linear-to-r from-violet-400 to-purple-500 font-mono">
-              0.0 px
-            </div>
-            <div className="text-xs text-slate-400 uppercase tracking-wider font-mono mt-1">
-              Zero-Whitespace Auto-Fit Standard
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. ARCHITECTURAL PILLARS */}
-      <section id="statutory-features" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
-          <span className="text-xs font-mono text-cyan-400 tracking-widest uppercase">ENGINEERED FOR PHILIPPINE LAW</span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-white">Full-Spectrum Procurement Compliance</h2>
-          <p className="text-slate-400 text-sm">
-            Transitioning seamlessly from RA 9184 (2016 IRR) to Republic Act No. 12009 (New Government Procurement Act).
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Card 1 */}
-          <div className="p-8 rounded-2xl bg-linear-to-b from-slate-900/90 to-slate-950 border border-white/10 hover:border-cyan-500/40 transition-all shadow-xl group">
-            <div className="w-12 h-12 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-6 group-hover:scale-110 transition-transform">
-              <Layers className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-white mb-2">Three-Layer Packaging Standard</h3>
-            <p className="text-sm text-slate-400 leading-relaxed">
-              Automated assembly of Original, Copy 1, and Copy 2 bid submissions. Strictly enforces statutory separation between Technical (Envelope 1) and Financial (Envelope 2) components.
+          <div className="space-y-1 pt-1">
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+              Statutory Procurement Portal
+            </h1>
+            <p className="text-sm text-slate-400 max-w-md mx-auto">
+              Secure document vault, 3-copy sealed envelope compiler, and automated bidding compliance.
             </p>
           </div>
+        </motion.div>
 
-          {/* Card 2 */}
-          <div className="p-8 rounded-2xl bg-linear-to-b from-slate-900/90 to-slate-950 border border-white/10 hover:border-emerald-500/40 transition-all shadow-xl group">
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-6 group-hover:scale-110 transition-transform">
-              <ShieldCheck className="w-6 h-6" />
+        {/* The Two Direct Actions: Log In & Register */}
+        <motion.div
+          initial={{ opacity: 0, y: 25 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.15 }}
+          className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+        >
+          {/* 1. LOG IN CARD */}
+          <div
+            onClick={onLogin}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onLogin();
+              }
+            }}
+            className="group relative p-6 rounded-2xl bg-slate-900/70 hover:bg-slate-900/95 border border-white/10 hover:border-cyan-500/50 transition-all duration-300 shadow-xl hover:shadow-[0_0_30px_rgba(6,182,212,0.15)] cursor-pointer flex flex-col justify-between backdrop-blur-xl text-left"
+          >
+            <div className="space-y-3">
+              <div className="w-11 h-11 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition-transform">
+                <LogIn className="w-5 h-5" />
+              </div>
+
+              <div>
+                <h2 className="text-lg font-bold text-white group-hover:text-cyan-300 transition-colors">
+                  Log In
+                </h2>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  Sign in to your registered corporate workspace, document vault, and active bid packages.
+                </p>
+              </div>
             </div>
-            <h3 className="text-lg font-bold text-white mb-2">Zero-Whitespace PDF Engine</h3>
-            <p className="text-sm text-slate-400 leading-relaxed">
-              Dynamically balanced table packing for legal 8.5" x 13" paper. Guarantees 100% page utilization, zero orphaned rows, and tamper-evident SHA-256 QR codes.
-            </p>
+
+            <div className="pt-6">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLogin();
+                }}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-cyan-600/90 border border-white/10 group-hover:border-cyan-500/40 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              >
+                <span>Sign In to Workspace</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
           </div>
 
-          {/* Card 3 */}
-          <div className="p-8 rounded-2xl bg-linear-to-b from-slate-900/90 to-slate-950 border border-white/10 hover:border-violet-500/40 transition-all shadow-xl group">
-            <div className="w-12 h-12 rounded-xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center text-violet-400 mb-6 group-hover:scale-110 transition-transform">
-              <Cpu className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-white mb-2">Node.js Enterprise Backend</h3>
-            <p className="text-sm text-slate-400 leading-relaxed">
-              Express server powering real-time PhilGEPS ingestion, document vault integrity monitoring, and statutory package validation with resilient port fallback.
-            </p>
-          </div>
-        </div>
-      </section>
+          {/* 2. REGISTER CARD */}
+          <div
+            onClick={onRegister}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onRegister();
+              }
+            }}
+            className={`group relative p-6 rounded-2xl bg-slate-900/70 hover:bg-slate-900/95 border transition-all duration-300 shadow-xl cursor-pointer flex flex-col justify-between backdrop-blur-xl text-left ${
+              !hasRegisteredAccounts
+                ? 'border-cyan-500/40 ring-1 ring-cyan-500/30 hover:shadow-[0_0_35px_rgba(0,240,255,0.2)]'
+                : 'border-white/10 hover:border-blue-500/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.15)]'
+            }`}
+          >
+            {!hasRegisteredAccounts && (
+              <div className="absolute -top-2.5 right-4 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold text-[10px] uppercase tracking-wider shadow-md flex items-center gap-1">
+                <Sparkles className="w-3 h-3 fill-current" />
+                <span>Start Here</span>
+              </div>
+            )}
 
-      {/* 6. CALL TO ACTION FOOTER */}
-      <footer className="border-t border-white/10 bg-slate-950/80 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-slate-400">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 rounded bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-              <Boxes className="w-3.5 h-3.5" />
+            <div className="space-y-3">
+              <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 group-hover:scale-105 transition-transform">
+                <Building2 className="w-5 h-5" />
+              </div>
+
+              <div>
+                <h2 className="text-lg font-bold text-white group-hover:text-blue-300 transition-colors">
+                  Register Company
+                </h2>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  Onboard a new contractor or supplier entity, configure your brand skin, and initialize admin access.
+                </p>
+              </div>
             </div>
-            <span>BiDOCS Enterprise • Philippine Government Procurement Architecture (RA 9184 &amp; RA 12009)</span>
+
+            <div className="pt-6">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRegister();
+                }}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 shadow-[0_0_15px_rgba(0,240,255,0.25)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Create New Account</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </div>
           </div>
-          <div className="font-mono">
-            Governing Law: RA 12009 (NGPA) / RA 9184 • GPPB Res. No. 02-2025
-          </div>
-        </div>
-      </footer>
+        </motion.div>
+      </div>
+
+      {/* Clean Minimalist Footer */}
+      <motion.footer
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, delay: 0.3 }}
+        className="w-full max-w-2xl py-4 border-t border-white/5 text-center text-slate-500 text-[11px] font-mono z-10"
+      >
+        BiDOCS Enterprise • Government Procurement Portal • Zero-Leak Local Storage
+      </motion.footer>
     </div>
   );
 };

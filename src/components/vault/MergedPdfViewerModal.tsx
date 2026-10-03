@@ -160,11 +160,19 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
               continue;
             }
 
-            // 1. Check if item has stored binary in IndexedDB
-            const dbData = await loadPdfData(item.id);
-            if (dbData) {
-              newResolved[item.id] = dbData;
-              continue;
+            const isTechOrFin = (item.category === 'TECHNICAL' || item.category === 'FINANCIAL' || (item as any).isTechnicalOrFinancial);
+            const isProjectMatch = !isTechOrFin || (
+              (activeProject?.id && item.projectId && item.projectId === activeProject.id) ||
+              (projectRefNo && item.philgepsRefNo && item.philgepsRefNo === projectRefNo)
+            );
+
+            // 1. Check if item has stored binary in IndexedDB (strictly scoped for project items)
+            if (isProjectMatch) {
+              const dbData = await loadPdfData(item.id);
+              if (dbData) {
+                newResolved[item.id] = dbData;
+                continue;
+              }
             }
 
             // 2. Resolve via System Generator (Ongoing, SLCC, Section VI, VII, FAL, Org Chart, Key Personnel, Equipment, Warranty, OSS, BSD, NFCC, Financial Bid Form, BOQ, Form L, Price Sched, Bid Summary, Cash Flow, PhilGEPS, SEC, Mayor's, Tax, AFS, PCAB, Sec Cert, JVA)
@@ -277,10 +285,18 @@ export const MergedPdfViewerModal: React.FC<MergedPdfViewerModalProps> = ({
         items.map(async (doc) => {
           if (resolvedPdfs[doc.id]) return resolvedPdfs[doc.id];
           if (doc.fileDataUrl) return doc.fileDataUrl;
-          try {
-            const dbData = await loadPdfData(doc.id);
-            if (dbData) return dbData;
-          } catch (_) {}
+          const isTechOrFin = (doc.category === 'TECHNICAL' || doc.category === 'FINANCIAL' || (doc as any).isTechnicalOrFinancial);
+          const isProjectMatch = !isTechOrFin || (
+            (activeProject?.id && doc.projectId && doc.projectId === activeProject.id) ||
+            (projectRefNo && doc.philgepsRefNo && doc.philgepsRefNo === projectRefNo)
+          );
+
+          if (isProjectMatch) {
+            try {
+              const dbData = await loadPdfData(doc.id);
+              if (dbData) return dbData;
+            } catch (_) {}
+          }
 
           return await resolveDocumentPdfAttachment(doc as any, {
             tenant,

@@ -32,7 +32,7 @@ const MainApp: React.FC = () => {
         />
       );
     }
-    if (authMode === "register" || tenants.length === 0) {
+    if (authMode === "register") {
       return (
         <RegisterPage
           onSwitchToLogin={() => setAuthMode("login")}

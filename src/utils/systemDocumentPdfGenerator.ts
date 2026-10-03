@@ -4001,13 +4001,35 @@ export async function resolveDocumentPdfAttachment(
   const isCorporateDoc = docIdUpper.includes('PHILGEPS') || dName.includes('philgeps') || dCode === 'DOC-1' ||
     dCode === 'PHILGEPS_PLATINUM' || ['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(dCode);
 
+  // Helper to verify if a vault document belongs strictly to this active project
+  const isVaultDocForThisProject = (v?: DocumentVaultItem | null): boolean => {
+    if (!v) return false;
+    const vRef = (v.philgepsRefNo || '').trim().toLowerCase();
+    const vRefDigits = vRef.replace(/[^0-9]/g, '');
+    const vProjId = v.projectId;
+    const vTitle = (v.projectTitle || '').trim().toLowerCase();
+    const curProjId = ctx.activeProject?.id;
+    const curTitle = (ctx.projectTitle || ctx.activeProject?.title || '').trim().toLowerCase();
+
+    if (currentRef && vRef && (vRef === currentRef || (currentRefDigits.length >= 6 && vRefDigits === currentRefDigits))) {
+      return true;
+    }
+    if (curProjId && vProjId && curProjId === vProjId) {
+      return true;
+    }
+    if (curTitle && vTitle && (curTitle === vTitle || (curTitle.length > 5 && (vTitle.includes(curTitle) || curTitle.includes(vTitle))))) {
+      return true;
+    }
+    return false;
+  };
+
   // 1. DIRECT EMBEDDED ATTACHMENT
   const directUrl = (doc as any).fileDataUrl || (doc as any).pdfDataUrl;
   if (typeof directUrl === 'string' && directUrl.trim().length > 0) {
     return directUrl;
   }
 
-  // 2. DIRECT VAULT DOC ID MATCH (In memory or IndexedDB) - ONLY if not cross-matched with corporate doc or financial doc
+  // 2. DIRECT VAULT DOC ID MATCH (In memory or IndexedDB) - Guarded with STRICT PROJECT ISOLATION
   if (doc.vaultDocId) {
     let isValidVaultLink = true;
     const linked = Array.isArray(ctx.vaultDocs) ? ctx.vaultDocs.find(v => v && v.id === doc.vaultDocId) : null;
@@ -4016,6 +4038,9 @@ export async function resolveDocumentPdfAttachment(
 
     if (isTechnicalOrFinancialDoc) {
       if (['DOC-1', 'DOC-2', 'DOC-3', 'DOC-4', 'DOC-5', 'DOC-6', 'DOC-7', 'DOC-8', 'DOC-9', 'DOC-10', 'DOC-11', 'DOC-12', 'DOC-13', 'DOC-14', 'DOC-15'].includes(vCode)) {
+        isValidVaultLink = false;
+      } else if (linked && !isVaultDocForThisProject(linked)) {
+        // STRICT PROJECT ISOLATION: Never bind a technical or financial document from another project
         isValidVaultLink = false;
       }
     } else if (isCorporateDoc) {
@@ -4040,10 +4065,14 @@ export async function resolveDocumentPdfAttachment(
     }
   }
 
-  // 3. DIRECT CLEAN ID MATCH IN INDEXEDDB (Guarded against financial cross-link for corporate docs)
+  // 3. DIRECT CLEAN ID MATCH IN INDEXEDDB (Guarded against financial cross-link for corporate docs, strictly isolated for technical/financial docs)
   if (cleanDocId && cleanDocId !== doc.vaultDocId) {
     let isCleanIdValid = true;
     if (isCorporateDoc && (cleanDocId.includes('cash') || cleanDocId.includes('financial') || cleanDocId.includes('estimate') || cleanDocId.includes('boq'))) {
+      isCleanIdValid = false;
+    }
+    // Technical or Financial proposals must NEVER bind to un-scoped global ID keys
+    if (isTechnicalOrFinancialDoc) {
       isCleanIdValid = false;
     }
     if (isCleanIdValid) {
@@ -4077,28 +4106,6 @@ export async function resolveDocumentPdfAttachment(
   // 5. UNIVERSAL SEARCH FOR MATCHING UPLOADED OR COMPLETED VAULT DOCUMENTS
   const findMatchingVaultDoc = (): DocumentVaultItem | undefined => {
     if (allVaultDocs.length === 0) return undefined;
-
-    // Helper to verify if a vault document belongs strictly to this active project
-    const isVaultDocForThisProject = (v?: DocumentVaultItem | null): boolean => {
-      if (!v) return false;
-      const vRef = (v.philgepsRefNo || '').trim().toLowerCase();
-      const vRefDigits = vRef.replace(/[^0-9]/g, '');
-      const vProjId = v.projectId;
-      const vTitle = (v.projectTitle || '').trim().toLowerCase();
-      const curProjId = ctx.activeProject?.id;
-      const curTitle = (ctx.projectTitle || ctx.activeProject?.title || '').trim().toLowerCase();
-
-      if (currentRef && vRef && (vRef === currentRef || (currentRefDigits.length >= 6 && vRefDigits === currentRefDigits))) {
-        return true;
-      }
-      if (curProjId && vProjId && curProjId === vProjId) {
-        return true;
-      }
-      if (curTitle && vTitle && (curTitle === vTitle || (curTitle.length > 5 && (vTitle.includes(curTitle) || curTitle.includes(vTitle))))) {
-        return true;
-      }
-      return false;
-    };
 
     // A. Direct vaultDocId (Guarded against corporate & financial cross-matching and cross-project leakage)
     if (doc.vaultDocId) {
@@ -4280,6 +4287,7 @@ export async function resolveDocumentPdfAttachment(
   const projId = ctx.activeProject?.id || '';
 
   const isTechSpecs = docIdUpper.includes('SECTION_VII') || docIdUpper.includes('SEC_VII') || docIdUpper.includes('TECH_SPECS') || dName.includes('section vii') || dName.includes('technical spec');
+  const isSectionVi = !dName.includes('section vii') && !dName.includes('sec_vii') && (docIdUpper.includes('SECTION_VI') || docIdUpper.includes('SEC_VI') || dName.includes('section vi') || dName.includes('schedule of req'));
   const isEquipment = isMajorEquipmentDoc(`${docIdUpper} ${dCode}`, dName);
   const isKeyPersonnel = docIdUpper.includes('KEY_PERSONNEL') || docIdUpper.includes('PERSONNEL') || dName.includes('key personnel') || dName.includes('manpower');
   const isOrgChart = docIdUpper.includes('ORGANIZATIONAL_CHART') || docIdUpper.includes('ORG_CHART') || dName.includes('org chart') || dName.includes('organizational chart');
@@ -4290,6 +4298,10 @@ export async function resolveDocumentPdfAttachment(
   const isDetailedEstimates = isFormLDetailedEstimates(`${docIdUpper} ${dCode}`, dName);
   const isPriceSched = docIdUpper.includes('PRICE_SCHEDULE') || docIdUpper.includes('PRICESCHED') || dName.includes('price schedule');
   const isFal = docIdUpper.includes('FRAMEWORK') || docIdUpper.includes('FAL') || dName.includes('framework agreement') || dName.includes('fal');
+  const isWarranty = docIdUpper.includes('AFTERSALES') || docIdUpper.includes('WARRANTY') || dName.includes('after-sale') || dName.includes('aftersales') || dName.includes('warranty');
+  const isNfcc = docIdUpper.includes('NFCC') || dName.includes('nfcc') || dName.includes('contracting capacity');
+  const isSummaryBid = docIdUpper.includes('SUMMARY_BID') || docIdUpper.includes('SUMMARY_BID_PRICE') || dName.includes('summary of bid');
+  const isCashFlow = docIdUpper.includes('CASH_FLOW') || docIdUpper.includes('CASHFLOW') || dName.includes('cash flow');
 
   const addKeys = (prefix: string) => {
     if (rawProjRef) candidateKeys.push(`${prefix}_${tenantId}_${rawProjRef}`);
@@ -4300,32 +4312,75 @@ export async function resolveDocumentPdfAttachment(
   if (rawProjRef || projId) {
     if (isTechSpecs) {
       addKeys('tech_specs');
+      addKeys('tech_specs_pdf');
+      addKeys('tech_specs_brochure');
+      addKeys('tech_specs_drawing');
+      addKeys('bidocs_tech_specs_pdf');
+    } else if (isSectionVi) {
+      addKeys('sec_vi');
+      addKeys('section_vi');
+      addKeys('sec_vi_pdf');
+      addKeys('section_vi_pdf');
+      addKeys('bidocs_sec_vi_pdf');
     } else if (isDetailedEstimates) {
       addKeys('detailed_estimates_pdf');
       addKeys('bidocs_detailed_estimates_pdf');
       addKeys('estimates_pdf');
+      addKeys('form_l_pdf');
     } else if (isEquipment) {
       addKeys('equipment_pdf');
+      addKeys('major_equipment_pdf');
+      addKeys('bidocs_equipment_pdf');
     } else if (isKeyPersonnel) {
       addKeys('key_personnel_pdf');
+      addKeys('personnel_pdf');
+      addKeys('bidocs_key_personnel_pdf');
     } else if (isOrgChart) {
       addKeys('org_chart_pdf');
+      addKeys('bidocs_org_chart_pdf');
     } else if (isOngoing) {
       addKeys('ongoing_pdf');
+      addKeys('ongoing_contracts_pdf');
+      addKeys('bidocs_ongoing_pdf');
     } else if (isSlcc) {
       addKeys('slcc_pdf');
+      addKeys('slcc_statement_pdf');
+      addKeys('bidocs_slcc_pdf');
     } else if (isBoq) {
       addKeys('boq');
       addKeys('boq_pdf');
+      addKeys('bill_of_quantities_pdf');
+      addKeys('bidocs_boq_pdf');
     } else if (isBidForm) {
       addKeys('bidform');
       addKeys('bidform_infra');
       addKeys('bidform_pdf');
+      addKeys('bidocs_bidform_pdf');
     } else if (isPriceSched) {
       addKeys('priceschedule');
       addKeys('pricesched');
+      addKeys('priceschedule4goods_pdf');
+      addKeys('bidocs_priceschedule_pdf');
     } else if (isFal) {
       addKeys('fal');
+      addKeys('fal_pdf');
+      addKeys('framework_agreement_pdf');
+      addKeys('bidocs_fal_pdf');
+    } else if (isWarranty) {
+      addKeys('warranty_pdf');
+      addKeys('aftersales_pdf');
+      addKeys('bidocs_warranty_pdf');
+    } else if (isNfcc) {
+      addKeys('nfcc_pdf');
+      addKeys('bidocs_nfcc_pdf');
+    } else if (isSummaryBid) {
+      addKeys('summary_bid_pdf');
+      addKeys('summary_bid_price_pdf');
+      addKeys('bidocs_summary_bid_pdf');
+    } else if (isCashFlow) {
+      addKeys('cash_flow_pdf');
+      addKeys('cashflow_pdf');
+      addKeys('bidocs_cash_flow_pdf');
     }
   }
 

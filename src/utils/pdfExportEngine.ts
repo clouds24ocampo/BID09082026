@@ -913,19 +913,20 @@ export async function buildMergedThreeLayerPdfBytes(
         const page = allPages[pageIdx];
         const width = page.getWidth();
         const height = page.getHeight();
-        const rotationAngle = page.getRotation().angle;
+        const rawRotation = page.getRotation().angle;
+        const normalizedRotation = ((rawRotation % 360) + 360) % 360;
 
         const isUntouchedPhilgeps = untouchedPhilgepsPageIndices.has(pageIdx);
 
         // 1. DIAGONAL WATERMARK (3-LINE: STATUS, COMPANY NAME, PHILGEPS REF - STRICTLY CONSTRAINED INSIDE PAPER)
-        if (effectiveFolderCopy && rotationAngle === 0 && !isUntouchedPhilgeps) {
+        if (effectiveFolderCopy && !isUntouchedPhilgeps) {
           const statusText = effectiveFolderCopy === 'ORIGINAL'
             ? 'ORIGINAL BID DOCUMENT'
             : 'CERTIFIED TRUE COPY';
           const companyText = (options?.companyName || 'QUANTUM CLOUD CORPORATION').toUpperCase().slice(0, 42);
           const refText = `REF: ${refNo} • BAC COMPLIANT`;
 
-          const wmAngleDeg = 30;
+          const wmAngleDeg = (30 + normalizedRotation) % 360;
           const theta = (wmAngleDeg * Math.PI) / 180;
           const cosT = Math.cos(theta);
           const sinT = Math.sin(theta);
@@ -936,10 +937,11 @@ export async function buildMergedThreeLayerPdfBytes(
           const wmColor = rgb(0.70, 0.74, 0.83);
           const wmOpacity = 0.22;
 
+          const baseW = (normalizedRotation === 90 || normalizedRotation === 270) ? height : width;
           const lines = [
-            { text: statusText, font: helveticaBold, size: width > 700 ? 22 : 18, offset: 16 },
-            { text: companyText, font: helveticaBold, size: width > 700 ? 12.5 : 10.5, offset: -2 },
-            { text: refText, font: helveticaFont, size: width > 700 ? 10 : 8.5, offset: -18 }
+            { text: statusText, font: helveticaBold, size: baseW > 700 ? 22 : 18, offset: 16 },
+            { text: companyText, font: helveticaBold, size: baseW > 700 ? 12.5 : 10.5, offset: -2 },
+            { text: refText, font: helveticaFont, size: baseW > 700 ? 10 : 8.5, offset: -18 }
           ];
 
           for (const l of lines) {
@@ -960,17 +962,14 @@ export async function buildMergedThreeLayerPdfBytes(
         }
 
         // 2. OFFICIAL GOVERNMENT RUBBER STAMP (FOR ORIGINAL, COPY_1, AND COPY_2)
-        // Perfectly rectangular, straight (0 deg rotation), crisp aligned text with solid backing box to prevent illegible overlap
+        // Uniform standard physical size (210pt x 56pt) across ALL page sizes & orientations (Portrait, Landscape, Rotated)
+        // Crisp aligned text, positioned with precision at bottom center directly above pagination pill
         // Strictly NEVER stamped over untouched PhilGEPS uploads to preserve government verification QR code
-        if (effectiveFolderCopy && rotationAngle === 0 && !isUntouchedPhilgeps) {
+        if (effectiveFolderCopy && !isUntouchedPhilgeps) {
           const isOrig = effectiveFolderCopy === 'ORIGINAL';
           const isCopy1 = effectiveFolderCopy === 'COPY_1';
-          const scaleFactor = Math.max(1, width / 612);
-          const stampW = Math.round(210 * scaleFactor);
-          const stampH = Math.round(56 * scaleFactor);
-          // Positioned directly at the top of the "Page X of Y" pagination pill
-          const stampX = (width - stampW) / 2;
-          const stampY = Math.round(24 * scaleFactor);
+          const stampW = 210;
+          const stampH = 56;
 
           const stampChosenColor = getStampColorRgb(options?.stampColor);
           const headerText = isOrig ? '* OFFICIAL ORIGINAL BID DOCUMENT *' : '* CERTIFIED TRUE COPY *';
@@ -980,109 +979,322 @@ export async function buildMergedThreeLayerPdfBytes(
             ? 'COPY 1 (FIRST CERTIFIED TRUE COPY)'
             : 'COPY 2 (SECOND CERTIFIED TRUE COPY)';
 
-          const headerFontSize = Math.round(7.8 * scaleFactor * 10) / 10;
-          const subTextFontSize = Math.round(6.4 * scaleFactor * 10) / 10;
-          const metaFontSize = Math.round(5.8 * scaleFactor * 10) / 10;
-          const refFontSize = Math.round(5.5 * scaleFactor * 10) / 10;
-          const padX = Math.round(8 * scaleFactor);
+          const headerFontSize = 7.8;
+          const subTextFontSize = 6.4;
+          const metaFontSize = 5.8;
+          const refFontSize = 5.5;
+          const padX = 8;
 
-          // Transparent rubber stamp border (NO solid white backing to keep underlying text fully readable)
-          page.drawRectangle({
-            x: stampX,
-            y: stampY,
-            width: stampW,
-            height: stampH,
-            borderColor: stampChosenColor,
-            borderWidth: 1.4 * scaleFactor
-          });
-
-          // Inner neat stamp border
-          page.drawRectangle({
-            x: stampX + 2.5 * scaleFactor,
-            y: stampY + 2.5 * scaleFactor,
-            width: stampW - 5 * scaleFactor,
-            height: stampH - 5 * scaleFactor,
-            borderColor: stampChosenColor,
-            borderWidth: 0.6 * scaleFactor
-          });
-
-          // Line 1: Header (Centered)
           const hW = helveticaBold.widthOfTextAtSize(headerText, headerFontSize);
-          page.drawText(headerText, {
-            x: stampX + (stampW - hW) / 2,
-            y: stampY + stampH - Math.round(13 * scaleFactor),
-            size: headerFontSize,
-            font: helveticaBold,
-            color: stampChosenColor
-          });
-
-          // Line 2: Copy Designation (Centered)
           const sW = helveticaBold.widthOfTextAtSize(subText, subTextFontSize);
-          page.drawText(subText, {
-            x: stampX + (stampW - sW) / 2,
-            y: stampY + stampH - Math.round(22 * scaleFactor),
-            size: subTextFontSize,
-            font: helveticaBold,
-            color: stampChosenColor
-          });
+          const dateText = `Date of Submission: ${submissionDate}`;
+          const signText = `Signed by: ${signatory.slice(0, 36)}`;
+          const refText = `Ref: ${refNo} • BAC COMPLIANT`;
 
-          // Line 3: Date of Submission (Left padded)
-          page.drawText(`Date of Submission: ${submissionDate}`, {
-            x: stampX + padX,
-            y: stampY + stampH - Math.round(32 * scaleFactor),
-            size: metaFontSize,
-            font: helveticaFont,
-            color: stampChosenColor
-          });
+          if (normalizedRotation === 0) {
+            const stampX = (width - stampW) / 2;
+            const stampY = 24;
 
-          // Line 4: Authorized Signatory (Left padded)
-          page.drawText(`Signed by: ${signatory.slice(0, 36)}`, {
-            x: stampX + padX,
-            y: stampY + stampH - Math.round(40.5 * scaleFactor),
-            size: metaFontSize,
-            font: helveticaFont,
-            color: stampChosenColor
-          });
+            // Outer border
+            page.drawRectangle({
+              x: stampX,
+              y: stampY,
+              width: stampW,
+              height: stampH,
+              borderColor: stampChosenColor,
+              borderWidth: 1.4
+            });
 
-          // Line 5: Project Reference & BAC Compliance (Left padded)
-          page.drawText(`Ref: ${refNo} • BAC COMPLIANT`, {
-            x: stampX + padX,
-            y: stampY + stampH - Math.round(49 * scaleFactor),
-            size: refFontSize,
-            font: helveticaBold,
-            color: stampChosenColor
-          });
+            // Inner border
+            page.drawRectangle({
+              x: stampX + 2.5,
+              y: stampY + 2.5,
+              width: stampW - 5,
+              height: stampH - 5,
+              borderColor: stampChosenColor,
+              borderWidth: 0.6
+            });
+
+            // Line 1: Header (Centered)
+            page.drawText(headerText, {
+              x: stampX + (stampW - hW) / 2,
+              y: stampY + stampH - 13,
+              size: headerFontSize,
+              font: helveticaBold,
+              color: stampChosenColor
+            });
+
+            // Line 2: Copy Designation (Centered)
+            page.drawText(subText, {
+              x: stampX + (stampW - sW) / 2,
+              y: stampY + stampH - 22,
+              size: subTextFontSize,
+              font: helveticaBold,
+              color: stampChosenColor
+            });
+
+            // Line 3: Date of Submission (Left padded)
+            page.drawText(dateText, {
+              x: stampX + padX,
+              y: stampY + stampH - 32,
+              size: metaFontSize,
+              font: helveticaFont,
+              color: stampChosenColor
+            });
+
+            // Line 4: Authorized Signatory (Left padded)
+            page.drawText(signText, {
+              x: stampX + padX,
+              y: stampY + stampH - 40.5,
+              size: metaFontSize,
+              font: helveticaFont,
+              color: stampChosenColor
+            });
+
+            // Line 5: Project Reference & BAC Compliance (Left padded)
+            page.drawText(refText, {
+              x: stampX + padX,
+              y: stampY + stampH - 49,
+              size: refFontSize,
+              font: helveticaBold,
+              color: stampChosenColor
+            });
+          } else if (normalizedRotation === 90) {
+            // Visual bottom corresponds to unrotated left edge (x=0)
+            const stampX = 24;
+            const stampY = (height - stampW) / 2;
+
+            page.drawRectangle({
+              x: stampX,
+              y: stampY,
+              width: stampH,
+              height: stampW,
+              borderColor: stampChosenColor,
+              borderWidth: 1.4
+            });
+
+            page.drawRectangle({
+              x: stampX + 2.5,
+              y: stampY + 2.5,
+              width: stampH - 5,
+              height: stampW - 5,
+              borderColor: stampChosenColor,
+              borderWidth: 0.6
+            });
+
+            // Rotated 90: baseline advances in +y, up is -x
+            page.drawText(headerText, {
+              x: stampX + stampH - 13,
+              y: stampY + (stampW - hW) / 2,
+              size: headerFontSize,
+              font: helveticaBold,
+              color: stampChosenColor,
+              rotate: degrees(90)
+            });
+
+            page.drawText(subText, {
+              x: stampX + stampH - 22,
+              y: stampY + (stampW - sW) / 2,
+              size: subTextFontSize,
+              font: helveticaBold,
+              color: stampChosenColor,
+              rotate: degrees(90)
+            });
+
+            page.drawText(dateText, {
+              x: stampX + stampH - 32,
+              y: stampY + padX,
+              size: metaFontSize,
+              font: helveticaFont,
+              color: stampChosenColor,
+              rotate: degrees(90)
+            });
+
+            page.drawText(signText, {
+              x: stampX + stampH - 40.5,
+              y: stampY + padX,
+              size: metaFontSize,
+              font: helveticaFont,
+              color: stampChosenColor,
+              rotate: degrees(90)
+            });
+
+            page.drawText(refText, {
+              x: stampX + stampH - 49,
+              y: stampY + padX,
+              size: refFontSize,
+              font: helveticaBold,
+              color: stampChosenColor,
+              rotate: degrees(90)
+            });
+          } else if (normalizedRotation === 180) {
+            // Visual bottom corresponds to unrotated top edge (y=height)
+            const stampX = (width - stampW) / 2;
+            const stampY = height - 24 - stampH;
+
+            page.drawRectangle({
+              x: stampX,
+              y: stampY,
+              width: stampW,
+              height: stampH,
+              borderColor: stampChosenColor,
+              borderWidth: 1.4
+            });
+
+            page.drawRectangle({
+              x: stampX + 2.5,
+              y: stampY + 2.5,
+              width: stampW - 5,
+              height: stampH - 5,
+              borderColor: stampChosenColor,
+              borderWidth: 0.6
+            });
+
+            // Rotated 180: baseline advances in -x, up is -y
+            page.drawText(headerText, {
+              x: stampX + (stampW + hW) / 2,
+              y: stampY + 13,
+              size: headerFontSize,
+              font: helveticaBold,
+              color: stampChosenColor,
+              rotate: degrees(180)
+            });
+
+            page.drawText(subText, {
+              x: stampX + (stampW + sW) / 2,
+              y: stampY + 22,
+              size: subTextFontSize,
+              font: helveticaBold,
+              color: stampChosenColor,
+              rotate: degrees(180)
+            });
+
+            page.drawText(dateText, {
+              x: stampX + stampW - padX,
+              y: stampY + 32,
+              size: metaFontSize,
+              font: helveticaFont,
+              color: stampChosenColor,
+              rotate: degrees(180)
+            });
+
+            page.drawText(signText, {
+              x: stampX + stampW - padX,
+              y: stampY + 40.5,
+              size: metaFontSize,
+              font: helveticaFont,
+              color: stampChosenColor,
+              rotate: degrees(180)
+            });
+
+            page.drawText(refText, {
+              x: stampX + stampW - padX,
+              y: stampY + 49,
+              size: refFontSize,
+              font: helveticaBold,
+              color: stampChosenColor,
+              rotate: degrees(180)
+            });
+          } else if (normalizedRotation === 270) {
+            // Visual bottom corresponds to unrotated right edge (x=width)
+            const stampX = width - 24 - stampH;
+            const stampY = (height - stampW) / 2;
+
+            page.drawRectangle({
+              x: stampX,
+              y: stampY,
+              width: stampH,
+              height: stampW,
+              borderColor: stampChosenColor,
+              borderWidth: 1.4
+            });
+
+            page.drawRectangle({
+              x: stampX + 2.5,
+              y: stampY + 2.5,
+              width: stampH - 5,
+              height: stampW - 5,
+              borderColor: stampChosenColor,
+              borderWidth: 0.6
+            });
+
+            // Rotated 270: baseline advances in -y, up is +x
+            page.drawText(headerText, {
+              x: stampX + 13,
+              y: stampY + (stampW + hW) / 2,
+              size: headerFontSize,
+              font: helveticaBold,
+              color: stampChosenColor,
+              rotate: degrees(270)
+            });
+
+            page.drawText(subText, {
+              x: stampX + 22,
+              y: stampY + (stampW + sW) / 2,
+              size: subTextFontSize,
+              font: helveticaBold,
+              color: stampChosenColor,
+              rotate: degrees(270)
+            });
+
+            page.drawText(dateText, {
+              x: stampX + 32,
+              y: stampY + stampW - padX,
+              size: metaFontSize,
+              font: helveticaFont,
+              color: stampChosenColor,
+              rotate: degrees(270)
+            });
+
+            page.drawText(signText, {
+              x: stampX + 40.5,
+              y: stampY + stampW - padX,
+              size: metaFontSize,
+              font: helveticaFont,
+              color: stampChosenColor,
+              rotate: degrees(270)
+            });
+
+            page.drawText(refText, {
+              x: stampX + 49,
+              y: stampY + stampW - padX,
+              size: refFontSize,
+              font: helveticaBold,
+              color: stampChosenColor,
+              rotate: degrees(270)
+            });
+          }
         }
 
         // 3. PAGE X OF Y PAGINATION (AT BOTTOM CENTER WITH TRANSPARENT PILL)
+        // Uniform clean font & dimensions across all page sizes and orientations
         // Strictly transparent so underlying text is never obscured
         if (!isUntouchedPhilgeps) {
-          const pageScale = Math.max(1, width / 612);
           const pageText = `Page ${pageIdx + 1} of ${totalPageCount}`;
-          const fontSize = Math.round(7.5 * pageScale * 10) / 10;
+          const fontSize = 7.5;
           const textWidth = helveticaFont.widthOfTextAtSize(pageText, fontSize);
-          const pillW = Math.round(textWidth + 18 * pageScale);
-          const pillH = Math.round(14 * pageScale);
+          const pillW = Math.round(textWidth + 18);
+          const pillH = 14;
 
-          if (rotationAngle === 0) {
+          if (normalizedRotation === 0) {
             const pillX = (width - pillW) / 2;
-            const pillY = Math.round(7 * pageScale);
+            const pillY = 7;
             page.drawRectangle({
               x: pillX,
               y: pillY,
               width: pillW,
               height: pillH,
               borderColor: rgb(0.8, 0.82, 0.88),
-              borderWidth: 0.6 * pageScale
+              borderWidth: 0.6
             });
             page.drawText(pageText, {
               x: (width - textWidth) / 2,
-              y: pillY + Math.round(3.5 * pageScale),
+              y: pillY + 3.5,
               size: fontSize,
               font: helveticaBold,
               color: rgb(0.12, 0.16, 0.25)
             });
-          } else if (rotationAngle === 90) {
+          } else if (normalizedRotation === 90) {
             const pillX = 7;
             const pillY = (height - pillW) / 2;
             page.drawRectangle({
@@ -1094,14 +1306,14 @@ export async function buildMergedThreeLayerPdfBytes(
               borderWidth: 0.6
             });
             page.drawText(pageText, {
-              x: pillX + 3.5,
+              x: pillX + 10.5,
               y: (height - textWidth) / 2,
               size: fontSize,
               font: helveticaBold,
               color: rgb(0.12, 0.16, 0.25),
               rotate: degrees(90)
             });
-          } else if (rotationAngle === 180) {
+          } else if (normalizedRotation === 180) {
             const pillX = (width - pillW) / 2;
             const pillY = height - 21;
             page.drawRectangle({
@@ -1120,7 +1332,7 @@ export async function buildMergedThreeLayerPdfBytes(
               color: rgb(0.12, 0.16, 0.25),
               rotate: degrees(180)
             });
-          } else if (rotationAngle === 270) {
+          } else if (normalizedRotation === 270) {
             const pillX = width - 21;
             const pillY = (height - pillW) / 2;
             page.drawRectangle({
@@ -1132,7 +1344,7 @@ export async function buildMergedThreeLayerPdfBytes(
               borderWidth: 0.6
             });
             page.drawText(pageText, {
-              x: pillX + 10.5,
+              x: pillX + 3.5,
               y: (height + textWidth) / 2,
               size: fontSize,
               font: helveticaBold,
