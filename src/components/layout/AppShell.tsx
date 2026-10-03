@@ -25,6 +25,8 @@ import {
   Briefcase,
   FileSpreadsheet,
   Users,
+  ArrowLeft,
+  Globe2,
 } from "lucide-react";
 
 import { AuroraBackground } from "../common/AuroraBackground";
@@ -34,12 +36,18 @@ import { getRoleDisplayName, isApproverRole } from "../../types";
 interface AppShellProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  tabHistory?: string[];
+  onBack?: () => void;
+  onBackToLanding?: () => void;
   children: React.ReactNode;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
   activeTab,
   setActiveTab,
+  tabHistory = [],
+  onBack,
+  onBackToLanding,
   children,
 }) => {
   const {
@@ -157,12 +165,29 @@ export const AppShell: React.FC<AppShellProps> = ({
 
   const brandColor = currentTenant?.brandColor || "#1e40af";
 
+  const currentTabItem = navItems.find((i) => i.id === activeTab);
+  const currentTabLabel = currentTabItem?.label || activeTab;
+
+  const previousTabId =
+    tabHistory.length > 0
+      ? tabHistory[tabHistory.length - 1]
+      : activeTab !== "dashboard"
+      ? "dashboard"
+      : null;
+
+  const previousTabItem = previousTabId
+    ? navItems.find((i) => i.id === previousTabId)
+    : null;
+  const previousTabLabel =
+    previousTabItem?.label ||
+    (previousTabId ? previousTabId : onBackToLanding ? "Landing Portal" : null);
+
   return (
     <AuroraBackground className="min-h-screen flex flex-col">
       {/* TOP BAR HEADER — HORIZONX FLOATING GLASS WITH GLOW */}
       <header className="h-16 border-b border-slate-800/80 bg-[#090d1a]/85 backdrop-blur-xl sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between shadow-lg shadow-black/30">
-        {/* Left Branding & Mobile Toggle */}
-        <div className="flex items-center gap-3 sm:gap-4">
+        {/* Left Branding & Mobile Toggle & Back Button */}
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 rounded-lg text-slate-400 hover:text-white md:hidden cursor-pointer"
@@ -174,8 +199,26 @@ export const AppShell: React.FC<AppShellProps> = ({
             )}
           </button>
 
+          {/* Quick Back Button in Top Bar */}
+          {(onBack || onBackToLanding) && (
+            <button
+              type="button"
+              onClick={onBack || onBackToLanding}
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold text-slate-200 hover:text-white bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 shadow-sm transition-all cursor-pointer group"
+              title={previousTabLabel ? `Go back to ${previousTabLabel}` : "Go back to previous page"}
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
+              <span>Back</span>
+              {previousTabLabel && (
+                <span className="hidden xl:inline text-[10px] text-slate-400 font-normal truncate max-w-28">
+                  ({previousTabLabel})
+                </span>
+              )}
+            </button>
+          )}
+
           <div
-            className="flex items-center gap-2.5 cursor-pointer group"
+            className="flex items-center gap-2.5 cursor-pointer group pl-1 sm:pl-2"
             onClick={() => setActiveTab("profile")}
           >
             <div
@@ -410,6 +453,19 @@ export const AppShell: React.FC<AppShellProps> = ({
                   <span>Tenant &amp; Branding Settings</span>
                 </button>
 
+                {onBackToLanding && (
+                  <button
+                    onClick={() => {
+                      onBackToLanding();
+                      setShowUserMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-cyan-300 hover:bg-slate-800 rounded-lg flex items-center gap-2 cursor-pointer"
+                  >
+                    <Globe2 className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Return to Landing Portal</span>
+                  </button>
+                )}
+
                 <button
                   onClick={() => {
                     logout();
@@ -522,7 +578,61 @@ export const AppShell: React.FC<AppShellProps> = ({
 
         {/* MAIN VIEWPORT */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 min-h-[calc(100vh-4rem)] min-w-0">
-          <div className="w-full max-w-[1780px] mx-auto">{children}</div>
+          <div className="w-full max-w-[1780px] mx-auto space-y-5">
+            {/* Top Workspace Navigation Bar with Back & Breadcrumb Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 px-4 rounded-2xl bg-[#0a0f1e]/85 border border-slate-800/90 backdrop-blur-xl shadow-lg">
+              <div className="flex items-center gap-2.5">
+                {(onBack || onBackToLanding) && (
+                  <button
+                    type="button"
+                    onClick={onBack || onBackToLanding}
+                    className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700/90 border border-slate-700 hover:border-cyan-500/60 shadow-md transition-all cursor-pointer group"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5 text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
+                    <span>Back {previousTabLabel ? `to ${previousTabLabel}` : 'to Previous Page'}</span>
+                  </button>
+                )}
+
+                <div className="hidden sm:flex items-center gap-2 text-xs font-medium text-slate-400 pl-1">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("dashboard")}
+                    className="hover:text-cyan-400 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Workspace</span>
+                  </button>
+                  <span>/</span>
+                  <span className="text-white font-bold">{currentTabLabel}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {activeTab !== "dashboard" && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("dashboard")}
+                    className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Dashboard Home</span>
+                  </button>
+                )}
+                {onBackToLanding && (
+                  <button
+                    type="button"
+                    onClick={onBackToLanding}
+                    className="text-xs font-semibold text-cyan-300 hover:text-white px-3 py-1.5 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 hover:border-cyan-400 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Globe2 className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Landing Portal</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {children}
+          </div>
         </main>
       </div>
 

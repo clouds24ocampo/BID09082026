@@ -17,11 +17,13 @@ interface LandingWebsiteViewProps {
 }
 
 export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({
+  onEnterApp,
   onLogin,
   onRegister
 }) => {
-  const { tenants } = useAuth();
+  const { tenants, currentUser, currentTenant } = useAuth();
   const hasRegisteredAccounts = Boolean(tenants && tenants.length > 0);
+  const isAuthenticated = Boolean(currentUser && currentTenant && hasRegisteredAccounts);
 
   return (
     <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col justify-between items-center p-4 sm:p-6 lg:p-8 relative overflow-hidden select-none font-sans">
@@ -86,6 +88,35 @@ export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({
           </div>
         </motion.div>
 
+        {/* Active Session Quick Resume Banner */}
+        {isAuthenticated && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 rounded-2xl bg-cyan-950/40 border border-cyan-500/40 shadow-xl backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 text-xs"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <div className="text-left">
+                <p className="text-slate-300">
+                  Active Session: <strong className="text-white">{currentUser?.fullName}</strong>
+                </p>
+                <p className="text-[11px] text-cyan-300 font-mono">
+                  {currentTenant?.companyName} ({currentTenant?.brandCode})
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onEnterApp || onLogin}
+              className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-cyan-400 hover:bg-cyan-300 shadow-md shadow-cyan-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <span>Resume Active Workspace</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        )}
+
         {/* The Two Direct Actions: Log In & Register */}
         <motion.div
           initial={{ opacity: 0, y: 25 }}
@@ -95,13 +126,23 @@ export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({
         >
           {/* 1. LOG IN CARD */}
           <div
-            onClick={onLogin}
+            onClick={() => {
+              if (isAuthenticated && onEnterApp) {
+                onEnterApp();
+              } else {
+                onLogin();
+              }
+            }}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                onLogin();
+                if (isAuthenticated && onEnterApp) {
+                  onEnterApp();
+                } else {
+                  onLogin();
+                }
               }
             }}
             className="group relative p-6 rounded-2xl bg-slate-900/70 hover:bg-slate-900/95 border border-white/10 hover:border-cyan-500/50 transition-all duration-300 shadow-xl hover:shadow-[0_0_30px_rgba(6,182,212,0.15)] cursor-pointer flex flex-col justify-between backdrop-blur-xl text-left"
@@ -113,10 +154,12 @@ export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({
 
               <div>
                 <h2 className="text-lg font-bold text-white group-hover:text-cyan-300 transition-colors">
-                  Log In
+                  {isAuthenticated ? 'Active Workspace' : 'Log In'}
                 </h2>
                 <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  Sign in to your registered corporate workspace, document vault, and active bid packages.
+                  {isAuthenticated
+                    ? `Access ${currentTenant?.companyName} digital vault, project profiles, and bid package compiler.`
+                    : 'Sign in to your registered corporate workspace, document vault, and active bid packages.'}
                 </p>
               </div>
             </div>
@@ -126,11 +169,15 @@ export const LandingWebsiteView: React.FC<LandingWebsiteViewProps> = ({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onLogin();
+                  if (isAuthenticated && onEnterApp) {
+                    onEnterApp();
+                  } else {
+                    onLogin();
+                  }
                 }}
                 className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-cyan-600/90 border border-white/10 group-hover:border-cyan-500/40 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
               >
-                <span>Sign In to Workspace</span>
+                <span>{isAuthenticated ? 'Open Active Workspace' : 'Sign In to Workspace'}</span>
                 <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
               </button>
             </div>

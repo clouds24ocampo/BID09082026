@@ -177,6 +177,20 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
 
   return (
     <AuroraBackground className="min-h-screen text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-10 relative overflow-hidden font-sans">
+
+      {/* Top Floating Back to Portal Button */}
+      {onBackToLanding && (
+        <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-30">
+          <button
+            type="button"
+            onClick={currentStep > 1 ? handleBack : onBackToLanding}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-white bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/50 shadow-xl backdrop-blur-xl transition-all cursor-pointer group"
+          >
+            <ArrowLeft className="w-4 h-4 text-cyan-400 group-hover:-translate-x-1 transition-transform" />
+            <span>{currentStep > 1 ? `Back to Step ${currentStep - 1}` : 'Back to Portal Home'}</span>
+          </button>
+        </div>
+      )}
       
       {/* HorizonX Ambient Lighting Spotlights */}
       <div
@@ -282,7 +296,16 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
               {/* Cockpit Header with Milestone Stepper */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <button
+                      type="button"
+                      onClick={currentStep > 1 ? handleBack : (onBackToLanding || onSwitchToLogin)}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer group"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+                      <span>{currentStep > 1 ? `Back to Step ${currentStep - 1}` : 'Back to Portal'}</span>
+                    </button>
+                    <span className="text-slate-600">•</span>
                     <span className="text-[10px] font-mono font-bold text-blue-400 uppercase tracking-widest">
                       Milestone {currentStep} of 4
                     </span>
@@ -700,19 +723,31 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
                     <button
                       type="button"
                       onClick={handleBack}
-                      className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-300 bg-slate-900 border border-slate-800 hover:bg-slate-800 transition flex items-center gap-2 cursor-pointer"
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-300 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:text-white transition flex items-center gap-2 cursor-pointer group"
                     >
-                      <ArrowLeft className="w-4 h-4" />
-                      <span>Back</span>
+                      <ArrowLeft className="w-4 h-4 text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
+                      <span>Back to Step {currentStep - 1}</span>
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={onSwitchToLogin}
-                      className="text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer"
-                    >
-                      Already registered? <span className="text-blue-400 underline font-bold">Log In</span>
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {onBackToLanding && (
+                        <button
+                          type="button"
+                          onClick={onBackToLanding}
+                          className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-300 bg-slate-900 border border-slate-800 hover:bg-slate-800 hover:text-white transition flex items-center gap-2 cursor-pointer group"
+                        >
+                          <ArrowLeft className="w-4 h-4 text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
+                          <span>Back to Portal</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={onSwitchToLogin}
+                        className="text-xs font-semibold text-slate-400 hover:text-white transition cursor-pointer"
+                      >
+                        Already registered? <span className="text-blue-400 underline font-bold">Log In</span>
+                      </button>
+                    </div>
                   )}
 
                   {currentStep < 4 ? (

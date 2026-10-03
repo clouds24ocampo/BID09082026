@@ -15,7 +15,8 @@ import {
   RefreshCw,
   Rocket,
   Globe2,
-  Radio
+  Radio,
+  ArrowLeft
 } from 'lucide-react';
 
 interface LoginPageProps {
@@ -82,6 +83,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBack
 
   return (
     <div className="min-h-screen bg-[#02040a] text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden font-sans select-none">
+
+      {/* Top Floating Back to Portal Button */}
+      {onBackToLanding && (
+        <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-30">
+          <button
+            type="button"
+            onClick={onBackToLanding}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-white bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/50 shadow-xl backdrop-blur-xl transition-all cursor-pointer group"
+          >
+            <ArrowLeft className="w-4 h-4 text-cyan-400 group-hover:-translate-x-1 transition-transform" />
+            <span>Back to Portal Home</span>
+          </button>
+        </div>
+      )}
 
       {/* ================= CONTINUOUS DEEP SPACE TRAVEL ENGINE ================= */}
 
@@ -270,6 +285,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBack
             {/* Form Header */}
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
               <div>
+                {onBackToLanding && (
+                  <button
+                    type="button"
+                    onClick={onBackToLanding}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-cyan-400 hover:text-cyan-300 transition-colors mb-1.5 cursor-pointer group"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+                    <span>Back to Portal Home</span>
+                  </button>
+                )}
                 <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                   <span>Mission Control</span>
                   <Sparkles className="w-4 h-4 text-cyan-400" />
@@ -484,16 +509,29 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBack
             </form>
 
             {/* Registration Switcher & System Reset */}
-            <div className="pt-4 border-t border-slate-800/80 text-center space-y-2">
-              <p className="text-xs text-slate-400">
-                Need to register a new entity?{' '}
-                <button
-                  onClick={onSwitchToRegister}
-                  className="font-semibold text-cyan-400 hover:text-cyan-300 underline focus:outline-none transition"
-                >
-                  Onboard Corporate Account
-                </button>
-              </p>
+            <div className="pt-4 border-t border-slate-800/80 space-y-3">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+                {onBackToLanding && (
+                  <button
+                    type="button"
+                    onClick={onBackToLanding}
+                    className="inline-flex items-center gap-1.5 font-bold text-slate-300 hover:text-cyan-400 transition cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Back to Portal Home</span>
+                  </button>
+                )}
+                <p>
+                  Need to register a new entity?{' '}
+                  <button
+                    type="button"
+                    onClick={onSwitchToRegister}
+                    className="font-semibold text-cyan-400 hover:text-cyan-300 underline focus:outline-none transition cursor-pointer"
+                  >
+                    Onboard Corporate Account
+                  </button>
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => {

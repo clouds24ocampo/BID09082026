@@ -19,62 +19,130 @@ import VaultErrorBoundary from "./components/common/VaultErrorBoundary";
 
 const MainApp: React.FC = () => {
   const { currentUser, currentTenant, tenants } = useAuth();
-  const [authMode, setAuthMode] = useState<"landing" | "login" | "register">("landing");
-  const [activeTab, setActiveTab] = useState("dashboard");
-
-  if (!currentUser || !currentTenant || tenants.length === 0) {
-    if (authMode === "landing") {
-      return (
-        <LandingWebsiteView
-          onEnterApp={() => setAuthMode(tenants.length === 0 ? "register" : "login")}
-          onLogin={() => setAuthMode("login")}
-          onRegister={() => setAuthMode("register")}
-        />
-      );
+  const [authMode, setAuthMode] = useState<"landing" | "login" | "register" | "app">(() => {
+    if (typeof window !== "undefined" && typeof window.sessionStorage !== "undefined") {
+      try {
+        const saved = window.sessionStorage.getItem("bidocs_auth_mode");
+        if (saved === "landing" || saved === "login" || saved === "register" || saved === "app") {
+          return saved as "landing" | "login" | "register" | "app";
+        }
+      } catch (_) {}
     }
+    return "landing";
+  });
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [tabHistory, setTabHistory] = useState<string[]>([]);
+
+  const handleSetAuthMode = (mode: "landing" | "login" | "register" | "app") => {
+    if (typeof window !== "undefined" && typeof window.sessionStorage !== "undefined") {
+      try {
+        window.sessionStorage.setItem("bidocs_auth_mode", mode);
+      } catch (_) {}
+    }
+    setAuthMode(mode);
+  };
+
+  // Automatically transition to "app" when user logs in or registers
+  React.useEffect(() => {
+    if (
+      currentUser &&
+      currentTenant &&
+      tenants.length > 0 &&
+      (authMode === "login" || authMode === "register")
+    ) {
+      handleSetAuthMode("app");
+    }
+  }, [currentUser, currentTenant, tenants.length, authMode]);
+
+  const handleNavigateTab = (newTab: string) => {
+    if (newTab !== activeTab) {
+      setTabHistory((prev) => [...prev, activeTab]);
+      setActiveTab(newTab);
+    }
+  };
+
+  const handleBackNavigation = () => {
+    if (tabHistory.length > 0) {
+      const prevTab = tabHistory[tabHistory.length - 1];
+      setTabHistory((prev) => prev.slice(0, -1));
+      setActiveTab(prevTab);
+    } else if (activeTab !== "dashboard") {
+      setActiveTab("dashboard");
+    } else {
+      handleSetAuthMode("landing");
+    }
+  };
+
+  if (
+    authMode !== "app" ||
+    !currentUser ||
+    !currentTenant ||
+    tenants.length === 0
+  ) {
     if (authMode === "register") {
       return (
         <RegisterPage
-          onSwitchToLogin={() => setAuthMode("login")}
-          onBackToLanding={() => setAuthMode("landing")}
+          onSwitchToLogin={() => handleSetAuthMode("login")}
+          onBackToLanding={() => handleSetAuthMode("landing")}
+        />
+      );
+    }
+    if (authMode === "login") {
+      return (
+        <LoginPage
+          onSwitchToRegister={() => handleSetAuthMode("register")}
+          onBackToLanding={() => handleSetAuthMode("landing")}
         />
       );
     }
     return (
-      <LoginPage
-        onSwitchToRegister={() => setAuthMode("register")}
-        onBackToLanding={() => setAuthMode("landing")}
+      <LandingWebsiteView
+        onEnterApp={() => {
+          if (currentUser && currentTenant && tenants.length > 0) {
+            handleSetAuthMode("app");
+          } else {
+            handleSetAuthMode(tenants.length === 0 ? "register" : "login");
+          }
+        }}
+        onLogin={() => handleSetAuthMode("login")}
+        onRegister={() => handleSetAuthMode("register")}
       />
     );
   }
 
   return (
-    <AppShell activeTab={activeTab} setActiveTab={setActiveTab}>
+    <AppShell
+      activeTab={activeTab}
+      setActiveTab={handleNavigateTab}
+      tabHistory={tabHistory}
+      onBack={handleBackNavigation}
+      onBackToLanding={() => handleSetAuthMode("landing")}
+    >
       <VaultErrorBoundary
         key={activeTab}
         fallbackTitle={`${activeTab.replace("-", " ").toUpperCase()} Module View`}
       >
         {activeTab === "dashboard" && (
-          <DashboardView setActiveTab={setActiveTab} />
+          <DashboardView setActiveTab={handleNavigateTab} />
         )}
         {activeTab === "tor" && (
           <TermsOfReferenceView
             tenant={currentTenant}
-            setActiveTab={setActiveTab}
+            setActiveTab={handleNavigateTab}
           />
         )}
         {activeTab === "pow" && (
           <PowModal
             tenant={currentTenant}
-            setActiveTab={setActiveTab}
+            setActiveTab={handleNavigateTab}
             initialTab="matrix"
           />
         )}
         {activeTab === "opportunities" && (
-          <OpportunityFinderView setActiveTab={setActiveTab} />
+          <OpportunityFinderView setActiveTab={handleNavigateTab} />
         )}
         {activeTab === "project-profile" && (
-          <ProjectProfileView setActiveTab={setActiveTab} />
+          <ProjectProfileView setActiveTab={handleNavigateTab} />
         )}
         {activeTab === "vault" && <DocumentVaultView />}
         {activeTab === "bids" && <BidPackageBuilderView />}
