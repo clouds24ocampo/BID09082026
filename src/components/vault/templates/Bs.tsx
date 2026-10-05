@@ -4,6 +4,7 @@ import { PDFDocument } from 'pdf-lib';
 import html2canvas from 'html2canvas';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import VaultErrorBoundary from '../../common/VaultErrorBoundary';
+import { frsResult, readFrs } from '../../../utils/paymentFormData';
 import {
   X,
   Download,
@@ -67,17 +68,17 @@ export const BsModalContent: React.FC<BsModalProps> = ({
   // Billing Figures
   const [originalContractAmount, setOriginalContractAmount] = useState<number>(propContractAmount || 0);
   const [approvedVariationOrders, setApprovedVariationOrders] = useState<number>(0);
-  const [grossAccomplishedThisPeriod, setGrossAccomplishedThisPeriod] = useState<number>(propContractAmount ? propContractAmount * 0.35 : 0);
-  const [lessAdvanceRecoupment, setLessAdvanceRecoupment] = useState<number>(propContractAmount ? propContractAmount * 0.35 * 0.15 : 0);
-  const [lessRetentionMoney, setLessRetentionMoney] = useState<number>(propContractAmount ? propContractAmount * 0.35 * 0.10 : 0);
+  const [grossAccomplishedThisPeriod, setGrossAccomplishedThisPeriod] = useState<number>(0);
+  const [lessAdvanceRecoupment, setLessAdvanceRecoupment] = useState<number>(0);
+  const [lessRetentionMoney, setLessRetentionMoney] = useState<number>(0);
   const [lessVat5, setLessVat5] = useState<number>(0);
   const [lessEwt2, setLessEwt2] = useState<number>(0);
   const [otherLiquidatedDeductions, setOtherLiquidatedDeductions] = useState<number>(0);
 
   // Bank Remittance Info
-  const [bankName, setBankName] = useState<string>('Land Bank of the Philippines / BDO');
+  const [bankName, setBankName] = useState<string>('');
   const [accountName, setAccountName] = useState<string>(tenant?.companyName || '');
-  const [accountNumber, setAccountNumber] = useState<string>('1892-0948-22');
+  const [accountNumber, setAccountNumber] = useState<string>('');
 
   // Signatories
   const [signatoryName, setSignatoryName] = useState<string>(tenant?.authorizedSignatory?.name || '');
@@ -85,6 +86,23 @@ export const BsModalContent: React.FC<BsModalProps> = ({
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const projectScopeKey = (projectRefNo || selectedOppId || activeProjectRefNo || 'default').replace(/[^a-zA-Z0-9]/g, '_');
+
+  // Pull this billing's figures from the Final Payment Reconciliation Sheet so every form tells one story.
+  const fillFromReconciliation = (ref: string): boolean => {
+    const rec = readFrs(tenant?.id || 'default', ref);
+    if (!rec || !(rec.finalValueOfWork > 0)) return false;
+    const out = frsResult(rec);
+    const sumRows = (rows: { amount: number }[]) => rows.reduce((a, r) => a + (Number(r?.amount) || 0), 0);
+    setOriginalContractAmount(rec.originalPrice);
+    setApprovedVariationOrders(sumRows(rec.variationOrders) - sumRows(rec.deductiveOrders));
+    setGrossAccomplishedThisPeriod(out.currentGross);
+    setLessAdvanceRecoupment(out.recoupment);
+    setLessRetentionMoney(out.retention);
+    setLessVat5(out.taxes.vat);
+    setLessEwt2(out.taxes.ewt);
+    setOtherLiquidatedDeductions(out.thirdParty + out.defects + out.other + out.ld);
+    return true;
+  };
 
   const totalDeductions = lessAdvanceRecoupment + lessRetentionMoney + lessVat5 + lessEwt2 + otherLiquidatedDeductions;
   const netAmountPayable = grossAccomplishedThisPeriod - totalDeductions;
@@ -139,14 +157,8 @@ export const BsModalContent: React.FC<BsModalProps> = ({
         setProjectRefNo(target.refNo);
         setProcuringEntity(target.procuringEntity);
         const amt = Number((target as any).abc || (target as any).contractAmount || 0);
-        if (amt > 0) {
-          setOriginalContractAmount(amt);
-          setGrossAccomplishedThisPeriod(amt * 0.35);
-          setLessAdvanceRecoupment(amt * 0.35 * 0.15);
-          setLessRetentionMoney(amt * 0.35 * 0.10);
-          setLessVat5(amt * 0.35 * 0.05);
-          setLessEwt2(amt * 0.35 * 0.02);
-        }
+        if (amt > 0) setOriginalContractAmount(amt);
+        fillFromReconciliation(activeProjectRefNo || target.refNo);
       }
     }
   }, [tenant, activeProjectRefNo, projectScopeKey]);
@@ -387,18 +399,20 @@ export const BsModalContent: React.FC<BsModalProps> = ({
                 />
               </div>
               <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase">Gross Billing This Period (₱)</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase">Gross Billing This Period (₱)</label>
+                  <button
+                    type="button"
+                    onClick={() => { if (!fillFromReconciliation(projectRefNo)) alert('No Final Payment Reconciliation Sheet (FRS) with a value of work has been saved for this project yet.'); }}
+                    className="text-[9px] font-bold text-blue-300 hover:text-blue-200 cursor-pointer normal-case"
+                  >
+                    Fill from FRS
+                  </button>
+                </div>
                 <input
                   type="number"
                   value={grossAccomplishedThisPeriod || ''}
-                  onChange={(e) => {
-                    const gross = Number(e.target.value);
-                    setGrossAccomplishedThisPeriod(gross);
-                    setLessAdvanceRecoupment(gross * 0.15);
-                    setLessRetentionMoney(gross * 0.10);
-                    setLessVat5(gross * 0.05);
-                    setLessEwt2(gross * 0.02);
-                  }}
+                  onChange={(e) => setGrossAccomplishedThisPeriod(Number(e.target.value))}
                   className="w-full mt-1 bg-slate-950 border border-emerald-500 rounded-lg px-2.5 py-1.5 text-xs text-emerald-400 font-mono font-bold"
                 />
               </div>
@@ -406,7 +420,7 @@ export const BsModalContent: React.FC<BsModalProps> = ({
 
             <div className="grid grid-cols-2 gap-2 text-[11px]">
               <div>
-                <label className="text-[10px] text-slate-400">15% Advance Recoupment</label>
+                <label className="text-[10px] text-slate-400">Advance Recoupment</label>
                 <input
                   type="number"
                   value={lessAdvanceRecoupment}
@@ -415,7 +429,7 @@ export const BsModalContent: React.FC<BsModalProps> = ({
                 />
               </div>
               <div>
-                <label className="text-[10px] text-slate-400">10% Retention Money</label>
+                <label className="text-[10px] text-slate-400">Retention Money</label>
                 <input
                   type="number"
                   value={lessRetentionMoney}
@@ -427,7 +441,7 @@ export const BsModalContent: React.FC<BsModalProps> = ({
 
             <div className="grid grid-cols-2 gap-2 text-[11px]">
               <div>
-                <label className="text-[10px] text-slate-400">5% Final VAT</label>
+                <label className="text-[10px] text-slate-400">Final VAT</label>
                 <input
                   type="number"
                   value={lessVat5}
@@ -436,7 +450,7 @@ export const BsModalContent: React.FC<BsModalProps> = ({
                 />
               </div>
               <div>
-                <label className="text-[10px] text-slate-400">2% EWT Withholding</label>
+                <label className="text-[10px] text-slate-400">EWT Withholding</label>
                 <input
                   type="number"
                   value={lessEwt2}
@@ -527,19 +541,19 @@ export const BsModalContent: React.FC<BsModalProps> = ({
                       </td>
                     </tr>
                     <tr className="bg-slate-50">
-                      <td className="p-2 pl-6 text-red-700">Less: Recoupment of 15% Advance Payment</td>
+                      <td className="p-2 pl-6 text-red-700">Less: Recoupment of Advance Payment</td>
                       <td className="p-2 text-right font-mono text-red-700">- ₱ {lessAdvanceRecoupment.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
                     </tr>
                     <tr className="bg-slate-50">
-                      <td className="p-2 pl-6 text-red-700">Less: 10% Retention Money</td>
+                      <td className="p-2 pl-6 text-red-700">Less: Retention Money</td>
                       <td className="p-2 text-right font-mono text-red-700">- ₱ {lessRetentionMoney.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
                     </tr>
                     <tr className="bg-slate-50">
-                      <td className="p-2 pl-6 text-red-700">Less: 5% Final Withholding VAT</td>
+                      <td className="p-2 pl-6 text-red-700">Less: Final Withholding VAT</td>
                       <td className="p-2 text-right font-mono text-red-700">- ₱ {lessVat5.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
                     </tr>
                     <tr className="bg-slate-50">
-                      <td className="p-2 pl-6 text-red-700">Less: 2% Expanded Withholding Tax (EWT)</td>
+                      <td className="p-2 pl-6 text-red-700">Less: Expanded Withholding Tax (EWT)</td>
                       <td className="p-2 text-right font-mono text-red-700">- ₱ {lessEwt2.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
                     </tr>
                     {otherLiquidatedDeductions > 0 && (

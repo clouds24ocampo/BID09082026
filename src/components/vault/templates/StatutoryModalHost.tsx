@@ -67,7 +67,9 @@ export const StatutoryModalHost: React.FC<StatutoryModalHostProps> = ({ type, te
   if (!type) return null;
   const common = {
     tenant,
-    activeProjectRefNo: project?.projectReferenceNumber || project?.philgepsRefNo || '',
+    // The forms look their project up by getOpportunityProjects().refNo, which is PhilGEPS-first. Passing
+    // projectReferenceNumber first made the lookup miss and silently swap in the first opportunity.
+    activeProjectRefNo: project?.philgepsRefNo || project?.projectReferenceNumber || '',
     activeProjectTitle: project?.title || '',
     activeProcuringEntity: project?.procuringEntity || 'Bids and Awards Committee',
     procuringEntityAddress: project?.procuringEntityAddress || '',

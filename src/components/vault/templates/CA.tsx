@@ -65,15 +65,19 @@ export const CaModalContent: React.FC<CaModalProps> = ({
   const [affiantAddress, setAffiantAddress] = useState<string>(tenant?.address || '');
   const [cityVenue, setCityVenue] = useState<string>('City/Municipality of Manila');
   const [provinceVenue, setProvinceVenue] = useState<string>('Metro Manila, Philippines');
-  const [idType, setIdType] = useState<string>('Passport / Driver’s License / PRC ID');
-  const [idNumber, setIdNumber] = useState<string>('PRC-0098762 / CTC No. 19283746');
-  const [idExpiry, setIdExpiry] = useState<string>('Valid until 2028');
+  const [idType, setIdType] = useState<string>('Competent evidence of identity');
+  const [idNumber, setIdNumber] = useState<string>('');
+  const [idExpiry, setIdExpiry] = useState<string>('');
 
   // Notary Public details
-  const [docNo, setDocNo] = useState<string>('124');
-  const [pageNo, setPageNo] = useState<string>('26');
-  const [bookNo, setBookNo] = useState<string>('XLII');
+  const [docNo, setDocNo] = useState<string>('');
+  const [pageNo, setPageNo] = useState<string>('');
+  const [bookNo, setBookNo] = useState<string>('');
   const [seriesYear, setSeriesYear] = useState<string>(new Date().getFullYear().toString());
+
+  // Disclosure of valid unpaid obligations (payment.md section 6): never assert "all paid" without it.
+  const [outstandingLabor, setOutstandingLabor] = useState<string>('None');
+  const [outstandingSuppliers, setOutstandingSuppliers] = useState<string>('None');
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const projectScopeKey = (projectRefNo || selectedOppId || activeProjectRefNo || 'default').replace(/[^a-zA-Z0-9]/g, '_');
@@ -111,6 +115,8 @@ export const CaModalContent: React.FC<CaModalProps> = ({
         if (parsed.pageNo) setPageNo(parsed.pageNo);
         if (parsed.bookNo) setBookNo(parsed.bookNo);
         if (parsed.seriesYear) setSeriesYear(parsed.seriesYear);
+        if (parsed.outstandingLabor) setOutstandingLabor(parsed.outstandingLabor);
+        if (parsed.outstandingSuppliers) setOutstandingSuppliers(parsed.outstandingSuppliers);
         return;
       }
     } catch (e) {
@@ -153,7 +159,9 @@ export const CaModalContent: React.FC<CaModalProps> = ({
       docNo,
       pageNo,
       bookNo,
-      seriesYear
+      seriesYear,
+      outstandingLabor,
+      outstandingSuppliers
     };
     try {
       localStorage.setItem(storageKey, JSON.stringify(payload));
@@ -461,6 +469,20 @@ export const CaModalContent: React.FC<CaModalProps> = ({
               </div>
             </div>
           </div>
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3">
+            <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Outstanding Valid Obligations</h3>
+            <p className="text-[10px] text-slate-400">State "None" only if every worker and supplier is paid. Otherwise list each unpaid amount; it is disclosed in the affidavit.</p>
+            <div>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase">Labor</label>
+              <input type="text" value={outstandingLabor} onChange={(e) => setOutstandingLabor(e.target.value)}
+                className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white" />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase">Materials, equipment and sub-contractors</label>
+              <input type="text" value={outstandingSuppliers} onChange={(e) => setOutstandingSuppliers(e.target.value)}
+                className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white" />
+            </div>
+          </div>
         </div>
 
         {/* Right Preview Sheet (7 cols) */}
@@ -497,16 +519,19 @@ export const CaModalContent: React.FC<CaModalProps> = ({
                     That the said company is the Contractor for the project: <strong>"{projectTitle}"</strong> under Contract / Reference No. <strong>{projectRefNo || 'N/A'}</strong> with the <strong>{procuringEntity}</strong> in the total contract amount of <strong>₱ {contractAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong>.
                   </li>
                   <li>
-                    That all workers, laborers, tradesmen, and personnel employed in the execution of the said project have been <strong>FULLY PAID</strong> their corresponding wages, salaries, overtime, and statutory benefits in accordance with the Philippine Labor Code.
+                    That all workers, laborers, tradesmen, and personnel employed in the execution of the said project have been <strong>PAID</strong> their corresponding wages, salaries, overtime, and statutory benefits in accordance with the Philippine Labor Code, except for the following valid obligations, if any: <strong>{outstandingLabor || 'None'}</strong>.
                   </li>
                   <li>
-                    That all materials, supplies, equipment rentals, fuels, and sub-contractors supplied and utilized for the works have been <strong>FULLY PAID AND SATISFIED</strong>, and that no outstanding liens, garnishments, or third-party liabilities exist against the project.
+                    That all materials, supplies, equipment rentals, fuels, and sub-contractors supplied and utilized for the works have been <strong>PAID</strong>, and that no unpaid claims, liens, garnishments, or third-party liabilities exist against the project that should legally be charged against the Procuring Entity, except for the following valid obligations, if any: <strong>{outstandingSuppliers || 'None'}</strong>.
                   </li>
                   <li>
                     That all applicable national and local taxes, fees, and government contributions (including SSS, PhilHealth, Pag-IBIG, and BIR withholdings) relative to the project have been fully paid and remitted.
                   </li>
                   <li>
-                    I am executing this Affidavit to attest to the truth of the foregoing facts and to release the Procuring Entity from any and all liability or claims arising from labor, material, or equipment obligations, in support of our application for progress billing / final payment.
+                    That all materials and equipment included in the billing were actually delivered, incorporated, installed or utilized in accordance with the approved plans and specifications, and that the Statement of Work Accomplished and supporting documents submitted accurately represent the actual work performed under the Contract.
+                  </li>
+                  <li>
+                    I am executing this Affidavit to attest to the truth of the foregoing facts and in support of the Contractor's application for progress billing / final payment.
                   </li>
                 </ol>
 
@@ -519,7 +544,7 @@ export const CaModalContent: React.FC<CaModalProps> = ({
               <div className="pt-8 text-right pr-6">
                 <p className="font-bold underline uppercase text-slate-900 text-sm">{affiantName || 'AUTHORIZED MANAGING OFFICER'}</p>
                 <p className="text-xs text-slate-600">Affiant / {affiantTitle}</p>
-                <p className="text-[11px] text-slate-500 font-mono mt-1">{idType}: {idNumber}</p>
+                <p className="text-[11px] text-slate-500 font-mono mt-1">{idType}: {idNumber || '__________________'}</p>
               </div>
             </div>
 
@@ -531,9 +556,9 @@ export const CaModalContent: React.FC<CaModalProps> = ({
 
               <div className="flex justify-between items-end pt-6">
                 <div className="space-y-1 text-xs font-mono text-slate-700">
-                  <p>Doc. No. &nbsp;<strong>{docNo}</strong>;</p>
-                  <p>Page No. <strong>{pageNo}</strong>;</p>
-                  <p>Book No. <strong>{bookNo}</strong>;</p>
+                  <p>Doc. No. &nbsp;<strong>{docNo || '______'}</strong>;</p>
+                  <p>Page No. <strong>{pageNo || '______'}</strong>;</p>
+                  <p>Book No. <strong>{bookNo || '______'}</strong>;</p>
                   <p>Series of <strong>{seriesYear}</strong>.</p>
                 </div>
 

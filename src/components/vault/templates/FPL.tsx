@@ -4,6 +4,7 @@ import { PDFDocument } from 'pdf-lib';
 import html2canvas from 'html2canvas';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import VaultErrorBoundary from '../../common/VaultErrorBoundary';
+import { frsResult, readFormState, readFrs, swaTotals } from '../../../utils/paymentFormData';
 import {
   X,
   Download,
@@ -68,9 +69,16 @@ export const FplModalContent: React.FC<FplModalProps> = ({
 
   // Financial Summary
   const [contractAmount, setContractAmount] = useState<number>(propContractAmount || 0);
-  const [finalBillingAmount, setFinalBillingAmount] = useState<number>(propContractAmount ? propContractAmount * 0.15 : 0);
-  const [retentionAmount, setRetentionAmount] = useState<number>(propContractAmount ? propContractAmount * 0.10 : 0);
+  const [finalBillingAmount, setFinalBillingAmount] = useState<number>(0);
+  const [retentionAmount, setRetentionAmount] = useState<number>(0);
   const [completionDate, setCompletionDate] = useState<string>(todayStr);
+  const [grossFinalBilling, setGrossFinalBilling] = useState<number>(0);
+  const [physicalPercent, setPhysicalPercent] = useState<number>(100);
+  const [contractNtpDate, setContractNtpDate] = useState<string>('');
+  const [originalDurationText, setOriginalDurationText] = useState<string>('');
+  const [revisedCompletionDate, setRevisedCompletionDate] = useState<string>('');
+  const [finalAcceptanceIssued, setFinalAcceptanceIssued] = useState<boolean>(false);
+  const [framework, setFramework] = useState<'RA_9184' | 'RA_12009_NGPA'>('RA_12009_NGPA');
   const [punchlistClearedDate, setPunchlistClearedDate] = useState<string>(todayStr);
 
   // Signatory
@@ -79,6 +87,36 @@ export const FplModalContent: React.FC<FplModalProps> = ({
 
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const projectScopeKey = (projectRefNo || selectedOppId || activeProjectRefNo || 'default').replace(/[^a-zA-Z0-9]/g, '_');
+
+  // Pull the letter's figures and dates from the saved SWA, SOTE and Final Payment Reconciliation Sheet.
+  const fillFromChain = (ref: string): boolean => {
+    const tid = tenant?.id || 'default';
+    const rec = readFrs(tid, ref);
+    const sote = readFormState<any>('sote', tid, ref);
+    const swa = readFormState<any>('swa', tid, ref);
+    let found = false;
+    if (rec && rec.finalValueOfWork > 0) {
+      const out = frsResult(rec);
+      setContractAmount(out.finalContractPrice);
+      setGrossFinalBilling(out.currentGross);
+      setFinalBillingAmount(out.netPayment);
+      setFinalAcceptanceIssued(rec.finalAcceptanceIssued);
+      setFramework(rec.framework);
+      found = true;
+    }
+    if (swa) {
+      const pct = swaTotals(swa).physicalPercent;
+      if (pct > 0) { setPhysicalPercent(pct); found = true; }
+    }
+    if (sote) {
+      if (sote.ntpDate) setContractNtpDate(sote.ntpDate);
+      if (sote.originalDurationDays) setOriginalDurationText(`${sote.originalDurationDays} Calendar Days`);
+      if (sote.revisedExpiryDate) setRevisedCompletionDate(sote.revisedExpiryDate);
+      if (sote.actualCompletionDate) setCompletionDate(sote.actualCompletionDate);
+      found = true;
+    }
+    return found;
+  };
 
   useEffect(() => {
     const tenantId = tenant?.id || 'default';
@@ -107,6 +145,13 @@ export const FplModalContent: React.FC<FplModalProps> = ({
         if (parsed.retentionAmount) setRetentionAmount(parsed.retentionAmount);
         if (parsed.completionDate) setCompletionDate(parsed.completionDate);
         if (parsed.punchlistClearedDate) setPunchlistClearedDate(parsed.punchlistClearedDate);
+        if (parsed.grossFinalBilling) setGrossFinalBilling(parsed.grossFinalBilling);
+        if (parsed.physicalPercent !== undefined) setPhysicalPercent(parsed.physicalPercent);
+        if (parsed.contractNtpDate) setContractNtpDate(parsed.contractNtpDate);
+        if (parsed.originalDurationText) setOriginalDurationText(parsed.originalDurationText);
+        if (parsed.revisedCompletionDate) setRevisedCompletionDate(parsed.revisedCompletionDate);
+        if (parsed.finalAcceptanceIssued !== undefined) setFinalAcceptanceIssued(parsed.finalAcceptanceIssued);
+        if (parsed.framework) setFramework(parsed.framework);
         if (parsed.signatoryName) setSignatoryName(parsed.signatoryName);
         if (parsed.signatoryTitle) setSignatoryTitle(parsed.signatoryTitle);
         return;
@@ -130,11 +175,8 @@ export const FplModalContent: React.FC<FplModalProps> = ({
         }
         if (target.procuringEntityAddress) setEntityAddress(target.procuringEntityAddress);
         const amt = Number((target as any).abc || (target as any).contractAmount || 0);
-        if (amt > 0) {
-          setContractAmount(amt);
-          setFinalBillingAmount(amt * 0.15);
-          setRetentionAmount(amt * 0.10);
-        }
+        if (amt > 0) setContractAmount(amt);
+        fillFromChain(activeProjectRefNo || target.refNo);
       }
     }
   }, [tenant, activeProjectRefNo, projectScopeKey]);
@@ -156,6 +198,13 @@ export const FplModalContent: React.FC<FplModalProps> = ({
       retentionAmount,
       completionDate,
       punchlistClearedDate,
+      grossFinalBilling,
+      physicalPercent,
+      contractNtpDate,
+      originalDurationText,
+      revisedCompletionDate,
+      finalAcceptanceIssued,
+      framework,
       signatoryName,
       signatoryTitle
     };
@@ -367,7 +416,7 @@ export const FplModalContent: React.FC<FplModalProps> = ({
                 />
               </div>
               <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase">Final Billing Amount (₱)</label>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase">Net Amount Due (₱)</label>
                 <input
                   type="number"
                   value={finalBillingAmount || ''}
@@ -375,6 +424,44 @@ export const FplModalContent: React.FC<FplModalProps> = ({
                   className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase">Gross Final Billing (₱)</label>
+                <input
+                  type="number"
+                  value={grossFinalBilling || ''}
+                  onChange={(e) => setGrossFinalBilling(Number(e.target.value))}
+                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase">Physical Accomplishment (%)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  value={physicalPercent}
+                  onChange={(e) => setPhysicalPercent(Number(e.target.value))}
+                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <label className="flex items-center gap-2 text-[11px] text-slate-300">
+                <input type="checkbox" checked={finalAcceptanceIssued} onChange={(e) => setFinalAcceptanceIssued(e.target.checked)} />
+                Certificate of Final Acceptance already issued
+              </label>
+              <button
+                type="button"
+                onClick={() => { if (!fillFromChain(projectRefNo)) alert('No saved SWA, SOTE or Final Payment Reconciliation Sheet (FRS) found for this project yet.'); }}
+                className="px-2 py-1 text-[10px] font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-blue-300 cursor-pointer whitespace-nowrap"
+              >
+                Fill from SWA / SOTE / FRS
+              </button>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -429,11 +516,14 @@ export const FplModalContent: React.FC<FplModalProps> = ({
 
                 <div className="pt-2">
                   <p className="font-bold text-slate-900">
-                    SUBJECT: <span className="underline uppercase">REQUEST FOR FINAL PAYMENT, 100% COMPLETION INSPECTION & RELEASE OF RETENTION MONEY</span>
+                    SUBJECT: <span className="underline uppercase">REQUEST FOR FINAL PAYMENT{finalAcceptanceIssued ? ' AND RELEASE OF RETENTION' : ' AND FINAL INSPECTION'} – {projectTitle || '[Project Name]'}</span>
                   </p>
                   <p className="text-xs text-slate-700 mt-1">
                     <strong>Project:</strong> {projectTitle || '[Project Name]'} <br />
-                    <strong>Contract / Ref No.:</strong> <span className="font-mono">{projectRefNo || 'N/A'}</span>
+                    <strong>Contract / Ref No.:</strong> <span className="font-mono">{projectRefNo || 'N/A'}</span> <br />
+                    <strong>Contractor:</strong> {companyName || 'N/A'} <br />
+                    <strong>Notice to Proceed:</strong> {contractNtpDate || '—'} • <strong>Original Duration:</strong> {originalDurationText || '—'} <br />
+                    <strong>Revised Completion Date:</strong> {revisedCompletionDate || '—'} • <strong>Actual Completion:</strong> {completionDate}
                   </p>
                 </div>
               </div>
@@ -445,11 +535,11 @@ export const FplModalContent: React.FC<FplModalProps> = ({
                 </p>
 
                 <p>
-                  We have the honor to formally notify your good office that the contract works for the above-referenced project have been <strong>100% physically completed</strong> as of <strong>{completionDate}</strong> in strict accordance with the approved plans, technical specifications, and contractual terms.
+                  We have the honor to formally notify your good office that the contract works for the above-referenced project have attained <strong>{physicalPercent.toFixed(2)}% physical accomplishment</strong> as of <strong>{completionDate}</strong>, in accordance with the approved plans, specifications, Bill of Quantities, contract documents and approved variation orders.
                 </p>
 
                 <p>
-                  All punch-list items noted during joint pre-final inspections have been completely rectified and verified by your project engineers on <strong>{punchlistClearedDate}</strong>.
+                  Defects noted during inspection were corrected as of <strong>{punchlistClearedDate}</strong>; the supporting documentation is enclosed.
                 </p>
 
                 <div className="my-3 p-4 bg-slate-50 border border-slate-300 rounded text-xs space-y-1.5">
@@ -459,10 +549,14 @@ export const FplModalContent: React.FC<FplModalProps> = ({
                   </div>
                   <div className="flex justify-between border-b border-slate-200 pb-1">
                     <span className="font-semibold text-slate-700">Total Work Accomplished:</span>
-                    <span className="font-bold font-mono text-blue-900">100.00% Completed</span>
+                    <span className="font-bold font-mono text-blue-900">{physicalPercent.toFixed(2)}% Completed</span>
                   </div>
                   <div className="flex justify-between border-b border-slate-200 pb-1">
-                    <span className="font-bold text-slate-900">Requested Final Payment Amount:</span>
+                    <span className="font-semibold text-slate-700">Gross Final Billing:</span>
+                    <span className="font-bold font-mono text-slate-900">₱ {grossFinalBilling.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-200 pb-1">
+                    <span className="font-bold text-slate-900">NET AMOUNT DUE (after previous payments, recoupment, retention, taxes and other authorized deductions):</span>
                     <span className="font-black font-mono text-blue-900 text-sm">₱ {finalBillingAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
@@ -476,12 +570,16 @@ export const FplModalContent: React.FC<FplModalProps> = ({
                   <li>Final Statement of Work Accomplished (SWA) and Billing Statement</li>
                   <li>Contractor's Sworn Affidavit of Full Payment of Labor, Materials, and Taxes</li>
                   <li>Comprehensive Materials Testing Reports & Quality Certifications</li>
-                  <li>Warranty Security Bond under Section 62 of RA 9184</li>
+                  <li>Warranty security and performance security documents, as applicable</li>
                   <li>Turnover and Acceptance Agreement</li>
                 </ul>
 
                 <p>
-                  In view of the foregoing, we respectfully request for the conduct of the <strong>Final Inspection</strong>, the issuance of the <strong>Certificate of Completion and Acceptance</strong>, and the prompt processing of our Final Payment and release of retention money.
+                  In view of the foregoing, we respectfully request that the final billing be evaluated, certified, processed and paid in accordance with the Contract, {framework === 'RA_12009_NGPA' ? 'Republic Act No. 12009 (NGPA) and its Implementing Rules and Regulations' : 'Republic Act No. 9184 and its Implementing Rules and Regulations'}, and applicable accounting and auditing rules{finalAcceptanceIssued ? ', together with the release of retention now due upon final acceptance' : ', and that the final inspection be scheduled and the Certificate of Completion and Acceptance be issued by the Procuring Entity'}.
+                </p>
+
+                <p>
+                  We certify that the documents submitted in support of this claim are true, correct and complete to the best of our knowledge, and that all works included in this final billing have actually been performed and are supported by the applicable measurements, records, inspection results and contract documents.
                 </p>
               </div>
             </div>

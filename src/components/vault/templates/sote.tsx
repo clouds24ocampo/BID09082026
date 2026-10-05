@@ -4,12 +4,16 @@ import { PDFDocument } from 'pdf-lib';
 import html2canvas from 'html2canvas';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import VaultErrorBoundary from '../../common/VaultErrorBoundary';
+import { computeTimeElapsed, computeLiquidatedDamages } from '../../../utils/finalPaymentCalc';
+import { readFormState, swaTotals } from '../../../utils/paymentFormData';
 import {
   X,
   Download,
   CheckCircle2,
   Clock,
-  Briefcase
+  Briefcase,
+  Plus,
+  Trash2
 } from 'lucide-react';
 
 export interface SoteModalProps {
@@ -61,17 +65,21 @@ export const SoteModalContent: React.FC<SoteModalProps> = ({
   const [asOfDate, setAsOfDate] = useState<string>(todayStr);
 
   // Time & Duration Parameters
-  const [ntpDate, setNtpDate] = useState<string>('2026-03-01');
-  const [effectivityDate, setEffectivityDate] = useState<string>('2026-03-08');
+  const [ntpDate, setNtpDate] = useState<string>('');
+  const [effectivityDate, setEffectivityDate] = useState<string>('');
   const [originalDurationDays, setOriginalDurationDays] = useState<number>(propContractDays || 180);
-  const [originalExpiryDate, setOriginalExpiryDate] = useState<string>('2026-09-04');
-  const [timeExtensionDays, setTimeExtensionDays] = useState<number>(15);
+  // Approved time extension orders (days each) and total approved suspension days.
+  const [extensionOrders, setExtensionOrders] = useState<{ id: string; days: number }[]>([]);
   const [timeSuspensionDays, setTimeSuspensionDays] = useState<number>(0);
-  const [revisedExpiryDate, setRevisedExpiryDate] = useState<string>('2026-09-19');
+  const [actualCompletionDate, setActualCompletionDate] = useState<string>('');
 
-  const [calendarDaysElapsed, setCalendarDaysElapsed] = useState<number>(140);
-  const [actualAccomplishmentPercent, setActualAccomplishmentPercent] = useState<number>(82.5);
-  const [plannedAccomplishmentPercent, setPlannedAccomplishmentPercent] = useState<number>(78.0);
+  const [actualAccomplishmentPercent, setActualAccomplishmentPercent] = useState<number>(0);
+  const [plannedAccomplishmentPercent, setPlannedAccomplishmentPercent] = useState<number>(0);
+
+  // Liquidated damages: rate per calendar day of delay on the unperformed portion at the revised completion date
+  const [contractPrice, setContractPrice] = useState<number>(propContractAmount || 0);
+  const [ldRatePercent, setLdRatePercent] = useState<number>(0.1);
+  const [accomplishmentAtDeadlinePercent, setAccomplishmentAtDeadlinePercent] = useState<number>(100);
 
   // Signatories
   const [contractorPE, setContractorPE] = useState<string>(tenant?.authorizedSignatory?.name || 'Engr. Contractor Project Engineer');
@@ -85,9 +93,26 @@ export const SoteModalContent: React.FC<SoteModalProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const projectScopeKey = (projectRefNo || selectedOppId || activeProjectRefNo || 'default').replace(/[^a-zA-Z0-9]/g, '_');
 
-  const revisedDurationDays = originalDurationDays + timeExtensionDays;
+  const timeExtensionDays = extensionOrders.reduce((a, o) => a + (Number(o.days) || 0), 0);
+  // Statement runs to the actual completion date, or to today while the project is ongoing (payment.md section 5).
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const timing = computeTimeElapsed({
+    ntpDate,
+    originalDays: originalDurationDays,
+    extensionDays: extensionOrders.map((o) => o.days),
+    suspensionDays: timeSuspensionDays,
+    actualCompletionDate: actualCompletionDate || todayIso,
+  });
+  const original = computeTimeElapsed({ ntpDate, originalDays: originalDurationDays, extensionDays: [], suspensionDays: 0, actualCompletionDate: todayIso });
+  const revisedDurationDays = timing.revisedDays;
+  const revisedExpiryDate = timing.revisedCompletionDate;
+  const originalExpiryDate = original.revisedCompletionDate;
+  const calendarDaysElapsed = timing.elapsedDays;
   const calendarDaysRemaining = Math.max(0, revisedDurationDays - calendarDaysElapsed);
-  const timeElapsedPercent = revisedDurationDays > 0 ? (calendarDaysElapsed / revisedDurationDays) * 100 : 0;
+  const timeElapsedPercent = timing.timeElapsedPercent;
+  const delayDays = actualCompletionDate ? timing.delayDays : 0;
+  const unperformedPortion = contractPrice * (1 - Math.min(100, Math.max(0, accomplishmentAtDeadlinePercent)) / 100);
+  const liquidatedDamages = computeLiquidatedDamages({ delayDays, unperformedPortion, ratePerDay: ldRatePercent / 100 });
   const slippagePercent = actualAccomplishmentPercent - plannedAccomplishmentPercent;
 
   useEffect(() => {
@@ -111,11 +136,16 @@ export const SoteModalContent: React.FC<SoteModalProps> = ({
         if (parsed.ntpDate) setNtpDate(parsed.ntpDate);
         if (parsed.effectivityDate) setEffectivityDate(parsed.effectivityDate);
         if (parsed.originalDurationDays !== undefined) setOriginalDurationDays(parsed.originalDurationDays);
-        if (parsed.originalExpiryDate) setOriginalExpiryDate(parsed.originalExpiryDate);
-        if (parsed.timeExtensionDays !== undefined) setTimeExtensionDays(parsed.timeExtensionDays);
+        if (Array.isArray(parsed.extensionOrders)) {
+          setExtensionOrders(parsed.extensionOrders.filter((o: any) => o && typeof o === 'object'));
+        } else if (Number(parsed.timeExtensionDays) > 0) {
+          setExtensionOrders([{ id: 'ext-legacy', days: Number(parsed.timeExtensionDays) }]);
+        }
         if (parsed.timeSuspensionDays !== undefined) setTimeSuspensionDays(parsed.timeSuspensionDays);
-        if (parsed.revisedExpiryDate) setRevisedExpiryDate(parsed.revisedExpiryDate);
-        if (parsed.calendarDaysElapsed !== undefined) setCalendarDaysElapsed(parsed.calendarDaysElapsed);
+        if (parsed.actualCompletionDate) setActualCompletionDate(parsed.actualCompletionDate);
+        if (parsed.contractPrice) setContractPrice(parsed.contractPrice);
+        if (parsed.ldRatePercent !== undefined) setLdRatePercent(parsed.ldRatePercent);
+        if (parsed.accomplishmentAtDeadlinePercent !== undefined) setAccomplishmentAtDeadlinePercent(parsed.accomplishmentAtDeadlinePercent);
         if (parsed.actualAccomplishmentPercent !== undefined) setActualAccomplishmentPercent(parsed.actualAccomplishmentPercent);
         if (parsed.plannedAccomplishmentPercent !== undefined) setPlannedAccomplishmentPercent(parsed.plannedAccomplishmentPercent);
         if (parsed.contractorPE) setContractorPE(parsed.contractorPE);
@@ -153,9 +183,16 @@ export const SoteModalContent: React.FC<SoteModalProps> = ({
       originalDurationDays,
       originalExpiryDate,
       timeExtensionDays,
+      extensionOrders,
       timeSuspensionDays,
       revisedExpiryDate,
       calendarDaysElapsed,
+      actualCompletionDate,
+      contractPrice,
+      ldRatePercent,
+      accomplishmentAtDeadlinePercent,
+      delayDays,
+      liquidatedDamages, // read by the Final Payment Reconciliation Sheet
       actualAccomplishmentPercent,
       plannedAccomplishmentPercent,
       contractorPE,
@@ -336,7 +373,7 @@ export const SoteModalContent: React.FC<SoteModalProps> = ({
               <div>
                 <label className="text-[10px] font-semibold text-slate-400 uppercase">Notice to Proceed (NTP)</label>
                 <input
-                  type="text"
+                  type="date"
                   value={ntpDate}
                   onChange={(e) => setNtpDate(e.target.value)}
                   className="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white"
@@ -357,82 +394,89 @@ export const SoteModalContent: React.FC<SoteModalProps> = ({
           {/* Time & Duration Accounting */}
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-3">
             <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5" /> Contract Duration & Extensions (CD)
+              <Clock className="w-3.5 h-3.5" /> Contract Duration, Orders & Completion
             </h3>
 
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-[10px] font-semibold text-slate-400 uppercase">Original (Days)</label>
-                <input
-                  type="number"
-                  value={originalDurationDays}
-                  onChange={(e) => setOriginalDurationDays(Number(e.target.value))}
-                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono"
-                />
+                <input type="number" min={0} value={originalDurationDays} onChange={(e) => setOriginalDurationDays(Number(e.target.value))}
+                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono" />
               </div>
               <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase">Extension (Days)</label>
-                <input
-                  type="number"
-                  value={timeExtensionDays}
-                  onChange={(e) => setTimeExtensionDays(Number(e.target.value))}
-                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono"
-                />
+                <label className="text-[10px] font-semibold text-slate-400 uppercase">Suspension (Days)</label>
+                <input type="number" min={0} value={timeSuspensionDays} onChange={(e) => setTimeSuspensionDays(Number(e.target.value))}
+                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono" />
               </div>
               <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase">Elapsed (Days)</label>
-                <input
-                  type="number"
-                  value={calendarDaysElapsed}
-                  onChange={(e) => setCalendarDaysElapsed(Number(e.target.value))}
-                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono"
-                />
+                <label className="text-[10px] font-semibold text-slate-400 uppercase">Actual Completion</label>
+                <input type="date" value={actualCompletionDate} onChange={(e) => setActualCompletionDate(e.target.value)}
+                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase">Original Expiry</label>
-                <input
-                  type="text"
-                  value={originalExpiryDate}
-                  onChange={(e) => setOriginalExpiryDate(e.target.value)}
-                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white"
-                />
+            <div>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase">Approved Time Extension Orders (days each)</label>
+              <div className="space-y-1.5 mt-1">
+                {extensionOrders.map((o, i) => (
+                  <div key={o.id} className="grid grid-cols-[1fr_28px] gap-1.5">
+                    <input type="number" min={0} aria-label={`Extension order ${i + 1} days`} value={o.days || ''} placeholder={`Time Extension Order No. ${i + 1} (days)`}
+                      onChange={(e) => setExtensionOrders(extensionOrders.map((x, j) => (j === i ? { ...x, days: Number(e.target.value) } : x)))}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono" />
+                    <button type="button" aria-label="Remove extension order" onClick={() => setExtensionOrders(extensionOrders.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-300 cursor-pointer">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => setExtensionOrders([...extensionOrders, { id: `ext-${Date.now()}`, days: 0 }])}
+                  className="text-[11px] text-blue-400 hover:text-blue-300 flex items-center gap-1 cursor-pointer">
+                  <Plus className="w-3 h-3" /> Add extension order
+                </button>
               </div>
-              <div>
-                <label className="text-[10px] font-semibold text-slate-400 uppercase">Revised Expiry</label>
-                <input
-                  type="text"
-                  value={revisedExpiryDate}
-                  onChange={(e) => setRevisedExpiryDate(e.target.value)}
-                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs font-semibold text-amber-300"
-                />
-              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-950 border border-slate-800 rounded-lg p-2.5 font-mono text-slate-300">
+              <p>Elapsed: <strong className="text-white">{calendarDaysElapsed} CD</strong></p>
+              <p>Revised duration: <strong className="text-white">{revisedDurationDays} CD</strong></p>
+              <p>Revised expiry: <strong className="text-amber-300">{revisedExpiryDate || '—'}</strong></p>
+              <p>Time elapsed: <strong className="text-white">{timeElapsedPercent.toFixed(2)}%</strong></p>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] font-semibold text-slate-400 uppercase">Actual Accomplishment (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={actualAccomplishmentPercent}
-                  onChange={(e) => setActualAccomplishmentPercent(Number(e.target.value))}
-                  className="w-full mt-1 bg-slate-950 border border-emerald-500 rounded px-2 py-1 text-xs text-emerald-400 font-mono font-bold"
-                />
+                <div className="flex gap-1.5">
+                  <input type="number" step="0.01" value={actualAccomplishmentPercent} onChange={(e) => setActualAccomplishmentPercent(Number(e.target.value))}
+                    className="w-full mt-1 bg-slate-950 border border-emerald-500 rounded px-2 py-1 text-xs text-emerald-400 font-mono font-bold" />
+                  <button type="button" onClick={() => setActualAccomplishmentPercent(swaTotals(readFormState('swa', tenant?.id || 'default', projectRefNo)).physicalPercent)}
+                    className="mt-1 px-2 text-[10px] font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-blue-300 cursor-pointer whitespace-nowrap">From SWA</button>
+                </div>
               </div>
               <div>
                 <label className="text-[10px] font-semibold text-slate-400 uppercase">Planned Accomplishment (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={plannedAccomplishmentPercent}
-                  onChange={(e) => setPlannedAccomplishmentPercent(Number(e.target.value))}
-                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono"
-                />
+                <input type="number" step="0.01" value={plannedAccomplishmentPercent} onChange={(e) => setPlannedAccomplishmentPercent(Number(e.target.value))}
+                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono" />
               </div>
             </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase">Contract Price</label>
+                <input type="number" min={0} value={contractPrice || ''} onChange={(e) => setContractPrice(Number(e.target.value))}
+                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono" />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase">LD Rate (% / day)</label>
+                <input type="number" min={0} step="0.01" value={ldRatePercent} onChange={(e) => setLdRatePercent(Number(e.target.value))}
+                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono" />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase">Done at deadline (%)</label>
+                <input type="number" min={0} max={100} value={accomplishmentAtDeadlinePercent} onChange={(e) => setAccomplishmentAtDeadlinePercent(Number(e.target.value))}
+                  className="w-full mt-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono" />
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400 font-mono">Delay: <strong className="text-white">{delayDays} CD</strong> • Liquidated damages: <strong className="text-red-300">₱ {liquidatedDamages.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong></p>
           </div>
         </div>
 
@@ -481,7 +525,7 @@ export const SoteModalContent: React.FC<SoteModalProps> = ({
                     </tr>
                     <tr className="bg-slate-50">
                       <td className="p-2.5">4. Approved Time Extension(s)</td>
-                      <td className="p-2.5 text-right font-mono text-blue-800">+{timeExtensionDays} Calendar Days</td>
+                      <td className="p-2.5 text-right font-mono text-blue-800">+{timeExtensionDays} Calendar Days ({extensionOrders.length} order{extensionOrders.length === 1 ? '' : 's'})</td>
                     </tr>
                     <tr className="bg-slate-50">
                       <td className="p-2.5">5. Approved Suspension Order(s)</td>
@@ -508,6 +552,18 @@ export const SoteModalContent: React.FC<SoteModalProps> = ({
                     <tr className="bg-blue-50 font-bold text-blue-950">
                       <td className="p-2.5">9. Percentage of Time Elapsed</td>
                       <td className="p-2.5 text-right font-mono text-sm">{timeElapsedPercent.toFixed(2)}%</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5">10. Actual Completion Date</td>
+                      <td className="p-2.5 text-right font-mono">{actualCompletionDate || 'Ongoing'}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2.5">11. Delay beyond Revised Expiry Date</td>
+                      <td className="p-2.5 text-right font-mono">{delayDays} Calendar Days</td>
+                    </tr>
+                    <tr className="bg-slate-50">
+                      <td className="p-2.5">12. Liquidated Damages ({ldRatePercent}% per day of the unperformed portion)</td>
+                      <td className="p-2.5 text-right font-mono">₱ {liquidatedDamages.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
                     </tr>
                   </tbody>
                 </table>

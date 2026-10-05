@@ -4,6 +4,7 @@ import { PDFDocument } from 'pdf-lib';
 import html2canvas from 'html2canvas';
 import { getOpportunityProjects, OpportunityProjectOption } from '../../../utils/opportunityProjects';
 import VaultErrorBoundary from '../../common/VaultErrorBoundary';
+import { computeRetention, computeTaxes } from '../../../utils/finalPaymentCalc';
 import {
   X,
   Download,
@@ -187,13 +188,22 @@ export const SwaModalContent: React.FC<SwaModalProps> = ({
   const slippagePercent = totalToDateAccomplishmentPercent - targetProgressPercent;
 
   // Deductions for this period (Image 2 Formulas)
-  const retentionDeduction = totalThisCost * (retentionRate / 100);
-  const ewtDeduction = useNetOfVatFormula 
-    ? (totalThisCost * (100 / 112)) * (ewtRate / 100)
-    : totalThisCost * (ewtRate / 100);
-  const vatDeduction = useNetOfVatFormula
-    ? (totalThisCost * (100 / 112)) * (vatRate / 100)
-    : totalThisCost * (vatRate / 100);
+  // Retention: rate applies to the part of this billing below 50% of the contract; above 50% it stops
+  // when work is satisfactory and on schedule (slippage >= 0), otherwise it continues (payment.md section 19).
+  const onSchedule = slippagePercent >= 0;
+  const retentionDeduction = computeRetention({
+    finalContractPrice: totalContractAmount,
+    cumulativeBefore: totalPrevCost,
+    billingGross: totalThisCost,
+    retentionRate,
+    onSchedule,
+  });
+  const { vat: vatDeduction, ewt: ewtDeduction } = computeTaxes({
+    billingGross: totalThisCost,
+    vatRate,
+    ewtRate,
+    netOfVat: useNetOfVatFormula,
+  });
   const recoupmentDeduction = totalThisCost * (recoupmentRate / 100);
   const totalDeductions = retentionDeduction + ewtDeduction + vatDeduction + recoupmentDeduction;
   const netPayableThisPeriod = totalThisCost - totalDeductions;
@@ -1186,7 +1196,7 @@ export const SwaModalContent: React.FC<SwaModalProps> = ({
                       <span>4. Less : Deductions (a+b+c+d)</span>
                     </div>
                     <div className="flex justify-between pl-6 text-red-800">
-                      <span>a. {retentionRate}% Retention ({retentionRate}% of Total of #3)</span>
+                      <span>a. {retentionRate}% Retention ({onSchedule ? 'on the part of #3 within the first 50% of contract' : 'on all of #3, behind schedule'})</span>
                       <span className="font-mono">- ₱ {retentionDeduction.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between pl-6 text-red-800">
