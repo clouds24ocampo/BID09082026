@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getOpportunityProjects } from '../opportunityProjects';
+import { getOpportunityProjects, parseOpportunityList } from '../opportunityProjects';
 
 // Simple in-memory localStorage mock for Node test environment
 const mockStorage: Record<string, string> = {};
@@ -72,5 +72,18 @@ describe('opportunityProjects - Strict Tenant Data Isolation', () => {
     const resultA = getOpportunityProjects('tenantA');
     expect(resultA).toHaveLength(1);
     expect(resultA[0].refNo).toBe('PHILGEPS-2026-0001');
+  });
+});
+
+describe('parseOpportunityList', () => {
+  it('returns [] for null, empty, bad JSON and non-arrays', () => {
+    expect(parseOpportunityList(null)).toEqual([]);
+    expect(parseOpportunityList('')).toEqual([]);
+    expect(parseOpportunityList('{bad')).toEqual([]);
+    expect(parseOpportunityList('{"a":1}')).toEqual([]);
+  });
+
+  it('drops null and primitive entries but keeps objects', () => {
+    expect(parseOpportunityList(JSON.stringify([null, 5, 'x', { id: 'a' }]))).toEqual([{ id: 'a' }]);
   });
 });

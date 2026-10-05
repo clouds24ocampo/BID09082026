@@ -21,6 +21,41 @@ import {
 
 export type CoverTabType = 'MOTHER' | 'ENVELOPE' | 'FOLDER' | 'SEPARATOR';
 
+type BundleCover = {
+  id: string;
+  title: string;
+  kind: 'MOTHER' | 'ENVELOPE' | 'FOLDER';
+  envelope?: 'ENVELOPE_1' | 'ENVELOPE_2';
+  copy?: 'ORIGINAL' | 'COPY_1' | 'COPY_2';
+};
+
+// Single source of truth for the 1-click bundle: drives both the off-screen render and the export order.
+const getBundleCovers = (scope: 'ALL_9_COVERS' | 'ORIGINAL_ONLY'): BundleCover[] => {
+  const all = scope === 'ALL_9_COVERS';
+  const folders = (env: 'ENVELOPE_1' | 'ENVELOPE_2'): BundleCover[] =>
+    (all ? (['ORIGINAL', 'COPY_1', 'COPY_2'] as const) : (['ORIGINAL'] as const)).map((copy) => ({
+      id: `packaging-bundle-folder-${env === 'ENVELOPE_1' ? 'env1' : 'env2'}-${copy.toLowerCase().replace('_', '')}-cover`,
+      title: '',
+      kind: 'FOLDER' as const,
+      envelope: env,
+      copy,
+    }));
+  const list: BundleCover[] = [
+    { id: 'packaging-bundle-mother-cover', title: '', kind: 'MOTHER' },
+    { id: 'packaging-bundle-env1-cover', title: '', kind: 'ENVELOPE', envelope: 'ENVELOPE_1' },
+    { id: 'packaging-bundle-env2-cover', title: '', kind: 'ENVELOPE', envelope: 'ENVELOPE_2' },
+    ...folders('ENVELOPE_1'),
+    ...folders('ENVELOPE_2'),
+  ];
+  const names = (c: BundleCover) =>
+    c.kind === 'MOTHER'
+      ? 'Mother_Envelope_Master_Cover'
+      : c.kind === 'ENVELOPE'
+        ? c.envelope === 'ENVELOPE_1' ? 'Envelope_1_Technical_Component_Cover' : 'Envelope_2_Financial_Component_Cover'
+        : `Folder_${c.envelope === 'ENVELOPE_1' ? 'Envelope_1_Technical' : 'Envelope_2_Financial'}_${c.copy}`;
+  return list.map((c, i) => ({ ...c, title: `${String(i + 1).padStart(2, '0')}_${names(c)}` }));
+};
+
 export const PackagingCoversView: React.FC = () => {
   const { currentTenant } = useAuth();
   const tenantId = currentTenant?.id || 'default';
@@ -152,21 +187,9 @@ export const PackagingCoversView: React.FC = () => {
     setIsExportingBundle(true);
     setBundleProgress({ percent: 5, status: 'Compiling statutory packaging covers...' });
     try {
-      const targetItems: { id: string; title: string }[] = [
-        { id: 'packaging-bundle-mother-cover', title: '01_Mother_Envelope_Master_Cover' },
-        { id: 'packaging-bundle-env1-cover', title: '02_Envelope_1_Technical_Component_Cover' },
-        { id: 'packaging-bundle-env2-cover', title: '03_Envelope_2_Financial_Component_Cover' },
-        { id: 'packaging-bundle-folder-env1-orig-cover', title: '04_Folder_Envelope_1_Technical_ORIGINAL' },
-        ...(bundleScope === 'ALL_9_COVERS' ? [
-          { id: 'packaging-bundle-folder-env1-copy1-cover', title: '05_Folder_Envelope_1_Technical_COPY_1' },
-          { id: 'packaging-bundle-folder-env1-copy2-cover', title: '06_Folder_Envelope_1_Technical_COPY_2' },
-        ] : []),
-        { id: 'packaging-bundle-folder-env2-orig-cover', title: bundleScope === 'ALL_9_COVERS' ? '07_Folder_Envelope_2_Financial_ORIGINAL' : '05_Folder_Envelope_2_Financial_ORIGINAL' },
-        ...(bundleScope === 'ALL_9_COVERS' ? [
-          { id: 'packaging-bundle-folder-env2-copy1-cover', title: '08_Folder_Envelope_2_Financial_COPY_1' },
-          { id: 'packaging-bundle-folder-env2-copy2-cover', title: '09_Folder_Envelope_2_Financial_COPY_2' },
-        ] : [])
-      ];
+      // Hidden covers mount only while exporting; wait for React to commit them before capture.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      const targetItems = getBundleCovers(bundleScope);
 
       const units: ExportDocumentUnit[] = [];
       for (const item of targetItems) {
@@ -749,6 +772,73 @@ export const PackagingCoversView: React.FC = () => {
           />
         )}
       </div>
+
+      {/* OFF-SCREEN BUNDLE COVERS (mounted only during 1-click export) */}
+      {isExportingBundle && (
+        <div className="fixed pointer-events-none" style={{ left: '-9999px', top: '0px', width: '816px', zIndex: -1 }} aria-hidden="true">
+          {getBundleCovers(bundleScope).map((c) => (
+            <div key={c.id}>
+              {c.kind === 'MOTHER' && (
+                <MotherEnvelopeCoverPage
+                  id={c.id}
+              tenant={currentTenant}
+              companyName={companyName}
+              companyAddress={companyAddress}
+              tin={tin}
+              philgepsPlatinumNo={philgepsPlatinumNo}
+              procuringEntity={procuringEntity}
+              projectTitle={projectTitle}
+              projectRefNo={projectRefNo}
+              solicitationNo={solicitationNo}
+              abc={abc}
+              submissionDeadline={submissionDeadline}
+              signatoryName={signatoryName}
+              signatoryTitle={signatoryTitle}
+                />
+              )}
+              {c.kind === 'ENVELOPE' && (
+                <EnvelopeCoverPage
+                  id={c.id}
+              tenant={currentTenant}
+              companyName={companyName}
+              companyAddress={companyAddress}
+              tin={tin}
+              philgepsPlatinumNo={philgepsPlatinumNo}
+              procuringEntity={procuringEntity}
+              projectTitle={projectTitle}
+              projectRefNo={projectRefNo}
+              solicitationNo={solicitationNo}
+              abc={abc}
+              submissionDeadline={submissionDeadline}
+              signatoryName={signatoryName}
+              signatoryTitle={signatoryTitle}
+                  envelopeChoice={c.envelope}
+                />
+              )}
+              {c.kind === 'FOLDER' && (
+                <FolderCoverPage
+                  id={c.id}
+              tenant={currentTenant}
+              companyName={companyName}
+              companyAddress={companyAddress}
+              tin={tin}
+              philgepsPlatinumNo={philgepsPlatinumNo}
+              procuringEntity={procuringEntity}
+              projectTitle={projectTitle}
+              projectRefNo={projectRefNo}
+              solicitationNo={solicitationNo}
+              abc={abc}
+              submissionDeadline={submissionDeadline}
+              signatoryName={signatoryName}
+              signatoryTitle={signatoryTitle}
+                  folderCopy={c.copy}
+                  envelopeChoice={c.envelope}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
     </div>
   );

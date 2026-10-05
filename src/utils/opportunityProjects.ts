@@ -15,6 +15,19 @@ export interface OpportunityProjectOption {
   dateTimeSubmitted: string;
 }
 
+// Saved opportunity lists come from localStorage: tolerate bad JSON, non-arrays and null/primitive entries.
+export const parseOpportunityList = (raw: string | null | undefined): any[] => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((o) => o && typeof o === "object")
+      : [];
+  } catch {
+    return [];
+  }
+};
+
 // High-speed in-memory cache for ultra-fast zero-latency project lookups
 let oppCache: {
   tenantId?: string;
@@ -53,35 +66,20 @@ export const getOpportunityProjects = (
         `bidocs_opportunities_${tenantId}`,
       );
       if (savedTenant) {
-        try {
-          const parsed = JSON.parse(savedTenant);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            rawItems.push(...parsed);
-          }
-        } catch (e) {}
+        rawItems.push(...parseOpportunityList(savedTenant));
       }
       // If no tenant-specific items found, check legacy key
       if (rawItems.length === 0) {
         const savedLegacy = localStorage.getItem("bidocs_opportunities");
         if (savedLegacy) {
-          try {
-            const parsed = JSON.parse(savedLegacy);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              rawItems.push(...parsed);
-            }
-          } catch (e) {}
+          rawItems.push(...parseOpportunityList(savedLegacy));
         }
       }
     } else {
       // 2. No tenantId provided: Load general legacy opportunities key
       const savedLegacy = localStorage.getItem("bidocs_opportunities");
       if (savedLegacy) {
-        try {
-          const parsed = JSON.parse(savedLegacy);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            rawItems.push(...parsed);
-          }
-        } catch (e) {}
+        rawItems.push(...parseOpportunityList(savedLegacy));
       }
 
       // 3. Scan all keys starting with bidocs_opportunities only when no tenantId is specified
@@ -90,12 +88,7 @@ export const getOpportunityProjects = (
         if (key && key.startsWith("bidocs_opportunities")) {
           const val = localStorage.getItem(key);
           if (val) {
-            try {
-              const parsed = JSON.parse(val);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                rawItems.push(...parsed);
-              }
-            } catch (e) {}
+            rawItems.push(...parseOpportunityList(val));
           }
         }
       }

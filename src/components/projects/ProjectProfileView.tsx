@@ -12,6 +12,7 @@ import {
   invalidateOpportunityProjectsCache,
   isProjectBidMergeDone,
   markProjectBidMergeDone,
+  parseOpportunityList,
 } from "../../utils/opportunityProjects";
 import {
   savePdfData,
@@ -1508,7 +1509,7 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
         localStorage.getItem(`bidocs_opportunities_${tenantId}`) ||
         localStorage.getItem("bidocs_opportunities");
       if (saved) {
-        const parsed: PhilGEPSOpportunity[] = JSON.parse(saved);
+        const parsed: PhilGEPSOpportunity[] = parseOpportunityList(saved);
         setProjects(parsed);
         const mergedList = parsed.filter((p) =>
           isProjectBidMergeDone(tenantId, p),
@@ -4781,8 +4782,8 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
                       <h3 className="text-sm font-bold text-white flex items-center gap-2">
                         <Building2 className="w-4 h-4 text-emerald-400" />
                         <span>
-                          Statutory Construction & Procurement Documents (15
-                          Forms)
+                          Statutory Construction & Procurement Documents (
+                          {STATUTORY_DOCUMENT_SLOTS.length} Forms)
                         </span>
                       </h3>
                       <p className="text-xs text-slate-400">
@@ -5967,39 +5968,43 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
       )}
 
       {activeStatutoryModal === "POW" && (
-        <PowModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("pow", dataUrl, name, refNo, title);
-            setPreviewPdfModal({
-              title: "Generated Terms of Reference (TOR)",
-              fileName: `${refNo || projectScopeKey}_STATUTORY_TOR.pdf`,
-              dataUrl,
-            });
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto font-sans">
+          <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-7xl overflow-hidden shadow-2xl my-auto max-h-[96vh] h-[94vh] flex flex-col">
+            <PowModal
+              tenant={currentTenant}
+              activeProjectRefNo={
+                selectedProject?.projectReferenceNumber ||
+                selectedProject?.philgepsRefNo ||
+                ""
+              }
+              activeProjectTitle={selectedProject?.title || ""}
+              activeProcuringEntity={
+                selectedProject?.procuringEntity || "Bids and Awards Committee"
+              }
+              procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
+              procuringEntityContactPerson={
+                selectedProject?.procuringEntityContactPerson || ""
+              }
+              headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
+              headOfProcuringEntityPosition={
+                selectedProject?.headOfProcuringEntityPosition || ""
+              }
+              solicitationNumber={selectedProject?.solicitationNumber || ""}
+              contractAmount={selectedProject?.approvedBudget || 0}
+              projectLocation={selectedProject?.areaOfDelivery || ""}
+              onSaveAndComplete={(dataUrl, name, refNo, title) => {
+                handleSaveStatutoryDoc("pow", dataUrl, name, refNo, title);
+                setPreviewPdfModal({
+                  title: "Generated Terms of Reference (TOR)",
+                  fileName: `${refNo || projectScopeKey}_STATUTORY_TOR.pdf`,
+                  dataUrl,
+                });
+                setActiveStatutoryModal(null);
+              }}
+              onClose={() => setActiveStatutoryModal(null)}
+            />
+          </div>
+        </div>
       )}
 
       {activeStatutoryModal === "ABP" && (

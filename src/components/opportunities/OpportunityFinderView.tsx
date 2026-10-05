@@ -28,6 +28,7 @@ import {
 import { SpotlightCard } from "../common/SpotlightCard";
 import { BorderBeam } from "../common/BorderBeam";
 import { ShinyText } from "../common/ShinyText";
+import { parseOpportunityList } from "../../utils/opportunityProjects";
 import { CyberBadge } from "../common/CyberBadge";
 
 const formatPhpCurrency = (val: number | string): string => {
@@ -122,7 +123,7 @@ export const OpportunityFinderView: React.FC<{
       }
 
       try {
-        const parsed: PhilGEPSOpportunity[] = JSON.parse(saved);
+        const parsed: PhilGEPSOpportunity[] = parseOpportunityList(saved);
 
         // Single-pass async hydration of all PDF data from IndexedDB
         const hydratedOps = await Promise.all(

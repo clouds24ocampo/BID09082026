@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { parseOpportunityList } from '../../utils/opportunityProjects';
 import {
   FolderKanban,
   FileCheck,
@@ -48,15 +49,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ setActiveTab }) =>
   }, [activeTenantId]);
 
   const opportunities = React.useMemo(() => {
-    const saved = localStorage.getItem(`bidocs_opportunities_${activeTenantId}`);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (_) {
-        return [];
-      }
-    }
-    return [];
+    return parseOpportunityList(
+      localStorage.getItem(`bidocs_opportunities_${activeTenantId}`),
+    );
   }, [activeTenantId]);
 
   const totalAbc = React.useMemo(() => {

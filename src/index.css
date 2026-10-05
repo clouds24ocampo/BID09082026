@@ -57,7 +57,10 @@ body {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    /* "none" (not translateY(0)): a retained transform makes this element the
+       containing block for descendant position:fixed modals, so they size to the
+       page instead of the viewport. */
+    transform: none;
   }
 }
 
@@ -68,16 +71,16 @@ body {
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: none;
   }
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.3s ease-out forwards;
+  animation: fadeIn 0.3s ease-out;
 }
 
 .animate-scaleIn {
-  animation: scaleIn 0.2s ease-out forwards;
+  animation: scaleIn 0.2s ease-out;
 }
 
 /* ReactBits & HorizonX 3D Keyframe Animations */
