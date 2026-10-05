@@ -27,6 +27,7 @@ import {
   Users,
   ArrowLeft,
   Globe2,
+  Wallet,
 } from "lucide-react";
 
 import { AuroraBackground } from "../common/AuroraBackground";
@@ -146,6 +147,12 @@ export const AppShell: React.FC<AppShellProps> = ({
       label: "Bid Packages",
       icon: FolderKanban,
       badge: "Envelopes",
+    },
+    {
+      id: "payments",
+      label: "Payment Documents",
+      icon: Wallet,
+      badge: "Final Billing",
     },
     { id: "covers", label: "Labels & Covers", icon: Box, badge: "Samples" },
     {

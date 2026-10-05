@@ -25,6 +25,7 @@ import { PdfPreviewModal } from "../vault/PdfPreviewModal";
 import { MergedPackageViewerModal } from "../vault/MergedPackageViewerModal";
 import { PackageItem, FolderCopyType } from "../bids/bidpackage";
 import { numberToWords } from "../../utils/numberToWords";
+import { NEW_FINAL_PAYMENT_SLOTS } from "../../utils/paymentDocsCatalog";
 import { DocumentQrCode } from "../common/DocumentQrCode";
 import { SpotlightCard } from "../common/SpotlightCard";
 import { BorderBeam } from "../common/BorderBeam";
@@ -74,23 +75,8 @@ import {
 } from "lucide-react";
 
 // 15 Statutory Document Template Modals
-import RlaModal from "../vault/templates/RLA";
-import SwaModal from "../vault/templates/SWA";
-import ProgressphotoModal from "../vault/templates/Progressphoto";
-import MtsModal from "../vault/templates/MTS";
-import CaModal from "../vault/templates/CA";
-import AbpModal from "../vault/templates/ABP";
-import WsModal from "../vault/templates/WS";
-import PowModal from "../vault/templates/POW";
-import BsModal from "../vault/templates/Bs";
-import CmsModal from "../vault/templates/CMS";
-import EupModal from "../vault/templates/EUP";
-import FplModal from "../vault/templates/FPL";
-import MpdsModal from "../vault/templates/mpds";
-import PertModal from "../vault/templates/pert";
-import SoteModal from "../vault/templates/sote";
-import ToaModal from "../vault/templates/toa";
 import PsdModal from "../vault/templates/psd";
+import { StatutoryModalHost } from "../vault/templates/StatutoryModalHost";
 import StatutoryDocumentsGuideModal from "../vault/templates/StatutoryDocumentsGuideModal";
 
 interface ProjectProfileViewProps {
@@ -193,7 +179,7 @@ const WIN_DOC_SLOTS = [
   },
 ];
 
-const FINAL_PAYMENT_DOC_SLOTS = [
+export const FINAL_PAYMENT_DOC_SLOTS = [
   {
     key: "voucher",
     title: "Disbursement Voucher / Payment Voucher",
@@ -234,6 +220,7 @@ const FINAL_PAYMENT_DOC_SLOTS = [
     title: "Final S-Curve / Progress Chart",
     desc: "Final Progress S-Curve Chart, Physical vs Financial Accomplishment Report",
   },
+  ...NEW_FINAL_PAYMENT_SLOTS,
 ];
 
 export interface StatutoryTemplateSlot {
@@ -256,6 +243,8 @@ export interface StatutoryTemplateSlot {
     | "PERT"
     | "SOTE"
     | "TOA"
+    | "FRS"
+    | "LMEC"
     | "POW";
   isUploadOnly?: boolean;
   description: string;
@@ -391,6 +380,22 @@ export const STATUTORY_DOCUMENT_SLOTS: StatutoryTemplateSlot[] = [
     templateType: "TOA",
     description:
       "Joint memorandum of agreement for official project turnover and acceptance.",
+  },
+  {
+    key: "frs",
+    name: "Final Payment Reconciliation Sheet (FRS)",
+    code: "FRS",
+    templateType: "FRS",
+    description:
+      "Final contract price, value of work, previous payments, retention, recoupment, taxes and net final payment.",
+  },
+  {
+    key: "lmec",
+    name: "Certificate of Payment: Labor, Materials & Equipment",
+    code: "LMEC",
+    templateType: "LMEC",
+    description:
+      "Schedule of payments to workers, suppliers and equipment lessors with proof, and the contractor's certification.",
   },
 ];
 
@@ -5803,519 +5808,23 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
         />
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* 15 STATUTORY DOCUMENT TEMPLATE MODALS (OVERLAYS)                    */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {activeStatutoryModal === "RLA" && (
-        <RlaModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("rla", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "SWA" && (
-        <SwaModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("swa", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "PROGRESS_PHOTO" && (
-        <ProgressphotoModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc(
-              "progress_photo",
+      <StatutoryModalHost
+        type={activeStatutoryModal}
+        tenant={currentTenant}
+        project={selectedProject}
+        onSave={(slotKey, dataUrl, name, refNo, title) => {
+          handleSaveStatutoryDoc(slotKey, dataUrl, name, refNo, title);
+          if (slotKey === "pow" && dataUrl) {
+            setPreviewPdfModal({
+              title: "Generated Terms of Reference (TOR)",
+              fileName: `${refNo || projectScopeKey}_STATUTORY_TOR.pdf`,
               dataUrl,
-              name,
-              refNo,
-              title,
-            );
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "MTS" && (
-        <MtsModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
+            });
           }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("mts", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "CA" && (
-        <CaModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("ca", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "POW" && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto font-sans">
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl w-full max-w-7xl overflow-hidden shadow-2xl my-auto max-h-[96vh] h-[94vh] flex flex-col">
-            <PowModal
-              tenant={currentTenant}
-              activeProjectRefNo={
-                selectedProject?.projectReferenceNumber ||
-                selectedProject?.philgepsRefNo ||
-                ""
-              }
-              activeProjectTitle={selectedProject?.title || ""}
-              activeProcuringEntity={
-                selectedProject?.procuringEntity || "Bids and Awards Committee"
-              }
-              procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-              procuringEntityContactPerson={
-                selectedProject?.procuringEntityContactPerson || ""
-              }
-              headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-              headOfProcuringEntityPosition={
-                selectedProject?.headOfProcuringEntityPosition || ""
-              }
-              solicitationNumber={selectedProject?.solicitationNumber || ""}
-              contractAmount={selectedProject?.approvedBudget || 0}
-              projectLocation={selectedProject?.areaOfDelivery || ""}
-              onSaveAndComplete={(dataUrl, name, refNo, title) => {
-                handleSaveStatutoryDoc("pow", dataUrl, name, refNo, title);
-                setPreviewPdfModal({
-                  title: "Generated Terms of Reference (TOR)",
-                  fileName: `${refNo || projectScopeKey}_STATUTORY_TOR.pdf`,
-                  dataUrl,
-                });
-                setActiveStatutoryModal(null);
-              }}
-              onClose={() => setActiveStatutoryModal(null)}
-            />
-          </div>
-        </div>
-      )}
-
-      {activeStatutoryModal === "ABP" && (
-        <AbpModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("abp", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "WS" && (
-        <WsModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("ws", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "BS" && (
-        <BsModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("bs", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "CMS" && (
-        <CmsModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("cms", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "EUP" && (
-        <EupModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("eup", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "FPL" && (
-        <FplModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("fpl", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "MPDS" && (
-        <MpdsModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("mpds", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "PERT" && (
-        <PertModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("pert", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "SOTE" && (
-        <SoteModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("sote", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
-
-      {activeStatutoryModal === "TOA" && (
-        <ToaModal
-          tenant={currentTenant}
-          activeProjectRefNo={
-            selectedProject?.projectReferenceNumber ||
-            selectedProject?.philgepsRefNo ||
-            ""
-          }
-          activeProjectTitle={selectedProject?.title || ""}
-          activeProcuringEntity={
-            selectedProject?.procuringEntity || "Bids and Awards Committee"
-          }
-          procuringEntityAddress={selectedProject?.procuringEntityAddress || ""}
-          procuringEntityContactPerson={
-            selectedProject?.procuringEntityContactPerson || ""
-          }
-          headOfProcuringEntity={selectedProject?.headOfProcuringEntity || ""}
-          headOfProcuringEntityPosition={
-            selectedProject?.headOfProcuringEntityPosition || ""
-          }
-          solicitationNumber={selectedProject?.solicitationNumber || ""}
-          contractAmount={selectedProject?.approvedBudget || 0}
-          projectLocation={selectedProject?.areaOfDelivery || ""}
-          onSaveAndComplete={(dataUrl, name, refNo, title) => {
-            handleSaveStatutoryDoc("toa", dataUrl, name, refNo, title);
-            setActiveStatutoryModal(null);
-          }}
-          onClose={() => setActiveStatutoryModal(null)}
-        />
-      )}
+          setActiveStatutoryModal(null);
+        }}
+        onClose={() => setActiveStatutoryModal(null)}
+      />
 
       {showPsdModal && (
         <PsdModal
