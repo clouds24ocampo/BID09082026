@@ -148,7 +148,57 @@ const wrapText = (text: string, maxWidth: number, font: PDFFont, fontSize: numbe
   }
   if (currentLine) lines.push(currentLine);
   return lines;
-};
+}
+
+/**
+ * Rules unused Legal-page space from the last content baseline down to the
+ * signatory band so statutory PDFs do not show a blank white void.
+ */
+const fillUnusedLegalSpace = (
+  page: PDFPage,
+  fontBold: PDFFont,
+  fontReg: PDFFont,
+  fromY: number,
+  isLandscape: boolean,
+  startX: number = 36
+) => {
+  const pageWidth = isLandscape ? 936 : 612;
+  const footerTop = isLandscape ? 104 : 108;
+  const usableBottom = footerTop + 10;
+  if (!Number.isFinite(fromY) || fromY <= usableBottom + 28) return;
+
+  const width = pageWidth - startX * 2;
+  const fillHeight = fromY - usableBottom;
+  page.drawRectangle({
+    x: startX,
+    y: usableBottom,
+    width,
+    height: fillHeight,
+    color: rgb(1, 1, 1),
+    borderColor: rgb(0.78, 0.81, 0.85),
+    borderWidth: 0.5
+  });
+
+  const nfText = '*** NOTHING FOLLOWS ***';
+  const nfSize = isLandscape ? 7 : 8;
+  const nfW = fontBold.widthOfTextAtSize(nfText, nfSize);
+  page.drawText(nfText, {
+    x: startX + (width - nfW) / 2,
+    y: fromY - 14,
+    size: nfSize,
+    font: fontBold,
+    color: rgb(0.22, 0.27, 0.33)
+  });
+
+  for (let lineY = fromY - 22; lineY > usableBottom + 6; lineY -= 12) {
+    page.drawLine({
+      start: { x: startX + 6, y: lineY },
+      end: { x: startX + width - 6, y: lineY },
+      thickness: 0.35,
+      color: rgb(0.82, 0.85, 0.88)
+    });
+  }
+};;
 
 /**
  * Draws a clean official corporate header on a PDF Page
@@ -256,8 +306,12 @@ const drawOfficialFooter = async (
   projectRefNo?: string,
   projectTitle?: string,
   isLandscape: boolean = true,
-  customY?: number
+  customY?: number,
+  contentBottomY?: number
 ) => {
+  if (typeof contentBottomY === 'number') {
+    fillUnusedLegalSpace(page, fontBold, fontReg, contentBottomY, isLandscape);
+  }
   const pageWidth = isLandscape ? 936 : 612;
   const footerY = customY ?? (isLandscape ? 36 : 40);
   const signatoryName = (tenant?.authorizedSignatory?.name || 'AUTHORIZED MANAGING OFFICER').toUpperCase();

@@ -90,7 +90,7 @@ export function autoFitPageChunks<T>(
   const totalContentHeight = rowHeights.reduce((sum, h) => sum + h, 0);
 
   // 1. Single Page Check: If all items + header + summary + signature fit on Page 1 (with 8% elasticity)
-  if (totalContentHeight <= singlePageCapacity * 1.08) {
+  if (totalContentHeight <= singlePageCapacity * 1.12) {
     return [items];
   }
 
