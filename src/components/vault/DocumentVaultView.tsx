@@ -2264,14 +2264,6 @@ export const DocumentVaultView: React.FC = () => {
     );
   };
 
-  const toggleSelectAll = (itemsToSelect: DocumentVaultItem[]) => {
-    if (selectedItemIds.length === itemsToSelect.length) {
-      setSelectedItemIds([]);
-    } else {
-      setSelectedItemIds(itemsToSelect.map((i) => i.id));
-    }
-  };
-
   const mandatoryDefs = CLASS_A_MASTER_LIST.filter((d) => !d.isOptional);
   const uploadedCodes = vaultItems.map((i) => i.documentCode);
   const completedMandatoryCount = mandatoryDefs.filter((d) =>

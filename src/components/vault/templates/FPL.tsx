@@ -33,7 +33,6 @@ export interface FplModalProps {
 }
 
 export const FplModalContent: React.FC<FplModalProps> = ({
-  item,
   tenant,
   activeProjectRefNo = '',
   activeProjectTitle = '',
@@ -42,10 +41,7 @@ export const FplModalContent: React.FC<FplModalProps> = ({
   procuringEntityContactPerson = '',
   headOfProcuringEntity: propHeadOfProcuringEntity = '',
   headOfProcuringEntityPosition: propHeadOfProcuringEntityPosition = '',
-  solicitationNumber: propSolicitationNumber = '',
   contractAmount: propContractAmount = 0,
-  projectLocation: propProjectLocation = '',
-  dateTimeSubmitted: propDateTimeSubmitted = '',
   onSaveAndComplete,
   onClose
 }) => {

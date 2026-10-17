@@ -55,19 +55,10 @@ const DEFAULT_DRAWING_SHEETS: AbpDrawingSheet[] = [
 ];
 
 export const AbpModalContent: React.FC<AbpModalProps> = ({
-  item,
   tenant,
   activeProjectRefNo = '',
   activeProjectTitle = '',
   activeProcuringEntity = '',
-  procuringEntityAddress = '',
-  procuringEntityContactPerson = '',
-  headOfProcuringEntity: propHeadOfProcuringEntity = '',
-  headOfProcuringEntityPosition: propHeadOfProcuringEntityPosition = '',
-  solicitationNumber: propSolicitationNumber = '',
-  contractAmount: propContractAmount = 0,
-  projectLocation: propProjectLocation = '',
-  dateTimeSubmitted: propDateTimeSubmitted = '',
   onSaveAndComplete,
   onClose
 }) => {

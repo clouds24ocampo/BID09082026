@@ -35,19 +35,11 @@ export interface PsdModalProps {
 }
 
 export const PsdModalContent: React.FC<PsdModalProps> = ({
-  item,
   tenant,
   activeProjectRefNo = '',
   activeProjectTitle = '',
   activeProcuringEntity = '',
   procuringEntityAddress = '',
-  procuringEntityContactPerson = '',
-  headOfProcuringEntity = '',
-  headOfProcuringEntityPosition = '',
-  solicitationNumber = '',
-  contractAmount = 0,
-  projectLocation = '',
-  dateTimeSubmitted = '',
   onSaveAndComplete,
   onClose
 }) => {

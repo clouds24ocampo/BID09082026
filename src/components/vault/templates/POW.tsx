@@ -573,19 +573,15 @@ const PRESET_GOODS_QUOTATION: PowItem[] = [
 ];
 
 export const POWModalContent: React.FC<PowModalProps> = ({
-  item,
   tenant,
   activeProjectRefNo = "",
   activeProjectTitle = "",
   activeProcuringEntity = "",
-  procuringEntityAddress = "",
   procuringEntityContactPerson = "",
   headOfProcuringEntity: propHeadOfProcuringEntity = "",
   headOfProcuringEntityPosition: propHeadOfProcuringEntityPosition = "",
-  solicitationNumber: propSolicitationNumber = "",
   contractAmount: propContractAmount = 0,
   projectLocation: propProjectLocation = "",
-  dateTimeSubmitted: propDateTimeSubmitted = "",
   initialMode = "POW",
   initialTab,
   onSaveAndComplete,

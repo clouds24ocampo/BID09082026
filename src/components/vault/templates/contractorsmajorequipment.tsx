@@ -287,10 +287,15 @@ export const ContractorsMajorEquipment: React.FC<ContractorsMajorEquipmentProps>
   const viewAttachedProofPdf = async (pdfKey: string) => {
     try {
       const pdfDataUrl = await loadPdfData(pdfKey);
-      if (pdfDataUrl) {
-        const win = window.open();
+      if (pdfDataUrl?.startsWith('data:application/pdf')) {
+        const win = window.open('', '_blank');
         if (win) {
-          win.document.write(`<iframe src="${pdfDataUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+          win.opener = null;
+          const frame = win.document.createElement('iframe');
+          frame.src = pdfDataUrl;
+          frame.style.cssText = 'border:0;position:fixed;inset:0;width:100%;height:100%';
+          win.document.body.style.margin = '0';
+          win.document.body.appendChild(frame);
         }
       } else {
         alert('Could not retrieve attached proof PDF file.');

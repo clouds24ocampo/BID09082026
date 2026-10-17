@@ -45,19 +45,10 @@ export interface ProgressphotoModalProps {
 }
 
 export const ProgressphotoModalContent: React.FC<ProgressphotoModalProps> = ({
-  item,
   tenant,
   activeProjectRefNo = '',
   activeProjectTitle = '',
   activeProcuringEntity = '',
-  procuringEntityAddress = '',
-  procuringEntityContactPerson = '',
-  headOfProcuringEntity: propHeadOfProcuringEntity = '',
-  headOfProcuringEntityPosition: propHeadOfProcuringEntityPosition = '',
-  solicitationNumber: propSolicitationNumber = '',
-  contractAmount: propContractAmount = 0,
-  projectLocation: propProjectLocation = '',
-  dateTimeSubmitted: propDateTimeSubmitted = '',
   onSaveAndComplete,
   onClose
 }) => {

@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { DocumentSeparatorCover } from '../../components/covers/DocumentSeparatorCover';
 import { DocumentCoverPage } from '../../components/vault/DocumentCoverPage';

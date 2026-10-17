@@ -61,20 +61,10 @@ const DEFAULT_ACTIVITIES: PertActivity[] = [
 ];
 
 export const PertModalContent: React.FC<PertModalProps> = ({
-  item,
   tenant,
   activeProjectRefNo = '',
   activeProjectTitle = '',
   activeProcuringEntity = '',
-  procuringEntityAddress = '',
-  procuringEntityContactPerson = '',
-  headOfProcuringEntity: propHeadOfProcuringEntity = '',
-  headOfProcuringEntityPosition: propHeadOfProcuringEntityPosition = '',
-  solicitationNumber: propSolicitationNumber = '',
-  contractAmount: propContractAmount = 0,
-  projectLocation: propProjectLocation = '',
-  contractDuration: propContractDuration = 180,
-  dateTimeSubmitted: propDateTimeSubmitted = '',
   onSaveAndComplete,
   onClose
 }) => {

@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -8,11 +7,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const DEFAULT_PORT = process.env.PORT || 3000;
+const DEFAULT_PORT = Number(process.env.PORT) || 3000;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// Security & Hygiene Headers (must precede routes/static to apply to them)
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// Same-origin only (Vite proxies /api in dev), so no CORS.
+app.use(express.json({ limit: '100kb' }));
 
 // Serve static assets if dist exists
 const distPath = path.join(__dirname, 'dist');
@@ -187,24 +194,26 @@ app.get('/api/regime/status', (req, res) => {
 
 // 5. Bid Package Verification API
 app.post('/api/bids/verify', (req, res) => {
-  const { projectId, envelope1 = {}, envelope2 = {} } = req.body;
+  const { projectId, envelope1, envelope2 } = req.body ?? {};
+  const e1 = envelope1 ?? {};
+  const e2 = envelope2 ?? {};
   const missingTech = [];
   const missingFin = [];
 
   // Required Envelope 1 elements
-  if (!envelope1.philgepsPlatinum) missingTech.push("PhilGEPS Platinum Registration Certificate");
-  if (!envelope1.bidSecurity) missingTech.push("Bid Securing Declaration / Bid Security");
-  if (!envelope1.omnibusSwornStatement) missingTech.push("Omnibus Sworn Statement (10-point GPPB format)");
+  if (!e1.philgepsPlatinum) missingTech.push("PhilGEPS Platinum Registration Certificate");
+  if (!e1.bidSecurity) missingTech.push("Bid Securing Declaration / Bid Security");
+  if (!e1.omnibusSwornStatement) missingTech.push("Omnibus Sworn Statement (10-point GPPB format)");
 
   // Required Envelope 2 elements
-  if (!envelope2.bidForm) missingFin.push("Original Signed Bid Form");
-  if (!envelope2.priceSchedule) missingFin.push("Bill of Quantities / Price Schedule");
+  if (!e2.bidForm) missingFin.push("Original Signed Bid Form");
+  if (!e2.priceSchedule) missingFin.push("Bill of Quantities / Price Schedule");
 
   const isCompliant = missingTech.length === 0 && missingFin.length === 0;
 
   res.json({
     timestamp: Date.now(),
-    projectId: projectId || 'PROJ-UNKNOWN',
+    projectId: typeof projectId === 'string' ? projectId.slice(0, 100) : 'PROJ-UNKNOWN',
     status: isCompliant ? 'STATUTORILY_COMPLIANT' : 'DISQUALIFIED_MISSING_DOCUMENTS',
     eligibleForOpening: isCompliant,
     envelope1: {
@@ -219,14 +228,6 @@ app.post('/api/bids/verify', (req, res) => {
       ? 'All mandatory technical and financial elements satisfy RA 12009 & GPPB standards.'
       : 'Bid envelope packaging incomplete. Submission would fail preliminary examination of bids.'
   });
-});
-
-// Security & Hygiene Headers
-app.disable('x-powered-by');
-app.use((req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  next();
 });
 
 // Wildcard SPA route if dist exists (Express 5 compatible)
@@ -246,7 +247,7 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ error: 'Malformed JSON payload' });
   }
   console.error('[BiDOCS API ERROR]', err);
-  res.status(500).json({ error: 'Internal API Server Error', message: err?.message });
+  res.status(500).json({ error: 'Internal API Server Error' });
 });
 
 // --------------------------------------------------------------------------

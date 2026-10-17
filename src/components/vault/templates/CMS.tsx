@@ -73,19 +73,10 @@ const DEFAULT_SECTIONS: MethodSection[] = [
 ];
 
 export const CmsModalContent: React.FC<CmsModalProps> = ({
-  item,
   tenant,
   activeProjectRefNo = '',
   activeProjectTitle = '',
   activeProcuringEntity = '',
-  procuringEntityAddress = '',
-  procuringEntityContactPerson = '',
-  headOfProcuringEntity: propHeadOfProcuringEntity = '',
-  headOfProcuringEntityPosition: propHeadOfProcuringEntityPosition = '',
-  solicitationNumber: propSolicitationNumber = '',
-  contractAmount: propContractAmount = 0,
-  projectLocation: propProjectLocation = '',
-  dateTimeSubmitted: propDateTimeSubmitted = '',
   onSaveAndComplete,
   onClose
 }) => {

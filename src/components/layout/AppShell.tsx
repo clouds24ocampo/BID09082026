@@ -401,7 +401,8 @@ export const AppShell: React.FC<AppShellProps> = ({
                 {users.filter(
                   (u) =>
                     u.tenantId === currentTenant?.id &&
-                    u.id !== currentUser?.id,
+                    u.id !== currentUser?.id &&
+                    (isApproverRole(currentUser?.role) || !isApproverRole(u.role)),
                 ).length > 0 && (
                   <div className="py-1 border-b border-slate-800/80">
                     <p className="px-3 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono">
@@ -411,7 +412,8 @@ export const AppShell: React.FC<AppShellProps> = ({
                       .filter(
                         (u) =>
                           u.tenantId === currentTenant?.id &&
-                          u.id !== currentUser?.id,
+                          u.id !== currentUser?.id &&
+                          (isApproverRole(currentUser?.role) || !isApproverRole(u.role)),
                       )
                       .map((u) => (
                         <button

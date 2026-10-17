@@ -1801,8 +1801,6 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
     slotKey: string,
     fileDataUrl?: string,
     customName?: string,
-    projectRef?: string,
-    projTitle?: string,
   ) => {
     if (!fileDataUrl) return;
 
@@ -5812,8 +5810,8 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
         type={activeStatutoryModal}
         tenant={currentTenant}
         project={selectedProject}
-        onSave={(slotKey, dataUrl, name, refNo, title) => {
-          handleSaveStatutoryDoc(slotKey, dataUrl, name, refNo, title);
+        onSave={(slotKey, dataUrl, name, refNo) => {
+          handleSaveStatutoryDoc(slotKey, dataUrl, name);
           if (slotKey === "pow" && dataUrl) {
             setPreviewPdfModal({
               title: "Generated Terms of Reference (TOR)",

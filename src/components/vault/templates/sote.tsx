@@ -36,20 +36,15 @@ export interface SoteModalProps {
 }
 
 export const SoteModalContent: React.FC<SoteModalProps> = ({
-  item,
   tenant,
   activeProjectRefNo = '',
   activeProjectTitle = '',
   activeProcuringEntity = '',
-  procuringEntityAddress = '',
   procuringEntityContactPerson = '',
   headOfProcuringEntity: propHeadOfProcuringEntity = '',
   headOfProcuringEntityPosition: propHeadOfProcuringEntityPosition = '',
-  solicitationNumber: propSolicitationNumber = '',
   contractAmount: propContractAmount = 0,
-  projectLocation: propProjectLocation = '',
   contractDays: propContractDays = 180,
-  dateTimeSubmitted: propDateTimeSubmitted = '',
   onSaveAndComplete,
   onClose
 }) => {

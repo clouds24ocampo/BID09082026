@@ -24,7 +24,6 @@ export interface DocumentCoverPageProps {
 export const DocumentCoverPage: React.FC<DocumentCoverPageProps> = ({ 
   item, 
   tenant, 
-  incrementNumber = 1,
   folderCopy = 'ORIGINAL',
   envelopeName
 }) => {

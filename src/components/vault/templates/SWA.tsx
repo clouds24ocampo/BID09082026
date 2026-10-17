@@ -60,19 +60,13 @@ const DEFAULT_SWA_ITEMS: SwaItem[] = [
 ];
 
 export const SwaModalContent: React.FC<SwaModalProps> = ({
-  item,
   tenant,
   activeProjectRefNo = '',
   activeProjectTitle = '',
   activeProcuringEntity = '',
-  procuringEntityAddress = '',
   procuringEntityContactPerson = '',
   headOfProcuringEntity: propHeadOfProcuringEntity = '',
   headOfProcuringEntityPosition: propHeadOfProcuringEntityPosition = '',
-  solicitationNumber: propSolicitationNumber = '',
-  contractAmount: propContractAmount = 0,
-  projectLocation: propProjectLocation = '',
-  dateTimeSubmitted: propDateTimeSubmitted = '',
   onSaveAndComplete,
   onClose
 }) => {
@@ -209,7 +203,7 @@ export const SwaModalContent: React.FC<SwaModalProps> = ({
   const netPayableThisPeriod = totalThisCost - totalDeductions;
 
   // Function to sync 100% from Section VI and Detailed Estimates
-  const syncFromSectionVI = useCallback((forceRefresh: boolean = false) => {
+  const syncFromSectionVI = useCallback(() => {
     const scopeKey = projectRefNo || activeProjectRefNo || selectedOppId;
     if (!scopeKey) return false;
 
@@ -534,7 +528,7 @@ export const SwaModalContent: React.FC<SwaModalProps> = ({
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => syncFromSectionVI(true)}
+            onClick={() => syncFromSectionVI()}
             title="Sync all BOQ items and Unit Prices from Section VI Requirements"
             className="px-3 py-1.5 bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/60 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
           >
@@ -755,7 +749,7 @@ export const SwaModalContent: React.FC<SwaModalProps> = ({
             </div>
 
             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-              {items.map((it, idx) => (
+              {items.map((it) => (
                 <div key={it.id} className="p-2.5 bg-slate-950 border border-slate-800 rounded-lg space-y-2">
                   <div className="flex items-center justify-between gap-1.5">
                     <input

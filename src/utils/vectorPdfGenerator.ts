@@ -51,64 +51,6 @@ const formatDateTimeDisplay = (raw?: string): string => {
 };
 
 /**
- * Stamps the official running header/footer across all pages after layout is complete.
- */
-function stampRunningFooters(
-  doc: jsPDF,
-  docTitle: string,
-  options: VectorPdfOptions
-) {
-  // Temporarily disabled per user request: bottom reserved for Certified True Copy stamp
-  /*
-  const totalPages = doc.getNumberOfPages();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const marginX = 36;
-  const footerY = pageHeight - 38;
-
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i);
-
-    // Separator rule
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.6);
-    doc.line(marginX, footerY, pageWidth - marginX, footerY);
-
-    // Left: Bidder / Company Name
-    doc.setFont('times', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(0, 0, 0);
-    doc.text((options.companyName || 'OFFICIAL BIDDER').toUpperCase(), marginX, footerY + 12);
-    doc.setFont('times', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(90, 90, 90);
-    doc.text('Official Bidder • Republic of the Philippines', marginX, footerY + 22);
-
-    // Center: Statutory document identifier
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(20, 20, 20);
-    const centerTitle = `${docTitle.toUpperCase()} • REF: ${options.projectRefNo || 'N/A'}`;
-    doc.text(centerTitle, pageWidth / 2, footerY + 12, { align: 'center' });
-    doc.setFont('times', 'italic');
-    doc.setFontSize(6.5);
-    doc.setTextColor(100, 100, 100);
-    doc.text('Philippine Bidding Documents (PBDs) • RA 9184 / RA 12009', pageWidth / 2, footerY + 22, { align: 'center' });
-
-    // Right: Page count
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(0, 0, 0);
-    doc.text(`PAGE ${i} OF ${totalPages}`, pageWidth - marginX, footerY + 12, { align: 'right' });
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(110, 110, 110);
-    doc.text('STANDARD FORM', pageWidth - marginX, footerY + 22, { align: 'right' });
-  }
-  */
-}
-
-/**
  * Draws the statutory header block (Page 1).
  */
 function drawPage1Header(
@@ -415,7 +357,6 @@ export async function generateSectionViVectorPdf(data: SectionViVectorData): Pro
   );
 
   // Stamp Running Footers across all pages
-  stampRunningFooters(doc, 'Section VI. Schedule of Requirements', data);
 
   const base64 = doc.output('datauristring').split(',')[1];
   return `data:application/pdf;base64,${base64}`;
@@ -535,7 +476,6 @@ export async function generateFrameworkAgreementListVectorPdf(data: SectionViVec
     data
   );
 
-  stampRunningFooters(doc, 'Framework Agreement List', data);
 
   const base64 = doc.output('datauristring').split(',')[1];
   return `data:application/pdf;base64,${base64}`;
@@ -640,7 +580,6 @@ export async function generateSectionViiVectorPdf(data: TechSpecVectorData): Pro
     data
   );
 
-  stampRunningFooters(doc, 'Section VII. Technical Specifications', data);
 
   const base64 = doc.output('datauristring').split(',')[1];
   return `data:application/pdf;base64,${base64}`;

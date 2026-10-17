@@ -35,7 +35,6 @@ export interface RlaModalProps {
 }
 
 export const RlaModalContent: React.FC<RlaModalProps> = ({
-  item,
   tenant,
   activeProjectRefNo = '',
   activeProjectTitle = '',
@@ -44,10 +43,7 @@ export const RlaModalContent: React.FC<RlaModalProps> = ({
   procuringEntityContactPerson = '',
   headOfProcuringEntity: propHeadOfProcuringEntity = '',
   headOfProcuringEntityPosition: propHeadOfProcuringEntityPosition = '',
-  solicitationNumber: propSolicitationNumber = '',
   contractAmount: propContractAmount = 0,
-  projectLocation: propProjectLocation = '',
-  dateTimeSubmitted: propDateTimeSubmitted = '',
   onSaveAndComplete,
   onClose
 }) => {

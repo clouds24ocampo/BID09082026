@@ -32,19 +32,11 @@ export interface WsModalProps {
 }
 
 export const WsModalContent: React.FC<WsModalProps> = ({
-  item,
   tenant,
   activeProjectRefNo = '',
   activeProjectTitle = '',
   activeProcuringEntity = '',
-  procuringEntityAddress = '',
-  procuringEntityContactPerson = '',
-  headOfProcuringEntity: propHeadOfProcuringEntity = '',
-  headOfProcuringEntityPosition: propHeadOfProcuringEntityPosition = '',
-  solicitationNumber: propSolicitationNumber = '',
   contractAmount: propContractAmount = 0,
-  projectLocation: propProjectLocation = '',
-  dateTimeSubmitted: propDateTimeSubmitted = '',
   onSaveAndComplete,
   onClose
 }) => {

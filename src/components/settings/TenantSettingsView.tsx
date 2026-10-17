@@ -466,7 +466,7 @@ export const TenantSettingsView: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    {!isCurrent && (
+                    {!isCurrent && (isApproverRole(currentUser?.role) || !isApprover) && (
                       <button
                         type="button"
                         onClick={() => {

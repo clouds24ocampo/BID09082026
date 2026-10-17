@@ -24,7 +24,6 @@ export interface DocumentSeparatorCoverProps {
 export const DocumentSeparatorCover: React.FC<DocumentSeparatorCoverProps> = ({ 
   item, 
   tenant, 
-  incrementNumber = 1,
   folderCopy = 'ORIGINAL',
   envelopeName
 }) => {

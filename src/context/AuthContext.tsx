@@ -41,12 +41,7 @@ interface AuthContextType {
   currentTenant: Tenant | null;
   tenants: Tenant[];
   users: User[];
-  login: (
-    email: string,
-    password: string,
-    role?: UserRole,
-    tenantId?: string,
-  ) => boolean;
+  login: (email: string, password: string) => boolean;
   logout: () => void;
   registerTenantAndUser: (
     tenantData: Omit<Tenant, "id" | "createdAt">,
@@ -139,12 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [currentUser]);
 
-  const login = (
-    email: string,
-    password: string,
-    _role?: UserRole,
-    _tenantId?: string,
-  ): boolean => {
+  const login = (email: string, password: string): boolean => {
     const normalizedEmail = email.trim().toLowerCase();
 
     // Find registered user — do NOT auto-create unknown users
@@ -300,6 +290,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const switchUser = (userId: string): boolean => {
     const target = users.find((u) => u.id === userId);
     if (!target) return false;
+    // Only approvers may assume another account; a preparer may not escalate.
+    if (isApproverRole(target.role) && !isApproverRole(currentUser?.role)) {
+      return false;
+    }
 
     const matchedTenant =
       tenants.find((t) => t.id === target.tenantId) || currentTenant;
@@ -365,43 +359,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const updateUserPassword = (userId: string, newPassword: string) => {
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId || (currentUser && u.email === currentUser.email)) {
-          const updated = {
-            ...u,
-            password: newPassword,
-            mustChangePassword: false,
-          };
-          safeSetItem(
-            `bidocs_user_password_${u.email.toLowerCase()}`,
-            newPassword,
-          );
-          safeSetItem(
-            `bidocs_must_change_password_${u.email.toLowerCase()}`,
-            "false",
-          );
-          return updated;
-        }
-        return u;
-      }),
-    );
+    if (!newPassword || !currentUser) return;
+    if (userId !== currentUser.id && !isApproverRole(currentUser.role)) return;
 
-    if (currentUser) {
-      const updatedCurrent = {
+    const target = users.find((u) => u.id === userId);
+    if (!target) return;
+
+    const email = target.email.toLowerCase();
+    safeSetItem(`bidocs_user_password_${email}`, newPassword);
+    safeSetItem(`bidocs_must_change_password_${email}`, "false");
+
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === userId
+          ? { ...u, password: newPassword, mustChangePassword: false }
+          : u,
+      ),
+    );
+    if (userId === currentUser.id) {
+      setCurrentUser({
         ...currentUser,
         password: newPassword,
         mustChangePassword: false,
-      };
-      setCurrentUser(updatedCurrent);
-      safeSetItem(
-        `bidocs_user_password_${currentUser.email.toLowerCase()}`,
-        newPassword,
-      );
-      safeSetItem(
-        `bidocs_must_change_password_${currentUser.email.toLowerCase()}`,
-        "false",
-      );
+      });
     }
   };
 
