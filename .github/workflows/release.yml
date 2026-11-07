@@ -43,18 +43,24 @@ jobs:
 
   android:
     name: Android
-    runs-on: ubuntu-latest
+    # Pinned image: ubuntu-latest moved to a newer release without the preinstalled Android SDK tooling.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+      # The runner image ships the Android SDK; make sure the exact API level we compile against is present.
+      - name: Android SDK components
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
       # No secrets are present while dependencies install or the web app builds.
       - run: npm ci
       - run: npm run build
@@ -103,7 +109,8 @@ jobs:
 
   publish:
     name: Attach to GitHub Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Desktop installers are published even if the Android job fails; a signed APK is added when it succeeds.
+    if: ${{ !cancelled() && needs.desktop.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
     needs: [desktop, android]
     runs-on: ubuntu-latest
     permissions:

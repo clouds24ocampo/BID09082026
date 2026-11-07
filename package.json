@@ -6,7 +6,7 @@
   "license": "UNLICENSED",
   "homepage": "https://github.com/clouds24ocampo/biddingsystem",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "main": "electron/main.cjs",
   "engines": {
