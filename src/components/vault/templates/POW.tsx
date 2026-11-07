@@ -2049,8 +2049,7 @@ export const POWModalContent: React.FC<PowModalProps> = ({
         ),
       ];
 
-      localStorage.setItem(tenantKey, JSON.stringify(updatedOps));
-      localStorage.setItem("bidocs_opportunities", JSON.stringify(updatedOps));
+      localStorage.setItem(tenantKey, JSON.stringify(updatedOps));
 
       // Invalidate project options cache so dropdowns update immediately
       invalidateOpportunityProjectsCache();
@@ -2064,13 +2063,11 @@ export const POWModalContent: React.FC<PowModalProps> = ({
       localStorage.setItem(
         `bidocs_active_project_${tenantId}`,
         JSON.stringify(activeData),
-      );
-      localStorage.setItem("bidocs_active_project", JSON.stringify(activeData));
+      );
       localStorage.setItem(
         `bidocs_active_vault_project_${tenantId}`,
         finalProjectRefNo,
-      );
-      localStorage.setItem("bidocs_active_vault_project", finalProjectRefNo);
+      );
 
       // 5. Automatically synchronize deliverables into Section VI (Schedule of Requirements)
       const convertedSectionViItems: any[] = calculatedRows.map((it, idx) => {

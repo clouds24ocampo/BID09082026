@@ -62,6 +62,25 @@ export const blobToDataUrl = async (blob: Blob): Promise<string> => {
   return `data:application/pdf;base64,${base64}`;
 };
 
+/**
+ * True when a rendered page canvas has no visible ink at all (pure white / transparent).
+ * Used to drop empty pages instead of embedding them in the PDF.
+ */
+export const isCanvasBlank = (canvas: HTMLCanvasElement): boolean => {
+  const ctx = canvas.getContext('2d');
+  if (!ctx || canvas.width === 0 || canvas.height === 0) return false;
+  const bandHeight = 128;
+  for (let y = 0; y < canvas.height; y += bandHeight) {
+    const h = Math.min(bandHeight, canvas.height - y);
+    const { data } = ctx.getImageData(0, y, canvas.width, h);
+    for (let i = 0; i < data.length; i += 4) {
+      // Any opaque pixel that is not near-white counts as content
+      if (data[i + 3] > 8 && (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245)) return false;
+    }
+  }
+  return true;
+};
+
 /** Formats a date string to date-only (strictly NO time component) for official BAC stamping */
 export const formatDateOnly = (dateStr?: string | null): string => {
   if (!dateStr) return 'August 30, 2026';
@@ -632,6 +651,7 @@ export async function buildMergedThreeLayerPdfBytes(
             elem.classList.contains('print-document-sheet');
 
           if (isPrePaginated) {
+            if (isCanvasBlank(canvas)) continue; // never emit an empty page
             const imgData = canvas.toDataURL('image/png');
             const pngImage = await pdfDoc.embedPng(imgData);
             const formPage = pdfDoc.addPage(pageSize);
@@ -698,6 +718,7 @@ export async function buildMergedThreeLayerPdfBytes(
                   0, 0, canvas.width, Math.min(height, canvas.height - startY)
                 );
               }
+              if (isCanvasBlank(sliceCanvas)) continue; // trailing padding only: skip the empty page
               const sliceImgData = sliceCanvas.toDataURL('image/png');
               const slicePngImage = await pdfDoc.embedPng(sliceImgData);
               const slicePage = pdfDoc.addPage(pageSize);
@@ -923,7 +944,7 @@ export async function buildMergedThreeLayerPdfBytes(
           const statusText = effectiveFolderCopy === 'ORIGINAL'
             ? 'ORIGINAL BID DOCUMENT'
             : 'CERTIFIED TRUE COPY';
-          const companyText = (options?.companyName || 'QUANTUM CLOUD CORPORATION').toUpperCase().slice(0, 42);
+          const companyText = (options?.companyName || 'AUTHORIZED BIDDER').toUpperCase().slice(0, 42);
           const refText = `REF: ${refNo} • BAC COMPLIANT`;
 
           const wmAngleDeg = (30 + normalizedRotation) % 360;

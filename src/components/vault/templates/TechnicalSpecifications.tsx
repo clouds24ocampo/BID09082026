@@ -120,7 +120,7 @@ const getStoredOpportunityRecord = (
   tenantId: string,
   opportunityId: string,
 ): RawOpportunityRecord | null => {
-  const keys = [`bidocs_opportunities_${tenantId}`, "bidocs_opportunities"];
+  const keys = [`bidocs_opportunities_${tenantId}`];
 
   for (const key of keys) {
     const saved = localStorage.getItem(key);

@@ -1,6 +1,6 @@
 import { PDFDocument } from 'pdf-lib';
 import html2canvas from 'html2canvas';
-import { blobToDataUrl } from './pdfExportEngine';
+import { blobToDataUrl, isCanvasBlank } from './pdfExportEngine';
 
 // Philippine Legal portrait, 8.5" x 13" (PDF-2: module scope).
 const LEGAL_PORTRAIT: [number, number] = [612, 936];
@@ -16,6 +16,7 @@ export async function legalPagesToPdfDataUrl(pages: HTMLElement[]): Promise<stri
       backgroundColor: '#ffffff',
       windowWidth: 816,
     });
+    if (isCanvasBlank(canvas)) continue; // never emit an empty page
     const png = await pdfDoc.embedPng(canvas.toDataURL('image/png'));
     const page = pdfDoc.addPage(LEGAL_PORTRAIT);
     page.drawImage(png, { x: 0, y: 0, width: LEGAL_PORTRAIT[0], height: LEGAL_PORTRAIT[1] });

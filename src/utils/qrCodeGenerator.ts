@@ -46,9 +46,9 @@ export const generateUniqueDocumentId = (
  * - Name of the Documents
  */
 export const formatQrCodePayload = (details: QrCodeDetails): string => {
-  const company = details.companyName || details.generatedBy || 'Quantum Cloud Corporation';
-  const project = details.projectTitle || details.projectName || 'Infrastructure & IT Modernization Project';
-  const submissionDate = details.submissionDate || details.dateTimeSubmitted || (details as any).submissionDeadline || 'August 30, 2026';
+  const company = details.companyName || details.generatedBy || 'N/A';
+  const project = details.projectTitle || details.projectName || 'N/A';
+  const submissionDate = details.submissionDate || details.dateTimeSubmitted || (details as any).submissionDeadline || 'N/A';
   const docName = details.documentName || 'Official Bid Document';
 
   return `Company Name: ${company}

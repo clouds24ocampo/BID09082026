@@ -4,6 +4,7 @@ import { loadPdfData, loadVaultItems } from './vaultIndexedDB';
 import { generateQrCodeDataUrl } from './qrCodeGenerator';
 import { isFormLDetailedEstimates, isMajorEquipmentDoc } from './envelopeClassification';
 import { numberToWords } from './numberToWords';
+import { createFillDoc, applyPageFill } from './pdfPageFill';
 
 // Standard Dimensions in Points (72 dpi)
 // Landscape Legal: 13" x 8.5" = 936pt x 612pt
@@ -26,6 +27,7 @@ export const sanitizePdfText = (text: string | null | undefined): string => {
 
 
 export const exportPdfDocAsDataUri = async (pdfDoc: PDFDocument): Promise<string> => {
+  applyPageFill(pdfDoc);
   try {
     return await pdfDoc.saveAsBase64({ dataUri: true });
   } catch (_) {
@@ -150,9 +152,107 @@ const wrapText = (text: string, maxWidth: number, font: PDFFont, fontSize: numbe
   return lines;
 }
 
+export interface ProseBlock {
+  text: string;
+  bold?: boolean;
+  /** Left indent in points. */
+  indent?: number;
+  /** Font size relative to the fitted body size. */
+  scale?: number;
+  align?: 'left' | 'center';
+  /** Extra space after the block, in multiples of the font size. */
+  gap?: number;
+}
+
 /**
- * Rules unused Legal-page space from the last content baseline down to the
- * signatory band so statutory PDFs do not show a blank white void.
+ * Lays out legal prose with full word-wrapping (never truncated) at the largest font size
+ * that fits `height`, so short forms use the whole page instead of a few tiny lines.
+ */
+const layoutProse = (
+  fontReg: PDFFont,
+  fontBold: PDFFont,
+  blocks: ProseBlock[],
+  box: { x: number; width: number; height: number; maxSize?: number; minSize?: number }
+) => {
+  const measure = (size: number) => {
+    let h = 0;
+    const laid = blocks.map((b) => {
+      const sz = size * (b.scale ?? 1);
+      const font = b.bold ? fontBold : fontReg;
+      const lines = wrapText(sanitizePdfText(b.text), box.width - (b.indent ?? 0), font, sz);
+      const lineH = sz * 1.5;
+      h += lines.length * lineH + size * (b.gap ?? 0.8);
+      return { b, sz, font, lines, lineH };
+    });
+    return { h, laid };
+  };
+  let size = box.maxSize ?? 12;
+  const min = box.minSize ?? 7;
+  let m = measure(size);
+  while (m.h > box.height && size > min) { size -= 0.25; m = measure(size); }
+  return {
+    size,
+    height: m.h,
+    /** Draws the blocks downward from `top`; returns the y just below the last line. */
+    draw: (page: PDFPage, top: number) => {
+      let y = top;
+      for (const { b, sz, font, lines, lineH } of m.laid) {
+        for (const line of lines) {
+          y -= lineH;
+          const w = font.widthOfTextAtSize(line, sz);
+          const x = b.align === 'center' ? box.x + (box.width - w) / 2 : box.x + (b.indent ?? 0);
+          page.drawText(line, { x, y: y + lineH * 0.25, size: sz, font, color: rgb(0.1, 0.15, 0.22) });
+        }
+        y -= size * (b.gap ?? 0.8);
+      }
+      return y;
+    },
+  };
+};
+
+/**
+ * Government-form fill-in rows: numbered, ruled, empty rows from the last data row down to the
+ * footer, so a short table still uses the whole page. Returns the y below the last row drawn.
+ */
+const drawBlankRows = (
+  page: PDFPage,
+  fontReg: PDFFont,
+  opts: { startX: number; colWidths: number[]; fromY: number; startIndex: number; rowHeight?: number; bottom?: number }
+): number => {
+  const rowHeight = opts.rowHeight ?? 24;
+  const bottom = opts.bottom ?? 122;
+  const tableWidth = opts.colWidths.reduce((a, b) => a + b, 0);
+  let y = opts.fromY;
+  let n = opts.startIndex;
+  while (y - rowHeight >= bottom) {
+    page.drawRectangle({
+      x: opts.startX,
+      y: y - rowHeight,
+      width: tableWidth,
+      height: rowHeight,
+      color: n % 2 === 0 ? rgb(0.97, 0.98, 0.99) : rgb(1, 1, 1),
+      borderColor: rgb(0.85, 0.88, 0.92),
+      borderWidth: 0.5
+    });
+    let x = opts.startX;
+    opts.colWidths.forEach((w, i) => {
+      if (i > 0) {
+        page.drawLine({ start: { x, y: y - rowHeight }, end: { x, y }, thickness: 0.4, color: rgb(0.88, 0.9, 0.94) });
+      }
+      x += w;
+    });
+    const label = String(n + 1);
+    const lw = fontReg.widthOfTextAtSize(label, 6.8);
+    page.drawText(label, { x: opts.startX + (opts.colWidths[0] - lw) / 2, y: y - rowHeight / 2 - 2, size: 6.8, font: fontReg, color: rgb(0.6, 0.64, 0.7) });
+    y -= rowHeight;
+    n++;
+  }
+  return y;
+};
+
+/**
+ * Marks the end of the content. The remaining vertical space is absorbed by
+ * `applyPageFill` (pdfPageFill.ts), which stretches the body down to the footer.
  */
 const fillUnusedLegalSpace = (
   page: PDFPage,
@@ -168,17 +268,6 @@ const fillUnusedLegalSpace = (
   if (!Number.isFinite(fromY) || fromY <= usableBottom + 28) return;
 
   const width = pageWidth - startX * 2;
-  const fillHeight = fromY - usableBottom;
-  page.drawRectangle({
-    x: startX,
-    y: usableBottom,
-    width,
-    height: fillHeight,
-    color: rgb(1, 1, 1),
-    borderColor: rgb(0.78, 0.81, 0.85),
-    borderWidth: 0.5
-  });
-
   const nfText = '*** NOTHING FOLLOWS ***';
   const nfSize = isLandscape ? 7 : 8;
   const nfW = fontBold.widthOfTextAtSize(nfText, nfSize);
@@ -189,16 +278,7 @@ const fillUnusedLegalSpace = (
     font: fontBold,
     color: rgb(0.22, 0.27, 0.33)
   });
-
-  for (let lineY = fromY - 22; lineY > usableBottom + 6; lineY -= 12) {
-    page.drawLine({
-      start: { x: startX + 6, y: lineY },
-      end: { x: startX + width - 6, y: lineY },
-      thickness: 0.35,
-      color: rgb(0.82, 0.85, 0.88)
-    });
-  }
-};;
+};
 
 /**
  * Draws a clean official corporate header on a PDF Page
@@ -467,7 +547,7 @@ const appendPdfStreams = async (mainDoc: PDFDocument, pdfSources: (string | unde
  * ─── 1. ONGOING CONTRACTS GENERATOR ───
  */
 export async function generateOngoingContractsPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -720,7 +800,7 @@ export async function generateOngoingContractsPdf(ctx: DocResolveContext): Promi
  * ─── 2. SLCC STATEMENT GENERATOR ───
  */
 export async function generateSlccStatementPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -942,7 +1022,7 @@ export async function generateSlccStatementPdf(ctx: DocResolveContext): Promise<
  * ─── 3. SECTION VI: SCHEDULE OF REQUIREMENTS GENERATOR ───
  */
 export async function generateSectionViRequirementsPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -1180,7 +1260,7 @@ export async function generateSectionViRequirementsPdf(ctx: DocResolveContext): 
  * ─── 4. SECTION VII: TECHNICAL SPECIFICATIONS GENERATOR ───
  */
 export async function generateTechnicalSpecificationsPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -1385,7 +1465,7 @@ export async function generateTechnicalSpecificationsPdf(ctx: DocResolveContext)
  * ─── 5. FRAMEWORK AGREEMENT LIST GENERATOR ───
  */
 export async function generateFrameworkAgreementListPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -1501,6 +1581,8 @@ export async function generateFrameworkAgreementListPdf(ctx: DocResolveContext):
     currentY -= rowHeight;
   }
 
+  currentY = drawBlankRows(page, fontReg, { startX, colWidths: cols.map(c => c.width), fromY: currentY, startIndex: items.length });
+
   // End of items marker
   if (items.length < 10 && currentY - 24 >= 115) {
     page.drawRectangle({
@@ -1558,7 +1640,7 @@ export async function generateFrameworkAgreementListPdf(ctx: DocResolveContext):
  * ─── 6. NFCC COMPUTATION GENERATOR ───
  */
 export async function generateNfccComputationPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -1677,7 +1759,7 @@ export async function generateNfccComputationPdf(ctx: DocResolveContext): Promis
  * ─── 7. FINANCIAL BID FORM GENERATOR (Goods / Infra / Consulting) ───
  */
 export async function generateFinancialBidFormPdf(ctx: DocResolveContext, category: 'INFRA' | 'GOODS' | 'CONSULTING' = 'INFRA'): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -1788,7 +1870,7 @@ export async function generateFinancialBidFormPdf(ctx: DocResolveContext, catego
  * ─── 8. BILL OF QUANTITIES (BOQ) GENERATOR ───
  */
 export async function generateBillOfQuantitiesPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -1977,7 +2059,7 @@ export async function generateBillOfQuantitiesPdf(ctx: DocResolveContext): Promi
  * ─── 9. DETAILED ESTIMATES (FORM L) GENERATOR ───
  */
 export async function generateDetailedEstimatesPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -2086,7 +2168,7 @@ export async function generateDetailedEstimatesPdf(ctx: DocResolveContext): Prom
  * ─── 10. ORGANIZATIONAL CHART GENERATOR ───
  */
 export async function generateOrgChartPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -2173,7 +2255,7 @@ export async function generateOrgChartPdf(ctx: DocResolveContext): Promise<strin
  * ─── 11. KEY PERSONNEL MATRIX GENERATOR ───
  */
 export async function generateKeyPersonnelPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -2311,8 +2393,10 @@ export async function generateKeyPersonnelPdf(ctx: DocResolveContext): Promise<s
     currentY -= rowHeight;
   });
 
+  currentY = drawBlankRows(page, fontReg, { startX, colWidths: cols.map(c => c.width), fromY: currentY, startIndex: personnel.length });
+
   // End of list divider if few items
-  if (personnel.length < 6) {
+  if (personnel.length < 6 && currentY - 22 >= 115) {
     page.drawRectangle({
       x: startX,
       y: currentY - 16,
@@ -2357,7 +2441,7 @@ export async function generateKeyPersonnelPdf(ctx: DocResolveContext): Promise<s
  * ─── 12. MAJOR EQUIPMENT UTILIZATION MATRIX GENERATOR ───
  */
 export async function generateMajorEquipmentPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -2497,8 +2581,10 @@ export async function generateMajorEquipmentPdf(ctx: DocResolveContext): Promise
     currentY -= rowHeight;
   });
 
+  currentY = drawBlankRows(page, fontReg, { startX, colWidths: cols.map(c => c.width), fromY: currentY, startIndex: equipment.length });
+
   // End of list divider if few items
-  if (equipment.length < 6) {
+  if (equipment.length < 6 && currentY - 22 >= 115) {
     page.drawRectangle({
       x: startX,
       y: currentY - 16,
@@ -2548,7 +2634,7 @@ export async function generateMajorEquipmentPdf(ctx: DocResolveContext): Promise
  * ─── 13. OMNIBUS SWORN STATEMENT GENERATOR ───
  */
 export async function generateOmnibusSwornStatementPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -2565,49 +2651,27 @@ export async function generateOmnibusSwornStatementPdf(ctx: DocResolveContext): 
   );
 
   const startX = 36;
-  let currentY = 820;
+  const currentY = 820;
+  const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-  page.drawText('REPUBLIC OF THE PHILIPPINES )', { x: startX, y: currentY, size: 8, font: fontBold, color: rgb(0.1, 0.15, 0.25) });
-  page.drawText('CITY/MUNICIPALITY OF MANILA ) S.S.', { x: startX, y: currentY - 12, size: 8, font: fontBold, color: rgb(0.1, 0.15, 0.25) });
-  currentY -= 32;
-
-  page.drawText('AFFIDAVIT', { x: 270, y: currentY, size: 10, font: fontBold, color: rgb(0.08, 0.12, 0.22) });
-  currentY -= 20;
-
-  const intro = `I, ${signatoryName}, of legal age, Filipino, residing at ${companyAddress}, after having been duly sworn in accordance with law, do hereby depose and state that:`;
-  page.drawText(intro, { x: startX, y: currentY, size: 7.2, font: fontReg, color: rgb(0.15, 0.2, 0.25) });
-  currentY -= 22;
-
-  const points = [
-    `1. I am the duly authorized and designated representative of ${companyName} with office address at ${companyAddress};`,
-    `2. I am granted full power and authority to do, execute and perform any and all acts necessary to participate, submit the bid, and to sign and execute the ensuing contract for ${ctx.projectTitle || 'the Project'} of ${ctx.procuringEntity || 'the Procuring Entity'};`,
-    `3. ${companyName} is not "blacklisted" or barred from bidding by the GOP or any of its agencies, offices, or LGUs;`,
-    `4. Each of the documents submitted in satisfaction of the bidding requirements is an authentic copy of the original, complete, and all statements and information provided therein are true and correct;`,
-    `5. ${companyName} is authorizing the Head of the Procuring Entity or its duly authorized representative(s) to verify all the documents submitted;`,
-    `6. None of the officers, directors, and controlling stockholders of ${companyName} is related to the Head of the Procuring Entity, members of the BAC, the TWG, or the BAC Secretariat by consanguinity or affinity up to the third civil degree;`,
-    `7. ${companyName} complies with existing labor laws and standards;`,
-    `8. ${companyName} is aware of and has undertaken the responsibilities as a Bidder in compliance with the Philippine Bidding Documents;`,
-    `9. ${companyName} did not give or pay, directly or indirectly, any commission, amount, fee, or any form of consideration to any person or official;`,
-    `10. In case advance payment was made or given, failure to perform or deliver any of the obligations and undertakings in the contract shall constitute sufficient grounds to constitute criminal liability for Swindling (Estafa).`
-  ];
-
-  points.forEach(p => {
-    page.drawText(p.slice(0, 115), { x: startX + 6, y: currentY, size: 6.8, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
-    if (p.length > 115) {
-      currentY -= 10;
-      page.drawText(p.slice(115, 230), { x: startX + 18, y: currentY, size: 6.8, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
-    }
-    currentY -= 14;
-  });
-
-  currentY -= 10;
-  page.drawText(`IN WITNESS WHEREOF, I have hereunto set my hand this ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} at Manila, Philippines.`, {
-    x: startX,
-    y: currentY,
-    size: 7.2,
-    font: fontReg,
-    color: rgb(0.15, 0.2, 0.25)
-  });
+  const prose = layoutProse(fontReg, fontBold, [
+    { text: 'REPUBLIC OF THE PHILIPPINES )', bold: true, gap: 0.1 },
+    { text: 'CITY/MUNICIPALITY OF MANILA ) S.S.', bold: true, gap: 1.2 },
+    { text: 'AFFIDAVIT', bold: true, align: 'center', scale: 1.3, gap: 1.2 },
+    { text: `I, ${signatoryName}, of legal age, Filipino, residing at ${companyAddress}, after having been duly sworn in accordance with law, do hereby depose and state that:`, gap: 0.9 },
+    { text: `1. I am the duly authorized and designated representative of ${companyName} with office address at ${companyAddress};`, indent: 8 },
+    { text: `2. I am granted full power and authority to do, execute and perform any and all acts necessary to participate, submit the bid, and to sign and execute the ensuing contract for ${ctx.projectTitle || 'the Project'} of ${ctx.procuringEntity || 'the Procuring Entity'};`, indent: 8 },
+    { text: `3. ${companyName} is not "blacklisted" or barred from bidding by the GOP or any of its agencies, offices, or LGUs;`, indent: 8 },
+    { text: `4. Each of the documents submitted in satisfaction of the bidding requirements is an authentic copy of the original, complete, and all statements and information provided therein are true and correct;`, indent: 8 },
+    { text: `5. ${companyName} is authorizing the Head of the Procuring Entity or its duly authorized representative(s) to verify all the documents submitted;`, indent: 8 },
+    { text: `6. None of the officers, directors, and controlling stockholders of ${companyName} is related to the Head of the Procuring Entity, members of the BAC, the TWG, or the BAC Secretariat by consanguinity or affinity up to the third civil degree;`, indent: 8 },
+    { text: `7. ${companyName} complies with existing labor laws and standards;`, indent: 8 },
+    { text: `8. ${companyName} is aware of and has undertaken the responsibilities as a Bidder in compliance with the Philippine Bidding Documents;`, indent: 8 },
+    { text: `9. ${companyName} did not give or pay, directly or indirectly, any commission, amount, fee, or any form of consideration to any person or official;`, indent: 8 },
+    { text: `10. In case advance payment was made or given, failure to perform or deliver any of the obligations and undertakings in the contract shall constitute sufficient grounds to constitute criminal liability for Swindling (Estafa).`, indent: 8, gap: 1.4 },
+    { text: `IN WITNESS WHEREOF, I have hereunto set my hand this ${dateStr} at Manila, Philippines.` },
+  ], { x: startX, width: 540, height: currentY - 130, maxSize: 11.5 });
+  prose.draw(page, currentY + 4);
 
   await drawOfficialFooter(
     pdfDoc, page, fontBold, fontReg, ctx.tenant,
@@ -2621,7 +2685,7 @@ export async function generateOmnibusSwornStatementPdf(ctx: DocResolveContext): 
  * ─── 14. BID SECURING DECLARATION GENERATOR ───
  */
 export async function generateBidSecuringDeclarationPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -2634,41 +2698,23 @@ export async function generateBidSecuringDeclarationPdf(ctx: DocResolveContext):
   );
 
   const startX = 36;
-  let currentY = 820;
+  const currentY = 820;
 
-  page.drawText('REPUBLIC OF THE PHILIPPINES )', { x: startX, y: currentY, size: 8, font: fontBold, color: rgb(0.1, 0.15, 0.25) });
-  page.drawText('CITY/MUNICIPALITY OF MANILA ) S.S.', { x: startX, y: currentY - 12, size: 8, font: fontBold, color: rgb(0.1, 0.15, 0.25) });
-  currentY -= 32;
-
-  page.drawText('BID SECURING DECLARATION', { x: 230, y: currentY, size: 10, font: fontBold, color: rgb(0.08, 0.12, 0.22) });
-  page.drawText(`Project Identification No. / PhilGEPS Ref: ${ctx.projectRefNo || 'PRJ-2026-001'}`, { x: 195, y: currentY - 14, size: 8, font: fontBold, color: rgb(0.2, 0.25, 0.35) });
-  currentY -= 36;
-
-  page.drawText(`To: ${ctx.procuringEntity || 'The Bids and Awards Committee'}`, { x: startX, y: currentY, size: 8, font: fontBold, color: rgb(0.1, 0.15, 0.25) });
-  currentY -= 18;
-
-  const clauses = [
-    `I/We, the undersigned, declare that:`,
-    `1. I/We understand that, according to your conditions, bids must be supported by a Bid Security, which may be in the form of a Bid Securing Declaration.`,
-    `2. I/We accept that: (a) I/we will be automatically disqualified from bidding for any procurement contract with any procuring entity for a period of two (2) years upon receipt of your Blacklisting Order; and, (b) I/we will pay the applicable fine provided under Section 6 of the Guidelines on the Use of Bid Securing Declaration, within fifteen (15) days from receipt of the written demand by the procuring entity for the commission of acts resulting to the enforcement of the bid securing declaration under Sections 23.1(b), 34.2, 40.1 and 69.1, except 69.1(f), of the IRR of RA No. 9184; without prejudice to other legal action the government may undertake.`,
-    `3. I/We understand that this Bid Securing Declaration shall cease to be valid on the following circumstances:`,
-    `   a. Upon expiration of the bid validity period, or any extension thereof pursuant to your request;`,
-    `   b. I am/we are declared ineligible or post-disqualified upon receipt of your notice to such effect, and (i) I/we failed to timely file a request for reconsideration or (ii) I/we filed a waiver to avail of said right; and`,
-    `   c. I am/we are declared the bidder with the Lowest Calculated Responsive Bid, and I/we have furnished the performance security and signed the Contract.`
-  ];
-
-  clauses.forEach(c => {
-    page.drawText(c.slice(0, 115), { x: startX + 4, y: currentY, size: 7.2, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
-    if (c.length > 115) {
-      currentY -= 11;
-      page.drawText(c.slice(115, 230), { x: startX + 16, y: currentY, size: 7.2, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
-    }
-    if (c.length > 230) {
-      currentY -= 11;
-      page.drawText(c.slice(230, 345), { x: startX + 16, y: currentY, size: 7.2, font: fontReg, color: rgb(0.1, 0.15, 0.2) });
-    }
-    currentY -= 16;
-  });
+  const prose = layoutProse(fontReg, fontBold, [
+    { text: 'REPUBLIC OF THE PHILIPPINES )', bold: true, gap: 0.1 },
+    { text: 'CITY/MUNICIPALITY OF MANILA ) S.S.', bold: true, gap: 1.2 },
+    { text: 'BID SECURING DECLARATION', bold: true, align: 'center', scale: 1.3, gap: 0.3 },
+    { text: `Project Identification No. / PhilGEPS Ref: ${ctx.projectRefNo || 'PRJ-2026-001'}`, bold: true, align: 'center', gap: 1.2 },
+    { text: `To: ${ctx.procuringEntity || 'The Bids and Awards Committee'}`, bold: true, gap: 1 },
+    { text: 'I/We, the undersigned, declare that:' },
+    { text: '1. I/We understand that, according to your conditions, bids must be supported by a Bid Security, which may be in the form of a Bid Securing Declaration.', indent: 8 },
+    { text: '2. I/We accept that: (a) I/we will be automatically disqualified from bidding for any procurement contract with any procuring entity for a period of two (2) years upon receipt of your Blacklisting Order; and, (b) I/we will pay the applicable fine provided under Section 6 of the Guidelines on the Use of Bid Securing Declaration, within fifteen (15) days from receipt of the written demand by the procuring entity for the commission of acts resulting to the enforcement of the bid securing declaration under Sections 23.1(b), 34.2, 40.1 and 69.1, except 69.1(f), of the IRR of RA No. 9184; without prejudice to other legal action the government may undertake.', indent: 8 },
+    { text: '3. I/We understand that this Bid Securing Declaration shall cease to be valid on the following circumstances:', indent: 8, gap: 0.4 },
+    { text: 'a. Upon expiration of the bid validity period, or any extension thereof pursuant to your request;', indent: 24, gap: 0.4 },
+    { text: 'b. I am/we are declared ineligible or post-disqualified upon receipt of your notice to such effect, and (i) I/we failed to timely file a request for reconsideration or (ii) I/we filed a waiver to avail of said right; and', indent: 24, gap: 0.4 },
+    { text: 'c. I am/we are declared the bidder with the Lowest Calculated Responsive Bid, and I/we have furnished the performance security and signed the Contract.', indent: 24 },
+  ], { x: startX, width: 540, height: currentY - 130, maxSize: 11.5 });
+  prose.draw(page, currentY + 4);
 
   await drawOfficialFooter(
     pdfDoc, page, fontBold, fontReg, ctx.tenant,
@@ -2682,7 +2728,7 @@ export async function generateBidSecuringDeclarationPdf(ctx: DocResolveContext):
  * ─── 15. AFTER-SALES SERVICE & WARRANTY UNDERTAKING ───
  */
 export async function generateAfterSalesWarrantyPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -2695,37 +2741,29 @@ export async function generateAfterSalesWarrantyPdf(ctx: DocResolveContext): Pro
   );
 
   const startX = 36;
-  let currentY = 810;
-  const boxWidth = 540;
+  const currentY = 810;
 
+  const prose = layoutProse(fontReg, fontBold, [
+    { text: 'AFTER-SALES SERVICE & WARRANTY UNDERTAKING', bold: true, align: 'center', scale: 1.2, gap: 1.4 },
+    { text: '1. Standard Warranty Coverage:', bold: true, gap: 0.15 },
+    { text: 'Minimum 1-Year Comprehensive Warranty on all supplied hardware, equipment, parts, materials, and workmanship from the date of issuance of the Certificate of Final Acceptance.', indent: 10, gap: 1 },
+    { text: '2. Response Time & SLA Guarantee:', bold: true, gap: 0.15 },
+    { text: '24/7 Hotline & Helpdesk Support with a maximum response time of two (2) hours upon receipt of notice, and on-site technical resolution within twenty-four (24) to forty-eight (48) hours.', indent: 10, gap: 1 },
+    { text: '3. Preventive Maintenance Program:', bold: true, gap: 0.15 },
+    { text: 'Quarterly on-site preventive maintenance, diagnostic checks, firmware updates, hardware calibration, and operational health reporting during the entire warranty duration.', indent: 10, gap: 1 },
+    { text: '4. Service Center Availability:', bold: true, gap: 0.15 },
+    { text: 'Fully equipped and accredited local service centers located in Metro Manila and regional service hubs with certified technicians and ready inventory of replacement spare parts.', indent: 10 },
+  ], { x: startX + 16, width: 508, height: currentY - 150, maxSize: 11.5 });
   page.drawRectangle({
     x: startX,
-    y: currentY - 240,
-    width: boxWidth,
-    height: 240,
+    y: currentY - prose.height - 30,
+    width: 540,
+    height: prose.height + 30,
     color: rgb(0.98, 0.99, 1),
     borderColor: rgb(0.7, 0.75, 0.85),
     borderWidth: 1
   });
-
-  const terms = [
-    { title: '1. Standard Warranty Coverage:', desc: 'Minimum 1-Year Comprehensive Warranty on all supplied hardware, equipment, parts, materials, and workmanship from the date of issuance of the Certificate of Final Acceptance.' },
-    { title: '2. Response Time & SLA Guarantee:', desc: '24/7 Hotline & Helpdesk Support with a maximum response time of two (2) hours upon receipt of notice, and on-site technical resolution within twenty-four (24) to forty-eight (48) hours.' },
-    { title: '3. Preventive Maintenance Program:', desc: 'Quarterly on-site preventive maintenance, diagnostic checks, firmware updates, hardware calibration, and operational health reporting during the entire warranty duration.' },
-    { title: '4. Service Center Availability:', desc: 'Fully equipped and accredited local service centers located in Metro Manila and regional service hubs with certified technicians and ready inventory of replacement spare parts.' }
-  ];
-
-  let tY = currentY - 20;
-  terms.forEach(t => {
-    page.drawText(t.title, { x: startX + 10, y: tY, size: 8, font: fontBold, color: rgb(0.1, 0.2, 0.4) });
-    page.drawText(t.desc.slice(0, 115), { x: startX + 10, y: tY - 12, size: 7.2, font: fontReg, color: rgb(0.15, 0.2, 0.25) });
-    if (t.desc.length > 115) {
-      page.drawText(t.desc.slice(115), { x: startX + 10, y: tY - 22, size: 7.2, font: fontReg, color: rgb(0.15, 0.2, 0.25) });
-      tY -= 48;
-    } else {
-      tY -= 38;
-    }
-  });
+  prose.draw(page, currentY - 14);
 
   await drawOfficialFooter(
     pdfDoc, page, fontBold, fontReg, ctx.tenant,
@@ -2739,7 +2777,7 @@ export async function generateAfterSalesWarrantyPdf(ctx: DocResolveContext): Pro
  * ─── 16. DETAILED PRICE SCHEDULE FOR GOODS GENERATOR ───
  */
 export async function generatePriceSchedulePdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -2950,7 +2988,7 @@ export async function generatePriceSchedulePdf(ctx: DocResolveContext): Promise<
  * ─── 17. SUMMARY OF BID PRICES (SF-INFR-43) GENERATOR ───
  */
 export async function generateSummaryOfBidPricesPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -3063,7 +3101,7 @@ export async function generateSummaryOfBidPricesPdf(ctx: DocResolveContext): Pro
  * ─── 18. CASH FLOW BY QUARTER (SF-INFR-56) GENERATOR ───
  */
 export async function generateCashFlowPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -3149,7 +3187,7 @@ export async function generateCashFlowPdf(ctx: DocResolveContext): Promise<strin
  * ─── 19. CORPORATE LEGAL: PHILGEPS PLATINUM CERTIFICATE ───
  */
 export async function generatePhilgepsCertificatePdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -3209,7 +3247,7 @@ export async function generatePhilgepsCertificatePdf(ctx: DocResolveContext): Pr
  * ─── 20. CORPORATE LEGAL: SEC / DTI REGISTRATION ───
  */
 export async function generateSecDtiRegistrationPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -3266,7 +3304,7 @@ export async function generateSecDtiRegistrationPdf(ctx: DocResolveContext): Pro
  * ─── 21. CORPORATE LEGAL: MAYOR'S / BUSINESS PERMIT ───
  */
 export async function generateMayorsPermitPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -3323,7 +3361,7 @@ export async function generateMayorsPermitPdf(ctx: DocResolveContext): Promise<s
  * ─── 22A. CORPORATE LEGAL: BIR CERTIFICATE OF REGISTRATION (BIR FORM 2303) ───
  */
 export async function generateBirRegistrationPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -3380,7 +3418,7 @@ export async function generateBirRegistrationPdf(ctx: DocResolveContext): Promis
  * ─── 22. CORPORATE LEGAL: BIR TAX CLEARANCE ───
  */
 export async function generateTaxClearancePdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -3436,7 +3474,7 @@ export async function generateTaxClearancePdf(ctx: DocResolveContext): Promise<s
  * ─── 23. CORPORATE LEGAL: AUDITED FINANCIAL STATEMENTS (AFS) ───
  */
 export async function generateAuditedFinancialStatementsPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -3494,7 +3532,7 @@ export async function generateAuditedFinancialStatementsPdf(ctx: DocResolveConte
  * ─── 24. CORPORATE LEGAL: PCAB LICENSE ───
  */
 export async function generatePcabLicensePdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -3693,7 +3731,7 @@ export async function generatePcabLicensePdf(ctx: DocResolveContext): Promise<st
  * ─── 25. CORPORATE LEGAL: SECRETARY'S CERTIFICATE / BOARD RESOLUTION ───
  */
 export async function generateSecretaryCertificatePdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -3711,39 +3749,23 @@ export async function generateSecretaryCertificatePdf(ctx: DocResolveContext): P
   );
 
   const startX = 36;
-  let currentY = 810;
-  const boxWidth = 540;
+  const currentY = 810;
 
+  const prose = layoutProse(fontReg, fontBold, [
+    { text: "SECRETARY'S CERTIFICATE & SPECIAL POWER OF ATTORNEY", bold: true, align: 'center', scale: 1.2, gap: 1.4 },
+    { text: `I, the undersigned Corporate Secretary of ${companyName}, a corporation duly organized and existing under Philippine laws with principal office at ${companyAddress}, do hereby certify that at a special meeting of the Board of Directors held at its principal office, the following resolution was approved:`, gap: 1.2 },
+    { text: `"RESOLVED, as it is hereby resolved, that ${signatoryName}, in his/her capacity as ${signatoryTitle}, is hereby appointed as the AUTHORIZED MANAGING OFFICER (AMO) and Attorney-in-Fact of the Corporation, with full power and authority to submit bids, represent, negotiate, sign, and execute any and all documents, contracts, and agreements for ${ctx.projectTitle || 'the Project'} (PhilGEPS Ref: ${ctx.projectRefNo || 'PRJ-2026'})."`, indent: 12 },
+  ], { x: startX + 16, width: 508, height: currentY - 150, maxSize: 11.5 });
   page.drawRectangle({
     x: startX,
-    y: currentY - 260,
-    width: boxWidth,
-    height: 260,
+    y: currentY - prose.height - 30,
+    width: 540,
+    height: prose.height + 30,
     color: rgb(0.98, 0.99, 1),
     borderColor: rgb(0.7, 0.75, 0.85),
     borderWidth: 1
   });
-
-  page.drawText("SECRETARY'S CERTIFICATE & SPECIAL POWER OF ATTORNEY", { x: startX + 110, y: currentY - 20, size: 8.5, font: fontBold, color: rgb(0.08, 0.15, 0.3) });
-
-  const secText = [
-    `I, the undersigned Corporate Secretary of ${companyName}, a corporation duly organized and existing under Philippine laws with principal office at ${companyAddress}, do hereby certify that at a special meeting of the Board of Directors held at its principal office, the following resolution was approved:`,
-    `"RESOLVED, as it is hereby resolved, that ${signatoryName}, in his/her capacity as ${signatoryTitle}, is hereby appointed as the AUTHORIZED MANAGING OFFICER (AMO) and Attorney-in-Fact of the Corporation, with full power and authority to submit bids, represent, negotiate, sign, and execute any and all documents, contracts, and agreements for ${ctx.projectTitle || 'the Project'} (PhilGEPS Ref: ${ctx.projectRefNo || 'PRJ-2026'})."`
-  ];
-
-  let bY = currentY - 50;
-  secText.forEach(st => {
-    page.drawText(st.slice(0, 115), { x: startX + 12, y: bY, size: 7.5, font: fontReg, color: rgb(0.15, 0.2, 0.3) });
-    if (st.length > 115) {
-      bY -= 12;
-      page.drawText(st.slice(115, 230), { x: startX + 12, y: bY, size: 7.5, font: fontReg, color: rgb(0.15, 0.2, 0.3) });
-    }
-    if (st.length > 230) {
-      bY -= 12;
-      page.drawText(st.slice(230), { x: startX + 12, y: bY, size: 7.5, font: fontReg, color: rgb(0.15, 0.2, 0.3) });
-    }
-    bY -= 25;
-  });
+  prose.draw(page, currentY - 14);
 
   await drawOfficialFooter(
     pdfDoc, page, fontBold, fontReg, ctx.tenant,
@@ -3757,7 +3779,7 @@ export async function generateSecretaryCertificatePdf(ctx: DocResolveContext): P
  * ─── 26. CORPORATE LEGAL: JOINT VENTURE AGREEMENT (JVA) ───
  */
 export async function generateJointVentureAgreementPdf(ctx: DocResolveContext): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
@@ -3770,37 +3792,25 @@ export async function generateJointVentureAgreementPdf(ctx: DocResolveContext): 
   );
 
   const startX = 36;
-  let currentY = 810;
-  const boxWidth = 540;
+  const currentY = 810;
 
+  const prose = layoutProse(fontReg, fontBold, [
+    { text: 'STATEMENT OF INTENT & JOINT VENTURE UNDERTAKING', bold: true, align: 'center', scale: 1.2, gap: 1.4 },
+    { text: `KNOW ALL MEN BY THESE PRESENTS that ${ctx.tenant?.companyName || 'Bidding Enterprise Corporation'}, through its duly authorized representative, hereby covenants and undertakes that:`, gap: 1.2 },
+    { text: '1. In the event the bidder enters into a Joint Venture with a qualified co-partner, a notarized Joint Venture Agreement (JVA) shall be executed and submitted in the event the bid is successful;', indent: 8 },
+    { text: '2. Each partner shall be jointly and severally liable to the Procuring Entity for all obligations and liabilities arising out of the contract;', indent: 8 },
+    { text: '3. The Lead Partner and Authorized Managing Officer shall possess full authority to conduct all business for and on behalf of the Joint Venture.', indent: 8 },
+  ], { x: startX + 16, width: 508, height: currentY - 150, maxSize: 11.5 });
   page.drawRectangle({
     x: startX,
-    y: currentY - 240,
-    width: boxWidth,
-    height: 240,
+    y: currentY - prose.height - 30,
+    width: 540,
+    height: prose.height + 30,
     color: rgb(0.98, 0.99, 1),
     borderColor: rgb(0.7, 0.75, 0.85),
     borderWidth: 1
   });
-
-  page.drawText('STATEMENT OF INTENT & JOINT VENTURE UNDERTAKING', { x: startX + 130, y: currentY - 22, size: 8.5, font: fontBold, color: rgb(0.08, 0.15, 0.3) });
-
-  const jvaText = [
-    `KNOW ALL MEN BY THESE PRESENTS that ${ctx.tenant?.companyName || 'Bidding Enterprise Corporation'}, through its duly authorized representative, hereby covenants and undertakes that:`,
-    `1. In the event the bidder enters into a Joint Venture with a qualified co-partner, a notarized Joint Venture Agreement (JVA) shall be executed and submitted in the event the bid is successful;`,
-    `2. Each partner shall be jointly and severally liable to the Procuring Entity for all obligations and liabilities arising out of the contract;`,
-    `3. The Lead Partner and Authorized Managing Officer shall possess full authority to conduct all business for and on behalf of the Joint Venture.`
-  ];
-
-  let jY = currentY - 55;
-  jvaText.forEach(jt => {
-    page.drawText(jt.slice(0, 115), { x: startX + 12, y: jY, size: 7.5, font: fontReg, color: rgb(0.15, 0.2, 0.3) });
-    if (jt.length > 115) {
-      jY -= 12;
-      page.drawText(jt.slice(115), { x: startX + 12, y: jY, size: 7.5, font: fontReg, color: rgb(0.15, 0.2, 0.3) });
-    }
-    jY -= 24;
-  });
+  prose.draw(page, currentY - 14);
 
   await drawOfficialFooter(
     pdfDoc, page, fontBold, fontReg, ctx.tenant,
@@ -3827,7 +3837,7 @@ export async function generateCustomExhibitPdf(
   doc: { id: string; documentName: string; category?: string; code?: string; documentNumber?: string },
   ctx: DocResolveContext
 ): Promise<string> {
-  const pdfDoc = await PDFDocument.create();
+  const pdfDoc = await createFillDoc();
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
