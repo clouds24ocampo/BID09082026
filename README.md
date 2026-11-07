@@ -51,6 +51,21 @@ Without them, push a tag and let CI build it (see [Release process](#release-pro
 All platforms use the same build (`vite.config.ts` sets a relative `base`) so behaviour is identical.
 Icons for every platform come from one source: `npm run icons` regenerates them from `scripts/generate-icons.mjs`.
 
+### Building the Windows installer locally
+
+```bash
+npx electron-builder --win --x64 --publish never
+```
+
+If packaging fails with `EPERM` or `EBUSY` while renaming `win-unpacked` (common inside OneDrive or
+antivirus-scanned folders), write the output elsewhere:
+
+```bash
+npx electron-builder --win --x64 --publish never --config.directories.output=C:/bidocs-release
+```
+
+Installers are unsigned unless a code-signing certificate is configured, so Windows SmartScreen will warn on first run.
+
 ### Desktop shell security
 
 Context isolation on, Node integration off, sandboxed renderer, navigation locked to the app,
