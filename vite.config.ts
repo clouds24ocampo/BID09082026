@@ -109,11 +109,12 @@ export default defineConfig({
   server: {
     host: true,
     port: 3001,
-    strictPort: true,
+    // Prefer 3001, but fall back to the next free port instead of crashing when it is taken
+    // (e.g. a dev server left running in another terminal).
+    strictPort: false,
     open: false,
     hmr: {
-      overlay: true,
-      port: 3001
+      overlay: true
     },
     proxy: {
       '/api': {

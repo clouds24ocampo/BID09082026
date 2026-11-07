@@ -26,7 +26,7 @@ Requires Node.js 20 or newer.
 
 ```bash
 npm install
-npm run dev            # http://localhost:3001
+npm run dev            # http://localhost:3001 (next free port if 3001 is taken)
 ```
 
 Production build, served by the bundled Express server:
