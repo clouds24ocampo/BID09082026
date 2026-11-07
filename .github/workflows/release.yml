@@ -44,13 +44,6 @@ jobs:
   android:
     name: Android
     runs-on: ubuntu-latest
-    env:
-      # Set these repository secrets to publish a signed release APK. Without them only a
-      # debug APK is built (workflow artifact for testing; it is never attached to the release).
-      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -62,27 +55,47 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+      # No secrets are present while dependencies install or the web app builds.
       - run: npm ci
       - run: npm run build
       - run: npx cap sync android
+
+      # Tiny step that only answers "are signing secrets configured?" (secret never leaves this step).
+      - name: Detect signing secrets
+        id: signing
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then echo "enabled=true" >> "$GITHUB_OUTPUT"; else echo "enabled=false" >> "$GITHUB_OUTPUT"; fi
+
       - name: Build signed release APK
-        if: env.KEYSTORE_B64 != ''
+        if: steps.signing.outputs.enabled == 'true'
         working-directory: android
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
           ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/release.keystore" ./gradlew assembleRelease --no-daemon
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore"
       - uses: actions/upload-artifact@v4
-        if: env.KEYSTORE_B64 != ''
+        if: steps.signing.outputs.enabled == 'true'
         with:
           name: android-release-apk
           if-no-files-found: error
           path: android/app/build/outputs/apk/release/*.apk
+
+      # Without signing secrets: unsigned-for-store debug APK, testing only, never attached to a release.
       - name: Build debug APK (testing only)
-        if: env.KEYSTORE_B64 == ''
+        if: steps.signing.outputs.enabled != 'true'
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
-        if: env.KEYSTORE_B64 == ''
+        if: steps.signing.outputs.enabled != 'true'
         with:
           name: android-debug-apk-testing-only
           if-no-files-found: error
