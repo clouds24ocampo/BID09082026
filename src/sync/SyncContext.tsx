@@ -246,11 +246,11 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const { data, error: err } = await client.auth.signUp({
             email: cleanEmail, password, options: { data: { full_name: auth.currentUser?.fullName ?? '' } },
           });
-          if (err) return { success: false, error: err.message };
+          if (err) return { success: false, error: friendly(err) };
           if (!data.session) return { success: false, error: 'Account created. Confirm your email, then choose "Sign in".' };
         } else {
           const { error: err } = await client.auth.signInWithPassword({ email: cleanEmail, password });
-          if (err) return { success: false, error: err.message };
+          if (err) return { success: false, error: friendly(err) };
         }
         // One online account = one company: refuse to mix data from different companies.
         const tenants = (await remote.listTenantRecords()).filter((t) => !t.deleted);
@@ -278,7 +278,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return await withClient(async (remote, client) => {
         const cleanEmail = email.trim().toLowerCase();
         const { data, error: err } = await client.auth.signInWithPassword({ email: cleanEmail, password });
-        if (err) return { success: false, error: err.message };
+        if (err) return { success: false, error: friendly(err) };
         const tenants = (await remote.listTenantRecords()).filter((t) => !t.deleted && t.payload);
         if (tenants.length !== 1) {
           await client.auth.signOut();
