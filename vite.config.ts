@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
+  // Relative asset URLs so the same build runs on the web, inside Electron (file://) and Capacitor.
+  base: './',
   plugins: [
     react(),
     tailwindcss(),

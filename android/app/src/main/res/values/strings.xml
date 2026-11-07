@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BiDOCS</string>
+    <string name="title_activity_main">BiDOCS</string>
+    <string name="package_name">ph.quantumcloud.bidocs</string>
+    <string name="custom_url_scheme">ph.quantumcloud.bidocs</string>
+</resources>

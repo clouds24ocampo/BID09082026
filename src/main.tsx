@@ -33,3 +33,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>,
 )
 
+// Offline app shell (web/PWA only). Skipped in dev, and inside the Electron/Capacitor shells
+// where assets are already bundled locally (file:// and capacitor:// are not http(s)).
+if (import.meta.env.PROD && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('[SW] registration failed', err));
+  });
+}

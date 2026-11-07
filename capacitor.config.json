@@ -1,0 +1,26 @@
+{
+  "appId": "ph.quantumcloud.bidocs",
+  "appName": "BiDOCS",
+  "webDir": "dist",
+  "backgroundColor": "#030712",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#030712"
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#030712"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "backgroundColor": "#030712",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#080c16",
+      "overlaysWebView": false
+    }
+  }
+}
