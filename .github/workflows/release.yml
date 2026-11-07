@@ -42,8 +42,15 @@ jobs:
             release/*.AppImage
 
   android:
-    name: Android APK
+    name: Android
     runs-on: ubuntu-latest
+    env:
+      # Set these repository secrets to publish a signed release APK. Without them only a
+      # debug APK is built (workflow artifact for testing; it is never attached to the release).
+      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -58,12 +65,26 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npx cap sync android
-      - name: Build debug APK
+      - name: Build signed release APK
+        if: env.KEYSTORE_B64 != ''
+        working-directory: android
+        run: |
+          echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/release.keystore" ./gradlew assembleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        if: env.KEYSTORE_B64 != ''
+        with:
+          name: android-release-apk
+          if-no-files-found: error
+          path: android/app/build/outputs/apk/release/*.apk
+      - name: Build debug APK (testing only)
+        if: env.KEYSTORE_B64 == ''
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
+        if: env.KEYSTORE_B64 == ''
         with:
-          name: android-debug-apk
+          name: android-debug-apk-testing-only
           if-no-files-found: error
           path: android/app/build/outputs/apk/debug/*.apk
 
@@ -79,6 +100,8 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+          # Only desktop installers and a signed release APK are published; never the debug APK.
+          pattern: '{desktop-*,android-release-apk}'
       - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: artifacts/*

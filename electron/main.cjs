@@ -7,6 +7,7 @@
  */
 const { app, BrowserWindow, Menu, shell, session, dialog } = require('electron');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 
 const DEV_URL = process.env.BIDOCS_DEV_URL; // e.g. http://localhost:3001 (set by `npm run desktop:dev`)
 const isMac = process.platform === 'darwin';
@@ -18,10 +19,37 @@ if (!app.requestSingleInstanceLock()) {
 
 let mainWindow = null;
 
+// The only document the window may ever show: the built index.html (hash and query ignored).
+const APP_FILE_URL = pathToFileURL(path.join(__dirname, '..', 'dist', 'index.html')).href;
+
 function isAppUrl(url) {
-  if (DEV_URL) return url.startsWith(DEV_URL);
-  return url.startsWith('file://');
+  try {
+    const u = new URL(url);
+    if (DEV_URL) return u.origin === new URL(DEV_URL).origin;
+    return u.protocol === 'file:' && pathToFileURL(decodeURIComponent(u.pathname.replace(/^\/([A-Za-z]:)/, '$1'))).href === APP_FILE_URL;
+  } catch {
+    return false;
+  }
 }
+
+// Sub-frames (PDF previews) may use inline data:/blob: documents, nothing else outside the app.
+function isAllowedFrameUrl(url) {
+  return url === 'about:blank' || /^(data|blob):/i.test(url) || isAppUrl(url);
+}
+
+// Same policy as the web build (netlify.toml / server.js), adapted so file:// assets load.
+const CSP = [
+  "default-src 'self' file:",
+  "script-src 'self' file:",
+  "style-src 'self' 'unsafe-inline' file: https://fonts.googleapis.com",
+  "font-src 'self' file: https://fonts.gstatic.com data:",
+  "img-src 'self' file: data: blob: https:",
+  "connect-src 'self' file: https:",
+  "frame-src 'self' file: data: blob: https://drive.google.com",
+  "object-src 'self' data: blob:",
+  "base-uri 'self'",
+  "form-action 'none'",
+].join('; ');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -50,10 +78,19 @@ function createWindow() {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
-  mainWindow.webContents.on('will-navigate', (event, url) => {
+  const guard = (event, url) => {
     if (!isAppUrl(url)) {
-      event.preventDefault();
+      event.preventDefault(); // also blocks files dropped onto the window
       if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+    }
+  };
+  mainWindow.webContents.on('will-navigate', guard);
+  mainWindow.webContents.on('will-redirect', guard);
+  mainWindow.webContents.on('will-frame-navigate', (event) => {
+    if (event.isMainFrame) return guard(event, event.url);
+    if (!isAllowedFrameUrl(event.url)) {
+      event.preventDefault();
+      if (/^https?:\/\//i.test(event.url)) shell.openExternal(event.url);
     }
   });
 
@@ -96,6 +133,12 @@ function buildMenu() {
 app.whenReady().then(() => {
   // Deny every permission request (camera, mic, geolocation, notifications...) - the app needs none.
   session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+
+  if (!DEV_URL) {
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      callback({ responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [CSP] } });
+    });
+  }
 
   buildMenu();
   createWindow();

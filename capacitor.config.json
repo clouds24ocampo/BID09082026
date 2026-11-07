@@ -5,6 +5,7 @@
   "backgroundColor": "#030712",
   "android": {
     "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false,
     "backgroundColor": "#030712"
   },
   "ios": {
