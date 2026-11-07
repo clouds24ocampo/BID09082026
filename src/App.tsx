@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { SyncProvider } from "./sync/SyncContext";
 import { LoginPage } from "./components/auth/LoginPage";
 import { RegisterPage } from "./components/auth/RegisterPage";
 import { LandingWebsiteView } from "./components/landing/LandingWebsiteView";
@@ -158,7 +159,9 @@ const MainApp: React.FC = () => {
 export function App() {
   return (
     <AuthProvider>
-      <MainApp />
+      <SyncProvider>
+        <MainApp />
+      </SyncProvider>
     </AuthProvider>
   );
 }

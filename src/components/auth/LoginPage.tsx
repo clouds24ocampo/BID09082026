@@ -18,6 +18,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 
+import { RestoreFromCloud } from '../sync/RestoreFromCloud';
 // Pre-login screens never show data from any registered company.
 const activeTenantPreview = {
   brandCode: 'BIDOCS',
@@ -380,6 +381,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBack
                 )}
               </motion.button>
             </form>
+
+            <RestoreFromCloud />
 
             {/* Registration Switcher & System Reset */}
             <div className="pt-4 border-t border-slate-800/80 space-y-3">

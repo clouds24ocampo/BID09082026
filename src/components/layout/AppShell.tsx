@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 
 import { AuroraBackground } from "../common/AuroraBackground";
+import { SyncBadge, SyncReloadBanner } from "../sync/SyncPanel";
 import { getRoleDisplayName, isApproverRole } from "../../types";
 
 interface AppShellProps {
@@ -249,6 +250,8 @@ export const AppShell: React.FC<AppShellProps> = ({
 
         {/* Right Header Actions */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <SyncBadge onClick={() => setActiveTab("settings")} />
+
           {/* Expiry Notifications Alert */}
           <div className="relative">
             <button
@@ -542,6 +545,8 @@ export const AppShell: React.FC<AppShellProps> = ({
                 )}
               </div>
             </div>
+
+            <SyncReloadBanner />
 
             {children}
           </div>

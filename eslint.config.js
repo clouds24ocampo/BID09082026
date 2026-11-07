@@ -25,7 +25,7 @@ export default [
   { files: ['electron/**/*.cjs'], languageOptions: { sourceType: 'commonjs', globals: { ...node, window: 'readonly', document: 'readonly' } } },
   {
     // Playwright page.evaluate callbacks run in the browser
-    files: ['scripts/e2e-auth.mjs'],
-    languageOptions: { globals: { ...node, window: 'readonly', document: 'readonly', localStorage: 'readonly', sessionStorage: 'readonly' } },
+    files: ['scripts/e2e-*.mjs'],
+    languageOptions: { globals: { ...node, window: 'readonly', document: 'readonly', localStorage: 'readonly', sessionStorage: 'readonly', Event: 'readonly' } },
   },
 ];

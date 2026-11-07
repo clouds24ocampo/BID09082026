@@ -32,7 +32,10 @@
     "mobile:sync": "npm run build && cap sync",
     "android:open": "npm run mobile:sync && cap open android",
     "android:run": "npm run mobile:sync && cap run android",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "e2e:sync": "node scripts/e2e-sync.mjs",
+    "e2e:auth": "node scripts/e2e-auth.mjs",
+    "mock:backend": "node scripts/mock-supabase.mjs"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
@@ -44,6 +47,7 @@
     "@capacitor/core": "^8.6.0",
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.4",
+    "@supabase/supabase-js": "^2.119.0",
     "animejs": "^4.5.0",
     "express": "^5.2.1",
     "framer-motion": "^13.0.0",
@@ -60,6 +64,7 @@
   "devDependencies": {
     "@capacitor/assets": "^4.0.0",
     "@capacitor/cli": "^8.6.0",
+    "@electric-sql/pglite": "^0.5.15",
     "@eslint/js": "^9.39.5",
     "@napi-rs/canvas": "^1.1.0",
     "@tailwindcss/postcss": "^4.3.3",

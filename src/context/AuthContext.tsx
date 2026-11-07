@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { Tenant, User, UserRole, isApproverRole } from "../types";
 import { purgeTenantData } from "../utils/vaultIndexedDB";
+import { runUntracked } from "../sync/hooks";
 import { safeGetItem, safeGetJson, safeSetJson, safeRemoveItem } from "../utils/safeStorage";
 import {
   hashPassword,
@@ -127,8 +128,13 @@ interface AuthContextType {
   /** Approver sets a one-time temporary password; the user must change it at next login. */
   resetUserPassword: (userId: string) => Promise<Result & { tempPassword?: string }>;
   updateUserPassword: (userId: string, newPassword: string) => Promise<Result>;
-  /** Permanently deletes the signed-in company, its accounts and all of its data. */
+  /** Permanently deletes the signed-in company, its accounts and all of its data on this device. */
   deleteCompany: () => Promise<void>;
+  /** Creates (or refreshes) a company restored from the online account, with a local owner login, and signs in. */
+  importCloudCompany: (
+    tenant: Tenant,
+    userData: { email: string; fullName: string; password: string },
+  ) => Promise<Result>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -179,6 +185,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  // Sync applied a newer company profile to storage: pick it up without a reload.
+  useEffect(() => {
+    const onTenants = () => setAllTenants(readList<Tenant>("bidocs_tenants").filter((t) => t && t.id && t.companyName));
+    window.addEventListener("bidocs:tenants-updated", onTenants);
+    return () => window.removeEventListener("bidocs:tenants-updated", onTenants);
   }, []);
 
   const endSession = useCallback(() => {
@@ -372,6 +385,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true };
   };
 
+  const importCloudCompany: AuthContextType["importCloudCompany"] = async (tenant, userData) => {
+    const email = userData.email.trim().toLowerCase();
+    if (!tenant || typeof tenant.id !== "string" || !tenant.id.startsWith("tenant-") || !tenant.companyName) {
+      return { success: false, error: "The online company data is not valid." };
+    }
+    const pwError = validatePassword(userData.password);
+    if (pwError) return { success: false, error: pwError };
+    const existing = allUsers.find((u) => u.email.toLowerCase() === email);
+    if (existing && existing.tenantId !== tenant.id) {
+      return { success: false, error: "This email already belongs to a different company on this device." };
+    }
+    const hash = await hashPassword(userData.password);
+    const user: StoredUser = existing
+      ? { ...existing, ...hash, mustChangePassword: false, lastLoginAt: new Date().toISOString() }
+      : {
+          id: uid("user"),
+          tenantId: tenant.id,
+          email,
+          fullName: userData.fullName.trim() || email,
+          role: "COMPANY_OWNER",
+          ...hash,
+          mustChangePassword: false,
+          lastLoginAt: new Date().toISOString(),
+        };
+    setAllTenants((prev) => (prev.some((t) => t.id === tenant.id) ? prev.map((t) => (t.id === tenant.id ? tenant : t)) : [...prev, tenant]));
+    setAllUsers((prev) => (existing ? prev.map((u) => (u.id === user.id ? user : u)) : [...prev, user]));
+    startSession(user);
+    return { success: true };
+  };
+
   const deleteCompany = async () => {
     if (!currentTenant || !isApproverRole(currentUser?.role)) return;
     const tenantId = currentTenant.id;
@@ -382,17 +425,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       /* ignore */
     }
-    await purgeTenantData(tenantId, opportunityIds).catch((e) =>
-      console.error("[AuthContext] Failed to purge company data:", e),
-    );
-    try {
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith("bidocs_") && key.includes(tenantId)) localStorage.removeItem(key);
+    // Deleting a company here removes it from this device only. The online copy is kept
+    // (and can be restored) until the owner deletes it explicitly from Settings > Online sync.
+    await runUntracked(async () => {
+      await purgeTenantData(tenantId, opportunityIds).catch((e) =>
+        console.error("[AuthContext] Failed to purge company data:", e),
+      );
+      try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("bidocs_") && key.includes(tenantId)) localStorage.removeItem(key);
+        }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
-    }
+    });
     endSession();
     setAllUsers((prev) => prev.filter((u) => u.tenantId !== tenantId));
     setAllTenants((prev) => prev.filter((t) => t.id !== tenantId));
@@ -414,6 +461,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetUserPassword,
         updateUserPassword,
         deleteCompany,
+        importCloudCompany,
       }}
     >
       {children}

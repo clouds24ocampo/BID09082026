@@ -9,6 +9,7 @@
  */
 
 import { LRUCache } from './lruCache';
+import { syncHooks } from '../sync/hooks';
 
 const DB_NAME = 'BiDOCS_VaultDB';
 const DB_VERSION = 2;
@@ -136,7 +137,7 @@ export async function upsertVaultItem(item: any): Promise<void> {
   store.put(cleanItem);
 
   return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => { syncHooks.vaultItem(cleanItem); resolve(); };
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -167,7 +168,7 @@ export async function upsertVaultItems(items: any[], tenantId?: string): Promise
   }
 
   return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => { cleanItems.forEach((i) => syncHooks.vaultItem(i)); resolve(); };
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -226,7 +227,11 @@ export async function deleteVaultItem(itemId: string, tenantId?: string): Promis
   tx.objectStore(STORE_PDF_BLOBS).delete(itemId);
 
   return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => {
+      syncHooks.vaultItemDeleted(itemId, tenantId);
+      syncHooks.blobDeleted(itemId);
+      resolve();
+    };
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -305,7 +310,10 @@ export async function saveVaultItems(items: any[], tenantId?: string): Promise<v
   }
 
   return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => {
+      syncHooks.vaultReplaced([...incomingIds] as string[], tenantId);
+      resolve();
+    };
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -361,7 +369,7 @@ export async function savePdfData(itemId: string, dataUrl: string): Promise<void
   store.put(dataUrl, itemId);
 
   return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => { syncHooks.blobSaved(itemId); resolve(); };
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -435,7 +443,7 @@ export async function deletePdfData(itemId: string): Promise<void> {
   store.delete(itemId);
 
   return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => { syncHooks.blobDeleted(itemId); resolve(); };
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -516,7 +524,13 @@ export async function clearVaultDataForTenant(tenantId: string): Promise<void> {
   }
 
   return new Promise((resolve, reject) => {
-    writeTx.oncomplete = () => resolve();
+    writeTx.oncomplete = () => {
+      for (const id of tenantItemIds) {
+        syncHooks.vaultItemDeleted(id, tenantId);
+        syncHooks.blobDeleted(id);
+      }
+      resolve();
+    };
     writeTx.onerror = () => reject(writeTx.error);
   });
 }
@@ -578,5 +592,16 @@ export async function purgeTenantData(tenantId: string, opportunityIds: string[]
   await new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
+  });
+}
+
+/** Keys of every stored PDF binary (used to queue existing files when sync is first enabled). */
+export async function listPdfKeys(): Promise<string[]> {
+  if (typeof indexedDB === 'undefined') return [];
+  const db = await openDB();
+  const req = db.transaction(STORE_PDF_BLOBS, 'readonly').objectStore(STORE_PDF_BLOBS).getAllKeys();
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve((req.result || []).map(String));
+    req.onerror = () => reject(req.error);
   });
 }

@@ -18,6 +18,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 
+import { SyncPanel } from '../sync/SyncPanel';
 const PRESET_COLORS = [
   { name: "Navy Blue", hex: "#1e40af" },
   { name: "Emerald Green", hex: "#059669" },
@@ -134,6 +135,8 @@ export const TenantSettingsView: React.FC = () => {
           </div>
         )}
       </div>
+
+      <SyncPanel />
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Brand Identity & Palette */}

@@ -6,7 +6,8 @@ QR-verified, 3-copy sealed bid packages (ORIGINAL, COPY 1, COPY 2) on Legal pape
 
 One React codebase ships as a **web app / PWA**, a **desktop app** (Electron) and a **mobile app** (Capacitor, Android).
 
-> Local-first: business data lives in the user's browser or device storage (IndexedDB and localStorage).
+> Local-first: business data lives in the user's browser or device storage (IndexedDB and localStorage) and the app works
+> fully offline. **Optional online sync** (Supabase) merges devices when they are online; see [docs/ONLINE-SYNC.md](docs/ONLINE-SYNC.md).
 > The optional Express server only serves the built files and a health endpoint.
 
 ## Contents
@@ -18,6 +19,7 @@ One React codebase ships as a **web app / PWA**, a **desktop app** (Electron) an
 - [PDF engine rules](#pdf-engine-rules)
 - [Project layout](#project-layout)
 - [Release process](#release-process)
+- [Online sync](#online-sync)
 - [Further reading](#further-reading)
 
 ## Quick start
@@ -125,6 +127,13 @@ server.js        Static server and /api/health
    then attaches them to the GitHub Release.
 
 Signed store builds (Play Store, App Store, code-signed installers) need your own signing keys added as repository secrets.
+
+## Online sync
+
+Offline-first, optional, per company. Set up a free Supabase project, run `supabase/migrations/20261107000000_sync.sql`,
+then connect from **Settings > Online sync** (or build with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, see `.env.example`).
+Edits made offline queue on the device and merge automatically when it is online; the most recent edit to a record wins.
+Details, limits and security notes: [docs/ONLINE-SYNC.md](docs/ONLINE-SYNC.md). Tested by `npm test` and `npm run e2e:sync`.
 
 ## Further reading
 
