@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import {
   Building2,
@@ -19,7 +19,6 @@ import {
   EyeOff,
   AlertTriangle,
   Key,
-  CheckCircle2,
   Trash2,
   Box,
   Briefcase,
@@ -28,10 +27,10 @@ import {
   ArrowLeft,
   Globe2,
   Wallet,
+  MoreHorizontal,
 } from "lucide-react";
 
 import { AuroraBackground } from "../common/AuroraBackground";
-import { safeGetItem } from "../../utils/safeStorage";
 import { getRoleDisplayName, isApproverRole } from "../../types";
 
 interface AppShellProps {
@@ -54,65 +53,47 @@ export const AppShell: React.FC<AppShellProps> = ({
   const {
     currentUser,
     currentTenant,
-    tenants,
-    users,
-    switchUser,
-    switchTenant,
     logout,
     updateUserPassword,
-    resetAllData,
+    deleteCompany,
   } = useAuth();
-  const [showTenantDropdown, setShowTenantDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // User-Specific Password Reset Enforcement State
-  const [mustChangePassword, setMustChangePassword] = useState(() => {
-    if (!currentUser) return false;
-    const userEmail = currentUser.email.toLowerCase();
-    const flag = safeGetItem(
-      `bidocs_must_change_password_${userEmail}`,
-      "false",
-    );
-    return flag === "true" || currentUser.mustChangePassword === true;
-  });
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMobileMenuOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileMenuOpen]);
+
+  // Admin-issued temporary passwords must be replaced before the app is usable.
+  const mustChangePassword = currentUser?.mustChangePassword === true;
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [pwError, setPwError] = useState("");
-  const [pwSuccess, setPwSuccess] = useState("");
 
-  const handlePasswordChangeSubmit = (e: React.FormEvent) => {
+  const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPwError("");
-
-    if (!newPassword || newPassword.length < 6) {
-      setPwError("New password must be at least 6 characters long.");
-      return;
-    }
-
-    if (newPassword === "BiDOCS#2026") {
-      setPwError(
-        "You cannot reuse the default temporary password (BiDOCS#2026). Please choose a new secure password.",
-      );
-      return;
-    }
 
     if (newPassword !== confirmPassword) {
       setPwError("New Password and Confirm Password do not match.");
       return;
     }
+    if (!currentUser) return;
 
-    if (currentUser) {
-      updateUserPassword(currentUser.id, newPassword);
+    const res = await updateUserPassword(currentUser.id, newPassword);
+    if (!res.success) {
+      setPwError(res.error || "Could not update password.");
+      return;
     }
-    setPwSuccess("Password updated successfully! System access secured.");
-    setTimeout(() => {
-      setMustChangePassword(false);
-    }, 200);
+    setNewPassword("");
+    setConfirmPassword("");
   };
 
   const navItems = [
@@ -192,12 +173,14 @@ export const AppShell: React.FC<AppShellProps> = ({
   return (
     <AuroraBackground className="min-h-screen flex flex-col">
       {/* TOP BAR HEADER — HORIZONX FLOATING GLASS WITH GLOW */}
-      <header className="h-16 border-b border-slate-800/80 bg-[#090d1a]/85 backdrop-blur-xl sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between shadow-lg shadow-black/30">
+      <header className="h-16 border-b border-slate-800/80 bg-[#090d1a]/85 backdrop-blur-xl sticky top-0 z-40 px-3 sm:px-6 flex items-center justify-between gap-2 shadow-lg shadow-black/30">
         {/* Left Branding & Mobile Toggle & Back Button */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1 sm:gap-3 min-w-0">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg text-slate-400 hover:text-white md:hidden cursor-pointer"
+            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={mobileMenuOpen}
+            className="p-2.5 -ml-1 rounded-lg text-slate-300 hover:text-white md:hidden cursor-pointer shrink-0"
           >
             {mobileMenuOpen ? (
               <X className="w-5 h-5" />
@@ -211,7 +194,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             <button
               type="button"
               onClick={onBack || onBackToLanding}
-              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold text-slate-200 hover:text-white bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 shadow-sm transition-all cursor-pointer group"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold text-slate-200 hover:text-white bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 shadow-sm transition-all cursor-pointer group"
               title={previousTabLabel ? `Go back to ${previousTabLabel}` : "Go back to previous page"}
             >
               <ArrowLeft className="w-3.5 h-3.5 text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
@@ -225,7 +208,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           )}
 
           <div
-            className="flex items-center gap-2.5 cursor-pointer group pl-1 sm:pl-2"
+            className="flex items-center gap-2.5 cursor-pointer group pl-1 sm:pl-2 min-w-0"
             onClick={() => setActiveTab("profile")}
           >
             <div
@@ -245,87 +228,40 @@ export const AppShell: React.FC<AppShellProps> = ({
                 currentTenant?.brandCode?.substring(0, 3) || "BID"
               )}
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-black text-white text-base tracking-tight text-shimmer">
                   BIDOCS
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 truncate max-w-37.5 sm:max-w-50 group-hover:text-slate-200 transition-colors">
+              <p className="text-[10px] text-slate-400 truncate max-w-28 min-[420px]:max-w-40 sm:max-w-50 group-hover:text-slate-200 transition-colors">
                 {currentTenant?.companyName}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Center: Tenant Switcher Dropdown */}
-        <div className="hidden md:flex items-center relative">
-          <button
-            onClick={() => setShowTenantDropdown(!showTenantDropdown)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition shadow-inner cursor-pointer"
-          >
-            <Building2 className="w-3.5 h-3.5" style={{ color: brandColor }} />
-            <span className="font-semibold">{currentTenant?.companyName}</span>
-            <ChevronDown className="w-3 h-3 text-slate-400" />
-          </button>
-
-          {showTenantDropdown && (
-            <div className="absolute top-10 left-0 w-72 bg-slate-900/95 border border-slate-800 rounded-xl shadow-2xl p-2 space-y-1 z-50 animate-scaleIn backdrop-blur-xl">
-              <div className="px-2 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                Switch Corporate Profile
-              </div>
-              {tenants.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => {
-                    switchTenant(t.id);
-                    setShowTenantDropdown(false);
-                  }}
-                  className={`w-full text-left p-2 rounded-lg text-xs flex items-center justify-between transition cursor-pointer ${
-                    t.id === currentTenant?.id
-                      ? "bg-blue-600/15 border border-blue-500/40 text-white shadow-sm"
-                      : "hover:bg-slate-800/80 text-slate-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: t.brandColor }}
-                    />
-                    <div className="truncate max-w-45">
-                      <p className="font-medium text-white truncate">
-                        {t.companyName}
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-mono">
-                        TIN: {t.tin}
-                      </p>
-                    </div>
-                  </div>
-                  {t.id === currentTenant?.id && (
-                    <span className="text-[10px] text-blue-400 font-bold">
-                      Active
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
+        {/* Center: Active company (accounts are bound to one company; no cross-company switching) */}
+        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-200 shadow-inner">
+          <Building2 className="w-3.5 h-3.5" style={{ color: brandColor }} />
+          <span className="font-semibold">{currentTenant?.companyName}</span>
         </div>
 
         {/* Right Header Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Expiry Notifications Alert */}
           <div className="relative">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className="p-2 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white transition relative cursor-pointer hover:border-slate-700"
+              aria-label="Compliance alerts"
+              className="p-2.5 sm:p-2 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white transition relative cursor-pointer hover:border-slate-700"
             >
               <Bell className="w-4 h-4" />
               <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
             </button>
 
             {showNotifications && (
-              <div className="absolute right-0 top-10 w-80 bg-slate-900/95 border border-slate-800 rounded-xl shadow-2xl p-3 z-50 space-y-2 animate-scaleIn backdrop-blur-xl">
+              <div className="absolute right-0 top-12 w-[min(20rem,calc(100vw-1.5rem))] bg-slate-900/95 border border-slate-800 rounded-xl shadow-2xl p-3 z-50 space-y-2 animate-scaleIn backdrop-blur-xl">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                   <span className="text-xs font-bold text-white">
                     Compliance Alerts
@@ -363,6 +299,7 @@ export const AppShell: React.FC<AppShellProps> = ({
               data-testid="user-profile-menu-toggle"
               id="user-profile-menu-btn"
               onClick={() => setShowUserMenu(!showUserMenu)}
+              aria-label="Account menu"
               className="flex items-center gap-2 p-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition cursor-pointer"
             >
               <div
@@ -378,7 +315,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             </button>
 
             {showUserMenu && (
-              <div className="absolute right-0 top-10 w-56 bg-slate-900/95 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 space-y-1 animate-scaleIn backdrop-blur-xl">
+              <div className="absolute right-0 top-12 w-56 max-w-[calc(100vw-1.5rem)] bg-slate-900/95 border border-slate-800 rounded-xl shadow-2xl p-2 z-50 space-y-1 animate-scaleIn backdrop-blur-xl">
                 <div className="px-3 py-2 border-b border-slate-800">
                   <p className="text-xs font-semibold text-white truncate">
                     {currentUser?.fullName}
@@ -396,49 +333,6 @@ export const AppShell: React.FC<AppShellProps> = ({
                     {getRoleDisplayName(currentUser?.role)}
                   </span>
                 </div>
-
-                {/* Quick Account Switcher */}
-                {users.filter(
-                  (u) =>
-                    u.tenantId === currentTenant?.id &&
-                    u.id !== currentUser?.id &&
-                    (isApproverRole(currentUser?.role) || !isApproverRole(u.role)),
-                ).length > 0 && (
-                  <div className="py-1 border-b border-slate-800/80">
-                    <p className="px-3 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                      Switch Active Account
-                    </p>
-                    {users
-                      .filter(
-                        (u) =>
-                          u.tenantId === currentTenant?.id &&
-                          u.id !== currentUser?.id &&
-                          (isApproverRole(currentUser?.role) || !isApproverRole(u.role)),
-                      )
-                      .map((u) => (
-                        <button
-                          key={u.id}
-                          onClick={() => {
-                            switchUser(u.id);
-                            setShowUserMenu(false);
-                          }}
-                          className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800 rounded-lg flex items-center justify-between transition cursor-pointer"
-                        >
-                          <div className="truncate max-w-30 shrink-0">
-                            <p className="font-semibold text-white truncate text-[11px]">
-                              {u.fullName}
-                            </p>
-                            <p className="text-[9px] text-slate-400 truncate font-mono">
-                              {u.email}
-                            </p>
-                          </div>
-                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
-                            {isApproverRole(u.role) ? "Approver" : "Preparer"}
-                          </span>
-                        </button>
-                      ))}
-                  </div>
-                )}
 
                 <button
                   onClick={() => {
@@ -486,23 +380,23 @@ export const AppShell: React.FC<AppShellProps> = ({
                   <span>Log Out Session</span>
                 </button>
 
-                <button
-                  onClick={() => {
-                    if (
-                      confirm(
-                        "Permanently purge all registered companies, accounts, vault documents, and IndexedDB files to register a clean company?",
-                      )
-                    ) {
-                      resetAllData();
-                      setShowUserMenu(false);
-                      window.location.reload();
-                    }
-                  }}
-                  className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg flex items-center gap-2 border-t border-slate-800 mt-1 pt-2 cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                  <span>Purge Workspace & Clear Companies</span>
-                </button>
+                {isApproverRole(currentUser?.role) && (
+                  <button
+                    onClick={async () => {
+                      const typed = prompt(
+                        `This permanently deletes "${currentTenant?.companyName}", all of its accounts, projects and documents. Type the company name to confirm:`,
+                      );
+                      if (typed !== null && typed.trim() === currentTenant?.companyName) {
+                        await deleteCompany();
+                        window.location.reload();
+                      }
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 rounded-lg flex items-center gap-2 border-t border-slate-800 mt-1 pt-2 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    <span>Delete Company &amp; All Data</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -512,8 +406,17 @@ export const AppShell: React.FC<AppShellProps> = ({
       {/* BODY CONTENT AREA WITH 3D SIDEBAR */}
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* SIDEBAR NAVIGATION — HORIZONX SLICK FROSTED ACRYLIC */}
+        {mobileMenuOpen && (
+          <button
+            type="button"
+            aria-label="Close navigation menu"
+            onClick={() => setMobileMenuOpen(false)}
+            className="md:hidden fixed inset-0 top-16 z-40 bg-black/60 backdrop-blur-sm animate-fadeIn cursor-default"
+          />
+        )}
         <aside
-          className={`w-64 bg-[#080c16]/90 backdrop-blur-xl border-r border-slate-800/80 flex-col justify-between py-4 px-3 md:flex md:relative md:inset-auto md:shadow-none ${mobileMenuOpen ? "flex absolute inset-y-16 left-0 z-30 shadow-2xl" : "hidden"}`}
+          aria-label="Primary navigation"
+          className={`w-64 bg-[#080c16] md:bg-[#080c16]/90 backdrop-blur-xl border-r border-slate-800/80 flex-col justify-between py-4 px-3 md:flex md:relative md:inset-auto md:shadow-none ${mobileMenuOpen ? "flex fixed top-16 bottom-0 left-0 z-50 w-[min(18rem,85vw)] overflow-y-auto shadow-2xl animate-fadeIn" : "hidden"}`}
         >
           <div className="space-y-1">
             <div className="px-3 py-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
@@ -586,11 +489,11 @@ export const AppShell: React.FC<AppShellProps> = ({
         </aside>
 
         {/* MAIN VIEWPORT */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 min-h-[calc(100vh-4rem)] min-w-0">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 pb-24 md:pb-8 min-h-[calc(100vh-4rem)] min-w-0">
           <div className="w-full max-w-[1780px] mx-auto space-y-5">
             {/* Top Workspace Navigation Bar with Back & Breadcrumb Controls */}
-            <div className="flex flex-wrap items-center justify-between gap-3 p-3 px-4 rounded-2xl bg-[#0a0f1e]/85 border border-slate-800/90 backdrop-blur-xl shadow-lg">
-              <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-between gap-2 p-2 sm:p-3 sm:px-4 rounded-2xl bg-[#0a0f1e]/85 border border-slate-800/90 backdrop-blur-xl shadow-lg">
+              <div className="flex items-center gap-2.5 min-w-0">
                 {(onBack || onBackToLanding) && (
                   <button
                     type="button"
@@ -598,7 +501,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                     className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700/90 border border-slate-700 hover:border-cyan-500/60 shadow-md transition-all cursor-pointer group"
                   >
                     <ArrowLeft className="w-3.5 h-3.5 text-cyan-400 group-hover:-translate-x-0.5 transition-transform" />
-                    <span>Back {previousTabLabel ? `to ${previousTabLabel}` : 'to Previous Page'}</span>
+                    <span className="truncate max-w-36 sm:max-w-none"><span className="sm:hidden">Back</span><span className="hidden sm:inline">Back {previousTabLabel ? `to ${previousTabLabel}` : 'to Previous Page'}</span></span>
                   </button>
                 )}
 
@@ -616,7 +519,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 {activeTab !== "dashboard" && (
                   <button
                     type="button"
@@ -624,7 +527,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                     className="text-xs font-semibold text-slate-300 hover:text-white px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition cursor-pointer flex items-center gap-1.5"
                   >
                     <LayoutDashboard className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Dashboard Home</span>
+                    <span className="hidden sm:inline">Dashboard Home</span>
                   </button>
                 )}
                 {onBackToLanding && (
@@ -634,7 +537,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                     className="text-xs font-semibold text-cyan-300 hover:text-white px-3 py-1.5 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 hover:border-cyan-400 transition cursor-pointer flex items-center gap-1.5"
                   >
                     <Globe2 className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Landing Portal</span>
+                    <span className="hidden sm:inline">Landing Portal</span>
                   </button>
                 )}
               </div>
@@ -644,6 +547,48 @@ export const AppShell: React.FC<AppShellProps> = ({
           </div>
         </main>
       </div>
+
+      {/* MOBILE BOTTOM TAB BAR - thumb-reach navigation for phones */}
+      <nav
+        aria-label="Quick navigation"
+        className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-slate-800/90 bg-[#080c16]/95 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]"
+      >
+        <ul className="grid grid-cols-5">
+          {[
+            { id: "dashboard", label: "Home", icon: LayoutDashboard },
+            { id: "opportunities", label: "Finder", icon: Search },
+            { id: "vault", label: "Vault", icon: FileCheck },
+            { id: "bids", label: "Bids", icon: FolderKanban },
+          ].map((t) => {
+            const Icon = t.icon;
+            const on = activeTab === t.id;
+            return (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab(t.id); setMobileMenuOpen(false); }}
+                  aria-current={on ? "page" : undefined}
+                  className={`w-full min-h-14 flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-colors cursor-pointer ${on ? "text-white" : "text-slate-400 active:text-slate-200"}`}
+                >
+                  <Icon className="w-5 h-5" style={{ color: on ? brandColor : undefined }} />
+                  <span>{t.label}</span>
+                </button>
+              </li>
+            );
+          })}
+          <li>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((v) => !v)}
+              aria-expanded={mobileMenuOpen}
+              className={`w-full min-h-14 flex flex-col items-center justify-center gap-1 text-[10px] font-semibold transition-colors cursor-pointer ${mobileMenuOpen ? "text-white" : "text-slate-400"}`}
+            >
+              <MoreHorizontal className="w-5 h-5" />
+              <span>More</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
 
       {/* MANDATORY PASSWORD CHANGE OVERLAY MODAL */}
       {mustChangePassword && (
@@ -658,7 +603,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                   Mandatory Password Change
                 </h3>
                 <p className="text-[11px] text-amber-400 font-mono">
-                  Default Temporary Password Active (BiDOCS#2026)
+                  Temporary Password Active
                 </p>
               </div>
             </div>
@@ -666,22 +611,14 @@ export const AppShell: React.FC<AppShellProps> = ({
             <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 space-y-1">
               <p className="font-bold">⚠️ System Security Requirement:</p>
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Your account password was reset to the default temporary
-                password (<strong>BiDOCS#2026</strong>). For system security,
-                you MUST change your password ASAP before continuing.
+                An administrator issued you a temporary password. Choose your own
+                password (min 8 characters, letters and numbers) before continuing.
               </p>
             </div>
 
             {pwError && (
               <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 font-medium">
                 ⚠️ {pwError}
-              </div>
-            )}
-
-            {pwSuccess && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400 font-medium flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>{pwSuccess}</span>
               </div>
             )}
 
@@ -699,7 +636,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     required
-                    placeholder="Enter new password (min 6 chars)"
+                    placeholder="Enter new password (min 8 chars)"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-10 py-2.5 text-white font-mono focus:outline-none focus:border-amber-500"
                   />
                   <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />

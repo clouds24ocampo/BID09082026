@@ -2531,15 +2531,15 @@ export const DocumentVaultView: React.FC = () => {
         {selectedCategory === "ELIGIBILITY_CLASS_A" && (
           <div className="space-y-6">
             <div
-              className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${
+              className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
                 isClassAFullyCompliant
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
                   : "bg-amber-500/10 border-amber-500/30 text-amber-400"
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-start sm:items-center gap-3 min-w-0">
                 <Award className="w-6 h-6 shrink-0" />
-                <div>
+                <div className="min-w-0">
                   <h3 className="text-sm font-bold">
                     Class A Eligibility Matrix Status: {completedMandatoryCount}{" "}
                     / {mandatoryDefs.length} Mandatory Uploaded
@@ -2551,7 +2551,7 @@ export const DocumentVaultView: React.FC = () => {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                 <button
                   onClick={handleClearAllClassAUploads}
                   className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition flex items-center gap-1.5 shadow-sm"

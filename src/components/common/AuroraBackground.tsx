@@ -12,7 +12,7 @@ export const AuroraBackground: React.FC<AuroraBackgroundProps> = ({
   showGrid = true,
 }) => {
   return (
-    <div className={`relative w-full overflow-hidden bg-[#070a12] text-slate-100 ${className}`}>
+    <div className={`relative w-full overflow-clip bg-[#070a12] text-slate-100 ${className}`}>
       {/* Ambient Moving Mesh Aurora Layer (Marked no-export for PDF safety) */}
       <div className="no-export pointer-events-none absolute inset-0 overflow-hidden z-0">
         {/* Glow Orb 1 - Deep Azure / Indigo */}

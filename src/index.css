@@ -357,3 +357,75 @@ body {
 .single-page-paper {
   font-family: var(--font-legal);
 }
+
+/* ==========================================================================
+   Platform polish: accessibility, touch, motion and native-app behaviour
+   (web, installed PWA, Electron desktop and Capacitor mobile share this)
+   ========================================================================== */
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scrollbar-color: #334155 #0f172a;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.28);
+  color: #fff;
+}
+
+/* Visible keyboard focus everywhere, without ringing mouse clicks */
+:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+img, svg, video, canvas {
+  max-width: 100%;
+}
+
+.text-balance { text-wrap: balance; }
+.text-pretty { text-wrap: pretty; }
+
+/* Comfortable tap targets on touch screens */
+@media (pointer: coarse) {
+  button, [role="button"], a.btn, select, summary {
+    min-height: 40px;
+  }
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+    font-size: 16px; /* prevents iOS zoom-on-focus */
+  }
+}
+
+/* Installed app / notched devices */
+@supports (padding: max(0px)) {
+  #root {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Desktop shell (Electron): the title bar area must not select text */
+.is-desktop-app header { -webkit-user-select: none; user-select: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
