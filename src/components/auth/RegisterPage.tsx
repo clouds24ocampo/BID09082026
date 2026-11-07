@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { LegalRegime, ProcurementType, UserRole } from '../../types';
+import { LegalRegime, ProcurementType } from '../../types';
 import {
   Building2,
   ShieldCheck,
@@ -9,13 +9,12 @@ import {
   Check,
   CheckCircle2,
   Award,
-  Sparkles,
-  Zap,
   Lock,
   Cpu,
   Layers,
   Globe2
 } from 'lucide-react';
+import { validatePassword } from '../../utils/passwordSecurity';
 import { AuroraBackground } from '../common/AuroraBackground';
 import { BorderBeam } from '../common/BorderBeam';
 import { ShinyText } from '../common/ShinyText';
@@ -42,7 +41,6 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('COMPANY_OWNER');
 
   // Step 2: Corporate Identifiers
   const [companyName, setCompanyName] = useState('');
@@ -67,54 +65,16 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleQuickFillDemo = () => {
-    registerTenantAndUser(
-      {
-        companyName: 'Apex Cloud & Infrastructure Builders Corp.',
-        brandCode: 'APEX',
-        brandColor: '#1e40af',
-        tin: '008-991-234-000',
-        secDtiRegNo: 'SEC-CS2019-94120',
-        pcabLicenseNo: 'PCAB-GE-94120',
-        pcabCategory: 'AAA',
-        philgepsPlatinumNo: 'PLATINUM-2026-009841',
-        address: '14th Floor, Cyber Tower One, Ortigas Center, Pasig City, Metro Manila',
-        authorizedSignatory: {
-          name: 'Engr. Ferdinand R. Valenzuela',
-          title: 'President & Authorized Managing Officer',
-          tin: '194-882-019'
-        },
-        preferredRegime: 'RA_12009_NGPA',
-        primaryProcurementType: 'INFRASTRUCTURE'
-      },
-      {
-        email: 'f.valenzuela@apexcloudph.com',
-        fullName: 'Engr. Ferdinand R. Valenzuela',
-        role: 'COMPANY_OWNER',
-        password: 'Password123!'
-      },
-      [
-        {
-          email: 'm.santos@apexcloudph.com',
-          fullName: 'Arch. Maria Clarissa Santos',
-          role: 'ESTIMATOR',
-          password: 'Password123!'
-        },
-        {
-          email: 'j.delacruz@apexcloudph.com',
-          fullName: 'Atty. Jose Maria dela Cruz',
-          role: 'HIGHER_MANAGER',
-          password: 'Password123!'
-        }
-      ]
-    );
-  };
-
   const handleNext = () => {
     setError('');
     if (currentStep === 1) {
       if (!fullName || !email || !password) {
         setError('Please complete all personal account fields.');
+        return;
+      }
+      const pwError = validatePassword(password);
+      if (pwError) {
+        setError(pwError);
         return;
       }
     } else if (currentStep === 2) {
@@ -136,12 +96,12 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
     setCurrentStep((prev) => (prev > 1 ? ((prev - 1) as any) : prev));
   };
 
-  const handleCompleteRegistration = (e: React.FormEvent) => {
+  const handleCompleteRegistration = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsSubmitting(true);
 
-    const success = registerTenantAndUser(
+    const result = await registerTenantAndUser(
       {
         companyName,
         brandCode: brandCode || companyName.substring(0, 4).toUpperCase(),
@@ -163,20 +123,19 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
       {
         email,
         fullName,
-        role,
-        password: password || undefined
+        password
       }
     );
     setIsSubmitting(false);
-    if (!success) {
-      setError('Registration failed. Please review your details.');
+    if (!result.success) {
+      setError(result.error || 'Registration failed. Please review your details.');
     }
   };
 
   const displayBrandCode = (brandCode.trim() || companyName.substring(0, 4) || 'BID').toUpperCase();
 
   return (
-    <AuroraBackground className="min-h-screen text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-10 relative overflow-hidden font-sans">
+    <AuroraBackground className="min-h-screen text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-10 relative overflow-clip font-sans">
 
       {/* Top Floating Back to Portal Button */}
       {onBackToLanding && (
@@ -252,35 +211,13 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
           </div>
 
           {/* Quick-Launch 1-Click Demo Button */}
-          <div className="p-4 rounded-2xl bg-linear-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/40 border border-blue-500/30 shadow-lg backdrop-blur-md space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5 font-mono">
-                <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" /> Instant Developer Sandbox
-              </span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono font-bold">
-                1-CLICK
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-300 leading-relaxed">
-              Want to skip manual typing? Auto-provision a certified Philippine General Contractor entity for testing.
-            </p>
-            <button
-              type="button"
-              onClick={handleQuickFillDemo}
-              className="w-full py-2 rounded-xl text-xs font-extrabold text-white bg-linear-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 shadow-lg shadow-blue-900/40 transition-all duration-300 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>⚡ 1-Click Launch Demo Enterprise</span>
-            </button>
-          </div>
-
           {/* HorizonX System Specs Pill */}
           <div className="hidden sm:flex items-center justify-between text-[11px] font-mono text-slate-500 px-1">
             <span className="flex items-center gap-1">
               <Cpu className="w-3.5 h-3.5 text-emerald-400" /> Statutory Bidding Engine
             </span>
             <span className="flex items-center gap-1">
-              <Lock className="w-3.5 h-3.5 text-blue-400" /> 256-Bit Vault Storage
+              <Lock className="w-3.5 h-3.5 text-blue-400" /> Local-First Vault Storage
             </span>
           </div>
 
@@ -396,6 +333,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
                         <label className="block text-xs font-bold text-slate-300">Account Password</label>
                         <input
                           type="password"
+                          autoComplete="new-password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder="••••••••••••"
@@ -404,20 +342,9 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
                         />
                       </div>
 
-                      <div className="space-y-1.5">
-                        <label className="block text-xs font-bold text-slate-300">Administrative Role Scope</label>
-                        <select
-                          value={role}
-                          onChange={(e) => setRole(e.target.value as UserRole)}
-                          className="w-full bg-slate-950/80 border border-slate-800 hover:border-slate-700 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition shadow-inner cursor-pointer"
-                        >
-                          <option value="COMPANY_OWNER">Company Owner & Authorized Managing Officer</option>
-                          <option value="BID_MANAGER">Bid Manager</option>
-                          <option value="Proposal_Team_Lead">Proposal Team Lead</option>
-                          <option value="ADMIN">System Administrator</option>
-                          <option value="COMPANY_AMO">Authorized Managing Officer</option>
-                        </select>
-                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        You become the Company Owner. Password: min 8 characters with letters and numbers.
+                      </p>
                     </div>
                   </div>
                 )}
@@ -752,6 +679,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
 
                   {currentStep < 4 ? (
                     <button
+                      key="next-step"
                       type="button"
                       onClick={handleNext}
                       className="px-6 py-2.5 rounded-xl text-xs font-extrabold text-white transition-all duration-300 flex items-center gap-2 shadow-lg shadow-blue-600/30 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
@@ -762,6 +690,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onB
                     </button>
                   ) : (
                     <button
+                      key="submit-registration"
                       type="submit"
                       disabled={isSubmitting}
                       className="px-7 py-3 rounded-xl text-xs font-black text-white transition-all duration-300 flex items-center gap-2 shadow-2xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"

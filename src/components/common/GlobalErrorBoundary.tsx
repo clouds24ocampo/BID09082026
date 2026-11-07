@@ -31,16 +31,14 @@ export class GlobalErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
-  private handleWipeAndReset = () => {
-    if (window.confirm('Reset all local storage and cache to restore default clean state?')) {
-      try {
-        localStorage.clear();
-        sessionStorage.clear();
-      } catch (e) {
-        console.error(e);
-      }
-      window.location.href = '/';
+  // Non-destructive: ends the session only. Saved companies and documents are never wiped from the crash screen.
+  private handleSignOut = () => {
+    try {
+      sessionStorage.clear();
+    } catch (e) {
+      console.error(e);
     }
+    window.location.href = '/';
   };
 
   public render() {
@@ -55,11 +53,11 @@ export class GlobalErrorBoundary extends Component<Props, State> {
             <div className="space-y-2">
               <h1 className="text-xl font-bold text-white">Application Recovery Console</h1>
               <p className="text-xs text-slate-400">
-                A runtime exception occurred while rendering the workspace. You can reload the page or reset the local cache.
+                A runtime exception occurred while rendering the workspace. You can reload the page or sign out and restart.
               </p>
             </div>
 
-            {this.state.error && (
+            {this.state.error && !import.meta.env.PROD && (
               <div className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-left text-[11px] font-mono text-red-300 overflow-x-auto max-h-36">
                 <p className="font-bold text-red-400">{this.state.error.name}: {this.state.error.message}</p>
                 {this.state.error.stack && (
@@ -78,11 +76,11 @@ export class GlobalErrorBoundary extends Component<Props, State> {
               </button>
 
               <button
-                onClick={this.handleWipeAndReset}
+                onClick={this.handleSignOut}
                 className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>Clear Cache & Reset</span>
+                <span>Sign Out &amp; Restart</span>
               </button>
             </div>
           </div>

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
-import { UserRole } from '../../types';
 import {
   Building2,
   Lock,
@@ -19,70 +18,41 @@ import {
   ArrowLeft
 } from 'lucide-react';
 
+// Pre-login screens never show data from any registered company.
+const activeTenantPreview = {
+  brandCode: 'BIDOCS',
+  brandColor: '#0284c7',
+  companyName: 'BiDOCS Enterprise',
+};
+
 interface LoginPageProps {
   onSwitchToRegister: () => void;
   onBackToLanding?: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBackToLanding }) => {
-  const { login, resetUserPassword, resetAllData, tenants } = useAuth();
+  const { login, hasAccounts } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('COMPANY_OWNER');
-  const [selectedTenantId, setSelectedTenantId] = useState(tenants[0]?.id || '');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const activeTenantPreview = tenants.find((t) => t.id === selectedTenantId) || tenants[0] || {
-    brandCode: 'BIDOCS',
-    brandColor: '#0284c7',
-    companyName: 'BiDOCS Enterprise'
-  };
-
-  const handleForgotPasswordReset = () => {
-    let targetEmail = email.trim();
-    if (!targetEmail) {
-      const promptEmail = prompt('Please enter the Work Email Address of the specific account password you wish to reset:');
-      if (!promptEmail || !promptEmail.trim()) {
-        setError('Email address is required to reset password for a specific account.');
-        return;
-      }
-      targetEmail = promptEmail.trim();
-      setEmail(targetEmail);
-    }
-
-    const success = resetUserPassword(targetEmail);
-    if (!success) {
-      setError(`No registered account found with email address "${targetEmail}". Please register a corporate account first.`);
-      return;
-    }
-
-    setPassword('BiDOCS#2026');
-    setError('');
-    alert(`Password for account [${targetEmail}] has been reset to temporary default: BiDOCS#2026.\n\nPlease log in using BiDOCS#2026. You will be prompted to change your password immediately upon logging in.`);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (!email) {
-      setError('Please enter your work email address.');
-      return;
-    }
-
     setIsLoading(true);
-    const success = login(email, password);
+    const result = await login(email, password);
     setIsLoading(false);
-    if (!success) {
-      setError('Invalid email or password. Please check your credentials and try again.');
+    if (!result.success) {
+      setPassword('');
+      setError(result.error || 'Invalid email or password.');
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#02040a] text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden font-sans select-none">
+    <div className="min-h-screen bg-[#02040a] text-slate-100 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-clip font-sans select-none">
 
       {/* Top Floating Back to Portal Button */}
       {onBackToLanding && (
@@ -314,7 +284,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBack
               >
                 <Building2 className="w-3.5 h-3.5" style={{ color: activeTenantPreview.brandColor || '#38bdf8' }} />
                 <span className="truncate max-w-37.5 font-semibold">
-                  {tenants.length > 0 ? activeTenantPreview.companyName : 'Register Company Account'}
+                  {hasAccounts ? 'Sign In' : 'Register Company Account'}
                 </span>
               </motion.div>
             </div>
@@ -336,105 +306,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBack
 
             <form onSubmit={handleSubmit} className="space-y-4">
 
-              {/* Select Corporate Tenant */}
-              {tenants.length === 0 ? (
+              {!hasAccounts && (
                 <div className="p-3.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono space-y-1 text-center">
                   <p className="font-bold">No Registered Companies Found</p>
-                  <p className="text-[11px] text-slate-400">Click "Register New Company Account" below to onboard your entity.</p>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase tracking-wider">
-                    Target Corporate Command Unit
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={selectedTenantId}
-                      onChange={(e) => setSelectedTenantId(e.target.value)}
-                      className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition appearance-none cursor-pointer"
-                    >
-                      {tenants.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.companyName} ({t.brandCode}) - TIN: {t.tin}
-                        </option>
-                      ))}
-                    </select>
-                    <Building2 className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                  </div>
+                  <p className="text-[11px] text-slate-400">Click "Onboard Corporate Account" below to register your entity.</p>
                 </div>
               )}
-
-              {/* User Role Toggle Buttons */}
-              <div>
-                <label className="block text-xs font-mono text-slate-300 mb-1.5 uppercase tracking-wider">
-                  Operator Clearance Scope
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 rounded-xl bg-slate-900/90 border border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRole('COMPANY_OWNER')}
-                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all relative ${selectedRole === 'COMPANY_OWNER' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                  >
-                    {selectedRole === 'COMPANY_OWNER' && (
-                      <motion.div
-                        layoutId="activeRoleSpaceTravel"
-                        className="absolute inset-0 bg-cyan-600 rounded-lg shadow-[0_0_12px_rgba(8,145,178,0.5)]"
-                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                      />
-                    )}
-                    <span className="relative z-10 text-[11px]">Owner</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRole('HIGHER_MANAGER')}
-                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all relative ${selectedRole === 'HIGHER_MANAGER' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                  >
-                    {selectedRole === 'HIGHER_MANAGER' && (
-                      <motion.div
-                        layoutId="activeRoleSpaceTravel"
-                        className="absolute inset-0 bg-cyan-600 rounded-lg shadow-[0_0_12px_rgba(8,145,178,0.5)]"
-                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                      />
-                    )}
-                    <span className="relative z-10 text-[11px]">Manager</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRole('ESTIMATOR')}
-                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all relative ${selectedRole === 'ESTIMATOR' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                  >
-                    {selectedRole === 'ESTIMATOR' && (
-                      <motion.div
-                        layoutId="activeRoleSpaceTravel"
-                        className="absolute inset-0 bg-cyan-600 rounded-lg shadow-[0_0_12px_rgba(8,145,178,0.5)]"
-                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                      />
-                    )}
-                    <span className="relative z-10 text-[11px]">Estimator</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRole('BID_MANAGER')}
-                    className={`py-1.5 px-2 rounded-lg text-xs font-semibold transition-all relative ${selectedRole === 'BID_MANAGER' ? 'text-white' : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                  >
-                    {selectedRole === 'BID_MANAGER' && (
-                      <motion.div
-                        layoutId="activeRoleSpaceTravel"
-                        className="absolute inset-0 bg-cyan-600 rounded-lg shadow-[0_0_12px_rgba(8,145,178,0.5)]"
-                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                      />
-                    )}
-                    <span className="relative z-10 text-[11px]">Bid Manager</span>
-                  </button>
-                </div>
-              </div>
 
               {/* Work Email Address */}
               <div>
@@ -448,6 +325,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBack
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@company.ph"
                     required
+                    autoComplete="username"
                     className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
                   />
                   <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
@@ -460,13 +338,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBack
                   <label className="block text-xs font-medium text-slate-300">
                     Access Key / Password
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleForgotPasswordReset}
-                    className="text-[11px] text-amber-400 hover:text-amber-300 hover:underline font-bold transition"
-                  >
-                    Reset password (BiDOCS#2026)?
-                  </button>
+<span className="text-[11px] text-slate-500">Forgot it? Ask your Company Owner or Manager to issue a temporary password.</span>
                 </div>
                 <div className="relative">
                   <input
@@ -475,6 +347,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBack
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
                     required
+                    autoComplete="current-password"
                     className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-9 pr-10 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
                   />
                   <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
@@ -532,19 +405,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToRegister, onBack
                   </button>
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirm('Permanently clear all registered companies, accounts, vault documents, and IndexedDB files to start a fresh company registration?')) {
-                    resetAllData();
-                    alert('All company data and storage have been completely wiped. Redirecting to clean Registration...');
-                    onSwitchToRegister();
-                  }
-                }}
-                className="text-[11px] font-mono text-slate-500 hover:text-amber-400 underline transition block mx-auto pt-1"
-              >
-                Purge All Systems & Start Fresh Registration
-              </button>
             </div>
 
           </div>

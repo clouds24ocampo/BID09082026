@@ -119,7 +119,9 @@ export interface User {
   email: string;
   fullName: string;
   role: UserRole;
-  password?: string;
+  /** PBKDF2 hash + salt (base64). Plaintext passwords are never stored. */
+  passwordHash?: string;
+  passwordSalt?: string;
   mustChangePassword?: boolean;
   avatarUrl?: string;
   lastLoginAt?: string;

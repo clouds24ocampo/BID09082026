@@ -11,8 +11,7 @@ import {
   UserCheck,
   Eye,
   EyeOff,
-  Key,
-  RotateCcw
+  Key
 } from 'lucide-react';
 
 const PRESET_COLORS = [
@@ -25,9 +24,7 @@ const PRESET_COLORS = [
 ];
 
 export const CompanyProfileView: React.FC = () => {
-  const { currentTenant, currentUser, updateTenantSettings, resetUserPassword, updateUserPassword } = useAuth();
-
-  const tenantKey = currentTenant?.id || currentUser?.id || 'default';
+  const { currentTenant, currentUser, updateTenantSettings, updateUserPassword } = useAuth();
 
   const [companyName, setCompanyName] = useState(currentTenant?.companyName || '');
   const [brandCode, setBrandCode] = useState(currentTenant?.brandCode || '');
@@ -42,13 +39,11 @@ export const CompanyProfileView: React.FC = () => {
   const [signatoryName, setSignatoryName] = useState(currentTenant?.authorizedSignatory?.name || '');
   const [signatoryTitle, setSignatoryTitle] = useState(currentTenant?.authorizedSignatory?.title || '');
 
-  // System Credentials (THIS SYSTEM) & Eye Toggle State
-  const [systemUsername, setSystemUsername] = useState(() => {
-    return localStorage.getItem(`bidocs_system_username_${tenantKey}`) || currentUser?.email || '';
-  });
-  const [systemPassword, setSystemPassword] = useState(() => {
-    return localStorage.getItem(`bidocs_system_password_${tenantKey}`) || currentUser?.password || '';
-  });
+  // Change own password (hashed on save; never displayed or stored in plaintext)
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   // Re-sync states when current tenant changes
   React.useEffect(() => {
@@ -62,25 +57,10 @@ export const CompanyProfileView: React.FC = () => {
     setAddress(currentTenant?.address || '');
     setSignatoryName(currentTenant?.authorizedSignatory?.name || '');
     setSignatoryTitle(currentTenant?.authorizedSignatory?.title || '');
-    setSystemUsername(localStorage.getItem(`bidocs_system_username_${tenantKey}`) || currentUser?.email || '');
-    setSystemPassword(localStorage.getItem(`bidocs_system_password_${tenantKey}`) || currentUser?.password || '');
-  }, [currentTenant?.id, currentUser?.email]);
-
-  const [showSystemUsername, setShowSystemUsername] = useState(false);
-  const [showSystemPassword, setShowSystemPassword] = useState(false);
+  }, [currentTenant?.id]);
 
   const [isSaved, setIsSaved] = useState(false);
   const [uploadError, setUploadError] = useState('');
-
-  const handleResetToDefaultPassword = () => {
-    const targetEmail = systemUsername || currentUser?.email || 'admin@bidocs.ph';
-    if (confirm(`Are you sure you want to reset the password for account [${targetEmail}] to default (BiDOCS#2026)? User must log in using BiDOCS#2026 and change it immediately.`)) {
-      resetUserPassword(targetEmail);
-      setSystemPassword('BiDOCS#2026');
-      alert(`Password for account [${targetEmail}] reset to default: BiDOCS#2026.\n\nPlease log in using BiDOCS#2026 to change your password.`);
-      window.location.reload();
-    }
-  };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -108,8 +88,22 @@ export const CompanyProfileView: React.FC = () => {
     setLogoUrl('');
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPasswordError('');
+    if (newPassword) {
+      if (newPassword !== confirmPassword) {
+        setPasswordError('New Password and Confirm Password do not match.');
+        return;
+      }
+      const res = currentUser ? await updateUserPassword(currentUser.id, newPassword) : { success: false, error: 'Not signed in.' };
+      if (!res.success) {
+        setPasswordError(res.error || 'Could not update password.');
+        return;
+      }
+      setNewPassword('');
+      setConfirmPassword('');
+    }
     updateTenantSettings({
       companyName,
       brandCode: brandCode.toUpperCase(),
@@ -125,13 +119,6 @@ export const CompanyProfileView: React.FC = () => {
         tin: tin
       }
     });
-
-    localStorage.setItem(`bidocs_system_username_${tenantKey}`, systemUsername);
-    localStorage.setItem(`bidocs_system_password_${tenantKey}`, systemPassword);
-
-    if (currentUser?.id && systemPassword) {
-      updateUserPassword(currentUser.id, systemPassword);
-    }
 
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2500);
@@ -399,67 +386,44 @@ export const CompanyProfileView: React.FC = () => {
           </div>
 
           <p className="text-xs text-slate-400">
-            Account login credentials for accessing <strong className="text-white">THIS BiDOCS System</strong>. Click the eye icon next to Username or Password to reveal or mask your credentials.
+            Signed in as <strong className="text-white">{currentUser?.email}</strong>. Leave blank to keep your current password. Min 8 characters with letters and numbers.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            {/* System Username / Email with Eye Toggle */}
-            <div>
-              <label className="block font-medium text-slate-300 mb-1">System Account Username / Email</label>
-              <div className="relative">
-                <input
-                  type={showSystemUsername ? "text" : "password"}
-                  value={systemUsername}
-                  onChange={(e) => setSystemUsername(e.target.value)}
-                  placeholder="admin@bidocs.ph"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3.5 pr-10 py-2.5 text-white font-mono focus:outline-none focus:border-amber-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSystemUsername(!showSystemUsername)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-white transition p-0.5"
-                  title={showSystemUsername ? "Hide Username" : "Show Username"}
-                >
-                  {showSystemUsername ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
-                </button>
-              </div>
-            </div>
+          {passwordError && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 font-medium">{passwordError}</div>
+          )}
 
-            {/* System Password with Eye Toggle */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
-              <label className="block font-medium text-slate-300 mb-1">System Account Password</label>
+              <label className="block font-medium text-slate-300 mb-1">New Password</label>
               <div className="relative">
                 <input
-                  type={showSystemPassword ? "text" : "password"}
-                  value={systemPassword}
-                  onChange={(e) => setSystemPassword(e.target.value)}
-                  placeholder="System Password"
+                  type={showNewPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3.5 pr-10 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowSystemPassword(!showSystemPassword)}
+                  onClick={() => setShowNewPassword(!showNewPassword)}
                   className="absolute right-3 top-2.5 text-slate-400 hover:text-white transition p-0.5"
-                  title={showSystemPassword ? "Hide Password" : "Show Password"}
+                  title={showNewPassword ? "Hide Password" : "Show Password"}
                 >
-                  {showSystemPassword ? <EyeOff className="w-4 h-4 text-emerald-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
+                  {showNewPassword ? <EyeOff className="w-4 h-4 text-emerald-400" /> : <Eye className="w-4 h-4 text-slate-400" />}
                 </button>
               </div>
             </div>
-          </div>
-
-          <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="text-slate-400 font-mono text-[11px]">
-              Default Security Password: <code className="text-amber-400 font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">BiDOCS#2026</code>
+            <div>
+              <label className="block font-medium text-slate-300 mb-1">Confirm New Password</label>
+              <input
+                type={showNewPassword ? "text" : "password"}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-mono focus:outline-none focus:border-emerald-500"
+              />
             </div>
-            <button
-              type="button"
-              onClick={handleResetToDefaultPassword}
-              className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition font-semibold flex items-center gap-1.5 self-start sm:self-auto"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Password to Default (BiDOCS#2026)</span>
-            </button>
           </div>
         </div>
 

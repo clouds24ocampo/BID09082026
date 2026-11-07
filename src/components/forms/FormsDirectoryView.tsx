@@ -142,8 +142,7 @@ export const FormsDirectoryView: React.FC = () => {
       let storedRef = "";
       try {
         const rawStored =
-          localStorage.getItem(`bidocs_active_project_${currentTenant?.id}`) ||
-          localStorage.getItem("bidocs_active_project");
+          localStorage.getItem(`bidocs_active_project_${currentTenant?.id}`);
         if (rawStored) {
           const parsed = JSON.parse(rawStored);
           storedRef = parsed.refNo || "";

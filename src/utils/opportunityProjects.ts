@@ -58,41 +58,11 @@ export const getOpportunityProjects = (
   }
 
   try {
-    let rawItems: any[] = [];
-
-    // 1. If tenantId is provided, load tenant-scoped opportunities strictly
-    if (tenantId) {
-      const savedTenant = localStorage.getItem(
-        `bidocs_opportunities_${tenantId}`,
-      );
-      if (savedTenant) {
-        rawItems.push(...parseOpportunityList(savedTenant));
-      }
-      // If no tenant-specific items found, check legacy key
-      if (rawItems.length === 0) {
-        const savedLegacy = localStorage.getItem("bidocs_opportunities");
-        if (savedLegacy) {
-          rawItems.push(...parseOpportunityList(savedLegacy));
-        }
-      }
-    } else {
-      // 2. No tenantId provided: Load general legacy opportunities key
-      const savedLegacy = localStorage.getItem("bidocs_opportunities");
-      if (savedLegacy) {
-        rawItems.push(...parseOpportunityList(savedLegacy));
-      }
-
-      // 3. Scan all keys starting with bidocs_opportunities only when no tenantId is specified
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith("bidocs_opportunities")) {
-          const val = localStorage.getItem(key);
-          if (val) {
-            rawItems.push(...parseOpportunityList(val));
-          }
-        }
-      }
-    }
+    // Tenant-scoped only: never read another tenant's (or a legacy global) project list.
+    if (!tenantId) return [];
+    const rawItems: any[] = [];
+    const savedTenant = localStorage.getItem(`bidocs_opportunities_${tenantId}`);
+    if (savedTenant) rawItems.push(...parseOpportunityList(savedTenant));
 
     if (rawItems.length > 0) {
       const rawList: OpportunityProjectOption[] = rawItems.map(
@@ -275,21 +245,14 @@ export const markProjectBidMergeDone = (
   };
 
   try {
-    if (tenantId) {
-      localStorage.setItem(
-        `bidocs_merged_done_${tenantId}_${cleanRef}`,
-        JSON.stringify(record),
-      );
-    }
+    if (!tenantId) return;
     localStorage.setItem(
-      `bidocs_merged_done_${cleanRef}`,
+      `bidocs_merged_done_${tenantId}_${cleanRef}`,
       JSON.stringify(record),
     );
 
     // Update merged project list for tenant
-    const listKey = tenantId
-      ? `bidocs_merged_projects_list_${tenantId}`
-      : "bidocs_merged_projects_list";
+    const listKey = `bidocs_merged_projects_list_${tenantId}`;
     const rawList = localStorage.getItem(listKey);
     let list: string[] = [];
     if (rawList) {
@@ -330,32 +293,19 @@ export const isProjectBidMergeDone = (
     project.id,
   ].filter(Boolean) as string[];
 
-  // 1. Check direct keys
+  if (!tenantId) return false;
+
   for (const ref of candidateRefs) {
-    if (
-      tenantId &&
-      localStorage.getItem(`bidocs_merged_done_${tenantId}_${ref}`)
-    )
-      return true;
-    if (localStorage.getItem(`bidocs_merged_done_${ref}`)) return true;
-    const winStatus = tenantId
-      ? localStorage.getItem(`bidocs_project_win_status_${tenantId}_${ref}`)
-      : null;
+    if (localStorage.getItem(`bidocs_merged_done_${tenantId}_${ref}`)) return true;
+    const winStatus = localStorage.getItem(`bidocs_project_win_status_${tenantId}_${ref}`);
     if (winStatus === "WIN" || winStatus === "WON") return true;
   }
 
-  // 2. Check merged projects list
   try {
-    const listKey = tenantId
-      ? `bidocs_merged_projects_list_${tenantId}`
-      : "bidocs_merged_projects_list";
-    const rawList = localStorage.getItem(listKey);
+    const rawList = localStorage.getItem(`bidocs_merged_projects_list_${tenantId}`);
     if (rawList) {
       const list: string[] = JSON.parse(rawList);
-      if (
-        Array.isArray(list) &&
-        candidateRefs.some((ref) => list.includes(ref))
-      ) {
+      if (Array.isArray(list) && candidateRefs.some((ref) => list.includes(ref))) {
         return true;
       }
     }

@@ -24,6 +24,15 @@ describe('opportunityProjects - Strict Tenant Data Isolation', () => {
     localStorage.clear();
   });
 
+  it('never falls back to a legacy global list or another tenant', () => {
+    const opp = [{ id: 'opp-9', projectReferenceNumber: 'PRJ-LEAK', title: 'Leak', procuringEntity: 'X' }];
+    localStorage.setItem('bidocs_opportunities', JSON.stringify(opp));
+    localStorage.setItem('bidocs_opportunities_tenantA', JSON.stringify(opp));
+
+    expect(getOpportunityProjects('tenantB')).toHaveLength(0);
+    expect(getOpportunityProjects(undefined)).toHaveLength(0);
+  });
+
   it('should retrieve opportunities strictly scoped to tenantA', () => {
     const oppTenantA = [
       { id: 'opp-1', projectReferenceNumber: 'PRJ-2026-A1', title: 'Project A1', procuringEntity: 'Agency A' }

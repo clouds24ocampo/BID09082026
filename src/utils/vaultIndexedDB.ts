@@ -551,100 +551,32 @@ export async function migrateFromLocalStorage(): Promise<any[]> {
 }
 
 /**
- * Vacuum and reclaim storage space by purging orphaned PDF blobs that are no longer referenced
+ * Permanently delete everything belonging to one tenant: vault items, their PDFs, and every
+ * PDF blob whose key embeds the tenant id or one of the given opportunity ids. Other tenants are untouched.
  */
-export async function vacuumOrphanedBlobs(): Promise<number> {
-  if (typeof indexedDB === 'undefined') return 0;
-  try {
-    const db = await openDB();
-    const readTx = db.transaction([STORE_VAULT_ITEMS, STORE_PDF_BLOBS], 'readonly');
-    const itemKeys = new Set<string>((await new Promise<any[]>((res) => {
-      const req = readTx.objectStore(STORE_VAULT_ITEMS).getAllKeys();
-      req.onsuccess = () => res(req.result || []);
-      req.onerror = () => res([]);
-    })).map(String));
+export async function purgeTenantData(tenantId: string, opportunityIds: string[] = []): Promise<void> {
+  if (!tenantId) return;
+  await clearVaultDataForTenant(tenantId);
+  if (typeof indexedDB === 'undefined') return;
 
-    const allBlobKeys: string[] = await new Promise((res) => {
-      const req = readTx.objectStore(STORE_PDF_BLOBS).getAllKeys();
-      req.onsuccess = () => res((req.result || []).map(String));
-      req.onerror = () => res([]);
-    });
-
-    // Find orphaned blobs (excluding active template prefixes like tech_specs_, fal_, boq_, equip_proof_, ongoing_row_pdf_, slcc_row_pdf_, proj_)
-    const orphaned = allBlobKeys.filter(k => {
-      if (itemKeys.has(k)) return false;
-      if (k.startsWith('tech_specs_') || k.startsWith('fal_') || k.startsWith('boq_') || 
-          k.startsWith('equip_proof_') || k.startsWith('ongoing_row_pdf_') || 
-          k.startsWith('slcc_row_pdf_') || k.startsWith('proj_') || k.startsWith('resume_') ||
-          k.startsWith('priceschedule_') || k.startsWith('pricesched_') || k.startsWith('bidform_')) {
-        return false;
-      }
-      return true;
-    });
-
-    if (orphaned.length === 0) return 0;
-
-    const writeTx = db.transaction(STORE_PDF_BLOBS, 'readwrite');
-    const blobStore = writeTx.objectStore(STORE_PDF_BLOBS);
-    for (const key of orphaned) {
-      blobStore.delete(key);
+  const db = await openDB();
+  const tx = db.transaction(STORE_PDF_BLOBS, 'readwrite');
+  const store = tx.objectStore(STORE_PDF_BLOBS);
+  const opPrefixes = opportunityIds.flatMap((id) => [`op_pdf_${id}`, `op_att_${id}_`]);
+  const cursorReq = store.openKeyCursor();
+  cursorReq.onsuccess = () => {
+    const cursor = cursorReq.result;
+    if (!cursor) return;
+    const key = String(cursor.key);
+    if (key.includes(tenantId) || opPrefixes.some((p) => key.startsWith(p))) {
+      store.delete(cursor.key);
       memoryPdfCache.delete(key);
     }
+    cursor.continue();
+  };
 
-    await new Promise((res) => {
-      writeTx.oncomplete = () => res(true);
-      writeTx.onerror = () => res(false);
-    });
-
-    console.log(`[VaultDB] Vacuumed ${orphaned.length} orphaned PDF blobs.`);
-    return orphaned.length;
-  } catch (err) {
-    console.error('[VaultDB] Vacuum error:', err);
-    return 0;
-  }
-}
-
-/**
- * Completely flush all localStorage, sessionStorage, and IndexedDB data
- */
-export async function purgeEntireApplicationStorage(): Promise<void> {
-  // Evict in-memory caches
-  memoryPdfCache.clear();
-  memoryVaultItemsCache.clear();
-
-  // 1. Clear Web Storages
-  try {
-    localStorage.clear();
-    sessionStorage.clear();
-    if (typeof caches !== 'undefined') {
-      caches.keys().then((names) => {
-        names.forEach((name) => caches.delete(name));
-      }).catch(() => {});
-    }
-  } catch (_) {}
-
-  // 2. Clear Vault IndexedDB
-  await clearAllVaultData();
-
-  // 3. Close active cached connection before deleting to avoid locks
-  if (cachedDB) {
-    try { cachedDB.close(); } catch (_) {}
-    cachedDB = null;
-  }
-
-  // 4. Delete BiDOCS Databases completely
-  try {
-    if (typeof indexedDB !== 'undefined') {
-      indexedDB.deleteDatabase(DB_NAME);
-      indexedDB.deleteDatabase('bidocs_vault_db');
-    }
-  } catch (_) {}
-
-  console.log('[BiDOCS] Entire database and storage flushed successfully.');
-}
-
-// Expose on window for easy developer/user console access
-if (typeof window !== 'undefined') {
-  (window as any).flushBiDocsDatabase = purgeEntireApplicationStorage;
-  (window as any).getVaultMemoryStats = getVaultMemoryCacheStats;
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
 }

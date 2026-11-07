@@ -19,7 +19,7 @@ import TermsOfReferenceView from "./components/vault/templates/TOR";
 import VaultErrorBoundary from "./components/common/VaultErrorBoundary";
 
 const MainApp: React.FC = () => {
-  const { currentUser, currentTenant, tenants } = useAuth();
+  const { currentUser, currentTenant, hasAccounts } = useAuth();
   const [authMode, setAuthMode] = useState<"landing" | "login" | "register" | "app">(() => {
     if (typeof window !== "undefined" && typeof window.sessionStorage !== "undefined") {
       try {
@@ -48,12 +48,11 @@ const MainApp: React.FC = () => {
     if (
       currentUser &&
       currentTenant &&
-      tenants.length > 0 &&
       (authMode === "login" || authMode === "register")
     ) {
       handleSetAuthMode("app");
     }
-  }, [currentUser, currentTenant, tenants.length, authMode]);
+  }, [currentUser, currentTenant, authMode]);
 
   const handleNavigateTab = (newTab: string) => {
     if (newTab !== activeTab) {
@@ -77,8 +76,7 @@ const MainApp: React.FC = () => {
   if (
     authMode !== "app" ||
     !currentUser ||
-    !currentTenant ||
-    tenants.length === 0
+    !currentTenant
   ) {
     if (authMode === "register") {
       return (
@@ -99,10 +97,10 @@ const MainApp: React.FC = () => {
     return (
       <LandingWebsiteView
         onEnterApp={() => {
-          if (currentUser && currentTenant && tenants.length > 0) {
+          if (currentUser && currentTenant) {
             handleSetAuthMode("app");
           } else {
-            handleSetAuthMode(tenants.length === 0 ? "register" : "login");
+            handleSetAuthMode(hasAccounts ? "login" : "register");
           }
         }}
         onLogin={() => handleSetAuthMode("login")}

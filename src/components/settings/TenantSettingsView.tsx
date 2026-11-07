@@ -14,7 +14,7 @@ import {
   Users,
   UserPlus,
   Trash2,
-  ArrowRightLeft,
+  KeyRound,
   AlertCircle,
 } from "lucide-react";
 
@@ -33,10 +33,10 @@ export const TenantSettingsView: React.FC = () => {
     currentUser,
     users,
     createTeamUser,
-    switchUser,
     deleteTeamUser,
+    resetUserPassword,
     updateTenantSettings,
-    resetAllData,
+    deleteCompany,
   } = useAuth();
 
   // Team Accounts & User Management States
@@ -44,13 +44,13 @@ export const TenantSettingsView: React.FC = () => {
   const [newUserName, setNewUserName] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserRole, setNewUserRole] = useState<UserRole>("ESTIMATOR");
-  const [newUserPassword, setNewUserPassword] = useState("BiDOCS#2026");
+  const [newUserPassword, setNewUserPassword] = useState("");
   const [userMsg, setUserMsg] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
 
-  const tenantUsers = users.filter((u) => u.tenantId === currentTenant?.id);
+  const tenantUsers = users;
 
   const [companyName, setCompanyName] = useState(
     currentTenant?.companyName || "",
@@ -466,21 +466,27 @@ export const TenantSettingsView: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    {!isCurrent && (isApproverRole(currentUser?.role) || !isApprover) && (
+                    {!isCurrent && isApproverRole(currentUser?.role) && (
                       <button
                         type="button"
-                        onClick={() => {
-                          switchUser(u.id);
-                          setUserMsg({
-                            type: "success",
-                            text: `Switched session to ${u.fullName} (${getRoleDisplayName(u.role)})!`,
-                          });
+                        onClick={async () => {
+                          if (!window.confirm(`Issue a new temporary password for "${u.fullName}"? Their current password stops working.`)) return;
+                          const res = await resetUserPassword(u.id);
+                          if (res.success) {
+                            window.prompt(
+                              `Temporary password for ${u.email} (shown once - copy it now and share it securely). They must change it at next login:`,
+                              res.tempPassword,
+                            );
+                            setUserMsg({ type: "success", text: `Temporary password issued for ${u.fullName}.` });
+                          } else {
+                            setUserMsg({ type: "error", text: res.error || "Could not reset password." });
+                          }
                         }}
                         className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700 transition cursor-pointer"
-                        title={`Switch active login session to ${u.fullName}`}
+                        title={`Issue a temporary password for ${u.fullName}`}
                       >
-                        <ArrowRightLeft className="w-3.5 h-3.5 text-blue-400" />
-                        <span>Switch to Account</span>
+                        <KeyRound className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Reset Password</span>
                       </button>
                     )}
 
@@ -493,11 +499,12 @@ export const TenantSettingsView: React.FC = () => {
                               `Delete user account "${u.fullName}" (${u.email})?`,
                             )
                           ) {
-                            deleteTeamUser(u.id);
-                            setUserMsg({
-                              type: "success",
-                              text: `Account "${u.fullName}" removed successfully.`,
-                            });
+                            const removed = deleteTeamUser(u.id);
+                            setUserMsg(
+                              removed
+                                ? { type: "success", text: `Account "${u.fullName}" removed successfully.` }
+                                : { type: "error", text: "You are not permitted to remove that account." },
+                            );
                           }
                         }}
                         className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-600/30 text-slate-400 hover:text-red-300 border border-slate-700 transition cursor-pointer"
@@ -542,9 +549,9 @@ export const TenantSettingsView: React.FC = () => {
             </div>
 
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
-                const res = createTeamUser({
+                const res = await createTeamUser({
                   fullName: newUserName,
                   email: newUserEmail,
                   role: newUserRole,
@@ -553,12 +560,12 @@ export const TenantSettingsView: React.FC = () => {
                 if (res.success) {
                   setUserMsg({
                     type: "success",
-                    text: `Account created for "${newUserName}" as ${getRoleDisplayName(newUserRole)}! Login credentials active.`,
+                    text: `Account created for "${newUserName}" as ${getRoleDisplayName(newUserRole)}! They must change the initial password at first login.`,
                   });
                   setShowAddUserModal(false);
                   setNewUserName("");
                   setNewUserEmail("");
-                  setNewUserPassword("BiDOCS#2026");
+                  setNewUserPassword("");
                 } else {
                   alert(res.error || "Failed to create user account.");
                 }
@@ -614,14 +621,18 @@ export const TenantSettingsView: React.FC = () => {
                     📋 Bid Manager (Can create POW/Quotation/Bidding Dossiers;
                     Needs Owner Approval to Print)
                   </option>
-                  <option value="HIGHER_MANAGER">
-                    💼 Higher Manager (Approver: Authorizes &amp; Approves
-                    Documents for Official Printing)
-                  </option>
-                  <option value="COMPANY_OWNER">
-                    👑 Company Owner (Executive Approver &amp; Signing
-                    Authority)
-                  </option>
+                  {currentUser?.role !== "HIGHER_MANAGER" && (
+                    <>
+                      <option value="HIGHER_MANAGER">
+                        💼 Higher Manager (Approver: Authorizes &amp; Approves
+                        Documents for Official Printing)
+                      </option>
+                      <option value="COMPANY_OWNER">
+                        👑 Company Owner (Executive Approver &amp; Signing
+                        Authority)
+                      </option>
+                    </>
+                  )}
                 </select>
 
                 <p className="text-[11px] text-slate-400 mt-1.5 italic font-sans">
@@ -636,14 +647,16 @@ export const TenantSettingsView: React.FC = () => {
                   Initial Password
                 </label>
                 <input
-                  type="text"
+                  type="password"
+                  autoComplete="new-password"
+                  required
                   value={newUserPassword}
                   onChange={(e) => setNewUserPassword(e.target.value)}
-                  placeholder="BiDOCS#2026"
+                  placeholder="Min 8 characters, letters and numbers"
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono focus:border-blue-500 focus:outline-none"
                 />
                 <span className="text-[10px] text-slate-500 mt-0.5 block">
-                  Default temporary password is BiDOCS#2026.
+                  Temporary: the user must change it at first login.
                 </span>
               </div>
 
@@ -667,37 +680,36 @@ export const TenantSettingsView: React.FC = () => {
         </div>
       )}
 
-      {/* Reset & Clean Workspace Section */}
-      <div className="glass-panel p-6 rounded-2xl border border-red-500/20 bg-red-500/5 space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-xs font-bold text-red-400 uppercase tracking-wider">
-              Reset Workspace Storage
-            </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              Purges all saved local storage items (`bidocs_tenants`,
-              `bidocs_users`, `bidocs_vault_items`, `bidocs_opportunities`) for
-              a clean slate.
-            </p>
+      {/* Delete company (approvers only; affects this company, never other companies) */}
+      {isApproverRole(currentUser?.role) && (
+        <div className="glass-panel p-6 rounded-2xl border border-red-500/20 bg-red-500/5 space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xs font-bold text-red-400 uppercase tracking-wider">
+                Delete Company
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Permanently deletes this company, its accounts, projects and uploaded documents. Other companies are not affected.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                const typed = window.prompt(
+                  `Type the company name "${currentTenant?.companyName}" to permanently delete everything:`,
+                );
+                if (typed !== null && typed.trim() === currentTenant?.companyName) {
+                  await deleteCompany();
+                  window.location.reload();
+                }
+              }}
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-red-600/80 hover:bg-red-600 text-white shadow transition shrink-0"
+            >
+              Delete Company &amp; All Data
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              if (
-                window.confirm(
-                  "Are you sure you want to clear all local workspace data? This will log you out, purge IndexedDB document blobs, and reset all saved items.",
-                )
-              ) {
-                resetAllData();
-                window.location.reload();
-              }
-            }}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-red-600/80 hover:bg-red-600 text-white shadow transition shrink-0"
-          >
-            Purge & Reset All Local Data
-          </button>
         </div>
-      </div>
+      )}
     </div>
   );
 };

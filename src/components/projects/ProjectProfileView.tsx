@@ -614,9 +614,7 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
   const [activeWorkspaceRef, setActiveWorkspaceRef] = useState<string>(() => {
     try {
       const saved =
-        localStorage.getItem(`bidocs_active_vault_project_${tenantId}`) ||
-        localStorage.getItem("bidocs_active_vault_project") ||
-        "";
+        localStorage.getItem(`bidocs_active_vault_project_${tenantId}`) || "";
       return saved;
     } catch {
       return "";
@@ -776,10 +774,6 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
           `bidocs_opportunities_${tenantId}`,
           JSON.stringify(updatedProjects),
         );
-        localStorage.setItem(
-          "bidocs_opportunities",
-          JSON.stringify(updatedProjects),
-        );
         invalidateOpportunityProjectsCache();
       } else if (status === "LOSE" && selectedProject) {
         const updatedProjects = projects.map((p) => {
@@ -793,10 +787,6 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
           `bidocs_opportunities_${tenantId}`,
           JSON.stringify(updatedProjects),
         );
-        localStorage.setItem(
-          "bidocs_opportunities",
-          JSON.stringify(updatedProjects),
-        );
         invalidateOpportunityProjectsCache();
       } else if (status === "DQ" && selectedProject) {
         const updatedProjects = projects.map((p) => {
@@ -808,10 +798,6 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
         setProjects(updatedProjects);
         localStorage.setItem(
           `bidocs_opportunities_${tenantId}`,
-          JSON.stringify(updatedProjects),
-        );
-        localStorage.setItem(
-          "bidocs_opportunities",
           JSON.stringify(updatedProjects),
         );
         invalidateOpportunityProjectsCache();
@@ -1510,9 +1496,7 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
   const loadProjectsFromStorage = () => {
     if (!tenantId) return;
     try {
-      const saved =
-        localStorage.getItem(`bidocs_opportunities_${tenantId}`) ||
-        localStorage.getItem("bidocs_opportunities");
+      const saved = localStorage.getItem(`bidocs_opportunities_${tenantId}`);
       if (saved) {
         const parsed: PhilGEPSOpportunity[] = parseOpportunityList(saved);
         setProjects(parsed);
@@ -2347,7 +2331,6 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
         `bidocs_opportunities_${tenantId}`,
         JSON.stringify(updatedList),
       );
-      localStorage.setItem("bidocs_opportunities", JSON.stringify(updatedList));
       markProjectBidMergeDone(
         tenantId,
         updatedItem.projectReferenceNumber || updatedItem.philgepsRefNo,
@@ -2385,7 +2368,6 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
         `bidocs_opportunities_${tenantId}`,
         JSON.stringify(updatedList),
       );
-      localStorage.setItem("bidocs_opportunities", JSON.stringify(updatedList));
       markProjectBidMergeDone(
         tenantId,
         cloned.projectReferenceNumber || cloned.philgepsRefNo,
@@ -2414,7 +2396,6 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
           `bidocs_opportunities_${tenantId}`,
           JSON.stringify(filtered),
         );
-        localStorage.setItem("bidocs_opportunities", JSON.stringify(filtered));
         invalidateOpportunityProjectsCache();
       } catch (e) {}
       setProjects(filtered);
@@ -2444,12 +2425,10 @@ export const ProjectProfileView: React.FC<ProjectProfileViewProps> = ({
         `bidocs_active_project_${tenantId}`,
         JSON.stringify(activeData),
       );
-      localStorage.setItem("bidocs_active_project", JSON.stringify(activeData));
       localStorage.setItem(
         `bidocs_active_vault_project_${tenantId}`,
         activeRef,
       );
-      localStorage.setItem("bidocs_active_vault_project", activeRef);
       setActiveWorkspaceRef(activeRef);
     } catch (e) {}
   };

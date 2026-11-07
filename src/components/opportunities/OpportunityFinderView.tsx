@@ -237,8 +237,7 @@ export const OpportunityFinderView: React.FC<{
       localStorage.setItem(
         `bidocs_opportunities_${tenantId}`,
         JSON.stringify(cleanList),
-      );
-      localStorage.setItem("bidocs_opportunities", JSON.stringify(cleanList));
+      );
     } catch (err) {
       console.warn("[OpportunityFinder] localStorage quota safe handle:", err);
     }
@@ -278,13 +277,11 @@ export const OpportunityFinderView: React.FC<{
       localStorage.setItem(
         `bidocs_active_project_${tenantId}`,
         JSON.stringify(activeData),
-      );
-      localStorage.setItem("bidocs_active_project", JSON.stringify(activeData));
+      );
       localStorage.setItem(
         `bidocs_active_vault_project_${tenantId}`,
         activeRef,
-      );
-      localStorage.setItem("bidocs_active_vault_project", activeRef);
+      );
     } catch (e) {
       console.error("[OpportunityFinder] Error setting active project:", e);
     }
@@ -711,11 +708,7 @@ export const OpportunityFinderView: React.FC<{
         localStorage.setItem(
           `bidocs_active_project_${tenantId}`,
           JSON.stringify(activeData),
-        );
-        localStorage.setItem(
-          "bidocs_active_project",
-          JSON.stringify(activeData),
-        );
+        );
       } catch (err) {
         console.error("[OpportunityFinder] Error setting active project:", err);
       }
@@ -742,8 +735,7 @@ export const OpportunityFinderView: React.FC<{
           parsed.refNo === deletingItem.projectReferenceNumber ||
           parsed.refNo === deletingItem.philgepsRefNo
         ) {
-          localStorage.removeItem(`bidocs_active_project_${tenantId}`);
-          localStorage.removeItem("bidocs_active_project");
+          localStorage.removeItem(`bidocs_active_project_${tenantId}`);
         }
       }
     } catch (_) {}
