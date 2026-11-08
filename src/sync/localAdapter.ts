@@ -98,7 +98,7 @@ export class BrowserLocal {
         const mine = e.tenantId === this.tenantId || (e.tenantId === undefined && this.vaultIds.has(e.id));
         if (!mine) return [];
         this.vaultIds.delete(e.id);
-        return [VI + e.id];
+        return [VI + e.id, BLOB + e.id]; // the file goes with its item
       }
       case 'replaced': {
         if (e.tenantId !== this.tenantId) return [];
@@ -155,6 +155,8 @@ export class BrowserLocal {
     apply: (rec: RemoteRecord, blob: string | null) =>
       runUntracked(async () => {
         const { key } = rec;
+        // Defense in depth: this device only ever applies records of its own company.
+        if (rec.tenantId !== this.tenantId) return;
         if (key.startsWith(LS)) {
           const lsKey = key.slice(LS.length);
           if (!this.belongsToLs(lsKey)) return; // a server record can never write outside synced keys
@@ -163,7 +165,8 @@ export class BrowserLocal {
         } else if (key.startsWith(TENANT)) {
           if (rec.deleted || !rec.payload) return; // a company is never deleted by sync
           const id = key.slice(TENANT.length);
-          if (id !== this.tenantId) return;
+          const incoming = rec.payload as { id?: string };
+          if (id !== this.tenantId || incoming?.id !== id) return;
           const list = parseList(read('bidocs_tenants')).filter((t) => t?.id !== id);
           list.push(rec.payload);
           rawStorage.set('bidocs_tenants', JSON.stringify(list));
@@ -172,11 +175,12 @@ export class BrowserLocal {
         } else if (key.startsWith(VI)) {
           const id = key.slice(VI.length);
           if (rec.deleted) {
+            if (!this.vaultIds.has(id)) return;
             this.vaultIds.delete(id);
             await deleteVaultItem(id, this.tenantId);
           } else {
             const item = rec.payload as { id: string; tenantId?: string };
-            if (item?.tenantId !== this.tenantId) return;
+            if (item?.id !== id || item?.tenantId !== this.tenantId) return;
             this.vaultIds.add(id);
             await upsertVaultItem(item);
           }

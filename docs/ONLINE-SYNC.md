@@ -25,8 +25,11 @@ VITE_SUPABASE_URL=https://YOURREF.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
 ```
 
-or leave the build generic and let each user enter them in **Settings > Online sync** (or on the login page under
+or leave the build generic and let a company owner or manager enter them in **Settings > Online sync** (or on the login page under
 "Restore from your online account"). Installed desktop and Android apps can be configured this way without rebuilding.
+
+Only `https://<project>.supabase.co` style hosts are accepted by default, because the URL decides where logins and company data
+are sent. Self-hosting needs `VITE_ALLOW_CUSTOM_SYNC_HOST=true` at build time. The host is always shown before credentials are entered.
 
 ## Using it
 
@@ -34,6 +37,7 @@ or leave the build generic and let each user enter them in **Settings > Online s
   choose **Create online account**. Existing data is uploaded.
 - **Another device:** on the login page choose **Restore from your online account**, sign in with the same online account.
   The company and all its data are copied to the device, and the same email and password become the login there.
+  Restore only creates a company that is **not already on that device**; it never replaces an existing local login or password.
 - **Offline:** keep working. Changes are saved on the device and queued. When the device is online again they upload automatically
   (within seconds, on reconnect, when the window regains focus, and every minute).
 - **Header badge:** shows Synced, N waiting, Offline, or a problem. Click it to open the sync settings.
@@ -66,7 +70,12 @@ device clocks should be roughly correct; the unit of upload for a vault file is 
 - Row level security restricts every table row and storage object to its owner (`auth.uid()`); the anon key alone grants nothing.
 - Data is protected in transit (TLS) and at rest by Supabase, but it is **not end-to-end encrypted**: the backend operator can read it.
   Decide whether that is acceptable for your procurement documents before enabling sync.
-- The Supabase session is kept in the device's local storage under `sb-bidocs-auth` and is never synced.
+- Each company has its own online session on a device (`sb-bidocs-auth-<company id>`), bound to the account it was linked with,
+  and is never synced. "Disconnect this device" signs out that device only, not your other devices.
+- Only a company owner or manager can connect, disconnect, change the online project or delete the online copy.
+  Other roles see a read-only status.
+- Records from the server are applied only if they belong to this company (company id, item ids and payload ids must match).
+- A restore-time project URL is used for that attempt only and saved only if the restore succeeds.
 
 ## Testing
 

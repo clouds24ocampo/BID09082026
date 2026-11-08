@@ -24,7 +24,10 @@ async function until(fn, timeout = 20000, step = 250) {
 }
 
 const mock = await startMockSupabase(54321);
-const vite = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--port', String(APP_PORT), '--strictPort'], { stdio: 'ignore' });
+// The mock backend is http://127.0.0.1, which the app only accepts when explicitly allowed at build time.
+const vite = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--port', String(APP_PORT), '--strictPort'], {
+  stdio: 'ignore', env: { ...process.env, VITE_ALLOW_CUSTOM_SYNC_HOST: 'true' },
+});
 const cleanup = async (code) => { vite.kill(); await mock.close(); await browser?.close(); process.exit(code); };
 let browser;
 
@@ -150,6 +153,58 @@ try {
   await until(() => mock.rows().find((r) => r.key === `ls:${notesKey}`)?.deleted === true, 30000);
   await poke(B.page);
   check('Deletion propagates to the other device', !!(await until(async () => (await lsGet(B.page, notesKey)) === null, 30000)));
+
+  // ---------------- A server record for another company is never applied ----------------
+  const evilKey = `bidocs_evil_${tenantId}_x`;
+  mock.inject(EMAIL, { key: `ls:${evilKey}`, tenant_id: 'tenant-00000000-0000-0000-0000-000000000000', payload: { v: 'evil' }, client_updated_ms: Date.now() + 1e6 });
+  mock.inject(EMAIL, { key: 'vi:evil-item', tenant_id: tenantId, payload: { id: 'evil-item', tenantId: 'tenant-00000000-0000-0000-0000-000000000000', name: 'x' }, client_updated_ms: Date.now() + 1e6 });
+  await poke(B.page);
+  await sleep(4000);
+  const evil = await B.page.evaluate(async ([k, t]) => {
+    const m = await import('/src/utils/vaultIndexedDB.ts');
+    return { ls: localStorage.getItem(k), item: (await m.loadVaultItems(t)).some((i) => i.id === 'evil-item') };
+  }, [evilKey, tenantId]);
+  check('Foreign-company records from the server are ignored', evil.ls === null && evil.item === false, JSON.stringify(evil));
+
+  // ---------------- Restore never replaces a company or login that already exists on a device ----------------
+  const C = await device('C');
+  await C.page.evaluate(() => sessionStorage.setItem('bidocs_auth_mode', 'register'));
+  await C.page.reload({ waitUntil: 'networkidle' });
+  await C.page.fill('input[placeholder="Engr. Juan Dela Cruz"]', 'Local Owner');
+  await C.page.fill('input[placeholder="juan@company.ph"]', EMAIL);
+  await C.page.fill('input[type="password"]', 'LocalPass99');
+  await C.page.click('button:has-text("Continue to Step 2")');
+  await C.page.fill('input[placeholder^="e.g. Apex"]', 'Other Local Co');
+  await C.page.fill('input[placeholder="008-991-234-000"]', '999-888-777-000');
+  await C.page.fill('input[placeholder="SEC-CS2019-94120"]', 'SEC-999');
+  await C.page.click('button:has-text("Continue to Step 3")');
+  await C.page.fill('input[placeholder="Engr. Ferdinand R. Valenzuela"]', 'Local Owner');
+  await C.page.click('button:has-text("Continue to Step 4")');
+  await C.page.click('button:has-text("Complete Onboarding")');
+  await C.page.waitForSelector('text=Bidding Modules', { timeout: 20000 });
+  await C.page.click('#user-profile-menu-btn');
+  await C.page.click('button:has-text("Log Out Session")');
+  await C.page.evaluate(() => sessionStorage.setItem('bidocs_auth_mode', 'login'));
+  await C.page.reload({ waitUntil: 'networkidle' });
+  await C.page.click('button:has-text("Restore from your online account")');
+  await C.page.fill('input[aria-label="Online account email"]', EMAIL);
+  await C.page.fill('input[aria-label="Online account password"]', PASSWORD);
+  await C.page.click('button:has-text("Restore company")');
+  const refused = await until(async () => (await text(C.page)).includes('already exists on this device'), 20000);
+  check('Restore refuses to take over an existing local login', !!refused && !(await text(C.page)).includes('Bidding Modules'));
+  const stillLocal = await C.page.evaluate(() => JSON.parse(localStorage.getItem('bidocs_tenants')).map((t) => t.companyName));
+  check('Restore left the existing local company untouched', stillLocal.length === 1 && stillLocal[0] === 'Other Local Co');
+
+  // ---------------- Deleting the online copy removes records and files ----------------
+  await A.page.click('#user-profile-menu-btn');
+  await A.page.click('button:has-text("Tenant & Branding Settings")');
+  const delPanel = A.page.locator('section[aria-labelledby="sync-title"]');
+  await delPanel.locator('summary:has-text("Delete the online copy")').click();
+  await delPanel.locator('input[aria-label="Type DELETE to confirm"]').fill('DELETE');
+  await delPanel.locator('button:has-text("Delete online copy")').click();
+  const wiped = await until(() => mock.rows().length === 0 && mock.files().length === 0, 20000);
+  check('Delete online copy removes every record and file', !!wiped, `rows=${mock.rows().length} files=${mock.files().length}`);
+  check('Local data survives deleting the online copy', (await lsGet(A.page, boqKey)) === JSON.stringify({ rows: [1, 2, 3, 4] }));
 
   // ---------------- Hygiene ----------------
   check('A and B: no uncaught page errors', errors.length === 0, errors.slice(0, 3).join(' | '));

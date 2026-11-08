@@ -88,14 +88,28 @@ export const SyncPanel: React.FC = () => {
         )}
       </div>
 
-      {!sync.configured && (
+      {!sync.canManage && (
+        <p className="text-xs text-slate-300" role="note">
+          {sync.linked
+            ? `This company syncs with ${sync.email}. Only a company owner or manager can change online sync settings.`
+            : 'Online sync is not connected. Only a company owner or manager can set it up.'}
+        </p>
+      )}
+
+      {sync.canManage && sync.configured && (
+        <p className="text-xs text-slate-400">
+          Online project: <strong className="text-slate-100 font-mono">{sync.host}</strong>
+        </p>
+      )}
+
+      {sync.canManage && !sync.configured && (
         <div className="space-y-3">
           <p className="text-xs text-slate-300">Enter the connection details of your online project (from your Supabase project settings).</p>
           <SyncConfigForm />
         </div>
       )}
 
-      {sync.configured && !sync.linked && (
+      {sync.canManage && sync.configured && !sync.linked && (
         <form className="space-y-3 max-w-md" onSubmit={(e) => { e.preventDefault(); void connect('signin'); }}>
           <p className="text-xs text-slate-300">Sign in to the online account for this company, or create one. One online account belongs to one company.</p>
           <label className="block text-xs text-slate-400 space-y-1.5">
@@ -122,10 +136,10 @@ export const SyncPanel: React.FC = () => {
             <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-3"><dt className="text-slate-500">Last synced</dt><dd className="text-slate-100 font-semibold">{sync.lastSyncAt ? new Date(sync.lastSyncAt).toLocaleString() : 'Not yet'}</dd></div>
             <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-3"><dt className="text-slate-500">Large files kept local</dt><dd className="text-slate-100 font-semibold">{sync.tooLarge}</dd></div>
           </dl>
-          {sync.status === 'signed-out' && <p role="alert" className="text-xs text-amber-300">Your online session expired. Disconnect and sign in again to resume syncing. Nothing is lost; changes stay queued.</p>}
+          {sync.status === 'signed-out' && <p role="alert" className="text-xs text-amber-300">Your online session expired. {sync.canManage ? 'Disconnect and sign in again to resume syncing.' : 'Ask a company owner or manager to sign in again.'} Nothing is lost; changes stay queued.</p>}
           {sync.error && <p role="alert" className="text-xs text-red-400">{sync.error}</p>}
           {sync.tooLarge > 0 && <p className="text-xs text-slate-400">Files over 25 MB are not uploaded automatically and stay on this device.</p>}
-          <div className="flex flex-wrap gap-2">
+          <div className={`flex flex-wrap gap-2 ${sync.canManage ? '' : 'hidden'}`}>
             <button type="button" className={btnPrimary} disabled={sync.status === 'syncing' || sync.status === 'offline'} onClick={() => void sync.syncNow()}>
               <span className="inline-flex items-center gap-1.5"><RefreshCw className="w-3.5 h-3.5" /> Sync now</span>
             </button>
@@ -133,7 +147,7 @@ export const SyncPanel: React.FC = () => {
               <span className="inline-flex items-center gap-1.5"><LogOut className="w-3.5 h-3.5" /> Disconnect this device</span>
             </button>
           </div>
-          <details className="rounded-xl border border-red-500/30 bg-red-500/5 p-3">
+          <details className={`rounded-xl border border-red-500/30 bg-red-500/5 p-3 ${sync.canManage ? '' : 'hidden'}`}>
             <summary className="text-xs font-semibold text-red-300 cursor-pointer">Delete the online copy</summary>
             <div className="mt-3 space-y-2 text-xs text-slate-300">
               <p>Permanently removes this company's records and files from the online account. Data on your devices is not touched. Type DELETE to confirm.</p>

@@ -10,7 +10,7 @@ export interface SyncConfig {
 const CONFIG_KEY = 'bidocs_sync_config';
 const BUCKET = 'vault';
 
-/** Build-time config (VITE_SUPABASE_*) wins; otherwise the URL/key a user entered in Settings. */
+/** Build-time config (VITE_SUPABASE_*) wins; otherwise the URL/key saved from Settings (re-validated on every read). */
 export function getSyncConfig(): SyncConfig | null {
   const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -19,7 +19,7 @@ export function getSyncConfig(): SyncConfig | null {
     const raw = localStorage.getItem(CONFIG_KEY);
     if (!raw) return null;
     const c = JSON.parse(raw) as SyncConfig;
-    return c?.url && c?.anonKey ? c : null;
+    return c?.url && c?.anonKey && validateConfig(c) === null ? c : null;
   } catch {
     return null;
   }
@@ -28,14 +28,22 @@ export function getSyncConfig(): SyncConfig | null {
 export function saveSyncConfig(cfg: SyncConfig | null): void {
   if (!cfg) rawStorage.remove(CONFIG_KEY);
   else rawStorage.set(CONFIG_KEY, JSON.stringify(cfg));
-  clientCache = null;
 }
 
-/** The anon key is public by design (row level security protects the data) but the URL must be https. */
+/**
+ * The anon key is public by design (row level security protects the data). The URL decides where credentials and
+ * company data are sent, so it must be https and a Supabase project host. Self-hosting sets
+ * VITE_ALLOW_CUSTOM_SYNC_HOST=true at build time (which also permits http://localhost for development).
+ */
 export function validateConfig(cfg: SyncConfig): string | null {
+  const custom = import.meta.env.VITE_ALLOW_CUSTOM_SYNC_HOST === 'true';
   try {
     const u = new URL(cfg.url);
-    if (u.protocol !== 'https:') return 'The project URL must start with https://';
+    const local = custom && (u.hostname === 'localhost' || u.hostname === '127.0.0.1');
+    if (u.protocol !== 'https:' && !local) return 'The project URL must start with https://';
+    if (!custom && !/\.supabase\.(co|in)$/i.test(u.hostname)) {
+      return 'Only Supabase project URLs (for example https://abcd1234.supabase.co) are accepted.';
+    }
   } catch {
     return 'Enter a valid project URL, for example https://abcd1234.supabase.co';
   }
@@ -43,19 +51,35 @@ export function validateConfig(cfg: SyncConfig): string | null {
   return null;
 }
 
-let clientCache: { key: string; client: SupabaseClient } | null = null;
-
-export function getClient(cfg: SyncConfig): SupabaseClient {
-  const key = `${cfg.url}|${cfg.anonKey}`;
-  if (!clientCache || clientCache.key !== key) {
-    clientCache = {
-      key,
-      client: createClient(cfg.url, cfg.anonKey, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'sb-bidocs-auth' },
-      }),
-    };
+export const hostOf = (cfg: SyncConfig | null): string | undefined => {
+  try {
+    return cfg ? new URL(cfg.url).host : undefined;
+  } catch {
+    return undefined;
   }
-  return clientCache.client;
+};
+
+const clients = new Map<string, SupabaseClient>();
+
+/**
+ * One client (and one stored login session) per company, so signing a company into its online account can never
+ * reuse another company's session. `scope: null` gives a throwaway in-memory client (used while restoring).
+ */
+export function getClient(cfg: SyncConfig, scope: string | null): SupabaseClient {
+  const key = `${cfg.url}|${cfg.anonKey}|${scope}`;
+  let c = clients.get(key);
+  if (!c) {
+    c = createClient(cfg.url, cfg.anonKey, {
+      auth: {
+        persistSession: scope !== null,
+        autoRefreshToken: scope !== null,
+        detectSessionInUrl: false,
+        storageKey: `sb-bidocs-auth-${scope ?? 'restore'}`,
+      },
+    });
+    clients.set(key, c);
+  }
+  return c;
 }
 
 // ---- binary helpers (no fetch(data:) because the page CSP does not allow data: in connect-src) ----
@@ -90,12 +114,13 @@ interface Row {
 }
 
 export class SupabaseRemote implements Remote {
-  constructor(private readonly client: SupabaseClient) {}
+  /** `expectedUserId` binds this remote to the online account the company was linked with. */
+  constructor(private readonly client: SupabaseClient, private readonly expectedUserId?: string) {}
 
   private async userId(): Promise<string> {
     const { data } = await this.client.auth.getSession();
     const id = data.session?.user.id;
-    if (!id) throw new Error('not authenticated');
+    if (!id || (this.expectedUserId && id !== this.expectedUserId)) throw new Error('not authenticated');
     return id;
   }
 
@@ -104,6 +129,7 @@ export class SupabaseRemote implements Remote {
   }
 
   async push(records: SyncRecord[]): Promise<void> {
+    await this.userId();
     const { error } = await this.client.rpc('sync_push', {
       records: records.map((r) => ({
         key: r.key,
@@ -117,6 +143,7 @@ export class SupabaseRemote implements Remote {
   }
 
   async pull(afterSeq: number, limit: number): Promise<RemoteRecord[]> {
+    await this.userId();
     const { data, error } = await this.client
       .from('sync_records')
       .select('key, tenant_id, deleted, payload, client_updated_ms, server_seq')
@@ -136,6 +163,7 @@ export class SupabaseRemote implements Remote {
 
   /** Tenant profile records of this account (used to bind an online account to exactly one company). */
   async listTenantRecords(): Promise<{ id: string; payload: unknown; deleted: boolean }[]> {
+    await this.userId();
     const { data, error } = await this.client
       .from('sync_records')
       .select('key, payload, deleted')
@@ -167,16 +195,31 @@ export class SupabaseRemote implements Remote {
     if (error) throw new Error(error.message);
   }
 
-  /** Permanently remove this account's synced data from the cloud (records and files). */
+  /**
+   * Permanently remove this account's synced data (files first, then records, so a failed run can simply be retried).
+   * Throws on any error; nothing is reported as deleted unless it was.
+   */
   async deleteAll(): Promise<void> {
     const uid = await this.userId();
+    const bucket = this.client.storage.from(BUCKET);
+    const PAGE = 100;
+    const listAll = async (prefix: string) => {
+      const names: string[] = [];
+      for (let offset = 0; ; offset += PAGE) {
+        const { data, error } = await bucket.list(prefix, { limit: PAGE, offset });
+        if (error) throw new Error(error.message);
+        names.push(...(data ?? []).map((f) => f.name));
+        if ((data?.length ?? 0) < PAGE) return names;
+      }
+    };
+    for (const folder of await listAll(uid)) {
+      const files = await listAll(`${uid}/${folder}`);
+      for (let i = 0; i < files.length; i += PAGE) {
+        const { error } = await bucket.remove(files.slice(i, i + PAGE).map((f) => `${uid}/${folder}/${f}`));
+        if (error) throw new Error(error.message);
+      }
+    }
     const { error } = await this.client.from('sync_records').delete().eq('user_id', uid);
     if (error) throw new Error(error.message);
-    const { data: tenants } = await this.client.storage.from(BUCKET).list(uid);
-    for (const folder of tenants ?? []) {
-      const { data: files } = await this.client.storage.from(BUCKET).list(`${uid}/${folder.name}`, { limit: 1000 });
-      const paths = (files ?? []).map((f) => `${uid}/${folder.name}/${f.name}`);
-      if (paths.length) await this.client.storage.from(BUCKET).remove(paths);
-    }
   }
 }

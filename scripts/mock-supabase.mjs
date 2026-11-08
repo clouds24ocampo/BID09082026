@@ -140,6 +140,8 @@ export async function startMockSupabase(port = 54321) {
     url: `http://127.0.0.1:${port}`,
     stats,
     rows: () => [...rows.values()],
+    /** Insert a record as if the server returned it (used to prove clients reject foreign data). */
+    inject: (email, rec) => { rows.set(`${users.get(email).id}\n${rec.key}`, { deleted: false, payload: null, ...rec, server_seq: ++seq }); },
     files: () => [...files.keys()],
     close: () => new Promise((r) => { server.closeAllConnections?.(); server.close(r); }),
   };

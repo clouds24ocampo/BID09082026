@@ -1,11 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import type { Tenant } from '../types';
+import { isApproverRole, type Tenant } from '../types';
 import { SyncEngine, emptyState, type StateStore, type SyncState } from './engine';
 import { BrowserLocal } from './localAdapter';
 import { installStorageTracker, onStorageWrite, onVaultEvent, rawStorage } from './hooks';
 import {
-  SupabaseRemote, getClient, getSyncConfig, saveSyncConfig, validateConfig, type SyncConfig,
+  SupabaseRemote, getClient, getSyncConfig, hostOf, saveSyncConfig, validateConfig, type SyncConfig,
 } from './supabaseRemote';
 
 export type SyncStatus = 'unconfigured' | 'signed-out' | 'offline' | 'syncing' | 'synced' | 'pending' | 'error';
@@ -13,7 +13,11 @@ type Result = { success: boolean; error?: string };
 
 export interface SyncContextValue {
   configured: boolean;
+  /** Host of the online project data is sent to (shown wherever credentials are entered). */
+  host?: string;
   linked: boolean;
+  /** Only a company owner or manager may connect, disconnect, or change the online project. */
+  canManage: boolean;
   email?: string;
   status: SyncStatus;
   pending: number;
@@ -24,7 +28,8 @@ export interface SyncContextValue {
   needsReload: boolean;
   saveConfig: (cfg: SyncConfig | null) => string | null;
   connect: (email: string, password: string, mode: 'signin' | 'signup') => Promise<Result>;
-  restoreFromCloud: (email: string, password: string) => Promise<Result>;
+  /** `cfgOverride` is used for this attempt only and saved only if the restore succeeds. */
+  restoreFromCloud: (email: string, password: string, cfgOverride?: SyncConfig) => Promise<Result>;
   disconnect: () => Promise<void>;
   syncNow: () => Promise<void>;
   deleteCloudCopy: () => Promise<Result>;
@@ -35,6 +40,7 @@ export interface SyncContextValue {
 const DISABLED: SyncContextValue = {
   configured: false,
   linked: false,
+  canManage: false,
   status: 'unconfigured',
   pending: 0,
   tooLarge: 0,
@@ -58,7 +64,9 @@ const MAX_BACKOFF_MS = 10 * 60_000;
 
 installStorageTracker();
 
-const readLink = (tenantId: string): { email: string } | null => {
+type Link = { email: string; userId?: string };
+
+const readLink = (tenantId: string): Link | null => {
   try {
     const v = JSON.parse(localStorage.getItem(linkKey(tenantId)) || 'null');
     return v?.email ? v : null;
@@ -97,7 +105,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const tenantId = auth.currentTenant?.id;
 
   const [cfg, setCfg] = useState<SyncConfig | null>(() => getSyncConfig());
-  const [link, setLink] = useState<{ email: string } | null>(() => (tenantId ? readLink(tenantId) : null));
+  const [link, setLink] = useState<Link | null>(() => (tenantId ? readLink(tenantId) : null));
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const [syncing, setSyncing] = useState(false);
   const [signedOut, setSignedOut] = useState(false);
@@ -172,7 +180,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const adapter = new BrowserLocal(tenantId);
       await adapter.init();
       if (cancelled) return;
-      const engine = new SyncEngine(tenantId, new SupabaseRemote(getClient(cfg)), adapter.local, stateStore(tenantId));
+      const engine = new SyncEngine(tenantId, new SupabaseRemote(getClient(cfg, tenantId), link.userId), adapter.local, stateStore(tenantId));
       engineRef.current = engine;
       const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(`bidocs-sync-${tenantId}`) : null;
 
@@ -230,87 +238,104 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (online && engineRef.current) void runSync();
   }, [online, runSync]);
 
-  const withClient = <T,>(fn: (remote: SupabaseRemote, client: ReturnType<typeof getClient>) => Promise<T>) => {
-    if (!cfg) throw new Error('Online sync is not configured.');
-    const client = getClient(cfg);
-    return fn(new SupabaseRemote(client), client);
-  };
+  const canManage = isApproverRole(auth.currentUser?.role);
+  const denied: Result = { success: false, error: 'Only a company owner or manager can change online sync settings.' };
 
   const connect: SyncContextValue['connect'] = async (email, password, mode) => {
     if (!tenantId || !auth.currentTenant) return { success: false, error: 'Sign in to a company first.' };
+    if (!canManage) return denied;
     if (!cfg) return { success: false, error: 'Enter the online project URL and key first.' };
+    const client = getClient(cfg, tenantId); // this company's own online session
     try {
-      return await withClient(async (remote, client) => {
-        const cleanEmail = email.trim().toLowerCase();
-        if (mode === 'signup') {
-          const { data, error: err } = await client.auth.signUp({
-            email: cleanEmail, password, options: { data: { full_name: auth.currentUser?.fullName ?? '' } },
-          });
-          if (err) return { success: false, error: friendly(err) };
-          if (!data.session) return { success: false, error: 'Account created. Confirm your email, then choose "Sign in".' };
-        } else {
-          const { error: err } = await client.auth.signInWithPassword({ email: cleanEmail, password });
-          if (err) return { success: false, error: friendly(err) };
-        }
-        // One online account = one company: refuse to mix data from different companies.
-        const tenants = (await remote.listTenantRecords()).filter((t) => !t.deleted);
-        if (tenants.some((t) => t.id !== tenantId)) {
-          await client.auth.signOut();
-          return { success: false, error: 'This online account already belongs to a different company.' };
-        }
-        const local = new BrowserLocal(tenantId);
-        await local.init();
-        const engine = new SyncEngine(tenantId, remote, local.local, stateStore(tenantId));
-        engine.enqueueExisting(await local.enumerate());
-        rawStorage.set(linkKey(tenantId), JSON.stringify({ email: cleanEmail, linkedAt: Date.now() }));
-        setLink({ email: cleanEmail });
-        setSignedOut(false);
-        return { success: true };
-      });
+      const cleanEmail = email.trim().toLowerCase();
+      let userId: string | undefined;
+      if (mode === 'signup') {
+        const { data, error: err } = await client.auth.signUp({
+          email: cleanEmail, password, options: { data: { full_name: auth.currentUser?.fullName ?? '' } },
+        });
+        if (err) return { success: false, error: friendly(err) };
+        if (!data.session) return { success: false, error: 'Account created. Confirm your email, then choose "Sign in".' };
+        userId = data.session.user.id;
+      } else {
+        const { data, error: err } = await client.auth.signInWithPassword({ email: cleanEmail, password });
+        if (err) return { success: false, error: friendly(err) };
+        userId = data.session?.user.id;
+      }
+      if (!userId) return { success: false, error: 'Sign-in did not return an account.' };
+      const remote = new SupabaseRemote(client, userId);
+      // One online account = one company: refuse to mix data from different companies.
+      const tenants = (await remote.listTenantRecords()).filter((t) => !t.deleted);
+      if (tenants.some((t) => t.id !== tenantId)) {
+        await client.auth.signOut({ scope: 'local' });
+        return { success: false, error: 'This online account already belongs to a different company.' };
+      }
+      const local = new BrowserLocal(tenantId);
+      await local.init();
+      const engine = new SyncEngine(tenantId, remote, local.local, stateStore(tenantId));
+      engine.enqueueExisting(await local.enumerate());
+      rawStorage.set(linkKey(tenantId), JSON.stringify({ email: cleanEmail, userId, linkedAt: Date.now() }));
+      setLink({ email: cleanEmail, userId });
+      setSignedOut(false);
+      return { success: true };
     } catch (e) {
       return { success: false, error: friendly(e) };
     }
   };
 
-  const restoreFromCloud: SyncContextValue['restoreFromCloud'] = async (email, password) => {
-    if (!cfg) return { success: false, error: 'Enter the online project URL and key first.' };
+  const restoreFromCloud: SyncContextValue['restoreFromCloud'] = async (email, password, cfgOverride) => {
+    const config = cfgOverride ?? cfg;
+    if (!config) return { success: false, error: 'Enter the online project URL and key first.' };
+    const problem = validateConfig(config);
+    if (problem) return { success: false, error: problem };
+    const temp = getClient(config, null); // throwaway: nothing is stored unless the restore succeeds
     try {
-      return await withClient(async (remote, client) => {
-        const cleanEmail = email.trim().toLowerCase();
-        const { data, error: err } = await client.auth.signInWithPassword({ email: cleanEmail, password });
-        if (err) return { success: false, error: friendly(err) };
-        const tenants = (await remote.listTenantRecords()).filter((t) => !t.deleted && t.payload);
-        if (tenants.length !== 1) {
-          await client.auth.signOut();
-          return { success: false, error: 'No company data was found in this online account.' };
-        }
-        const tenant = tenants[0].payload as Tenant;
-        const fullName = String(data.user?.user_metadata?.full_name || cleanEmail);
-        rawStorage.set(linkKey(tenant.id), JSON.stringify({ email: cleanEmail, linkedAt: Date.now() }));
-        const res = await auth.importCloudCompany(tenant, { email: cleanEmail, fullName, password });
-        if (!res.success) await client.auth.signOut();
+      const cleanEmail = email.trim().toLowerCase();
+      const { data, error: err } = await temp.auth.signInWithPassword({ email: cleanEmail, password });
+      if (err) return { success: false, error: friendly(err) };
+      const session = data.session;
+      const userId = data.user?.id;
+      if (!session || !userId) return { success: false, error: 'Sign-in did not return an account.' };
+      const tenants = (await new SupabaseRemote(temp, userId).listTenantRecords()).filter((t) => !t.deleted && t.payload);
+      if (tenants.length !== 1) return { success: false, error: 'No company data was found in this online account.' };
+      const tenant = tenants[0].payload as Tenant;
+
+      // Bind a per-company session and link first (the engine starts once the company exists), undo on failure.
+      const tenantClient = getClient(config, tenant.id);
+      const { error: sErr } = await tenantClient.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token });
+      if (sErr) return { success: false, error: friendly(sErr) };
+      rawStorage.set(linkKey(tenant.id), JSON.stringify({ email: cleanEmail, userId, linkedAt: Date.now() }));
+      const fullName = String(data.user?.user_metadata?.full_name || cleanEmail);
+      const res = await auth.importCloudCompany(tenant, { email: cleanEmail, fullName, password });
+      if (!res.success) {
+        rawStorage.remove(linkKey(tenant.id));
+        await tenantClient.auth.signOut({ scope: 'local' }).catch(() => undefined);
         return res;
-      });
+      }
+      if (cfgOverride) saveSyncConfig(cfgOverride); // persisted only now that the restore worked
+      setCfg(getSyncConfig());
+      return res;
     } catch (e) {
       return { success: false, error: friendly(e) };
+    } finally {
+      await temp.auth.signOut({ scope: 'local' }).catch(() => undefined);
     }
   };
 
   const disconnect = async () => {
-    if (cfg) await getClient(cfg).auth.signOut().catch(() => undefined);
-    if (tenantId) {
-      rawStorage.remove(linkKey(tenantId));
-      rawStorage.remove(stateKey(tenantId));
-    }
+    if (!canManage || !tenantId) return;
+    if (cfg) await getClient(cfg, tenantId).auth.signOut({ scope: 'local' }).catch(() => undefined);
+    rawStorage.remove(linkKey(tenantId));
+    rawStorage.remove(stateKey(tenantId));
     setLink(null);
     setPending(0);
     setError(undefined);
   };
 
   const deleteCloudCopy: SyncContextValue['deleteCloudCopy'] = async () => {
+    if (!canManage || !tenantId || !cfg) return denied;
     try {
-      await withClient((remote) => remote.deleteAll());
-      if (tenantId) rawStorage.remove(stateKey(tenantId));
+      // The remote is bound to the account this company was linked with; a different session is refused.
+      await new SupabaseRemote(getClient(cfg, tenantId), link?.userId).deleteAll();
       await disconnect();
       return { success: true };
     } catch (e) {
@@ -337,6 +362,8 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value = useMemo<SyncContextValue>(
     () => ({
       configured: !!cfg,
+      host: hostOf(cfg),
+      canManage,
       linked: !!link,
       email: link?.email,
       status,
@@ -346,6 +373,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       tooLarge,
       needsReload,
       saveConfig: (c) => {
+        if (tenantId && !canManage) return denied.error!;
         if (c) {
           const problem = validateConfig(c);
           if (problem) return problem;
@@ -361,7 +389,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       deleteCloudCopy,
       reload: () => window.location.reload(),
     }),
-    [cfg, link, status, pending, lastSyncAt, error, tooLarge, needsReload, tenantId, auth.currentTenant, auth.currentUser, runSync],
+    [cfg, link, status, pending, lastSyncAt, error, tooLarge, needsReload, tenantId, canManage, auth.currentTenant, auth.currentUser, runSync],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

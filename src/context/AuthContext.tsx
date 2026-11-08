@@ -392,25 +392,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     const pwError = validatePassword(userData.password);
     if (pwError) return { success: false, error: pwError };
-    const existing = allUsers.find((u) => u.email.toLowerCase() === email);
-    if (existing && existing.tenantId !== tenant.id) {
-      return { success: false, error: "This email already belongs to a different company on this device." };
+    // Restore only creates a company this device does not have. A company or login that already exists here
+    // must be opened with its local password: an online sign-in never replaces local credentials.
+    if (allTenants.some((t) => t.id === tenant.id) || allUsers.some((u) => u.email.toLowerCase() === email)) {
+      return {
+        success: false,
+        error: "This company or email already exists on this device. Use Log in with your local password.",
+      };
     }
-    const hash = await hashPassword(userData.password);
-    const user: StoredUser = existing
-      ? { ...existing, ...hash, mustChangePassword: false, lastLoginAt: new Date().toISOString() }
-      : {
-          id: uid("user"),
-          tenantId: tenant.id,
-          email,
-          fullName: userData.fullName.trim() || email,
-          role: "COMPANY_OWNER",
-          ...hash,
-          mustChangePassword: false,
-          lastLoginAt: new Date().toISOString(),
-        };
-    setAllTenants((prev) => (prev.some((t) => t.id === tenant.id) ? prev.map((t) => (t.id === tenant.id ? tenant : t)) : [...prev, tenant]));
-    setAllUsers((prev) => (existing ? prev.map((u) => (u.id === user.id ? user : u)) : [...prev, user]));
+    const user: StoredUser = {
+      id: uid("user"),
+      tenantId: tenant.id,
+      email,
+      fullName: userData.fullName.trim() || email,
+      role: "COMPANY_OWNER",
+      ...(await hashPassword(userData.password)),
+      mustChangePassword: false,
+      lastLoginAt: new Date().toISOString(),
+    };
+    setAllTenants((prev) => [...prev, tenant]);
+    setAllUsers((prev) => [...prev, user]);
     startSession(user);
     return { success: true };
   };
