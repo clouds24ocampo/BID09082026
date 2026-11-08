@@ -166,6 +166,18 @@ try {
   }, [evilKey, tenantId]);
   check('Foreign-company records from the server are ignored', evil.ls === null && evil.item === false, JSON.stringify(evil));
 
+  // ---------------- A device whose online project changes must not keep using the old link or session ----------------
+  const pushesBefore = mock.stats.pushes;
+  await B.page.evaluate(() => localStorage.setItem('bidocs_sync_config', JSON.stringify({ url: 'http://localhost:54321', anonKey: 'mock-anon-key-for-tests-000000' })));
+  await B.page.reload({ waitUntil: 'networkidle' });
+  await B.page.click('#user-profile-menu-btn');
+  await B.page.click('button:has-text("Tenant & Branding Settings")');
+  const swapped = await until(async () => (await B.page.locator('section[aria-labelledby="sync-title"]').innerText()).includes('Sign in'), 15000);
+  await lsSet(B.page, `bidocs_boq_${tenantId}_REF-1`, JSON.stringify({ rows: [9] }));
+  await sleep(3500);
+  check('Project change: company shows as not connected and sends nothing to the new project', !!swapped && mock.stats.pushes === pushesBefore);
+  await B.page.evaluate((c) => localStorage.setItem('bidocs_sync_config', c), cfg);
+
   // ---------------- Restore never replaces a company or login that already exists on a device ----------------
   const C = await device('C');
   await C.page.evaluate(() => sessionStorage.setItem('bidocs_auth_mode', 'register'));

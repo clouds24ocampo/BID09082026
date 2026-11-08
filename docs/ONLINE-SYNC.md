@@ -70,8 +70,8 @@ device clocks should be roughly correct; the unit of upload for a vault file is 
 - Row level security restricts every table row and storage object to its owner (`auth.uid()`); the anon key alone grants nothing.
 - Data is protected in transit (TLS) and at rest by Supabase, but it is **not end-to-end encrypted**: the backend operator can read it.
   Decide whether that is acceptable for your procurement documents before enabling sync.
-- Each company has its own online session on a device (`sb-bidocs-auth-<company id>`), bound to the account it was linked with,
-  and is never synced. "Disconnect this device" signs out that device only, not your other devices.
+- Each company has its own online session on a device, stored per online project and company, bound to the account it was linked with,
+  and never synced. If the device's online project is changed, companies linked to the old project show as not connected and send nothing to the new one. "Disconnect this device" signs out that device only, not your other devices.
 - Only a company owner or manager can connect, disconnect, change the online project or delete the online copy.
   Other roles see a read-only status.
 - Records from the server are applied only if they belong to this company (company id, item ids and payload ids must match).

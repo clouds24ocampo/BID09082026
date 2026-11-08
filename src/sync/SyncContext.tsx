@@ -64,7 +64,7 @@ const MAX_BACKOFF_MS = 10 * 60_000;
 
 installStorageTracker();
 
-type Link = { email: string; userId?: string };
+type Link = { email: string; userId?: string; host?: string };
 
 const readLink = (tenantId: string): Link | null => {
   try {
@@ -105,7 +105,7 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const tenantId = auth.currentTenant?.id;
 
   const [cfg, setCfg] = useState<SyncConfig | null>(() => getSyncConfig());
-  const [link, setLink] = useState<Link | null>(() => (tenantId ? readLink(tenantId) : null));
+  const [storedLink, setLink] = useState<Link | null>(() => (tenantId ? readLink(tenantId) : null));
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const [syncing, setSyncing] = useState(false);
   const [signedOut, setSignedOut] = useState(false);
@@ -114,6 +114,9 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [lastSyncAt, setLastSyncAt] = useState<number | undefined>();
   const [tooLarge, setTooLarge] = useState(0);
   const [needsReload, setNeedsReload] = useState(false);
+
+  // A link belongs to the project it was made with; if the device's project changed, the company counts as not connected.
+  const link = storedLink && (!storedLink.host || storedLink.host === hostOf(cfg)) ? storedLink : null;
 
   const engineRef = useRef<SyncEngine | null>(null);
   const failures = useRef(0);
@@ -273,8 +276,9 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await local.init();
       const engine = new SyncEngine(tenantId, remote, local.local, stateStore(tenantId));
       engine.enqueueExisting(await local.enumerate());
-      rawStorage.set(linkKey(tenantId), JSON.stringify({ email: cleanEmail, userId, linkedAt: Date.now() }));
-      setLink({ email: cleanEmail, userId });
+      const host = hostOf(cfg);
+      rawStorage.set(linkKey(tenantId), JSON.stringify({ email: cleanEmail, userId, host, linkedAt: Date.now() }));
+      setLink({ email: cleanEmail, userId, host });
       setSignedOut(false);
       return { success: true };
     } catch (e) {
@@ -298,22 +302,32 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const tenants = (await new SupabaseRemote(temp, userId).listTenantRecords()).filter((t) => !t.deleted && t.payload);
       if (tenants.length !== 1) return { success: false, error: 'No company data was found in this online account.' };
       const tenant = tenants[0].payload as Tenant;
-
-      // Bind a per-company session and link first (the engine starts once the company exists), undo on failure.
-      const tenantClient = getClient(config, tenant.id);
-      const { error: sErr } = await tenantClient.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token });
-      if (sErr) return { success: false, error: friendly(sErr) };
-      rawStorage.set(linkKey(tenant.id), JSON.stringify({ email: cleanEmail, userId, linkedAt: Date.now() }));
-      const fullName = String(data.user?.user_metadata?.full_name || cleanEmail);
-      const res = await auth.importCloudCompany(tenant, { email: cleanEmail, fullName, password });
-      if (!res.success) {
-        rawStorage.remove(linkKey(tenant.id));
-        await tenantClient.auth.signOut({ scope: 'local' }).catch(() => undefined);
-        return res;
+      // Nothing below may touch an existing company's session or link: refuse before any of it is created.
+      if (auth.companyExistsOnDevice(tenant?.id, cleanEmail)) {
+        return { success: false, error: 'This company or email already exists on this device. Use Log in with your local password.' };
       }
-      if (cfgOverride) saveSyncConfig(cfgOverride); // persisted only now that the restore worked
-      setCfg(getSyncConfig());
-      return res;
+
+      // Bind a per-company session and link first (the engine starts once the company exists); undone on any failure.
+      const tenantClient = getClient(config, tenant.id);
+      const linkRecord = JSON.stringify({ email: cleanEmail, userId, host: hostOf(config), linkedAt: Date.now() });
+      let restored = false;
+      try {
+        const { error: sErr } = await tenantClient.auth.setSession({ access_token: session.access_token, refresh_token: session.refresh_token });
+        if (sErr) return { success: false, error: friendly(sErr) };
+        rawStorage.set(linkKey(tenant.id), linkRecord);
+        const fullName = String(data.user?.user_metadata?.full_name || cleanEmail);
+        const res = await auth.importCloudCompany(tenant, { email: cleanEmail, fullName, password });
+        restored = res.success;
+        if (!res.success) return res;
+        if (cfgOverride) saveSyncConfig(cfgOverride); // persisted only now that the restore worked
+        setCfg(getSyncConfig());
+        return res;
+      } finally {
+        if (!restored) {
+          rawStorage.remove(linkKey(tenant.id));
+          await tenantClient.auth.signOut({ scope: 'local' }).catch(() => undefined);
+        }
+      }
     } catch (e) {
       return { success: false, error: friendly(e) };
     } finally {

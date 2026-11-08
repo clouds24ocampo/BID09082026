@@ -130,7 +130,9 @@ interface AuthContextType {
   updateUserPassword: (userId: string, newPassword: string) => Promise<Result>;
   /** Permanently deletes the signed-in company, its accounts and all of its data on this device. */
   deleteCompany: () => Promise<void>;
-  /** Creates (or refreshes) a company restored from the online account, with a local owner login, and signs in. */
+  /** True when this company id or login email already exists on this device (restore must not touch it). */
+  companyExistsOnDevice: (tenantId: string, email: string) => boolean;
+  /** Creates a company restored from the online account, with a new local owner login, and signs in. */
   importCloudCompany: (
     tenant: Tenant,
     userData: { email: string; fullName: string; password: string },
@@ -385,6 +387,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true };
   };
 
+  const companyExistsOnDevice = (tenantId: string, email: string) =>
+    allTenants.some((t) => t.id === tenantId) || allUsers.some((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+
   const importCloudCompany: AuthContextType["importCloudCompany"] = async (tenant, userData) => {
     const email = userData.email.trim().toLowerCase();
     if (!tenant || typeof tenant.id !== "string" || !tenant.id.startsWith("tenant-") || !tenant.companyName) {
@@ -463,6 +468,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateUserPassword,
         deleteCompany,
         importCloudCompany,
+        companyExistsOnDevice,
       }}
     >
       {children}

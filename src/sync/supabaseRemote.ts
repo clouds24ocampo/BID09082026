@@ -74,7 +74,8 @@ export function getClient(cfg: SyncConfig, scope: string | null): SupabaseClient
         persistSession: scope !== null,
         autoRefreshToken: scope !== null,
         detectSessionInUrl: false,
-        storageKey: `sb-bidocs-auth-${scope ?? 'restore'}`,
+        // project host + company: a stored session can never be loaded by, or sent to, a different project
+        storageKey: `sb-bidocs-${hostOf(cfg) ?? 'unknown'}-${scope ?? 'restore'}`,
       },
     });
     clients.set(key, c);
